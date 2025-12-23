@@ -25,7 +25,7 @@ if (!isset($_SESSION['user_role'])) {
 
 // --- Role-based page access control ---
 $current_page = basename($_SERVER['PHP_SELF']);
-$admin_only_pages = ['users.php', 'email_notifications.php', 'create-device.php', 'edit-device.php', 'license_management.php', 'code_updates.php']; // Add license_management.php here
+$admin_only_pages = ['users.php', 'email_notifications.php', 'email_logs.php', 'create-device.php', 'edit-device.php', 'license_management.php', 'code_updates.php'];
 
 if ($_SESSION['user_role'] !== 'admin' && in_array($current_page, $admin_only_pages)) {
     header('Location: index.php'); // Redirect non-admins from admin-only pages
