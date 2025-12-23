@@ -49,6 +49,21 @@ include 'header.php';
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Top Hosts by Resource Usage -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-semibold text-white">
+                                <i class="fas fa-microchip text-cyan-400 mr-2"></i>Top Hosts by Usage
+                            </h2>
+                            <a href="host_metrics.php" class="text-sm text-cyan-400 hover:underline">View All</a>
+                        </div>
+                        <div id="topHostsWidget">
+                            <div class="text-center py-4 text-slate-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Loading...
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Ping Test -->
                     <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
                         <h2 class="text-xl font-semibold text-white mb-4">Manual Ping Test</h2>
@@ -62,7 +77,9 @@ include 'header.php';
                             <pre id="pingResultPre" class="bg-slate-900/50 text-white text-sm p-4 rounded-lg overflow-x-auto"></pre>
                         </div>
                     </div>
+                </div>
 
+                <div class="grid grid-cols-1 lg:grid-cols-1 gap-8 mt-8">
                     <!-- Recent Activity -->
                     <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
                         <h2 class="text-xl font-semibold text-white mb-4">Recent Activity</h2>

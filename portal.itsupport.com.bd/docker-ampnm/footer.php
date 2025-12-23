@@ -20,8 +20,10 @@
     <script src="assets/js/map/mapManager.js"></script>
     <script src="assets/js/map/network.js"></script>
     <script src="assets/js/map/legend.js"></script>
+    <script src="assets/js/map/deviceInfoPanel.js"></script>
     <script src="assets/js/device-metrics-panel.js"></script>
     <script src="assets/js/map.js"></script>
+    <script src="assets/js/dashboard-widgets.js"></script>
 
     <script src="assets/js/network_graphs.js"></script>
     <script src="assets/js/users.js"></script>
