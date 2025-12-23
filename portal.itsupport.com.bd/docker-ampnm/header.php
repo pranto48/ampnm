@@ -19,6 +19,7 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/device-metrics.css">
 </head>
 <body class="bg-slate-900 text-slate-300 min-h-screen">
     <nav class="bg-slate-800/50 backdrop-blur-lg shadow-lg sticky top-0 z-50">
