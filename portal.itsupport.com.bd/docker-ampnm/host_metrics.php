@@ -637,7 +637,7 @@ function fallbackCopy(text) {
 }
 
 function downloadAgent() {
-    window.open('assets/windows-agent/AMPNM-Agent-Installer.ps1', '_blank');
+    window.location.href = 'download-agent.php?file=AMPNM-Agent-Installer.ps1';
 }
 
 // Alert Settings Management
