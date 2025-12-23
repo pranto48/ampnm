@@ -43,24 +43,67 @@ function renderMap({ map, devices, edges }) {
     mapSubtitle.textContent = map?.public_view_enabled ? "Public viewing enabled" : "Read-only preview";
     metaSummary.textContent = `${devices.length} devices • ${edges.length} links`;
 
+    // Font Awesome icon mapping based on device type and subchoice
+    const iconLibrary = {
+        switch: ['fa-network-wired', 'fa-diagram-project', 'fa-sitemap', 'fa-bezier-curve', 'fa-code-branch', 'fa-shuffle', 'fa-arrows-split-up-and-left', 'fa-circle-nodes'],
+        router: ['fa-router', 'fa-globe', 'fa-wifi', 'fa-arrows-left-right', 'fa-share-nodes', 'fa-tower-broadcast', 'fa-earth-americas', 'fa-network-wired'],
+        server: ['fa-server', 'fa-database', 'fa-hard-drive', 'fa-microchip', 'fa-memory', 'fa-computer', 'fa-desktop', 'fa-hdd'],
+        computer: ['fa-desktop', 'fa-computer', 'fa-display', 'fa-tv', 'fa-laptop', 'fa-keyboard', 'fa-personal-computer', 'fa-monitor-waveform'],
+        laptop: ['fa-laptop', 'fa-laptop-code', 'fa-laptop-file', 'fa-laptop-medical', 'fa-display', 'fa-computer', 'fa-file-laptop', 'fa-note-laptop'],
+        phone: ['fa-mobile', 'fa-mobile-screen', 'fa-phone', 'fa-tablet', 'fa-mobile-retro', 'fa-tablet-screen-button', 'fa-mobile-alt', 'fa-tablet-alt'],
+        printer: ['fa-print', 'fa-fax', 'fa-file-export', 'fa-file-arrow-down', 'fa-scanner', 'fa-copy', 'fa-scroll', 'fa-rectangle-list'],
+        camera: ['fa-camera', 'fa-video', 'fa-webcam', 'fa-eye', 'fa-record-vinyl', 'fa-camera-retro', 'fa-camera-movie', 'fa-surveillance'],
+        firewall: ['fa-shield-halved', 'fa-shield', 'fa-lock', 'fa-user-shield', 'fa-fire', 'fa-fire-flame-curved', 'fa-shield-keyhole', 'fa-firewall'],
+        cloud: ['fa-cloud', 'fa-cloud-arrow-up', 'fa-cloud-arrow-down', 'fa-server', 'fa-globe', 'fa-network-wired', 'fa-cloud-bolt', 'fa-clouds'],
+        wifi: ['fa-wifi', 'fa-signal', 'fa-tower-broadcast', 'fa-satellite-dish', 'fa-broadcast-tower', 'fa-antenna', 'fa-wifi-strong', 'fa-signal-bars'],
+        storage: ['fa-hdd', 'fa-database', 'fa-layer-group', 'fa-cubes', 'fa-boxes-stacked', 'fa-archive', 'fa-warehouse', 'fa-vault'],
+        generic: ['fa-circle', 'fa-square', 'fa-diamond', 'fa-star', 'fa-bookmark', 'fa-tag', 'fa-certificate', 'fa-award']
+    };
+
+    const getIconClass = (type, subchoice) => {
+        const icons = iconLibrary[type] || iconLibrary.generic;
+        const index = parseInt(subchoice, 10) || 0;
+        return icons[index] || icons[0];
+    };
+
     const nodes = devices.map((device) => {
         const colorByStatus = {
             online: "#22c55e",
             offline: "#ef4444",
             warning: "#f59e0b",
+            critical: "#dc2626",
         };
-        return {
+
+        // Build node configuration
+        const nodeConfig = {
             id: device.id,
             label: device.name || device.ip || `Device ${device.id}`,
             title: buildTitle(device),
-            shape: device.icon_url ? "image" : "dot",
-            image: device.icon_url || undefined,
             size: device.icon_size ? Number(device.icon_size) / 1.5 : 18,
             x: device.x ?? undefined,
             y: device.y ?? undefined,
             font: { color: "#e2e8f0", size: device.name_text_size ? Number(device.name_text_size) : 14 },
             color: colorByStatus[device.status] || "#38bdf8",
         };
+
+        // Use custom icon_url if set, otherwise use Font Awesome icon
+        if (device.icon_url) {
+            nodeConfig.shape = "image";
+            nodeConfig.image = device.icon_url;
+        } else if (device.type) {
+            // Use Font Awesome icon based on type and subchoice
+            nodeConfig.shape = "icon";
+            nodeConfig.icon = {
+                face: "'Font Awesome 6 Free'",
+                code: getIconClass(device.type, device.subchoice || 0),
+                size: device.icon_size ? Number(device.icon_size) : 30,
+                color: colorByStatus[device.status] || "#38bdf8",
+            };
+        } else {
+            nodeConfig.shape = "dot";
+        }
+
+        return nodeConfig;
     });
 
     const edgeStyles = {
