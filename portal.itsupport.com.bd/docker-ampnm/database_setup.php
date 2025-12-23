@@ -241,6 +241,39 @@ try {
             `setting_value` TEXT NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // NEW TABLE FOR HOST METRICS (Windows Agent Monitoring)
+        "CREATE TABLE IF NOT EXISTS `host_metrics` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `device_id` INT(6) UNSIGNED NULL,
+            `host_name` VARCHAR(255) NOT NULL,
+            `host_ip` VARCHAR(45) NOT NULL,
+            `cpu_percent` DECIMAL(5,2) NULL,
+            `memory_percent` DECIMAL(5,2) NULL,
+            `memory_total_gb` DECIMAL(10,2) NULL,
+            `memory_free_gb` DECIMAL(10,2) NULL,
+            `disk_percent` DECIMAL(5,2) NULL,
+            `disk_total_gb` DECIMAL(10,2) NULL,
+            `disk_free_gb` DECIMAL(10,2) NULL,
+            `network_in_mbps` DECIMAL(10,2) NULL,
+            `network_out_mbps` DECIMAL(10,2) NULL,
+            `gpu_percent` DECIMAL(5,2) NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE SET NULL,
+            INDEX `idx_host_metrics_device` (`device_id`),
+            INDEX `idx_host_metrics_ip` (`host_ip`),
+            INDEX `idx_host_metrics_created` (`created_at` DESC)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // TABLE FOR AGENT TOKENS (authentication for Windows agents)
+        "CREATE TABLE IF NOT EXISTS `agent_tokens` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `token` VARCHAR(64) NOT NULL UNIQUE,
+            `name` VARCHAR(100) NOT NULL,
+            `enabled` BOOLEAN DEFAULT TRUE,
+            `last_used_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     ];
 

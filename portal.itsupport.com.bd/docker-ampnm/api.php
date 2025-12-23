@@ -11,6 +11,13 @@ try {
 
     // --- Public Actions (NO AUTH REQUIRED) ---
     // These actions must be handled and exit BEFORE any authentication checks.
+    
+    // Handle Windows Agent metrics submission (token-authenticated, no session)
+    if ($action === 'submit_metrics') {
+        require __DIR__ . '/api/handlers/metrics_handler.php';
+        exit;
+    }
+    
     if ($action === 'get_public_map_data') {
         $map_id = $_GET['map_id'] ?? null;
         if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required.']); exit; }
@@ -155,7 +162,8 @@ try {
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs'];
     $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
-    $licenseActions = ['get_current_license_info', 'update_app_license_key', 'force_license_recheck']; // Added license actions
+    $licenseActions = ['get_current_license_info', 'update_app_license_key', 'force_license_recheck'];
+    $metricsActions = ['get_latest_metrics', 'get_metrics_history', 'get_all_hosts', 'get_agent_tokens', 'create_agent_token', 'delete_agent_token', 'toggle_agent_token'];
 
     if (in_array($action, $pingActions)) {
         require __DIR__ . '/api/handlers/ping_handler.php';
@@ -171,8 +179,10 @@ try {
         require __DIR__ . '/api/handlers/log_handler.php';
     } elseif (in_array($action, $notificationActions)) {
         require __DIR__ . '/api/handlers/notification_handler.php';
-    } elseif (in_array($action, $licenseActions)) { // Handle new license actions
+    } elseif (in_array($action, $licenseActions)) {
         require __DIR__ . '/api/handlers/license_handler.php';
+    } elseif (in_array($action, $metricsActions)) {
+        require __DIR__ . '/api/handlers/metrics_handler.php';
     } elseif ($action === 'health') {
         echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
     } else {
