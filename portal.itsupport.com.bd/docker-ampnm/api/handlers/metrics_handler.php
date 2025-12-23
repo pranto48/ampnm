@@ -82,12 +82,14 @@ function cleanupOldMetrics($pdo, $daysToKeep = 7) {
     return $stmt->rowCount();
 }
 
+// Parse input early for all actions that need it
+$input = json_decode(file_get_contents('php://input'), true) ?? [];
+
 // Handle different actions
 switch ($action) {
     case 'submit_metrics':
         // Accept metrics from Windows agent
         $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
-        $input = json_decode(file_get_contents('php://input'), true) ?? [];
         
         // Validate token
         $tokenInfo = validateAgentToken($pdo, $token);
