@@ -41,7 +41,7 @@ MapApp.utils = {
             return defaultIcon;
         }
 
-        // Get the type data
+        // Get the type data (flat structure: library[deviceType])
         const typeData = window.deviceIconsLibrary[deviceType];
         if (!typeData || !typeData.icons) {
             console.warn(`Unknown device type: ${deviceType}`);

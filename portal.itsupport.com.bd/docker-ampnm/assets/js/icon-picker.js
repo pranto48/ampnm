@@ -1,25 +1,26 @@
 /**
  * Enhanced Icon Picker Component
  * Provides categorized icon selection for device management
+ * Works with flat device icons library structure
  */
 
 const IconPicker = {
     // Configuration
     config: {
         container: '#icon-picker-container',
-        categoryTabs: '#icon-category-tabs',
         deviceTabs: '#icon-device-tabs',
         gallery: '#icon-gallery',
         search: '#icon-search',
         preview: '#icon-preview',
         hiddenInput: '#selected-icon-id',
-        deviceTypeSelect: '#device-type'
+        subchoiceInput: '#selected-icon-subchoice',
+        iconClassInput: '#selected-icon-class',
+        deviceTypeSelect: '#type'
     },
     
     // State
     selectedIcon: null,
-    currentCategory: 'network',
-    currentDeviceType: null,
+    currentDeviceType: 'server',
     library: null,
     elements: {},
     
@@ -44,6 +45,9 @@ const IconPicker = {
         this.bindEvents();
         this.render();
         
+        // Check for pre-selected icon from hidden input
+        this.loadExistingSelection();
+        
         console.log('IconPicker: Initialized successfully');
     },
     
@@ -52,13 +56,39 @@ const IconPicker = {
      */
     cacheElements: function() {
         this.elements.container = document.querySelector(this.config.container);
-        this.elements.categoryTabs = document.querySelector(this.config.categoryTabs);
         this.elements.deviceTabs = document.querySelector(this.config.deviceTabs);
         this.elements.gallery = document.querySelector(this.config.gallery);
         this.elements.search = document.querySelector(this.config.search);
         this.elements.preview = document.querySelector(this.config.preview);
         this.elements.hiddenInput = document.querySelector(this.config.hiddenInput);
+        this.elements.subchoiceInput = document.querySelector(this.config.subchoiceInput);
+        this.elements.iconClassInput = document.querySelector(this.config.iconClassInput);
         this.elements.deviceTypeSelect = document.querySelector(this.config.deviceTypeSelect);
+    },
+    
+    /**
+     * Load existing selection from hidden inputs or device type select
+     */
+    loadExistingSelection: function() {
+        // Get the current device type from the select dropdown
+        if (this.elements.deviceTypeSelect) {
+            const deviceType = this.elements.deviceTypeSelect.value;
+            if (deviceType && this.library[deviceType]) {
+                this.switchDeviceType(deviceType);
+            }
+        }
+        
+        // If there's a pre-selected subchoice, select that icon
+        if (this.elements.subchoiceInput) {
+            const subchoice = parseInt(this.elements.subchoiceInput.value, 10) || 0;
+            const typeData = this.library[this.currentDeviceType];
+            if (typeData && typeData.icons && typeData.icons[subchoice]) {
+                const icon = typeData.icons[subchoice];
+                // Generate icon ID
+                const iconId = this.currentDeviceType + '-' + subchoice;
+                this.selectIcon(iconId, this.currentDeviceType, icon.icon, subchoice, false);
+            }
+        }
     },
     
     /**
@@ -68,7 +98,7 @@ const IconPicker = {
         // Device type select change
         if (this.elements.deviceTypeSelect) {
             this.elements.deviceTypeSelect.addEventListener('change', (e) => {
-                this.switchToDeviceType(e.target.value);
+                this.switchDeviceType(e.target.value);
             });
         }
         
@@ -79,17 +109,6 @@ const IconPicker = {
             });
         }
         
-        // Category tab clicks (delegated)
-        if (this.elements.categoryTabs) {
-            this.elements.categoryTabs.addEventListener('click', (e) => {
-                const tab = e.target.closest('.icon-category-tab');
-                if (tab) {
-                    const category = tab.dataset.category;
-                    this.switchCategory(category);
-                }
-            });
-        }
-        
         // Device type tab clicks (delegated)
         if (this.elements.deviceTabs) {
             this.elements.deviceTabs.addEventListener('click', (e) => {
@@ -97,6 +116,10 @@ const IconPicker = {
                 if (tab) {
                     const deviceType = tab.dataset.type;
                     this.switchDeviceType(deviceType);
+                    // Update select dropdown
+                    if (this.elements.deviceTypeSelect) {
+                        this.elements.deviceTypeSelect.value = deviceType;
+                    }
                 }
             });
         }
@@ -106,7 +129,11 @@ const IconPicker = {
             this.elements.gallery.addEventListener('click', (e) => {
                 const btn = e.target.closest('.icon-gallery-btn');
                 if (btn) {
-                    this.selectIcon(btn.dataset.iconId, btn.dataset.deviceType, btn.dataset.iconClass);
+                    const iconId = btn.dataset.iconId;
+                    const deviceType = btn.dataset.deviceType;
+                    const iconClass = btn.dataset.iconClass;
+                    const iconIndex = parseInt(btn.dataset.iconIndex, 10) || 0;
+                    this.selectIcon(iconId, deviceType, iconClass, iconIndex, true);
                 }
             });
         }
@@ -116,48 +143,30 @@ const IconPicker = {
      * Render the complete picker UI
      */
     render: function() {
-        this.renderCategoryTabs();
-        this.renderDeviceTypeTabs(this.currentCategory);
+        this.renderDeviceTypeTabs();
         
-        // Set initial device type
-        const firstType = this.library.categories[this.currentCategory].types[0];
-        this.currentDeviceType = firstType;
-        this.renderIconGallery(firstType);
-    },
-    
-    /**
-     * Render category tabs
-     */
-    renderCategoryTabs: function() {
-        if (!this.elements.categoryTabs) return;
-        
-        let html = '';
-        for (const [key, category] of Object.entries(this.library.categories)) {
-            const activeClass = key === this.currentCategory ? 'active' : '';
-            html += `
-                <button type="button" class="icon-category-tab ${activeClass}" data-category="${key}">
-                    <i class="fas ${category.icon}"></i>
-                    <span>${category.label}</span>
-                </button>
-            `;
+        // Set initial device type from select or use first
+        if (this.elements.deviceTypeSelect) {
+            this.currentDeviceType = this.elements.deviceTypeSelect.value || 'server';
         }
-        this.elements.categoryTabs.innerHTML = html;
+        
+        this.renderIconGallery(this.currentDeviceType);
     },
     
     /**
-     * Render device type tabs for a category
+     * Render device type tabs
      */
-    renderDeviceTypeTabs: function(category) {
+    renderDeviceTypeTabs: function() {
         if (!this.elements.deviceTabs) return;
         
-        const categoryData = this.library.categories[category];
-        if (!categoryData) return;
-        
         let html = '';
-        categoryData.types.forEach((type, index) => {
-            const typeData = this.library.types[type];
+        const deviceTypes = Object.keys(this.library);
+        const initialType = this.elements.deviceTypeSelect?.value || 'server';
+        
+        deviceTypes.forEach(type => {
+            const typeData = this.library[type];
             if (typeData) {
-                const activeClass = index === 0 ? 'active' : '';
+                const activeClass = type === initialType ? 'active' : '';
                 html += `
                     <button type="button" class="icon-device-tab ${activeClass}" data-type="${type}">
                         ${typeData.label}
@@ -174,8 +183,8 @@ const IconPicker = {
     renderIconGallery: function(deviceType) {
         if (!this.elements.gallery) return;
         
-        const typeData = this.library.types[deviceType];
-        if (!typeData) {
+        const typeData = this.library[deviceType];
+        if (!typeData || !typeData.icons) {
             this.elements.gallery.innerHTML = `
                 <div class="icon-no-results">
                     <i class="fas fa-search"></i>
@@ -186,14 +195,20 @@ const IconPicker = {
         }
         
         let html = '';
-        typeData.icons.forEach(icon => {
-            const selectedClass = this.selectedIcon && this.selectedIcon.id === icon.id ? 'selected' : '';
+        typeData.icons.forEach((icon, index) => {
+            const iconId = deviceType + '-' + index;
+            // Check if this specific icon is selected
+            const isSelected = this.selectedIcon && 
+                               this.selectedIcon.id === iconId && 
+                               this.selectedIcon.deviceType === deviceType;
+            const selectedClass = isSelected ? 'selected' : '';
             html += `
                 <button type="button" 
                         class="icon-gallery-btn ${selectedClass}" 
-                        data-icon-id="${icon.id}" 
+                        data-icon-id="${iconId}" 
                         data-device-type="${deviceType}"
                         data-icon-class="${icon.icon}"
+                        data-icon-index="${index}"
                         title="${icon.label}">
                     <i class="fas ${icon.icon}"></i>
                     <span class="icon-label">${icon.label}</span>
@@ -204,24 +219,23 @@ const IconPicker = {
     },
     
     /**
-     * Switch to a category
+     * Switch to a device type
      */
-    switchCategory: function(category) {
-        if (!this.library.categories[category]) return;
+    switchDeviceType: function(deviceType) {
+        if (!this.library[deviceType]) return;
         
-        this.currentCategory = category;
+        this.currentDeviceType = deviceType;
         
-        // Update category tab states
-        const tabs = this.elements.categoryTabs.querySelectorAll('.icon-category-tab');
-        tabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.category === category);
-        });
+        // Update device tab states
+        if (this.elements.deviceTabs) {
+            const tabs = this.elements.deviceTabs.querySelectorAll('.icon-device-tab');
+            tabs.forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.type === deviceType);
+            });
+        }
         
-        // Render device type tabs and gallery
-        this.renderDeviceTypeTabs(category);
-        const firstType = this.library.categories[category].types[0];
-        this.currentDeviceType = firstType;
-        this.renderIconGallery(firstType);
+        // Render icon gallery
+        this.renderIconGallery(deviceType);
         
         // Clear search
         if (this.elements.search) {
@@ -230,73 +244,51 @@ const IconPicker = {
     },
     
     /**
-     * Switch to a device type
-     */
-    switchDeviceType: function(deviceType) {
-        if (!this.library.types[deviceType]) return;
-        
-        this.currentDeviceType = deviceType;
-        
-        // Update device tab states
-        const tabs = this.elements.deviceTabs.querySelectorAll('.icon-device-tab');
-        tabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.type === deviceType);
-        });
-        
-        // Render icon gallery
-        this.renderIconGallery(deviceType);
-        
-        // Update device type select if it exists
-        if (this.elements.deviceTypeSelect) {
-            this.elements.deviceTypeSelect.value = deviceType;
-        }
-    },
-    
-    /**
-     * Switch to device type (from select dropdown)
-     */
-    switchToDeviceType: function(deviceType) {
-        const typeData = this.library.types[deviceType];
-        if (!typeData) return;
-        
-        // Find and switch to the category
-        const category = typeData.category;
-        if (category !== this.currentCategory) {
-            this.switchCategory(category);
-        }
-        
-        // Switch to device type
-        this.switchDeviceType(deviceType);
-    },
-    
-    /**
      * Select an icon
      */
-    selectIcon: function(iconId, deviceType, iconClass) {
+    selectIcon: function(iconId, deviceType, iconClass, subchoice, animate = true) {
         // Update state
         this.selectedIcon = {
             id: iconId,
             deviceType: deviceType,
-            iconClass: iconClass
+            iconClass: iconClass,
+            subchoice: subchoice
         };
         
-        // Update hidden input
+        // Update hidden inputs
         if (this.elements.hiddenInput) {
             this.elements.hiddenInput.value = iconId;
         }
         
-        // Update gallery button states
+        if (this.elements.subchoiceInput) {
+            this.elements.subchoiceInput.value = subchoice;
+        }
+        
+        if (this.elements.iconClassInput) {
+            this.elements.iconClassInput.value = iconClass;
+        }
+        
+        // IMPORTANT: Clear ALL selected states from ALL buttons first
+        document.querySelectorAll('.icon-gallery-btn.selected').forEach(btn => {
+            btn.classList.remove('selected', 'just-selected');
+        });
+        
+        // Update current gallery button states - only select the ONE clicked button
         const buttons = this.elements.gallery.querySelectorAll('.icon-gallery-btn');
         buttons.forEach(btn => {
             btn.classList.remove('selected', 'just-selected');
-            if (btn.dataset.iconId === iconId) {
-                btn.classList.add('selected', 'just-selected');
-                setTimeout(() => btn.classList.remove('just-selected'), 300);
+            // Match by both iconId AND deviceType to ensure uniqueness
+            if (btn.dataset.iconId === iconId && btn.dataset.deviceType === deviceType) {
+                btn.classList.add('selected');
+                if (animate) {
+                    btn.classList.add('just-selected');
+                    setTimeout(() => btn.classList.remove('just-selected'), 300);
+                }
             }
         });
         
         // Update preview
-        this.updatePreview(iconId, iconClass);
+        this.updatePreview(iconId, iconClass, deviceType, subchoice);
         
         // Dispatch custom event
         const event = new CustomEvent('iconSelected', {
@@ -304,44 +296,32 @@ const IconPicker = {
         });
         document.dispatchEvent(event);
         
-        console.log('IconPicker: Selected icon', iconId);
+        console.log('IconPicker: Selected icon', iconId, 'subchoice:', subchoice);
     },
     
     /**
      * Update preview section
      */
-    updatePreview: function(iconId, iconClass) {
+    updatePreview: function(iconId, iconClass, deviceType, subchoice) {
         if (!this.elements.preview) return;
         
-        // Find icon data
-        let iconData = null;
-        let deviceType = null;
-        
-        for (const [type, data] of Object.entries(this.library.types)) {
-            const found = data.icons.find(i => i.id === iconId);
-            if (found) {
-                iconData = found;
-                deviceType = type;
-                break;
-            }
-        }
-        
-        if (!iconData) {
+        const typeData = this.library[deviceType];
+        if (!typeData || !typeData.icons || !typeData.icons[subchoice]) {
             this.elements.preview.innerHTML = '';
             return;
         }
         
-        const typeData = this.library.types[deviceType];
+        const iconData = typeData.icons[subchoice];
         
         this.elements.preview.innerHTML = `
             <div class="icon-preview-section">
                 <div class="icon-preview-box">
-                    <i class="fas ${iconClass || iconData.icon}"></i>
+                    <i class="fas ${iconClass}"></i>
                 </div>
                 <div class="icon-preview-info">
                     <div class="icon-preview-label">Selected Icon</div>
                     <div class="icon-preview-name">${typeData.label} - ${iconData.label}</div>
-                    <div class="icon-preview-id">${iconId}</div>
+                    <div class="icon-preview-id">${iconClass}</div>
                 </div>
             </div>
         `;
@@ -358,9 +338,9 @@ const IconPicker = {
         buttons.forEach(btn => {
             const label = btn.querySelector('.icon-label');
             const text = label ? label.textContent.toLowerCase() : '';
-            const iconId = btn.dataset.iconId.toLowerCase();
+            const iconClass = btn.dataset.iconClass.toLowerCase();
             
-            const matches = text.includes(term) || iconId.includes(term);
+            const matches = text.includes(term) || iconClass.includes(term);
             btn.style.display = matches ? '' : 'none';
             
             if (matches) hasVisible = true;
@@ -391,21 +371,26 @@ const IconPicker = {
     },
     
     /**
-     * Set icon programmatically
+     * Set icon programmatically by device type and subchoice
      */
-    setIcon: function(iconId) {
-        // Find the icon
-        for (const [type, data] of Object.entries(this.library.types)) {
-            const icon = data.icons.find(i => i.id === iconId);
-            if (icon) {
-                // Switch to correct category and type
-                this.switchToDeviceType(type);
-                // Select the icon
-                this.selectIcon(iconId, type, icon.icon);
-                return true;
-            }
-        }
-        return false;
+    setIcon: function(deviceType, subchoice) {
+        if (!this.library[deviceType]) return false;
+        
+        const typeData = this.library[deviceType];
+        const index = parseInt(subchoice, 10) || 0;
+        
+        if (!typeData.icons || !typeData.icons[index]) return false;
+        
+        const icon = typeData.icons[index];
+        const iconId = deviceType + '-' + index;
+        
+        // Switch to device type
+        this.switchDeviceType(deviceType);
+        
+        // Select the icon
+        this.selectIcon(iconId, deviceType, icon.icon, index, false);
+        
+        return true;
     }
 };
 

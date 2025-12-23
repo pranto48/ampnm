@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $critical_latency_threshold = $_POST['critical_latency_threshold'] ?? null;
     $critical_packetloss_threshold = $_POST['critical_packetloss_threshold'] ?? null;
     $show_live_ping = isset($_POST['show_live_ping']) ? 1 : 0;
+    $subchoice = $_POST['subchoice'] ?? 0;
 
     // Basic validation
     if (empty($name)) {
@@ -41,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($max_devices > 0 && $current_devices >= $max_devices) {
                 $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">License limit reached. You cannot add more than ' . $max_devices . ' devices.</div>';
             } else {
-                $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, subchoice) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
                     $current_user_id, $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port, $monitor_method, $type, empty($description) ? null : $description, empty($map_id) ? null : $map_id,
@@ -49,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
                     empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
                     empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
-                    $show_live_ping
+                    $show_live_ping, $subchoice
                 ]);
                 // Redirect to map.php with the map_id
                 if ($map_id) {
@@ -107,9 +108,26 @@ include 'header.php';
                         ?>
                     </select>
                     
+                    <!-- Hidden inputs for icon picker -->
+                    <input type="hidden" id="selected-icon-id" name="subchoice_icon_id" value="">
+                    <input type="hidden" id="selected-icon-subchoice" name="subchoice" value="0">
+                    <input type="hidden" id="selected-icon-class" name="icon_class" value="">
+                    
                     <!-- Enhanced Icon Picker Container -->
-                    <link rel="stylesheet" href="assets/icon-picker.css">
-                    <div id="iconPickerContainer" class="icon-picker-container"></div>
+                    <link rel="stylesheet" href="assets/css/icon-picker.css">
+                    <div id="icon-picker-container" class="icon-picker-container">
+                        <div class="icon-picker-header">
+                            <span class="icon-picker-title"><i class="fas fa-palette"></i> Select Icon</span>
+                        </div>
+                        <div id="icon-category-tabs" class="icon-category-tabs"></div>
+                        <div id="icon-device-tabs" class="icon-device-tabs"></div>
+                        <div class="icon-search-container">
+                            <i class="fas fa-search icon-search-icon"></i>
+                            <input type="text" id="icon-search" class="icon-search-input" placeholder="Search icons...">
+                        </div>
+                        <div id="icon-gallery" class="icon-gallery"></div>
+                        <div id="icon-preview"></div>
+                    </div>
                 </div>
 
                 <div>
