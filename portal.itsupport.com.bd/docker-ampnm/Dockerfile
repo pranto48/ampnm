@@ -43,10 +43,16 @@ RUN set -eux; \
 # Enable Apache's mod_rewrite for pretty URLs
 RUN a2enmod rewrite
 
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 WORKDIR /var/www/html
 
 # Copy application source
 COPY . .
+
+# Install PHP dependencies (PHPMailer)
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Ensure the uploads directories exist with writable permissions
 RUN set -eux; \
