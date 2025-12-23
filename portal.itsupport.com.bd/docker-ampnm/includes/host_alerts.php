@@ -1,16 +1,19 @@
 <?php
 /**
  * Host Alert System - Checks thresholds and sends email alerts
- * Uses PHPMailer for reliable SMTP delivery
+ * Uses PHPMailer for reliable SMTP delivery with optional queue support
  */
 
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/email_queue.php';
 
 class HostAlertSystem {
     private $pdo;
     private $settings;
     private $smtpSettings;
     private $mailer;
+    private $emailQueue;
+    private $useQueue = false;
     
     public function __construct($pdo) {
         $this->pdo = $pdo;
@@ -21,6 +24,10 @@ class HostAlertSystem {
         if ($this->smtpSettings) {
             $this->mailer = new AMPNMMailer($this->smtpSettings);
         }
+        
+        // Initialize email queue
+        $this->emailQueue = new EmailQueue($pdo);
+        $this->useQueue = $this->emailQueue->isEnabled();
     }
     
     /**
@@ -206,16 +213,25 @@ class HostAlertSystem {
         
         $body = $this->buildEmailBody($hostIp, $hostName, $alert, $metrics);
         
-        // Send using PHPMailer
+        // Determine priority based on alert level
+        $priority = $alert['level'] === 'critical' ? 'high' : 'normal';
+        
         foreach ($recipients as $to) {
-            $result = $this->mailer->send($to, $subject, $body);
-            if (!$result) {
-                error_log("Failed to send alert to {$to}: " . $this->mailer->getLastError());
+            if ($this->useQueue) {
+                // Use email queue for reliable delivery with retry
+                $this->emailQueue->queue($to, $subject, $body, $priority);
+                error_log("Host Alert Queued: {$alert['level']} {$alert['type']} for {$hostName} to {$to}");
+            } else {
+                // Direct send using PHPMailer
+                $result = $this->mailer->send($to, $subject, $body);
+                if (!$result) {
+                    error_log("Failed to send alert to {$to}: " . $this->mailer->getLastError());
+                }
             }
         }
         
         // Log for debugging
-        error_log("Host Alert Sent: {$alert['level']} {$alert['type']} for {$hostName} ({$hostIp}) - {$alert['value']}%");
+        error_log("Host Alert Processed: {$alert['level']} {$alert['type']} for {$hostName} ({$hostIp}) - {$alert['value']}%");
     }
     
     /**

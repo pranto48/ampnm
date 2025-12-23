@@ -324,6 +324,55 @@ try {
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY `unique_user` (`user_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // TABLE FOR EMAIL QUEUE (with retry logic)
+        "CREATE TABLE IF NOT EXISTS `email_queue` (
+            `id` INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `recipient` VARCHAR(255) NOT NULL,
+            `subject` VARCHAR(500) NOT NULL,
+            `body` LONGTEXT NOT NULL,
+            `priority` ENUM('low', 'normal', 'high') DEFAULT 'normal',
+            `status` ENUM('pending', 'processing', 'sent', 'failed', 'cancelled') DEFAULT 'pending',
+            `attempts` INT(3) DEFAULT 0,
+            `max_attempts` INT(3) DEFAULT 3,
+            `error_message` TEXT NULL,
+            `scheduled_at` TIMESTAMP NULL,
+            `sent_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX `idx_email_queue_status` (`status`),
+            INDEX `idx_email_queue_priority` (`priority`),
+            INDEX `idx_email_queue_scheduled` (`scheduled_at`),
+            INDEX `idx_email_queue_created` (`created_at` DESC)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // TABLE FOR EMAIL DELIVERY LOGS
+        "CREATE TABLE IF NOT EXISTS `email_logs` (
+            `id` INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `queue_id` INT(11) UNSIGNED NULL,
+            `recipient` VARCHAR(255) NOT NULL,
+            `subject` VARCHAR(500) NOT NULL,
+            `status` ENUM('sent', 'failed', 'bounced') NOT NULL,
+            `smtp_response` TEXT NULL,
+            `error_message` TEXT NULL,
+            `attempts` INT(3) DEFAULT 1,
+            `sent_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_email_logs_recipient` (`recipient`),
+            INDEX `idx_email_logs_status` (`status`),
+            INDEX `idx_email_logs_sent` (`sent_at` DESC),
+            FOREIGN KEY (`queue_id`) REFERENCES `email_queue`(`id`) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // TABLE FOR SYSTEM SETTINGS (log retention, etc.)
+        "CREATE TABLE IF NOT EXISTS `system_settings` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `setting_key` VARCHAR(100) NOT NULL UNIQUE,
+            `setting_value` TEXT NULL,
+            `setting_type` ENUM('string', 'number', 'boolean', 'json') DEFAULT 'string',
+            `description` VARCHAR(500) NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     ];
 
@@ -454,6 +503,25 @@ try {
             $stmt = $pdo->prepare("INSERT INTO `app_settings` (setting_key, setting_value) VALUES (?, ?)");
             $stmt->execute([$key, $value]);
             message("Initialized app setting: '$key'.");
+        }
+    }
+    
+    // Initialize system_settings for log retention and email queue
+    $system_settings = [
+        ['log_retention_days', '7', 'number', 'Number of days to keep email logs (default: 7)'],
+        ['alert_log_retention_days', '30', 'number', 'Number of days to keep alert logs (default: 30)'],
+        ['email_queue_max_retries', '3', 'number', 'Maximum retry attempts for failed emails'],
+        ['email_queue_retry_delay', '5', 'number', 'Minutes to wait before retrying failed emails'],
+        ['email_queue_enabled', 'true', 'boolean', 'Enable email queue system (vs direct sending)']
+    ];
+    
+    foreach ($system_settings as $setting) {
+        $stmt = $pdo->prepare("SELECT setting_value FROM `system_settings` WHERE setting_key = ?");
+        $stmt->execute([$setting[0]]);
+        if (!$stmt->fetch()) {
+            $stmt = $pdo->prepare("INSERT INTO `system_settings` (setting_key, setting_value, setting_type, description) VALUES (?, ?, ?, ?)");
+            $stmt->execute($setting);
+            message("Initialized system setting: '{$setting[0]}'.");
         }
     }
 
