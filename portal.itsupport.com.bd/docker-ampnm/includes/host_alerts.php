@@ -63,25 +63,28 @@ class HostAlertSystem {
             return; // Alerts disabled or no SMTP configured
         }
         
+        // Check for per-host override
+        $thresholds = $this->getThresholdsForHost($hostIp);
+        
         $alerts = [];
         
         // Check CPU
         if ($metrics['cpu_percent'] !== null) {
             $cpu = floatval($metrics['cpu_percent']);
-            if ($cpu >= $this->settings['cpu_critical_threshold']) {
-                $alerts[] = ['type' => 'cpu', 'level' => 'critical', 'value' => $cpu, 'threshold' => $this->settings['cpu_critical_threshold']];
-            } elseif ($cpu >= $this->settings['cpu_warning_threshold']) {
-                $alerts[] = ['type' => 'cpu', 'level' => 'warning', 'value' => $cpu, 'threshold' => $this->settings['cpu_warning_threshold']];
+            if ($cpu >= $thresholds['cpu_critical']) {
+                $alerts[] = ['type' => 'cpu', 'level' => 'critical', 'value' => $cpu, 'threshold' => $thresholds['cpu_critical']];
+            } elseif ($cpu >= $thresholds['cpu_warning']) {
+                $alerts[] = ['type' => 'cpu', 'level' => 'warning', 'value' => $cpu, 'threshold' => $thresholds['cpu_warning']];
             }
         }
         
         // Check Memory
         if ($metrics['memory_percent'] !== null) {
             $mem = floatval($metrics['memory_percent']);
-            if ($mem >= $this->settings['memory_critical_threshold']) {
-                $alerts[] = ['type' => 'memory', 'level' => 'critical', 'value' => $mem, 'threshold' => $this->settings['memory_critical_threshold']];
-            } elseif ($mem >= $this->settings['memory_warning_threshold']) {
-                $alerts[] = ['type' => 'memory', 'level' => 'warning', 'value' => $mem, 'threshold' => $this->settings['memory_warning_threshold']];
+            if ($mem >= $thresholds['memory_critical']) {
+                $alerts[] = ['type' => 'memory', 'level' => 'critical', 'value' => $mem, 'threshold' => $thresholds['memory_critical']];
+            } elseif ($mem >= $thresholds['memory_warning']) {
+                $alerts[] = ['type' => 'memory', 'level' => 'warning', 'value' => $mem, 'threshold' => $thresholds['memory_warning']];
             }
         }
         
@@ -93,10 +96,20 @@ class HostAlertSystem {
         }
         
         if ($diskPercent !== null) {
-            if ($diskPercent >= $this->settings['disk_critical_threshold']) {
-                $alerts[] = ['type' => 'disk', 'level' => 'critical', 'value' => round($diskPercent, 2), 'threshold' => $this->settings['disk_critical_threshold']];
-            } elseif ($diskPercent >= $this->settings['disk_warning_threshold']) {
-                $alerts[] = ['type' => 'disk', 'level' => 'warning', 'value' => round($diskPercent, 2), 'threshold' => $this->settings['disk_warning_threshold']];
+            if ($diskPercent >= $thresholds['disk_critical']) {
+                $alerts[] = ['type' => 'disk', 'level' => 'critical', 'value' => round($diskPercent, 2), 'threshold' => $thresholds['disk_critical']];
+            } elseif ($diskPercent >= $thresholds['disk_warning']) {
+                $alerts[] = ['type' => 'disk', 'level' => 'warning', 'value' => round($diskPercent, 2), 'threshold' => $thresholds['disk_warning']];
+            }
+        }
+        
+        // Check GPU
+        if (isset($metrics['gpu_percent']) && $metrics['gpu_percent'] !== null) {
+            $gpu = floatval($metrics['gpu_percent']);
+            if ($gpu >= $thresholds['gpu_critical']) {
+                $alerts[] = ['type' => 'gpu', 'level' => 'critical', 'value' => $gpu, 'threshold' => $thresholds['gpu_critical']];
+            } elseif ($gpu >= $thresholds['gpu_warning']) {
+                $alerts[] = ['type' => 'gpu', 'level' => 'warning', 'value' => $gpu, 'threshold' => $thresholds['gpu_warning']];
             }
         }
         
@@ -104,9 +117,44 @@ class HostAlertSystem {
         foreach ($alerts as $alert) {
             if (!$this->isInCooldown($hostIp, $alert['type'], $alert['level'])) {
                 $this->sendAlert($hostIp, $hostName, $alert, $metrics);
-                $this->logAlert($hostIp, $alert);
+                $this->logAlert($hostIp, $hostName, $alert);
             }
         }
+    }
+    
+    /**
+     * Get thresholds for a specific host (override or global)
+     */
+    private function getThresholdsForHost($hostIp) {
+        // Check for per-host override
+        $stmt = $this->pdo->prepare("SELECT * FROM host_alert_overrides WHERE host_ip = ? AND enabled = TRUE");
+        $stmt->execute([$hostIp]);
+        $override = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($override) {
+            return [
+                'cpu_warning' => $override['cpu_warning'] ?? 80,
+                'cpu_critical' => $override['cpu_critical'] ?? 95,
+                'memory_warning' => $override['memory_warning'] ?? 80,
+                'memory_critical' => $override['memory_critical'] ?? 95,
+                'disk_warning' => $override['disk_warning'] ?? 85,
+                'disk_critical' => $override['disk_critical'] ?? 95,
+                'gpu_warning' => $override['gpu_warning'] ?? 80,
+                'gpu_critical' => $override['gpu_critical'] ?? 95
+            ];
+        }
+        
+        // Use global settings
+        return [
+            'cpu_warning' => $this->settings['cpu_warning_threshold'] ?? 80,
+            'cpu_critical' => $this->settings['cpu_critical_threshold'] ?? 95,
+            'memory_warning' => $this->settings['memory_warning_threshold'] ?? 80,
+            'memory_critical' => $this->settings['memory_critical_threshold'] ?? 95,
+            'disk_warning' => $this->settings['disk_warning_threshold'] ?? 85,
+            'disk_critical' => $this->settings['disk_critical_threshold'] ?? 95,
+            'gpu_warning' => 80,
+            'gpu_critical' => 95
+        ];
     }
     
     /**
@@ -128,12 +176,12 @@ class HostAlertSystem {
     /**
      * Log the alert to prevent spam
      */
-    private function logAlert($hostIp, $alert) {
+    private function logAlert($hostIp, $hostName, $alert) {
         $stmt = $this->pdo->prepare("
-            INSERT INTO host_alert_log (host_ip, alert_type, alert_level, value, threshold)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO host_alert_log (host_ip, host_name, alert_type, alert_level, value, threshold)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$hostIp, $alert['type'], $alert['level'], $alert['value'], $alert['threshold']]);
+        $stmt->execute([$hostIp, $hostName, $alert['type'], $alert['level'], $alert['value'], $alert['threshold']]);
     }
     
     /**
