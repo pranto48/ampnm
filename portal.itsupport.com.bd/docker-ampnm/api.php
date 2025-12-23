@@ -165,6 +165,7 @@ try {
     $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'test_smtp', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
     $licenseActions = ['get_current_license_info', 'update_app_license_key', 'force_license_recheck'];
     $metricsActions = ['get_latest_metrics', 'get_metrics_history', 'get_all_hosts', 'get_agent_tokens', 'create_agent_token', 'delete_agent_token', 'toggle_agent_token'];
+    $emailLogsActions = ['get_email_stats', 'get_email_logs', 'get_email_queue', 'retry_email', 'cancel_email', 'process_email_queue', 'cleanup_email_logs', 'get_system_settings', 'save_system_settings', 'get_alert_logs', 'cleanup_alert_logs'];
 
     if (in_array($action, $pingActions)) {
         require __DIR__ . '/api/handlers/ping_handler.php';
@@ -184,6 +185,8 @@ try {
         require __DIR__ . '/api/handlers/license_handler.php';
     } elseif (in_array($action, $metricsActions)) {
         require __DIR__ . '/api/handlers/metrics_handler.php';
+    } elseif (in_array($action, $emailLogsActions)) {
+        require __DIR__ . '/api/handlers/email_logs_handler.php';
     } elseif ($action === 'health') {
         echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
     } else {
