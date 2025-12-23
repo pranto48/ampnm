@@ -274,6 +274,56 @@ try {
             `enabled` BOOLEAN DEFAULT TRUE,
             `last_used_at` TIMESTAMP NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // TABLE FOR PER-HOST ALERT OVERRIDES
+        "CREATE TABLE IF NOT EXISTS `host_alert_overrides` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `host_ip` VARCHAR(45) NOT NULL UNIQUE,
+            `host_name` VARCHAR(255) NULL,
+            `enabled` BOOLEAN DEFAULT TRUE,
+            `cpu_warning` INT(3) DEFAULT 80,
+            `cpu_critical` INT(3) DEFAULT 95,
+            `memory_warning` INT(3) DEFAULT 80,
+            `memory_critical` INT(3) DEFAULT 95,
+            `disk_warning` INT(3) DEFAULT 85,
+            `disk_critical` INT(3) DEFAULT 95,
+            `gpu_warning` INT(3) DEFAULT 80,
+            `gpu_critical` INT(3) DEFAULT 95,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX `idx_host_alert_overrides_ip` (`host_ip`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // TABLE FOR ALERT HISTORY LOG
+        "CREATE TABLE IF NOT EXISTS `host_alert_log` (
+            `id` INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `host_ip` VARCHAR(45) NOT NULL,
+            `host_name` VARCHAR(255) NULL,
+            `alert_type` VARCHAR(20) NOT NULL,
+            `alert_level` VARCHAR(20) NOT NULL,
+            `value` DECIMAL(5,2) NOT NULL,
+            `threshold` DECIMAL(5,2) NOT NULL,
+            `sent_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_host_alert_log_ip` (`host_ip`),
+            INDEX `idx_host_alert_log_sent` (`sent_at` DESC)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
+        // TABLE FOR GLOBAL ALERT SETTINGS
+        "CREATE TABLE IF NOT EXISTS `host_alert_settings` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `cpu_warning_threshold` INT(3) DEFAULT 80,
+            `cpu_critical_threshold` INT(3) DEFAULT 95,
+            `memory_warning_threshold` INT(3) DEFAULT 80,
+            `memory_critical_threshold` INT(3) DEFAULT 95,
+            `disk_warning_threshold` INT(3) DEFAULT 85,
+            `disk_critical_threshold` INT(3) DEFAULT 95,
+            `enabled` BOOLEAN DEFAULT TRUE,
+            `cooldown_minutes` INT(5) DEFAULT 30,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `unique_user` (`user_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     ];
 

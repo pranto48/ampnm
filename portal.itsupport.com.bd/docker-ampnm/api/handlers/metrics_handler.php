@@ -200,9 +200,11 @@ switch ($action) {
     case 'get_all_hosts':
         // Get list of all monitored hosts with latest metrics
         $stmt = $pdo->query("
-            SELECT hm.*, d.name as device_name, d.id as linked_device_id
+            SELECT hm.*, d.name as device_name, d.id as linked_device_id,
+                   CASE WHEN hao.id IS NOT NULL AND hao.enabled = 1 THEN 1 ELSE 0 END as has_override
             FROM host_metrics hm
             LEFT JOIN devices d ON hm.device_id = d.id
+            LEFT JOIN host_alert_overrides hao ON hm.host_ip = hao.host_ip
             WHERE hm.id IN (
                 SELECT MAX(id) FROM host_metrics GROUP BY host_ip
             )
@@ -305,6 +307,78 @@ switch ($action) {
             ]);
         }
         echo json_encode(['success' => true]);
+        break;
+    
+    case 'get_host_override':
+        $hostIp = $_GET['host_ip'] ?? null;
+        if (!$hostIp) {
+            echo json_encode(['error' => 'host_ip required']);
+            break;
+        }
+        
+        $stmt = $pdo->prepare("SELECT * FROM host_alert_overrides WHERE host_ip = ?");
+        $stmt->execute([$hostIp]);
+        $override = $stmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode($override ?: []);
+        break;
+        
+    case 'save_host_override':
+        $hostIp = $input['host_ip'] ?? null;
+        if (!$hostIp) {
+            echo json_encode(['error' => 'host_ip required']);
+            break;
+        }
+        
+        // Check if override exists
+        $stmt = $pdo->prepare("SELECT id FROM host_alert_overrides WHERE host_ip = ?");
+        $stmt->execute([$hostIp]);
+        $existing = $stmt->fetch();
+        
+        if ($existing) {
+            $sql = "UPDATE host_alert_overrides SET 
+                    host_name = ?, enabled = ?,
+                    cpu_warning = ?, cpu_critical = ?,
+                    memory_warning = ?, memory_critical = ?,
+                    disk_warning = ?, disk_critical = ?,
+                    gpu_warning = ?, gpu_critical = ?,
+                    updated_at = NOW()
+                    WHERE host_ip = ?";
+            $pdo->prepare($sql)->execute([
+                $input['host_name'] ?? $hostIp,
+                $input['enabled'] ? 1 : 0,
+                $input['cpu_warning'] ?? 80, $input['cpu_critical'] ?? 95,
+                $input['memory_warning'] ?? 80, $input['memory_critical'] ?? 95,
+                $input['disk_warning'] ?? 85, $input['disk_critical'] ?? 95,
+                $input['gpu_warning'] ?? 80, $input['gpu_critical'] ?? 95,
+                $hostIp
+            ]);
+        } else {
+            $sql = "INSERT INTO host_alert_overrides 
+                    (host_ip, host_name, enabled, cpu_warning, cpu_critical, memory_warning, memory_critical, disk_warning, disk_critical, gpu_warning, gpu_critical)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $pdo->prepare($sql)->execute([
+                $hostIp,
+                $input['host_name'] ?? $hostIp,
+                $input['enabled'] ? 1 : 0,
+                $input['cpu_warning'] ?? 80, $input['cpu_critical'] ?? 95,
+                $input['memory_warning'] ?? 80, $input['memory_critical'] ?? 95,
+                $input['disk_warning'] ?? 85, $input['disk_critical'] ?? 95,
+                $input['gpu_warning'] ?? 80, $input['gpu_critical'] ?? 95
+            ]);
+        }
+        echo json_encode(['success' => true]);
+        break;
+        
+    case 'delete_host_override':
+        $hostIp = $input['host_ip'] ?? null;
+        if (!$hostIp) {
+            echo json_encode(['error' => 'host_ip required']);
+            break;
+        }
+        
+        $stmt = $pdo->prepare("DELETE FROM host_alert_overrides WHERE host_ip = ?");
+        $stmt->execute([$hostIp]);
+        echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
         break;
         
     default:

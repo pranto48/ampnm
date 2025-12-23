@@ -9,33 +9,63 @@
 
     const IconPicker = {
         config: {
-            containerSelector: '#iconPickerContainer',
+            containerSelector: '#icon-picker-container, #iconPickerContainer',
+            categoryTabsSelector: '#icon-category-tabs, #categoryTabsContainer',
+            deviceTabsSelector: '#icon-device-tabs, #deviceTypeTabsContainer',
+            gallerySelector: '#icon-gallery, #iconGallery',
+            searchSelector: '#icon-search, .icon-search-input',
+            previewSelector: '#icon-preview, #selectedIconPreview',
             typeSelectSelector: '#type',
-            tabSelector: '[data-icon-category]',
-            buttonSelector: '.icon-gallery-btn',
-            searchSelector: '.icon-picker-search input',
-            previewSelector: '#selectedIconPreview',
-            hiddenInputSelector: '#selectedIconId'
+            hiddenIconIdSelector: '#selected-icon-id, #selectedIconId',
+            hiddenSubchoiceSelector: '#selected-icon-subchoice',
+            hiddenIconClassSelector: '#selected-icon-class'
         },
 
         selectedIcon: null,
+        currentCategory: null,
+        currentDeviceType: null,
 
         init: function() {
-            if (!this.validateDom()) return;
+            // Wait for DOM and icons library
+            if (!this.validateDom()) {
+                console.log('Icon picker container not found');
+                return;
+            }
+            
+            if (!window.deviceIconsLibrary) {
+                console.error('Device icons library not loaded');
+                return;
+            }
+            
             this.cacheElements();
             this.bindEvents();
             this.render();
+            console.log('Icon picker initialized');
         },
 
         validateDom: function() {
-            return document.querySelector(this.config.containerSelector) !== null;
+            return document.querySelector('#icon-picker-container') !== null || 
+                   document.querySelector('#iconPickerContainer') !== null;
         },
 
         cacheElements: function() {
-            this.typeSelect = document.querySelector(this.config.typeSelectSelector);
-            this.container = document.querySelector(this.config.containerSelector);
-            this.preview = document.querySelector(this.config.previewSelector);
-            this.hiddenInput = document.querySelector(this.config.hiddenInputSelector);
+            this.container = document.querySelector('#icon-picker-container') || 
+                             document.querySelector('#iconPickerContainer');
+            this.categoryTabs = document.querySelector('#icon-category-tabs') || 
+                                document.querySelector('#categoryTabsContainer');
+            this.deviceTabs = document.querySelector('#icon-device-tabs') || 
+                              document.querySelector('#deviceTypeTabsContainer');
+            this.gallery = document.querySelector('#icon-gallery') || 
+                          document.querySelector('#iconGallery');
+            this.searchInput = document.querySelector('#icon-search') || 
+                              document.querySelector('.icon-search-input');
+            this.preview = document.querySelector('#icon-preview') || 
+                          document.querySelector('#selectedIconPreview');
+            this.typeSelect = document.querySelector('#type');
+            this.hiddenIconId = document.querySelector('#selected-icon-id') || 
+                               document.querySelector('#selectedIconId');
+            this.hiddenSubchoice = document.querySelector('#selected-icon-subchoice');
+            this.hiddenIconClass = document.querySelector('#selected-icon-class');
         },
 
         bindEvents: function() {
@@ -43,266 +73,346 @@
             
             // Type select change
             if (this.typeSelect) {
-                this.typeSelect.addEventListener('change', () => self.updateCategory());
+                this.typeSelect.addEventListener('change', () => self.onTypeChange());
             }
 
             // Delegate event for category tabs
             document.addEventListener('click', (e) => {
-                if (e.target.closest('[data-icon-category]')) {
-                    const btn = e.target.closest('[data-icon-category]');
-                    self.switchCategory(btn.dataset.iconCategory);
+                if (e.target.closest('.icon-category-tab')) {
+                    e.preventDefault();
+                    const btn = e.target.closest('.icon-category-tab');
+                    const category = btn.dataset.category;
+                    if (category) {
+                        self.switchCategory(category);
+                    }
                 }
             });
 
             // Delegate event for device type tabs
             document.addEventListener('click', (e) => {
-                if (e.target.closest('[data-device-type]')) {
-                    const btn = e.target.closest('[data-device-type]');
-                    self.switchDeviceType(btn.dataset.deviceType);
+                if (e.target.closest('.icon-device-tab')) {
+                    e.preventDefault();
+                    const btn = e.target.closest('.icon-device-tab');
+                    const deviceType = btn.dataset.deviceType;
+                    if (deviceType) {
+                        self.switchDeviceType(deviceType);
+                    }
                 }
             });
 
             // Delegate event for icon buttons
             document.addEventListener('click', (e) => {
-                const btn = e.target.closest('.icon-gallery-btn[data-icon-id]');
-                if (btn) {
+                const btn = e.target.closest('.icon-gallery-btn');
+                if (btn && btn.dataset.iconIndex !== undefined) {
                     e.preventDefault();
-                    self.selectIcon(btn.dataset.iconId, btn.dataset.deviceType, btn.dataset.iconClass);
+                    const deviceType = btn.dataset.deviceType;
+                    const iconIndex = parseInt(btn.dataset.iconIndex);
+                    const iconClass = btn.dataset.iconClass;
+                    const iconLabel = btn.dataset.iconLabel;
+                    self.selectIcon(deviceType, iconIndex, iconClass, iconLabel);
                 }
             });
 
             // Search functionality
+            if (this.searchInput) {
+                this.searchInput.addEventListener('input', (e) => self.filterIcons(e.target.value));
+            }
+            
+            // Also listen for dynamically added search input
             document.addEventListener('input', (e) => {
-                if (e.target.matches('.icon-search-input')) {
+                if (e.target.matches('#icon-search, .icon-search-input')) {
                     self.filterIcons(e.target.value);
                 }
             });
         },
 
         render: function() {
-            if (!window.deviceIconsLibrary) {
-                console.error('Device icons library not loaded');
-                return;
+            // Get unique categories from device types
+            const categories = this.getCategories();
+            
+            // Render category tabs
+            this.renderCategoryTabs(categories);
+            
+            // Get first category and its device types
+            const firstCategory = Object.keys(categories)[0];
+            this.currentCategory = firstCategory;
+            
+            // Render device type tabs for first category
+            this.renderDeviceTypeTabs(firstCategory);
+            
+            // Render icons for first device type
+            const deviceTypes = Object.keys(window.deviceIconsLibrary);
+            if (deviceTypes.length > 0) {
+                // If type select has a value, use that, otherwise use first device type
+                const selectedType = this.typeSelect?.value || deviceTypes[0];
+                this.currentDeviceType = selectedType;
+                this.renderIcons(selectedType);
             }
-            this.renderCategoryTabs();
-            this.renderDeviceTypeTabs('network'); // Default to network category
-            this.renderPicker('switch'); // Default to switch type
         },
 
-        renderCategoryTabs: function() {
+        getCategories: function() {
+            // Group device types by first letter or create simple categories
             const categories = {
-                'network': { label: 'Network', icon: 'fa-network-wired' },
-                'compute': { label: 'Compute', icon: 'fa-server' },
-                'security': { label: 'Security', icon: 'fa-shield-halved' },
-                'storage': { label: 'Storage', icon: 'fa-database' },
-                'endpoint': { label: 'Endpoints', icon: 'fa-desktop' },
-                'peripheral': { label: 'Peripherals', icon: 'fa-print' },
-                'iot': { label: 'IoT', icon: 'fa-microchip' },
-                'infrastructure': { label: 'Infrastructure', icon: 'fa-plug' },
-                'cloud': { label: 'Cloud', icon: 'fa-cloud' },
-                'service': { label: 'Services', icon: 'fa-cogs' },
-                'other': { label: 'Other', icon: 'fa-ellipsis' }
+                'network': { label: 'Network', icon: 'fa-network-wired', types: [] },
+                'compute': { label: 'Compute', icon: 'fa-server', types: [] },
+                'security': { label: 'Security', icon: 'fa-shield-halved', types: [] },
+                'storage': { label: 'Storage', icon: 'fa-database', types: [] },
+                'endpoint': { label: 'Endpoints', icon: 'fa-desktop', types: [] },
+                'other': { label: 'Other', icon: 'fa-ellipsis', types: [] }
             };
+            
+            // Categorize device types
+            const typeCategories = {
+                'router': 'network', 'wifi-router': 'network', 'switch': 'network', 
+                'modem': 'network', 'loadbalancer': 'network', 'radio-tower': 'network',
+                'server': 'compute', 'database': 'compute', 'cloud': 'compute', 'rack': 'compute',
+                'firewall': 'security', 'camera': 'security',
+                'nas': 'storage',
+                'laptop': 'endpoint', 'tablet': 'endpoint', 'mobile': 'endpoint',
+                'printer': 'endpoint', 'ipphone': 'endpoint', 'monitor': 'endpoint',
+                'keyboard': 'endpoint', 'punchdevice': 'endpoint'
+            };
+            
+            Object.keys(window.deviceIconsLibrary).forEach(type => {
+                const cat = typeCategories[type] || 'other';
+                if (categories[cat]) {
+                    categories[cat].types.push(type);
+                }
+            });
+            
+            return categories;
+        },
 
-            let html = '<div class="icon-category-tabs">';
-            Object.entries(categories).forEach(([key, cat], idx) => {
+        renderCategoryTabs: function(categories) {
+            if (!this.categoryTabs) return;
+            
+            let html = '';
+            let isFirst = true;
+            
+            Object.entries(categories).forEach(([key, cat]) => {
+                if (cat.types.length === 0) return;
                 html += `
-                    <button type="button" class="category-tab ${idx === 0 ? 'active' : ''}" 
-                            data-icon-category="${key}">
+                    <button type="button" class="icon-category-tab ${isFirst ? 'active' : ''}" 
+                            data-category="${key}">
                         <i class="fas ${cat.icon}"></i>
                         <span>${cat.label}</span>
                     </button>
                 `;
+                isFirst = false;
             });
-            html += '</div>';
-
-            // Insert category tabs before the container content
-            const tabsContainer = document.getElementById('categoryTabsContainer');
-            if (tabsContainer) {
-                tabsContainer.innerHTML = html;
-            }
+            
+            this.categoryTabs.innerHTML = html;
         },
 
         renderDeviceTypeTabs: function(category) {
-            const deviceTypes = window.getIconsByCategory ? window.getIconsByCategory(category) : {};
+            if (!this.deviceTabs) return;
             
-            let html = '<div class="device-type-tabs">';
+            const categories = this.getCategories();
+            const types = categories[category]?.types || [];
+            
+            let html = '';
             let isFirst = true;
-            Object.entries(deviceTypes).forEach(([type, data]) => {
+            
+            types.forEach(type => {
+                const typeData = window.deviceIconsLibrary[type];
+                if (!typeData) return;
+                
                 html += `
-                    <button type="button" class="device-type-tab ${isFirst ? 'active' : ''}" 
+                    <button type="button" class="icon-device-tab ${isFirst ? 'active' : ''}" 
                             data-device-type="${type}">
-                        ${data.label}
+                        ${typeData.label}
                     </button>
                 `;
                 isFirst = false;
             });
-            html += '</div>';
-
-            const typesContainer = document.getElementById('deviceTypeTabsContainer');
-            if (typesContainer) {
-                typesContainer.innerHTML = html;
-            }
-
-            // Render first device type's icons
-            const firstType = Object.keys(deviceTypes)[0];
-            if (firstType) {
-                this.renderPicker(firstType);
+            
+            this.deviceTabs.innerHTML = html;
+            
+            // Render icons for first type
+            if (types.length > 0) {
+                this.currentDeviceType = types[0];
+                this.renderIcons(types[0]);
             }
         },
 
-        renderPicker: function(deviceType) {
-            if (!this.container || !window.deviceIconsLibrary || !window.deviceIconsLibrary[deviceType]) {
+        renderIcons: function(deviceType) {
+            if (!this.gallery) {
+                this.gallery = document.querySelector('#icon-gallery');
+            }
+            if (!this.gallery) return;
+            
+            const typeData = window.deviceIconsLibrary[deviceType];
+            if (!typeData) {
+                this.gallery.innerHTML = '<p class="icon-no-results"><i class="fas fa-exclamation-circle"></i><br>No icons found</p>';
                 return;
             }
-
-            const typeData = window.deviceIconsLibrary[deviceType];
-            const iconVariants = typeData.icons || [];
-
-            let html = `
-                <div class="icon-picker-header">
-                    <span class="icon-picker-title">
-                        <i class="fas ${iconVariants[0]?.icon || 'fa-cube'}"></i>
-                        ${typeData.label}
-                    </span>
-                    <span class="icon-picker-stats">${iconVariants.length} icon${iconVariants.length !== 1 ? 's' : ''}</span>
-                </div>
-            `;
-
-            // Add search box
-            html += `
-                <div class="icon-picker-search">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search ${typeData.label.toLowerCase()}..." class="icon-search-input">
-                </div>
-            `;
-
-            // Render icon gallery
-            html += '<div class="icon-gallery" id="iconGallery">';
-            iconVariants.forEach((variant) => {
-                const isSelected = this.selectedIcon && this.selectedIcon.id === variant.id;
+            
+            const icons = typeData.icons || [];
+            
+            let html = '';
+            icons.forEach((icon, index) => {
+                const isSelected = this.selectedIcon && 
+                                   this.selectedIcon.type === deviceType && 
+                                   this.selectedIcon.index === index;
                 html += `
                     <button type="button" class="icon-gallery-btn ${isSelected ? 'selected' : ''}" 
-                            data-icon-id="${variant.id}" 
                             data-device-type="${deviceType}"
-                            data-icon-class="${variant.icon}"
-                            title="${variant.label}">
-                        <div class="icon-gallery-btn-content">
-                            <i class="fas ${variant.icon}"></i>
-                            <span>${variant.label}</span>
-                        </div>
+                            data-icon-index="${index}"
+                            data-icon-class="${icon.icon}"
+                            data-icon-label="${icon.label}"
+                            title="${icon.label}">
+                        <i class="fas ${icon.icon}"></i>
+                        <span class="icon-label">${icon.label}</span>
                     </button>
                 `;
             });
-            html += '</div>';
-
-            this.container.innerHTML = html;
+            
+            if (icons.length === 0) {
+                html = '<p class="icon-no-results"><i class="fas fa-exclamation-circle"></i><br>No icons available</p>';
+            }
+            
+            this.gallery.innerHTML = html;
         },
 
-        updateCategory: function() {
-            const newType = this.typeSelect?.value || 'switch';
-            this.renderPicker(newType);
-        },
-
-        switchCategory: function(category) {
-            // Update active state on category tabs
-            document.querySelectorAll('.category-tab').forEach(tab => {
-                tab.classList.toggle('active', tab.dataset.iconCategory === category);
+        onTypeChange: function() {
+            if (!this.typeSelect) return;
+            
+            const newType = this.typeSelect.value;
+            this.currentDeviceType = newType;
+            
+            // Find which category this type belongs to
+            const categories = this.getCategories();
+            for (const [catKey, cat] of Object.entries(categories)) {
+                if (cat.types.includes(newType)) {
+                    this.switchCategory(catKey, false);
+                    break;
+                }
+            }
+            
+            // Highlight correct device tab
+            document.querySelectorAll('.icon-device-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.deviceType === newType);
             });
             
+            this.renderIcons(newType);
+        },
+
+        switchCategory: function(category, updateIcons = true) {
+            this.currentCategory = category;
+            
+            // Update active state on category tabs
+            document.querySelectorAll('.icon-category-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.category === category);
+            });
+            
+            // Render device type tabs for this category
             this.renderDeviceTypeTabs(category);
         },
 
         switchDeviceType: function(deviceType) {
+            this.currentDeviceType = deviceType;
+            
             // Update active state on device type tabs
-            document.querySelectorAll('.device-type-tab').forEach(tab => {
+            document.querySelectorAll('.icon-device-tab').forEach(tab => {
                 tab.classList.toggle('active', tab.dataset.deviceType === deviceType);
             });
             
+            // Update type select if present
             if (this.typeSelect) {
                 this.typeSelect.value = deviceType;
-                this.typeSelect.dispatchEvent(new Event('change'));
             }
-            this.renderPicker(deviceType);
+            
+            this.renderIcons(deviceType);
         },
 
-        selectIcon: function(iconId, deviceType, iconClass) {
+        selectIcon: function(deviceType, iconIndex, iconClass, iconLabel) {
             this.selectedIcon = {
-                id: iconId,
                 type: deviceType,
-                icon: iconClass
+                index: iconIndex,
+                icon: iconClass,
+                label: iconLabel
             };
 
-            // Update hidden input for form submission
-            if (this.hiddenInput) {
-                this.hiddenInput.value = iconId;
+            // Update hidden inputs for form submission
+            if (this.hiddenIconId) {
+                this.hiddenIconId.value = `${deviceType}-${iconIndex}`;
+            }
+            if (this.hiddenSubchoice) {
+                this.hiddenSubchoice.value = iconIndex;
+            }
+            if (this.hiddenIconClass) {
+                this.hiddenIconClass.value = iconClass;
             }
 
             // Update visual selection
             document.querySelectorAll('.icon-gallery-btn').forEach(btn => {
-                btn.classList.toggle('selected', btn.dataset.iconId === iconId);
+                const isMatch = btn.dataset.deviceType === deviceType && 
+                               parseInt(btn.dataset.iconIndex) === iconIndex;
+                btn.classList.toggle('selected', isMatch);
+                if (isMatch) {
+                    btn.classList.add('just-selected');
+                    setTimeout(() => btn.classList.remove('just-selected'), 300);
+                }
             });
 
             // Update preview
-            this.updatePreview(iconClass, iconId);
+            this.updatePreview();
 
-            // Dispatch custom event for network map integration
+            // Dispatch custom event
             const event = new CustomEvent('iconSelected', {
-                detail: {
-                    id: iconId,
-                    type: deviceType,
-                    icon: iconClass
-                }
+                detail: this.selectedIcon
             });
             document.dispatchEvent(event);
 
-            // If there's a callback registered, call it
+            // Call global callback if registered
             if (typeof window.onIconSelected === 'function') {
                 window.onIconSelected(this.selectedIcon);
             }
         },
 
-        updatePreview: function(iconClass, iconId) {
-            const preview = document.querySelector(this.config.previewSelector);
-            if (preview) {
-                preview.innerHTML = `
-                    <div class="selected-icon-preview">
-                        <div class="preview-icon">
-                            <i class="fas ${iconClass}"></i>
-                        </div>
-                        <div class="preview-info">
-                            <span class="preview-label">Selected Icon</span>
-                            <span class="preview-id">${iconId}</span>
-                        </div>
-                    </div>
-                `;
-                preview.classList.add('has-selection');
+        updatePreview: function() {
+            if (!this.preview) {
+                this.preview = document.querySelector('#icon-preview');
             }
+            if (!this.preview || !this.selectedIcon) return;
+            
+            this.preview.innerHTML = `
+                <div class="icon-preview-section">
+                    <div class="icon-preview-box">
+                        <i class="fas ${this.selectedIcon.icon}"></i>
+                    </div>
+                    <div class="icon-preview-info">
+                        <span class="icon-preview-label">Selected Icon</span>
+                        <span class="icon-preview-name">${this.selectedIcon.label}</span>
+                        <span class="icon-preview-id">${this.selectedIcon.type} #${this.selectedIcon.index}</span>
+                    </div>
+                </div>
+            `;
         },
 
         filterIcons: function(searchTerm) {
             const buttons = document.querySelectorAll('.icon-gallery-btn');
             const term = searchTerm.toLowerCase().trim();
 
+            let visibleCount = 0;
             buttons.forEach(btn => {
-                const label = btn.title.toLowerCase();
-                const id = btn.dataset.iconId?.toLowerCase() || '';
-                const matches = !term || label.includes(term) || id.includes(term);
-                btn.style.display = matches ? 'flex' : 'none';
+                const label = (btn.dataset.iconLabel || btn.title || '').toLowerCase();
+                const iconClass = (btn.dataset.iconClass || '').toLowerCase();
+                const matches = !term || label.includes(term) || iconClass.includes(term);
+                btn.style.display = matches ? '' : 'none';
+                if (matches) visibleCount++;
             });
 
-            // Update search status
-            const gallery = document.getElementById('iconGallery');
+            // Show no results message
+            const gallery = document.querySelector('#icon-gallery');
             if (gallery) {
-                const existingMsg = gallery.querySelector('.no-results-message');
+                const existingMsg = gallery.querySelector('.icon-no-results');
                 if (existingMsg) existingMsg.remove();
 
-                const visible = Array.from(buttons).filter(btn => btn.style.display !== 'none').length;
-                if (visible === 0 && term) {
+                if (visibleCount === 0 && term) {
                     const msg = document.createElement('p');
-                    msg.className = 'no-results-message';
-                    msg.style.cssText = 'grid-column: 1/-1; text-align: center; color: rgba(226, 232, 240, 0.5); padding: 20px;';
-                    msg.textContent = 'No icons match your search';
+                    msg.className = 'icon-no-results';
+                    msg.innerHTML = '<i class="fas fa-search"></i><br>No icons match your search';
                     gallery.appendChild(msg);
                 }
             }
@@ -314,20 +424,35 @@
         },
 
         // Set icon programmatically
-        setIcon: function(iconId) {
-            const allIcons = window.getAllDeviceIcons ? window.getAllDeviceIcons() : [];
-            const icon = allIcons.find(i => i.id === iconId);
-            if (icon) {
-                this.selectIcon(icon.id, icon.type, icon.icon);
+        setIcon: function(deviceType, iconIndex) {
+            const typeData = window.deviceIconsLibrary[deviceType];
+            if (typeData && typeData.icons[iconIndex]) {
+                const icon = typeData.icons[iconIndex];
+                this.selectIcon(deviceType, iconIndex, icon.icon, icon.label);
             }
         }
     };
 
     // Initialize when DOM is ready
+    function initPicker() {
+        if (window.deviceIconsLibrary) {
+            IconPicker.init();
+        } else {
+            // Wait a bit for the library to load
+            setTimeout(() => {
+                if (window.deviceIconsLibrary) {
+                    IconPicker.init();
+                } else {
+                    console.error('Device icons library not loaded after timeout');
+                }
+            }, 500);
+        }
+    }
+    
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => IconPicker.init());
+        document.addEventListener('DOMContentLoaded', initPicker);
     } else {
-        IconPicker.init();
+        initPicker();
     }
 
     // Expose to global scope

@@ -204,6 +204,115 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
     </div>
 </div>
 
+<!-- Per-Host Alert Override Modal -->
+<div id="host-override-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg max-h-[80vh] overflow-hidden shadow-xl">
+        <div class="flex justify-between items-center p-4 border-b border-slate-700">
+            <h3 class="text-lg font-bold text-white"><i class="fas fa-sliders text-purple-400 mr-2"></i>Per-Host Thresholds</h3>
+            <button onclick="closeHostOverrideModal()" class="text-slate-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-4 overflow-y-auto max-h-[60vh]">
+            <div class="bg-slate-900/50 rounded-lg p-3 mb-4 border border-slate-700">
+                <p class="text-white font-medium" id="override-host-name">Host Name</p>
+                <p class="text-slate-400 text-sm" id="override-host-ip">IP Address</p>
+            </div>
+            
+            <div class="flex items-center justify-between mb-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                <label class="text-sm text-slate-300">Enable Custom Thresholds</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="override-enabled" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+            </div>
+            
+            <div id="override-thresholds" class="space-y-4">
+                <!-- CPU -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-microchip text-cyan-400 mr-2"></i>CPU Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="override-cpu-warning" min="0" max="100" value="80" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="override-cpu-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Memory -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-memory text-purple-400 mr-2"></i>Memory Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="override-memory-warning" min="0" max="100" value="80" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="override-memory-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Disk -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-hdd text-green-400 mr-2"></i>Disk Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="override-disk-warning" min="0" max="100" value="85" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="override-disk-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- GPU -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-tv text-orange-400 mr-2"></i>GPU Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="override-gpu-warning" min="0" max="100" value="80" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="override-gpu-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 border-t border-slate-700 flex justify-between">
+            <button onclick="deleteHostOverride()" class="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm font-medium transition-colors">
+                <i class="fas fa-trash mr-2"></i>Reset to Global
+            </button>
+            <div class="flex gap-3">
+                <button onclick="closeHostOverrideModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
+                    Cancel
+                </button>
+                <button onclick="saveHostOverride()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors">
+                    <i class="fas fa-save mr-2"></i>Save Override
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
 <script>
 const notyf = new Notyf({ duration: 3000, position: { x: 'right', y: 'top' } });
@@ -219,21 +328,28 @@ function createHostCard(host) {
     const statusText = isRecent ? 'Online' : 'Offline';
     
     return `
-        <div class="host-card bg-slate-800/50 rounded-xl border border-slate-700 hover:border-cyan-500/50 transition-all cursor-pointer p-4" 
-             onclick="selectHost('${host.host_ip}', '${host.host_name || host.host_ip}')">
+        <div class="host-card bg-slate-800/50 rounded-xl border border-slate-700 hover:border-cyan-500/50 transition-all p-4">
             <div class="flex justify-between items-start mb-4">
-                <div>
+                <div class="cursor-pointer flex-1" onclick="selectHost('${host.host_ip}', '${host.host_name || host.host_ip}')">
                     <div class="flex items-center gap-2 mb-1">
                         <span class="w-2 h-2 rounded-full ${statusClass}"></span>
                         <h3 class="text-white font-medium">${host.host_name || 'Unknown Host'}</h3>
+                        ${host.has_override ? '<i class="fas fa-sliders text-purple-400 text-xs" title="Custom thresholds"></i>' : ''}
                     </div>
                     <p class="text-slate-400 text-xs">${host.host_ip}</p>
                     ${host.device_name ? `<p class="text-cyan-400 text-xs mt-1"><i class="fas fa-link mr-1"></i>${host.device_name}</p>` : ''}
                 </div>
-                <span class="px-2 py-1 text-xs rounded ${isRecent ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${statusText}</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="event.stopPropagation(); openHostOverrideModal('${host.host_ip}', '${host.host_name || host.host_ip}')" 
+                            class="p-1.5 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded transition-colors" 
+                            title="Custom alert thresholds">
+                        <i class="fas fa-sliders text-xs"></i>
+                    </button>
+                    <span class="px-2 py-1 text-xs rounded ${isRecent ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${statusText}</span>
+                </div>
             </div>
             
-            <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="grid grid-cols-2 gap-3 text-sm cursor-pointer" onclick="selectHost('${host.host_ip}', '${host.host_name || host.host_ip}')">`;
                 <div class="bg-slate-900/50 rounded-lg p-2">
                     <div class="flex items-center justify-between">
                         <span class="text-slate-400 text-xs">CPU</span>
@@ -712,6 +828,148 @@ async function saveAlertSettings() {
     } catch (error) {
         console.error('Failed to save alert settings:', error);
         notyf.error('Failed to save settings');
+    }
+}
+
+// Per-Host Override Management
+let currentOverrideHostIp = null;
+let currentOverrideHostName = null;
+
+function openHostOverrideModal(hostIp, hostName) {
+    currentOverrideHostIp = hostIp;
+    currentOverrideHostName = hostName;
+    
+    document.getElementById('override-host-name').textContent = hostName;
+    document.getElementById('override-host-ip').textContent = hostIp;
+    
+    document.getElementById('host-override-modal').classList.remove('hidden');
+    document.getElementById('host-override-modal').classList.add('flex');
+    
+    loadHostOverride(hostIp);
+}
+
+function closeHostOverrideModal() {
+    document.getElementById('host-override-modal').classList.add('hidden');
+    document.getElementById('host-override-modal').classList.remove('flex');
+    currentOverrideHostIp = null;
+    currentOverrideHostName = null;
+}
+
+async function loadHostOverride(hostIp) {
+    try {
+        const response = await fetch(`api.php?action=get_host_override&host_ip=${encodeURIComponent(hostIp)}`);
+        const data = await response.json();
+        
+        const enabledCheckbox = document.getElementById('override-enabled');
+        const thresholdsDiv = document.getElementById('override-thresholds');
+        
+        if (data && data.id) {
+            enabledCheckbox.checked = data.enabled == 1;
+            document.getElementById('override-cpu-warning').value = data.cpu_warning ?? 80;
+            document.getElementById('override-cpu-critical').value = data.cpu_critical ?? 95;
+            document.getElementById('override-memory-warning').value = data.memory_warning ?? 80;
+            document.getElementById('override-memory-critical').value = data.memory_critical ?? 95;
+            document.getElementById('override-disk-warning').value = data.disk_warning ?? 85;
+            document.getElementById('override-disk-critical').value = data.disk_critical ?? 95;
+            document.getElementById('override-gpu-warning').value = data.gpu_warning ?? 80;
+            document.getElementById('override-gpu-critical').value = data.gpu_critical ?? 95;
+        } else {
+            // No override exists, use global defaults
+            enabledCheckbox.checked = false;
+            document.getElementById('override-cpu-warning').value = 80;
+            document.getElementById('override-cpu-critical').value = 95;
+            document.getElementById('override-memory-warning').value = 80;
+            document.getElementById('override-memory-critical').value = 95;
+            document.getElementById('override-disk-warning').value = 85;
+            document.getElementById('override-disk-critical').value = 95;
+            document.getElementById('override-gpu-warning').value = 80;
+            document.getElementById('override-gpu-critical').value = 95;
+        }
+        
+        thresholdsDiv.style.opacity = enabledCheckbox.checked ? '1' : '0.5';
+        thresholdsDiv.style.pointerEvents = enabledCheckbox.checked ? 'auto' : 'none';
+        
+        // Add listener for enabled toggle
+        enabledCheckbox.onchange = function() {
+            thresholdsDiv.style.opacity = this.checked ? '1' : '0.5';
+            thresholdsDiv.style.pointerEvents = this.checked ? 'auto' : 'none';
+        };
+    } catch (error) {
+        console.error('Failed to load host override:', error);
+    }
+}
+
+async function saveHostOverride() {
+    if (!currentOverrideHostIp) return;
+    
+    const enabled = document.getElementById('override-enabled').checked;
+    const settings = {
+        host_ip: currentOverrideHostIp,
+        host_name: currentOverrideHostName,
+        enabled: enabled,
+        cpu_warning: parseInt(document.getElementById('override-cpu-warning').value) || 80,
+        cpu_critical: parseInt(document.getElementById('override-cpu-critical').value) || 95,
+        memory_warning: parseInt(document.getElementById('override-memory-warning').value) || 80,
+        memory_critical: parseInt(document.getElementById('override-memory-critical').value) || 95,
+        disk_warning: parseInt(document.getElementById('override-disk-warning').value) || 85,
+        disk_critical: parseInt(document.getElementById('override-disk-critical').value) || 95,
+        gpu_warning: parseInt(document.getElementById('override-gpu-warning').value) || 80,
+        gpu_critical: parseInt(document.getElementById('override-gpu-critical').value) || 95
+    };
+    
+    // Validate thresholds
+    const metrics = ['cpu', 'memory', 'disk', 'gpu'];
+    for (const metric of metrics) {
+        if (settings[`${metric}_warning`] >= settings[`${metric}_critical`]) {
+            notyf.error(`${metric.toUpperCase()} warning must be less than critical`);
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('api.php?action=save_host_override', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            notyf.success('Host thresholds saved');
+            closeHostOverrideModal();
+            loadHosts(); // Refresh to show override indicator
+        } else {
+            notyf.error(result.error || 'Failed to save');
+        }
+    } catch (error) {
+        console.error('Failed to save host override:', error);
+        notyf.error('Failed to save');
+    }
+}
+
+async function deleteHostOverride() {
+    if (!currentOverrideHostIp) return;
+    
+    if (!confirm('Reset this host to use global thresholds?')) return;
+    
+    try {
+        const response = await fetch('api.php?action=delete_host_override', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host_ip: currentOverrideHostIp })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            notyf.success('Reset to global thresholds');
+            closeHostOverrideModal();
+            loadHosts();
+        } else {
+            notyf.error(result.error || 'Failed to reset');
+        }
+    } catch (error) {
+        console.error('Failed to delete host override:', error);
+        notyf.error('Failed to reset');
     }
 }
 
