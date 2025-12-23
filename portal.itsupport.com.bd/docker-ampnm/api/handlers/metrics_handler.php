@@ -111,6 +111,19 @@ switch ($action) {
         // Save metrics
         $metricsId = saveHostMetrics($pdo, $input, $deviceId);
         
+        // Check thresholds and send alerts if needed
+        try {
+            require_once __DIR__ . '/../../includes/host_alerts.php';
+            $alertSystem = new HostAlertSystem($pdo);
+            $alertSystem->checkAndAlert(
+                $input['host_ip'],
+                $input['host_name'] ?? $input['host_ip'],
+                $input
+            );
+        } catch (Exception $e) {
+            error_log("Host Alert Error: " . $e->getMessage());
+        }
+        
         // Cleanup old data occasionally (1 in 100 requests)
         if (rand(1, 100) === 1) {
             cleanupOldMetrics($pdo);
@@ -247,6 +260,48 @@ switch ($action) {
         $stmt = $pdo->prepare("UPDATE agent_tokens SET enabled = ? WHERE id = ?");
         $stmt->execute([$enabled, $tokenId]);
         
+        echo json_encode(['success' => true]);
+        break;
+        
+    case 'get_alert_settings':
+        $userId = $_SESSION['user_id'] ?? null;
+        $stmt = $pdo->prepare("SELECT * FROM host_alert_settings WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode($settings ?: [
+            'cpu_warning_threshold' => 80,
+            'cpu_critical_threshold' => 95,
+            'memory_warning_threshold' => 80,
+            'memory_critical_threshold' => 95,
+            'disk_warning_threshold' => 80,
+            'disk_critical_threshold' => 95,
+            'enabled' => true,
+            'cooldown_minutes' => 30
+        ]);
+        break;
+        
+    case 'save_alert_settings':
+        $userId = $_SESSION['user_id'] ?? null;
+        $stmt = $pdo->prepare("SELECT id FROM host_alert_settings WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        
+        if ($stmt->fetch()) {
+            $sql = "UPDATE host_alert_settings SET cpu_warning_threshold=?, cpu_critical_threshold=?, memory_warning_threshold=?, memory_critical_threshold=?, disk_warning_threshold=?, disk_critical_threshold=?, enabled=?, cooldown_minutes=? WHERE user_id=?";
+            $pdo->prepare($sql)->execute([
+                $input['cpu_warning_threshold'] ?? 80, $input['cpu_critical_threshold'] ?? 95,
+                $input['memory_warning_threshold'] ?? 80, $input['memory_critical_threshold'] ?? 95,
+                $input['disk_warning_threshold'] ?? 80, $input['disk_critical_threshold'] ?? 95,
+                $input['enabled'] ?? true, $input['cooldown_minutes'] ?? 30, $userId
+            ]);
+        } else {
+            $sql = "INSERT INTO host_alert_settings (user_id, cpu_warning_threshold, cpu_critical_threshold, memory_warning_threshold, memory_critical_threshold, disk_warning_threshold, disk_critical_threshold, enabled, cooldown_minutes) VALUES (?,?,?,?,?,?,?,?,?)";
+            $pdo->prepare($sql)->execute([
+                $userId, $input['cpu_warning_threshold'] ?? 80, $input['cpu_critical_threshold'] ?? 95,
+                $input['memory_warning_threshold'] ?? 80, $input['memory_critical_threshold'] ?? 95,
+                $input['disk_warning_threshold'] ?? 80, $input['disk_critical_threshold'] ?? 95,
+                $input['enabled'] ?? true, $input['cooldown_minutes'] ?? 30
+            ]);
+        }
         echo json_encode(['success' => true]);
         break;
         

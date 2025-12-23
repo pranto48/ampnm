@@ -35,6 +35,18 @@ MapApp.network = {
                 await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
             } 
         });
+        
+        // Single click: Show device info panel
+        MapApp.state.network.on("click", (params) => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                if (MapApp.deviceInfoPanel) {
+                    MapApp.deviceInfoPanel.show(nodeId);
+                }
+            }
+        });
+        
+        // Double click: Open edit modal (admin only)
         MapApp.state.network.on("doubleClick", (params) => { 
             if (window.userRole === 'admin' && params.nodes.length > 0) MapApp.ui.openDeviceModal(params.nodes[0]); 
         });

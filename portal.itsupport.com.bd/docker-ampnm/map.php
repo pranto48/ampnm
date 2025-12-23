@@ -275,6 +275,48 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             <div id="placeDeviceLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
         </div>
     </div>
+    
+    <!-- Device Info Panel (with metrics) -->
+    <div id="deviceInfoPanel" class="device-info-panel hidden">
+        <div class="device-info-header">
+            <h3 id="deviceInfoName">Device Name</h3>
+            <button id="closeDeviceInfoPanel" class="text-slate-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="device-info-content">
+            <div class="device-info-row">
+                <span class="label">IP Address</span>
+                <span id="deviceInfoIp" class="value">--</span>
+            </div>
+            <div class="device-info-row">
+                <span class="label">Status</span>
+                <span id="deviceInfoStatus" class="value">--</span>
+            </div>
+            <div class="device-info-row">
+                <span class="label">Type</span>
+                <span id="deviceInfoType" class="value">--</span>
+            </div>
+            <div class="device-info-row">
+                <span class="label">Response Time</span>
+                <span id="deviceInfoLatency" class="value">--</span>
+            </div>
+            <div class="device-info-row">
+                <span class="label">Last Seen</span>
+                <span id="deviceInfoLastSeen" class="value">--</span>
+            </div>
+            <div id="deviceInfoDescription" class="device-info-description hidden"></div>
+            
+            <!-- Host Metrics Section -->
+            <div id="deviceMetricsContainer"></div>
+        </div>
+        <?php if ($is_admin): ?>
+        <div class="device-info-actions">
+            <button id="deviceInfoEditBtn" class="btn-primary"><i class="fas fa-edit mr-1"></i>Edit</button>
+            <button id="deviceInfoPingBtn" class="btn-secondary"><i class="fas fa-sync mr-1"></i>Check</button>
+        </div>
+        <?php endif; ?>
+    </div>
 </main>
 
 <!-- Load device icons library for JavaScript icon mapping -->
