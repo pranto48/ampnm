@@ -16,6 +16,9 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
         
         <?php if ($user_role === 'admin'): ?>
         <div class="flex gap-2">
+            <button onclick="openAlertSettingsModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors">
+                <i class="fas fa-bell mr-2"></i>Alert Thresholds
+            </button>
             <button onclick="openTokenModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors">
                 <i class="fas fa-key mr-2"></i>Manage Agent Tokens
             </button>
@@ -94,6 +97,109 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
                     <i class="fas fa-spinner fa-spin mr-2"></i> Loading tokens...
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Settings Modal -->
+<div id="alert-settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg max-h-[80vh] overflow-hidden shadow-xl">
+        <div class="flex justify-between items-center p-4 border-b border-slate-700">
+            <h3 class="text-lg font-bold text-white"><i class="fas fa-bell text-amber-400 mr-2"></i>Alert Thresholds</h3>
+            <button onclick="closeAlertSettingsModal()" class="text-slate-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-4 overflow-y-auto max-h-[60vh]">
+            <p class="text-slate-400 text-sm mb-4">Configure warning and critical thresholds for system alerts. Email notifications will be sent when thresholds are exceeded.</p>
+            
+            <div class="space-y-5">
+                <!-- CPU Thresholds -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-microchip text-cyan-400 mr-2"></i>CPU Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="cpu-warning" min="0" max="100" value="80" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="cpu-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Memory Thresholds -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-memory text-purple-400 mr-2"></i>Memory Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="memory-warning" min="0" max="100" value="80" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="memory-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Disk Thresholds -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-hdd text-green-400 mr-2"></i>Disk Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="disk-warning" min="0" max="100" value="85" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="disk-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- GPU Thresholds -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-tv text-orange-400 mr-2"></i>GPU Usage</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Warning (%)</label>
+                            <input type="number" id="gpu-warning" min="0" max="100" value="80" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">Critical (%)</label>
+                            <input type="number" id="gpu-critical" min="0" max="100" value="95" 
+                                   class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Alert Cooldown -->
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <h4 class="text-white font-medium mb-3"><i class="fas fa-clock text-slate-400 mr-2"></i>Alert Cooldown</h4>
+                    <div>
+                        <label class="block text-slate-400 text-xs mb-1">Minutes between repeat alerts for same host</label>
+                        <input type="number" id="alert-cooldown" min="5" max="1440" value="30" 
+                               class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 border-t border-slate-700 flex justify-end gap-3">
+            <button onclick="closeAlertSettingsModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
+                Cancel
+            </button>
+            <button onclick="saveAlertSettings()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors">
+                <i class="fas fa-save mr-2"></i>Save Settings
+            </button>
         </div>
     </div>
 </div>
@@ -497,6 +603,81 @@ function copyToken(element, token) {
 
 function downloadAgent() {
     window.open('assets/windows-agent/AMPNM-Agent-Installer.ps1', '_blank');
+}
+
+// Alert Settings Management
+function openAlertSettingsModal() {
+    document.getElementById('alert-settings-modal').classList.remove('hidden');
+    document.getElementById('alert-settings-modal').classList.add('flex');
+    loadAlertSettings();
+}
+
+function closeAlertSettingsModal() {
+    document.getElementById('alert-settings-modal').classList.add('hidden');
+    document.getElementById('alert-settings-modal').classList.remove('flex');
+}
+
+async function loadAlertSettings() {
+    try {
+        const response = await fetch('api.php?action=get_alert_settings');
+        const data = await response.json();
+        
+        if (data && data.success !== false) {
+            document.getElementById('cpu-warning').value = data.cpu_warning ?? 80;
+            document.getElementById('cpu-critical').value = data.cpu_critical ?? 95;
+            document.getElementById('memory-warning').value = data.memory_warning ?? 80;
+            document.getElementById('memory-critical').value = data.memory_critical ?? 95;
+            document.getElementById('disk-warning').value = data.disk_warning ?? 85;
+            document.getElementById('disk-critical').value = data.disk_critical ?? 95;
+            document.getElementById('gpu-warning').value = data.gpu_warning ?? 80;
+            document.getElementById('gpu-critical').value = data.gpu_critical ?? 95;
+            document.getElementById('alert-cooldown').value = data.cooldown_minutes ?? 30;
+        }
+    } catch (error) {
+        console.error('Failed to load alert settings:', error);
+    }
+}
+
+async function saveAlertSettings() {
+    const settings = {
+        cpu_warning: parseInt(document.getElementById('cpu-warning').value) || 80,
+        cpu_critical: parseInt(document.getElementById('cpu-critical').value) || 95,
+        memory_warning: parseInt(document.getElementById('memory-warning').value) || 80,
+        memory_critical: parseInt(document.getElementById('memory-critical').value) || 95,
+        disk_warning: parseInt(document.getElementById('disk-warning').value) || 85,
+        disk_critical: parseInt(document.getElementById('disk-critical').value) || 95,
+        gpu_warning: parseInt(document.getElementById('gpu-warning').value) || 80,
+        gpu_critical: parseInt(document.getElementById('gpu-critical').value) || 95,
+        cooldown_minutes: parseInt(document.getElementById('alert-cooldown').value) || 30
+    };
+    
+    // Validate thresholds
+    const metrics = ['cpu', 'memory', 'disk', 'gpu'];
+    for (const metric of metrics) {
+        if (settings[`${metric}_warning`] >= settings[`${metric}_critical`]) {
+            notyf.error(`${metric.toUpperCase()} warning must be less than critical`);
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('api.php?action=save_alert_settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            notyf.success('Alert settings saved');
+            closeAlertSettingsModal();
+        } else {
+            notyf.error(result.error || 'Failed to save settings');
+        }
+    } catch (error) {
+        console.error('Failed to save alert settings:', error);
+        notyf.error('Failed to save settings');
+    }
 }
 
 // Range change handler
