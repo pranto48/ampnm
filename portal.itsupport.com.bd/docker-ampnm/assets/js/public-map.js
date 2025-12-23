@@ -163,10 +163,37 @@ async function loadMap() {
             loader.hidden = true;
         }
         renderMap(payload);
+        initLegends();
     } catch (error) {
         const message = error.name === "AbortError" ? "Map request timed out" : "Unexpected error";
         showError(message, error.message || "");
     }
+}
+
+// Legend toggle functionality
+function initLegends() {
+    // Toggle buttons
+    document.querySelectorAll('.legend-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const legend = btn.closest('.legend-container');
+            const legendType = legend.dataset.legend;
+            const bar = document.getElementById(legendType + '-legend-bar');
+            legend.classList.add('legend-hidden');
+            if (bar) bar.classList.remove('legend-bar-hidden');
+        });
+    });
+    
+    // Collapsed bar click to expand
+    document.querySelectorAll('.legend-bar').forEach(bar => {
+        bar.addEventListener('click', () => {
+            const legendType = bar.dataset.legend;
+            const legend = document.getElementById(legendType === 'status' ? 'status-legend-container' : 'connection-legend');
+            if (legend) {
+                legend.classList.remove('legend-hidden');
+                bar.classList.add('legend-bar-hidden');
+            }
+        });
+    });
 }
 
 loadMap();

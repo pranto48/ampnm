@@ -128,10 +128,226 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34,211,238,0.4); } 70% { box-shadow: 0 0 0 12px rgba(34,211,238,0); } 100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); } }
 
+/* Legend Container Styles (Draggable) */
+.legend-container {
+    position: absolute;
+    background-color: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 20;
+    min-width: 160px;
+    overflow: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.legend-container[data-legend="status"] {
+    bottom: 100px;
+    right: 20px;
+}
+
+.legend-container[data-legend="connection"] {
+    bottom: 20px;
+    right: 20px;
+}
+
+.legend-container.legend-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.9);
+}
+
+.legend-container.dragging {
+    cursor: grabbing;
+    box-shadow: 0 12px 40px rgba(34, 211, 238, 0.2);
+    border-color: var(--glow);
+}
+
+/* Legend Header */
+.legend-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(168, 85, 247, 0.05));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.legend-drag-handle {
+    cursor: grab;
+    color: var(--muted);
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.legend-drag-handle:hover {
+    color: var(--glow);
+    background: rgba(34, 211, 238, 0.1);
+}
+
+.legend-drag-handle:active {
+    cursor: grabbing;
+}
+
+.legend-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.legend-toggle-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.legend-toggle-btn:hover {
+    background: rgba(248, 113, 113, 0.2);
+    border-color: rgba(248, 113, 113, 0.3);
+    color: #f87171;
+}
+
+.legend-toggle-btn i {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
+/* Legend Content */
+.legend-content {
+    padding: 12px;
+}
+
+#status-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text);
+    padding: 4px 0;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.connection-types {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.conn-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text);
+}
+
+.conn-line {
+    width: 32px;
+    height: 2px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* Collapsed Legend Bar */
+.legend-bar {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--stroke);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    z-index: 15;
+    transition: all 0.2s ease;
+}
+
+.legend-bar:hover {
+    background: rgba(15, 23, 42, 1);
+    border-color: var(--glow);
+    color: var(--glow);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(34, 211, 238, 0.15);
+}
+
+.legend-bar.legend-bar-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.8);
+}
+
+#status-legend-bar {
+    bottom: 100px;
+    right: 20px;
+}
+
+#connection-legend-bar {
+    bottom: 20px;
+    right: 20px;
+}
+
 @media (max-width: 768px) {
     body { padding: 14px; }
     .page-header { flex-direction: column; align-items: flex-start; }
     .actions { width: 100%; }
     .map-frame { min-height: 420px; }
     #mapCanvas { height: 460px; }
+    
+    .legend-container {
+        min-width: 140px;
+    }
+    
+    .legend-header {
+        padding: 8px 10px;
+    }
+    
+    .legend-title {
+        font-size: 11px;
+    }
+    
+    .legend-content {
+        padding: 10px;
+    }
+    
+    .legend-item, .conn-item {
+        font-size: 11px;
+    }
+    
+    .legend-bar {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
 }

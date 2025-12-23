@@ -19,6 +19,7 @@
     <script src="assets/js/map/deviceManager.js"></script>
     <script src="assets/js/map/mapManager.js"></script>
     <script src="assets/js/map/network.js"></script>
+    <script src="assets/js/map/legend.js"></script>
     <script src="assets/js/map.js"></script>
 
     <script src="assets/js/network_graphs.js"></script>
