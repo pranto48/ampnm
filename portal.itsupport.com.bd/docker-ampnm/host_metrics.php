@@ -497,31 +497,43 @@ async function loadTokens() {
             return;
         }
         
-        container.innerHTML = tokens.map(token => `
-            <div class="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-white font-medium">${token.name}</p>
-                        <code class="text-xs text-cyan-400 bg-slate-800 px-2 py-1 rounded mt-1 inline-block cursor-pointer" 
-                              onclick="copyToken(this, '${token.token}')" title="Click to copy">
-                            ${token.token.substring(0, 16)}...
-                        </code>
-                        <p class="text-slate-500 text-xs mt-1">
-                            Last used: ${token.last_used_at ? new Date(token.last_used_at).toLocaleString() : 'Never'}
-                        </p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="toggleToken(${token.id}, ${!token.enabled})" 
-                                class="px-2 py-1 text-xs rounded ${token.enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
-                            ${token.enabled ? 'Enabled' : 'Disabled'}
-                        </button>
-                        <button onclick="deleteToken(${token.id})" class="px-2 py-1 text-xs bg-red-500/20 text-red-400 rounded hover:bg-red-500/30">
-                            <i class="fas fa-trash"></i>
-                        </button>
+        container.innerHTML = tokens.map(token => {
+            const tokenStr = token.token || '';
+            const tokenPreview = tokenStr.length > 16 ? tokenStr.substring(0, 16) + '...' : tokenStr;
+            const isEnabled = token.enabled == 1 || token.enabled === true;
+            const lastUsed = token.last_used_at ? new Date(token.last_used_at).toLocaleString() : 'Never';
+            
+            return `
+                <div class="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-white font-medium">${token.name || 'Unnamed Token'}</p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <code class="text-xs text-cyan-400 bg-slate-800 px-2 py-1 rounded cursor-pointer hover:bg-slate-700 transition-colors" 
+                                      onclick="copyToken(this, '${tokenStr}')" title="Click to copy full token">
+                                    ${tokenPreview}
+                                </code>
+                                <button onclick="copyToken(this, '${tokenStr}')" class="text-xs text-slate-400 hover:text-cyan-400 transition-colors" title="Copy token">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <p class="text-slate-500 text-xs mt-1">
+                                Last used: ${lastUsed}
+                            </p>
+                        </div>
+                        <div class="flex gap-2 ml-2">
+                            <button onclick="toggleToken(${token.id}, ${!isEnabled})" 
+                                    class="px-2 py-1 text-xs rounded ${isEnabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                                ${isEnabled ? 'Enabled' : 'Disabled'}
+                            </button>
+                            <button onclick="deleteToken(${token.id})" class="px-2 py-1 text-xs bg-red-500/20 text-red-400 rounded hover:bg-red-500/30">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
         console.error('Failed to load tokens:', error);
         notyf.error('Failed to load tokens');
@@ -596,9 +608,32 @@ async function toggleToken(id, enabled) {
 }
 
 function copyToken(element, token) {
-    navigator.clipboard.writeText(token).then(() => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(token).then(() => {
+            notyf.success('Token copied to clipboard');
+        }).catch(() => {
+            fallbackCopy(token);
+        });
+    } else {
+        fallbackCopy(token);
+    }
+}
+
+function fallbackCopy(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
         notyf.success('Token copied to clipboard');
-    });
+    } catch (err) {
+        notyf.error('Failed to copy. Please copy manually.');
+        prompt('Copy this token:', text);
+    }
+    document.body.removeChild(textArea);
 }
 
 function downloadAgent() {
