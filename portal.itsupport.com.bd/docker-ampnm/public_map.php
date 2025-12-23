@@ -46,6 +46,59 @@
             </div>
             <div id="mapError" class="error-card" hidden></div>
             <div id="mapCanvas"></div>
+            
+            <!-- Status Legend (Draggable) -->
+            <div id="status-legend-container" class="legend-container" data-legend="status">
+                <div class="legend-header">
+                    <span class="legend-drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                    <span class="legend-title">Device Status</span>
+                    <button class="legend-toggle-btn" data-target="status-legend-content" title="Hide Legend">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                <div id="status-legend-content" class="legend-content">
+                    <div id="status-legend">
+                        <div class="legend-item"><div class="legend-dot" style="background-color: #22c55e;"></div><span>Online</span></div>
+                        <div class="legend-item"><div class="legend-dot" style="background-color: #f59e0b;"></div><span>Warning</span></div>
+                        <div class="legend-item"><div class="legend-dot" style="background-color: #dc2626;"></div><span>Critical</span></div>
+                        <div class="legend-item"><div class="legend-dot" style="background-color: #64748b;"></div><span>Offline</span></div>
+                        <div class="legend-item"><div class="legend-dot" style="background-color: #94a3b8;"></div><span>Unknown</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Collapsed Status Legend Bar -->
+            <button id="status-legend-bar" class="legend-bar legend-bar-hidden" data-legend="status">
+                <i class="fas fa-circle" style="color: #22c55e;"></i>
+                <span>Status</span>
+            </button>
+            
+            <!-- Connection Types Legend (Draggable) -->
+            <div id="connection-legend" class="legend-container" data-legend="connection">
+                <div class="legend-header">
+                    <span class="legend-drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                    <span class="legend-title"><i class="fas fa-project-diagram mr-2" style="color: #22d3ee;"></i>Connection Types</span>
+                    <button class="legend-toggle-btn" data-target="connection-legend-content" title="Hide Legend">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                <div id="connection-legend-content" class="legend-content">
+                    <div class="connection-types">
+                        <div class="conn-item"><div class="conn-line" style="background-color: #a78bfa;"></div><span>🔌 CAT5 Cable</span></div>
+                        <div class="conn-item"><div class="conn-line" style="background-color: #f97316;"></div><span>💡 Fiber Optic</span></div>
+                        <div class="conn-item"><div class="conn-line" style="background-color: #38bdf8;"></div><span>📡 WiFi</span></div>
+                        <div class="conn-item"><div class="conn-line" style="background-color: #84cc16;"></div><span>📻 Radio</span></div>
+                        <div class="conn-item"><div class="conn-line" style="background-color: #60a5fa;"></div><span>🌐 LAN</span></div>
+                        <div class="conn-item"><div class="conn-line" style="background-color: #c084fc;"></div><span>🔒 Tunnel</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Collapsed Connection Legend Bar -->
+            <button id="connection-legend-bar" class="legend-bar legend-bar-hidden" data-legend="connection">
+                <i class="fas fa-project-diagram" style="color: #22d3ee;"></i>
+                <span>Connections</span>
+            </button>
         </section>
     </div>
 

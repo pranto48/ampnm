@@ -141,13 +141,175 @@ button:hover, a.hoverable:hover {
     background-color: #0f172a; border: 1px solid #334155; border-radius: 3px; z-index: 10;
 }
 
-#status-legend {
-    position: absolute; bottom: 1.25rem; right: 1.25rem; background-color: rgba(15, 23, 42, 0.8);
-    border: 1px solid #334155; border-radius: 0.5rem; padding: 0.75rem;
-    display: flex; flex-direction: column; gap: 0.5rem; z-index: 5;
+/* Legend Container Styles (Draggable) */
+.legend-container {
+    position: absolute;
+    background-color: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid #334155;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 20;
+    min-width: 160px;
+    overflow: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
-.legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+.legend-container[data-legend="status"] {
+    bottom: 100px;
+    right: 20px;
+}
+
+.legend-container[data-legend="connection"] {
+    bottom: 20px;
+    right: 20px;
+}
+
+.legend-container.legend-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.9);
+}
+
+.legend-container.dragging {
+    cursor: grabbing;
+    box-shadow: 0 12px 40px rgba(0, 212, 255, 0.2);
+    border-color: #22d3ee;
+}
+
+/* Legend Header */
+.legend-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(168, 85, 247, 0.05));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.legend-drag-handle {
+    cursor: grab;
+    color: #64748b;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.legend-drag-handle:hover {
+    color: #22d3ee;
+    background: rgba(34, 211, 238, 0.1);
+}
+
+.legend-drag-handle:active {
+    cursor: grabbing;
+}
+
+.legend-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.legend-toggle-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.legend-toggle-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+.legend-toggle-btn i {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
+/* Legend Content */
+.legend-content {
+    padding: 12px;
+}
+
+#status-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #cbd5e1;
+    padding: 4px 0;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Collapsed Legend Bar */
+.legend-bar {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    z-index: 15;
+    transition: all 0.2s ease;
+}
+
+.legend-bar:hover {
+    background: rgba(15, 23, 42, 1);
+    border-color: #22d3ee;
+    color: #22d3ee;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(34, 211, 238, 0.15);
+}
+
+.legend-bar.legend-bar-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.8);
+}
+
+#status-legend-bar {
+    bottom: 100px;
+    right: 20px;
+}
+
+#connection-legend-bar {
+    bottom: 20px;
+    right: 20px;
+}
 
 /* Context Menu */
 .context-menu {
@@ -180,4 +342,32 @@ button:hover, a.hoverable:hover {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
+}
+
+/* Mobile adjustments for legends */
+@media (max-width: 640px) {
+    .legend-container {
+        min-width: 140px;
+    }
+    
+    .legend-header {
+        padding: 8px 10px;
+    }
+    
+    .legend-title {
+        font-size: 11px;
+    }
+    
+    .legend-content {
+        padding: 10px;
+    }
+    
+    .legend-item {
+        font-size: 11px;
+    }
+    
+    .legend-bar {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
 }
