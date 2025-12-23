@@ -1,18 +1,26 @@
 <?php
 /**
  * Host Alert System - Checks thresholds and sends email alerts
- * Uses the existing SMTP settings from the notification system
+ * Uses PHPMailer for reliable SMTP delivery
  */
+
+require_once __DIR__ . '/mailer.php';
 
 class HostAlertSystem {
     private $pdo;
     private $settings;
     private $smtpSettings;
+    private $mailer;
     
     public function __construct($pdo) {
         $this->pdo = $pdo;
         $this->loadSettings();
         $this->loadSmtpSettings();
+        
+        // Initialize mailer if SMTP settings exist
+        if ($this->smtpSettings) {
+            $this->mailer = new AMPNMMailer($this->smtpSettings);
+        }
     }
     
     /**
@@ -59,7 +67,7 @@ class HostAlertSystem {
      * Check metrics against thresholds and send alerts if needed
      */
     public function checkAndAlert($hostIp, $hostName, $metrics) {
-        if (!$this->settings['enabled'] || !$this->smtpSettings) {
+        if (!$this->settings['enabled'] || !$this->smtpSettings || !$this->mailer) {
             return; // Alerts disabled or no SMTP configured
         }
         
@@ -188,10 +196,8 @@ class HostAlertSystem {
      * Send email alert
      */
     private function sendAlert($hostIp, $hostName, $alert, $metrics) {
-        $smtp = $this->smtpSettings;
-        
-        // Get admin email recipients (all device subscriptions for now, or use SMTP from_email)
-        $recipients = [$smtp['from_email']];
+        // Get admin email recipients (use SMTP from_email as default recipient)
+        $recipients = [$this->smtpSettings['from_email']];
         
         $levelEmoji = $alert['level'] === 'critical' ? '🔴' : '🟡';
         $typeLabel = ucfirst($alert['type']);
@@ -200,17 +206,12 @@ class HostAlertSystem {
         
         $body = $this->buildEmailBody($hostIp, $hostName, $alert, $metrics);
         
-        // Use PHP mail or SMTP library
-        $headers = [
-            'MIME-Version: 1.0',
-            'Content-type: text/html; charset=utf-8',
-            'From: ' . ($smtp['from_name'] ? "{$smtp['from_name']} <{$smtp['from_email']}>" : $smtp['from_email']),
-            'Reply-To: ' . $smtp['from_email']
-        ];
-        
+        // Send using PHPMailer
         foreach ($recipients as $to) {
-            // Try to use mail() function
-            @mail($to, $subject, $body, implode("\r\n", $headers));
+            $result = $this->mailer->send($to, $subject, $body);
+            if (!$result) {
+                error_log("Failed to send alert to {$to}: " . $this->mailer->getLastError());
+            }
         }
         
         // Log for debugging

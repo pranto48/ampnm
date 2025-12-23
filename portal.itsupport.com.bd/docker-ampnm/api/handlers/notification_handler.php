@@ -1,5 +1,7 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
+require_once __DIR__ . '/../../includes/mailer.php';
+
 $current_user_id = $_SESSION['user_id'];
 
 switch ($action) {
@@ -140,83 +142,19 @@ switch ($action) {
                 exit;
             }
             
-            // Build test email
-            $subject = "AMPNM Test Email - Configuration Verified";
-            $time = date('Y-m-d H:i:s');
-            
-            $body = "
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
-                    .container { max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 12px; overflow: hidden; }
-                    .header { background: #22c55e; color: white; padding: 20px; text-align: center; }
-                    .header h1 { margin: 0; font-size: 24px; }
-                    .content { padding: 24px; }
-                    .metric { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #334155; }
-                    .metric:last-child { border-bottom: none; }
-                    .label { color: #94a3b8; }
-                    .value { font-weight: bold; color: #fff; }
-                    .footer { padding: 16px 24px; background: #0f172a; text-align: center; font-size: 12px; color: #64748b; }
-                    .success { color: #22c55e; }
-                </style>
-            </head>
-            <body>
-                <div class='container'>
-                    <div class='header'>
-                        <h1>✅ SMTP Configuration Test</h1>
-                    </div>
-                    <div class='content'>
-                        <p style='text-align: center; font-size: 18px; color: #22c55e; margin-bottom: 20px;'>
-                            Your SMTP settings are working correctly!
-                        </p>
-                        <div class='metric'>
-                            <span class='label'>SMTP Host</span>
-                            <span class='value'>{$smtp['host']}</span>
-                        </div>
-                        <div class='metric'>
-                            <span class='label'>Port</span>
-                            <span class='value'>{$smtp['port']}</span>
-                        </div>
-                        <div class='metric'>
-                            <span class='label'>Encryption</span>
-                            <span class='value'>" . strtoupper($smtp['encryption']) . "</span>
-                        </div>
-                        <div class='metric'>
-                            <span class='label'>From Email</span>
-                            <span class='value'>{$smtp['from_email']}</span>
-                        </div>
-                        <div class='metric'>
-                            <span class='label'>Test Sent At</span>
-                            <span class='value'>{$time}</span>
-                        </div>
-                    </div>
-                    <div class='footer'>
-                        Sent by AMPNM Network Monitoring System
-                    </div>
-                </div>
-            </body>
-            </html>
-            ";
-            
-            // Send email using PHP mail() or configured SMTP
-            $headers = [
-                'MIME-Version: 1.0',
-                'Content-type: text/html; charset=utf-8',
-                'From: ' . ($smtp['from_name'] ? "{$smtp['from_name']} <{$smtp['from_email']}>" : $smtp['from_email']),
-                'Reply-To: ' . $smtp['from_email']
-            ];
-            
-            $result = @mail($test_email, $subject, $body, implode("\r\n", $headers));
-            
-            if ($result) {
-                error_log("Test email sent to {$test_email} from SMTP settings for user {$current_user_id}");
-                echo json_encode(['success' => true, 'message' => "Test email sent successfully to {$test_email}"]);
-            } else {
-                $lastError = error_get_last();
-                error_log("Failed to send test email to {$test_email}: " . ($lastError['message'] ?? 'Unknown error'));
-                echo json_encode(['success' => false, 'error' => 'Failed to send test email. Check your server mail configuration.']);
+            // Use PHPMailer for reliable SMTP delivery
+            try {
+                $mailer = new AMPNMMailer($smtp);
+                $result = $mailer->sendTest($test_email);
+                
+                if ($result['success']) {
+                    echo json_encode(['success' => true, 'message' => $result['message']]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => $result['message']]);
+                }
+            } catch (Exception $e) {
+                error_log("PHPMailer exception: " . $e->getMessage());
+                echo json_encode(['success' => false, 'error' => 'Failed to send test email: ' . $e->getMessage()]);
             }
         }
         break;
