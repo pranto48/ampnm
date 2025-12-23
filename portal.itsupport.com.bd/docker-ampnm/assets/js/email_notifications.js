@@ -11,7 +11,11 @@ function initEmailNotifications() {
         smtpFromEmail: document.getElementById('smtpFromEmail'),
         smtpFromName: document.getElementById('smtpFromName'),
         saveSmtpBtn: document.getElementById('saveSmtpBtn'),
+        testSmtpBtn: document.getElementById('testSmtpBtn'),
         smtpLoader: document.getElementById('smtpLoader'),
+        testEmailModal: document.getElementById('testEmailModal'),
+        testEmailAddress: document.getElementById('testEmailAddress'),
+        sendTestEmailBtn: document.getElementById('sendTestEmailBtn'),
 
         deviceSelect: document.getElementById('deviceSelect'),
         subscriptionFormContainer: document.getElementById('subscriptionFormContainer'),
@@ -88,6 +92,48 @@ function initEmailNotifications() {
                 els.saveSmtpBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Settings';
             }
         });
+        
+        // Test Email functionality
+        els.testSmtpBtn.addEventListener('click', () => {
+            // Pre-fill with from_email if available
+            if (els.smtpFromEmail.value) {
+                els.testEmailAddress.value = els.smtpFromEmail.value;
+            }
+            els.testEmailModal.classList.remove('hidden');
+            els.testEmailModal.classList.add('flex');
+        });
+        
+        window.closeTestEmailModal = () => {
+            els.testEmailModal.classList.add('hidden');
+            els.testEmailModal.classList.remove('flex');
+        };
+        
+        window.sendTestEmail = async () => {
+            const email = els.testEmailAddress.value.trim();
+            if (!email) {
+                window.notyf.error('Please enter an email address.');
+                return;
+            }
+            
+            els.sendTestEmailBtn.disabled = true;
+            els.sendTestEmailBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+            
+            try {
+                const result = await api.post('test_smtp', { email });
+                if (result.success) {
+                    window.notyf.success(result.message);
+                    window.closeTestEmailModal();
+                } else {
+                    window.notyf.error(result.error || 'Failed to send test email.');
+                }
+            } catch (error) {
+                window.notyf.error('An unexpected error occurred while sending test email.');
+                console.error(error);
+            } finally {
+                els.sendTestEmailBtn.disabled = false;
+                els.sendTestEmailBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Test';
+            }
+        };
     } else {
         // Disable SMTP form elements for viewers
         if (els.smtpSettingsForm) {
