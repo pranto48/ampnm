@@ -1,0 +1,28 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /docker-ampnm/
+
+    # Prevent direct access to login.php from the /assets/ directory
+    # This is a specific fix for the reported ERR_TOO_MANY_REDIRECTS on /assets/login.php
+    RewriteRule ^assets/login\.php$ - [F,L] # Forbid access (returns 403 Forbidden)
+
+    # Explicitly allow direct access to API and public map entry points
+    # These should not be rewritten to index.php
+    RewriteRule ^api\.php$ - [L]
+    RewriteRule ^public_map\.php$ - [L]
+    RewriteRule ^database_setup\.php$ - [L]
+    RewriteRule ^logout\.php$ - [L]
+    RewriteRule ^license_setup\.php$ - [L]
+    RewriteRule ^license_expired\.php$ - [L]
+
+    # For the React build assets, ensure they are served directly
+    RewriteRule ^assets/(.*)$ assets/$1 [L]
+
+    # Handle React Router client-side routing for index.php
+    # If the request is not for a real file or directory, serve index.php
+    # This is for the main authenticated React app
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^((?!api\.php|public_map\.php|database_setup\.php|logout\.php|license_setup\.php|license_expired\.php).*)$ index.php [NC,L]
+
+</IfModule>

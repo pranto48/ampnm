@@ -1,0 +1,174 @@
+╔══════════════════════════════════════════════════════════════╗
+║  AMPNM - Script Version for XAMPP/LAMP                      ║
+║  Quick Start Guide - UPDATED with Auto Setup!               ║
+╚══════════════════════════════════════════════════════════════╝
+
+🚀 FASTEST INSTALLATION EVER! (2 STEPS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Copy files to web directory
+  XAMPP: C:\xampp\htdocs\ampnm
+  LAMP:  /var/www/html/ampnm
+
+Step 2: Open setup wizard
+  http://localhost/ampnm/setup.php
+
+That's it! The wizard does everything else automatically! 🎉
+
+📋 DETAILED STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. COPY FILES
+   Windows XAMPP: Copy to C:\xampp\htdocs\ampnm
+   Mac XAMPP:     Copy to /Applications/XAMPP/htdocs/ampnm
+   Linux LAMP:    sudo cp -r script-ampnm /var/www/html/ampnm
+
+2. START SERVICES
+   XAMPP: Open Control Panel → Start Apache & MySQL
+   LAMP:  sudo systemctl start apache2 mysql
+
+3. OPEN SETUP WIZARD
+   Browser: http://localhost/ampnm/setup.php
+
+4. ENTER DATABASE INFO
+   Host:     localhost
+   User:     root
+   Password: (leave empty for XAMPP)
+   Database: network_monitor
+
+5. CLICK "TEST & CONTINUE"
+   The wizard will:
+   ✓ Test connection
+   ✓ Create database
+   ✓ Create all tables (users, devices, maps, etc.)
+   ✓ Generate config.php
+   ✓ Set up admin user
+
+6. LOGIN & USE!
+   Username: admin
+   Password: admin123
+   ⚠️ Change password immediately!
+
+✨ WHAT GETS CREATED AUTOMATICALLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Database: network_monitor
+✓ 9 Tables: users, devices, maps, ping_results, etc.
+✓ Admin user: admin/admin123
+✓ config.php file with your database settings
+✓ Installation ID for licensing
+
+NO manual database work needed!
+NO phpMyAdmin required!
+NO SQL imports!
+NO config file editing!
+
+🎯 DEFAULT VALUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Database Configuration:
+  Host: localhost
+  User: root
+  Pass: (empty)
+  DB:   network_monitor
+
+Login Credentials:
+  User: admin
+  Pass: admin123
+
+📍 ACCESS URLS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Setup Wizard:  http://localhost/ampnm/setup.php
+Dashboard:     http://localhost/ampnm/
+Login:         http://localhost/ampnm/login.php
+Map View:      http://localhost/ampnm/map.php
+
+✅ FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Real-time network monitoring
+✓ Ping, HTTP, TCP checks
+✓ Visual network topology map
+✓ Alert system
+✓ Email notifications
+✓ Historical data
+✓ User management
+✓ License system
+✓ Mobile responsive
+
+🆚 vs DOCKER VERSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Same Features: ✓ 100% Identical
+Same UI:       ✓ Looks exactly the same
+Same Tables:   ✓ Database structure identical
+
+Only difference: Installation method!
+  Docker:  docker-compose up
+  Script:  setup.php wizard
+
+Both work perfectly! Choose based on your preference.
+
+🔧 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Connection failed"
+  → Check MySQL is running in XAMPP Control Panel
+  → Try 127.0.0.1 instead of localhost
+  → Verify username/password
+
+"Access denied"
+  → Use 'root' as username for XAMPP
+  → Password should be empty for default XAMPP
+  → Restart MySQL service
+
+"Can't create database"
+  → User needs CREATE privilege
+  → Try logging into MySQL as root first
+  → Check disk space
+
+"Page not found"
+  → Verify files are in htdocs/ampnm
+  → Check Apache is running
+  → Try http://127.0.0.1/ampnm/setup.php
+
+⏰ ENABLE AUTO-MONITORING (Optional)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For continuous monitoring, set up a scheduled task:
+
+Windows (Task Scheduler):
+  Program:   C:\xampp\php\php.exe
+  Arguments: C:\xampp\htdocs\ampnm\api.php
+  Schedule:  Every 1 minute
+
+Linux (Crontab):
+  * * * * * curl http://localhost/ampnm/api.php?action=check_all
+
+Mac (Crontab):
+  * * * * * /Applications/XAMPP/xamppfiles/bin/php /Applications/XAMPP/xamppfiles/htdocs/ampnm/api.php
+
+📞 SUPPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Website: https://portal.itsupport.com.bd
+Email:   support@itsupport.com.bd
+Docs:    See README.md for full documentation
+
+📝 WHAT'S INCLUDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ setup.php              - Setup wizard (START HERE!)
+✓ README.md              - Full documentation
+✓ INSTALLATION.md        - Detailed install guide
+✓ QUICK_START.txt        - This file
+✓ All application files  - Ready to use!
+
+═══════════════════════════════════════════════════════════════
+
+NEXT STEP: http://localhost/ampnm/setup.php
+
+The wizard will guide you through everything! 🚀
+
+═══════════════════════════════════════════════════════════════
