@@ -753,7 +753,15 @@ function fallbackCopy(text) {
 }
 
 function downloadAgent() {
-    window.location.href = 'download-agent.php?file=AMPNM-Agent-Installer.ps1';
+    // Use direct link element for better browser compatibility
+    const downloadUrl = 'download-agent.php?file=AMPNM-Agent-Installer.ps1';
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = 'AMPNM-Agent-Installer.ps1';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 // Alert Settings Management
