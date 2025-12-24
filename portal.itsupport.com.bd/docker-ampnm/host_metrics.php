@@ -25,6 +25,9 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
             <button onclick="downloadAgent()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
                 <i class="fas fa-download mr-2"></i>Download Agent
             </button>
+            <button onclick="copyInstallCommand()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
+                <i class="fas fa-copy mr-2"></i>Copy Install Command
+            </button>
         </div>
         <?php endif; ?>
     </div>
@@ -762,6 +765,30 @@ function downloadAgent() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+function copyInstallCommand() {
+    const serverUrl = window.location.origin;
+    const installCommand = `powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '${serverUrl}/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\\AMPNM-Agent-Installer.ps1 }"`;
+    
+    navigator.clipboard.writeText(installCommand).then(() => {
+        showToast('Install command copied to clipboard!', 'success');
+    }).catch(err => {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = installCommand;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showToast('Install command copied to clipboard!', 'success');
+        } catch (e) {
+            showToast('Failed to copy command', 'error');
+        }
+        document.body.removeChild(textArea);
+    });
 }
 
 // Alert Settings Management
