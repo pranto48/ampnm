@@ -140,6 +140,7 @@ try {
             `status` ENUM('online', 'offline', 'unknown', 'warning', 'critical') DEFAULT 'unknown',
             `last_seen` TIMESTAMP NULL,
             `type` VARCHAR(50) NOT NULL DEFAULT 'server',
+            `subchoice` TINYINT UNSIGNED NOT NULL DEFAULT 0,
             `description` TEXT,
             `enabled` BOOLEAN DEFAULT TRUE,
             `x` DECIMAL(10, 4) NULL,
@@ -450,6 +451,11 @@ try {
     if (!columnExists($pdo, $dbname, 'devices', 'router_api_port')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `router_api_port` INT(5) NULL AFTER `router_api_password`;");
         message("Upgraded 'devices' table: added 'router_api_port' column.");
+    }
+    // NEW MIGRATION: Add subchoice column to devices table for icon variants
+    if (!columnExists($pdo, $dbname, 'devices', 'subchoice')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `subchoice` TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER `type`;");
+        message("Upgraded 'devices' table: added 'subchoice' column for icon variants.");
     }
 
 
