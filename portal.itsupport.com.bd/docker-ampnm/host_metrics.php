@@ -77,7 +77,7 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
 </div>
 
 <!-- Agent Tokens Modal -->
-<div id="token-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70">
+<div id="token-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70">
     <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-xl">
         <div class="flex justify-between items-center p-4 border-b border-slate-700">
             <h3 class="text-lg font-bold text-white"><i class="fas fa-key text-cyan-400 mr-2"></i>Agent Tokens</h3>
