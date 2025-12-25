@@ -25,11 +25,59 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
             <button onclick="downloadAgent()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
                 <i class="fas fa-download mr-2"></i>Download Agent
             </button>
-            <button onclick="copyInstallCommand()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
-                <i class="fas fa-copy mr-2"></i>Copy Install Command
-            </button>
+            <div class="relative group">
+                <button onclick="copyInstallCommand()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
+                    <i class="fas fa-copy mr-2"></i>Copy Install Command
+                </button>
+                <!-- Tooltip -->
+                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 p-3 bg-slate-900 border border-slate-600 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <p class="text-xs text-slate-400 mb-2">PowerShell command that will be copied:</p>
+                    <code class="text-xs text-green-400 break-all leading-relaxed block">powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '&lt;server&gt;/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\AMPNM-Agent-Installer.ps1 }"</code>
+                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full">
+                        <div class="border-8 border-transparent border-t-slate-900"></div>
+                    </div>
+                </div>
+            </div>
         </div>
         <?php endif; ?>
+    </div>
+    
+    <!-- Agent Installation Status Summary -->
+    <div id="agent-status-summary" class="bg-slate-800/50 rounded-xl border border-slate-700 p-4 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-satellite-dish text-cyan-400 text-xl"></i>
+                <div>
+                    <h3 class="text-white font-medium">Agent Installation Status</h3>
+                    <p class="text-slate-400 text-xs">Track which hosts have successfully installed and registered the monitoring agent</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-4">
+                <div class="flex items-center gap-2 px-3 py-2 bg-green-500/10 rounded-lg border border-green-500/30">
+                    <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+                    <span class="text-green-400 font-medium text-sm" id="registered-count">0</span>
+                    <span class="text-slate-400 text-xs">Registered</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
+                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>
+                    <span class="text-cyan-400 font-medium text-sm" id="online-count">0</span>
+                    <span class="text-slate-400 text-xs">Online Now</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-red-500/10 rounded-lg border border-red-500/30">
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span class="text-red-400 font-medium text-sm" id="offline-count">0</span>
+                    <span class="text-slate-400 text-xs">Offline</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- First Seen Info -->
+        <div id="recent-registrations" class="mt-4 hidden">
+            <div class="border-t border-slate-700 pt-3">
+                <p class="text-xs text-slate-400 mb-2"><i class="fas fa-clock mr-1"></i>Recent Registrations</p>
+                <div id="recent-registrations-list" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
     </div>
     
     <!-- Monitored Hosts Grid -->
@@ -330,6 +378,10 @@ function createHostCard(host) {
     const statusClass = isRecent ? 'bg-green-500' : 'bg-red-500';
     const statusText = isRecent ? 'Online' : 'Offline';
     
+    // Calculate time since first registration
+    const firstSeen = host.first_seen_at ? new Date(host.first_seen_at) : null;
+    const firstSeenDisplay = firstSeen ? getTimeAgo(firstSeen) : 'Unknown';
+    
     return `
         <div class="host-card bg-slate-800/50 rounded-xl border border-slate-700 hover:border-cyan-500/50 transition-all p-4">
             <div class="flex justify-between items-start mb-4">
@@ -338,6 +390,9 @@ function createHostCard(host) {
                         <span class="w-2 h-2 rounded-full ${statusClass}"></span>
                         <h3 class="text-white font-medium">${host.host_name || 'Unknown Host'}</h3>
                         ${host.has_override ? '<i class="fas fa-sliders text-purple-400 text-xs" title="Custom thresholds"></i>' : ''}
+                        <span class="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-400 rounded border border-green-500/30" title="Agent registered ${firstSeenDisplay}">
+                            <i class="fas fa-check-circle mr-0.5"></i>Registered
+                        </span>
                     </div>
                     <p class="text-slate-400 text-xs">${host.host_ip}</p>
                     ${host.device_name ? `<p class="text-cyan-400 text-xs mt-1"><i class="fas fa-link mr-1"></i>${host.device_name}</p>` : ''}
@@ -352,7 +407,7 @@ function createHostCard(host) {
                 </div>
             </div>
             
-            <div class="grid grid-cols-2 gap-3 text-sm cursor-pointer" onclick="selectHost('${host.host_ip}', '${host.host_name || host.host_ip}')">`;
+            <div class="grid grid-cols-2 gap-3 text-sm cursor-pointer" onclick="selectHost('${host.host_ip}', '${host.host_name || host.host_ip}')">
                 <div class="bg-slate-900/50 rounded-lg p-2">
                     <div class="flex items-center justify-between">
                         <span class="text-slate-400 text-xs">CPU</span>
@@ -391,9 +446,34 @@ function createHostCard(host) {
                 </div>
             </div>
             
-            <p class="text-slate-500 text-xs mt-3 text-right">Updated: ${lastUpdate}</p>
+            <div class="flex justify-between items-center mt-3 text-xs">
+                <span class="text-slate-500" title="First registered"><i class="fas fa-calendar-plus mr-1"></i>${firstSeenDisplay}</span>
+                <span class="text-slate-500">Updated: ${lastUpdate}</span>
+            </div>
         </div>
     `;
+}
+
+// Helper function to format time ago
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    const intervals = {
+        year: 31536000,
+        month: 2592000,
+        week: 604800,
+        day: 86400,
+        hour: 3600,
+        minute: 60
+    };
+    
+    for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+        const interval = Math.floor(seconds / secondsInUnit);
+        if (interval >= 1) {
+            return interval === 1 ? `1 ${unit} ago` : `${interval} ${unit}s ago`;
+        }
+    }
+    return 'Just now';
 }
 
 // Load all hosts
@@ -403,6 +483,9 @@ async function loadHosts() {
         const hosts = await response.json();
         
         const container = document.getElementById('hosts-container');
+        
+        // Update status summary
+        updateAgentStatusSummary(hosts || []);
         
         if (!hosts || hosts.length === 0) {
             container.innerHTML = `
@@ -419,6 +502,39 @@ async function loadHosts() {
     } catch (error) {
         console.error('Failed to load hosts:', error);
         notyf.error('Failed to load hosts');
+    }
+}
+
+// Update agent installation status summary
+function updateAgentStatusSummary(hosts) {
+    const registeredCount = hosts.length;
+    const onlineCount = hosts.filter(h => h.created_at && (Date.now() - new Date(h.created_at).getTime()) < 300000).length;
+    const offlineCount = registeredCount - onlineCount;
+    
+    document.getElementById('registered-count').textContent = registeredCount;
+    document.getElementById('online-count').textContent = onlineCount;
+    document.getElementById('offline-count').textContent = offlineCount;
+    
+    // Show recent registrations (last 24 hours)
+    const recentHosts = hosts.filter(h => {
+        if (!h.first_seen_at) return false;
+        return (Date.now() - new Date(h.first_seen_at).getTime()) < 86400000; // 24 hours
+    });
+    
+    const recentContainer = document.getElementById('recent-registrations');
+    const recentList = document.getElementById('recent-registrations-list');
+    
+    if (recentHosts.length > 0) {
+        recentContainer.classList.remove('hidden');
+        recentList.innerHTML = recentHosts.map(host => `
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-800 rounded-lg border border-slate-600 text-xs">
+                <i class="fas fa-desktop text-cyan-400"></i>
+                <span class="text-white">${host.host_name || host.host_ip}</span>
+                <span class="text-slate-400">- ${getTimeAgo(new Date(host.first_seen_at))}</span>
+            </span>
+        `).join('');
+    } else {
+        recentContainer.classList.add('hidden');
     }
 }
 
