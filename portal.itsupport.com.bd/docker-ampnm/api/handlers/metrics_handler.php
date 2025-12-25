@@ -198,10 +198,11 @@ switch ($action) {
         break;
         
     case 'get_all_hosts':
-        // Get list of all monitored hosts with latest metrics
+        // Get list of all monitored hosts with latest metrics and first registration time
         $stmt = $pdo->query("
             SELECT hm.*, d.name as device_name, d.id as linked_device_id,
-                   CASE WHEN hao.id IS NOT NULL AND hao.enabled = 1 THEN 1 ELSE 0 END as has_override
+                   CASE WHEN hao.id IS NOT NULL AND hao.enabled = 1 THEN 1 ELSE 0 END as has_override,
+                   (SELECT MIN(created_at) FROM host_metrics WHERE host_ip = hm.host_ip) as first_seen_at
             FROM host_metrics hm
             LEFT JOIN devices d ON hm.device_id = d.id
             LEFT JOIN host_alert_overrides hao ON hm.host_ip = hao.host_ip
