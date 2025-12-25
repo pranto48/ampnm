@@ -52,7 +52,22 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
                     <p class="text-slate-400 text-xs">Track which hosts have successfully installed and registered the monitoring agent</p>
                 </div>
             </div>
-            <div class="flex flex-wrap gap-4">
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Notification Controls -->
+                <div class="flex items-center gap-1 mr-2">
+                    <button id="notification-toggle" onclick="toggleNotifications()" 
+                            class="p-2 rounded-lg hover:bg-slate-700 transition-colors text-green-400" 
+                            title="Notifications On">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button id="sound-toggle" onclick="toggleSound()" 
+                            class="p-2 rounded-lg hover:bg-slate-700 transition-colors text-cyan-400" 
+                            title="Sound On">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+                
+                <!-- Status Counts -->
                 <div class="flex items-center gap-2 px-3 py-2 bg-green-500/10 rounded-lg border border-green-500/30">
                     <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
                     <span class="text-green-400 font-medium text-sm" id="registered-count">0</span>
@@ -366,10 +381,69 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
 
 <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
 <script>
-const notyf = new Notyf({ duration: 3000, position: { x: 'right', y: 'top' } });
+const notyf = new Notyf({ 
+    duration: 5000, 
+    position: { x: 'right', y: 'top' },
+    types: [
+        {
+            type: 'new-agent',
+            background: '#10b981',
+            icon: {
+                className: 'fas fa-satellite-dish',
+                tagName: 'i',
+                color: 'white'
+            }
+        }
+    ]
+});
 let selectedHostIp = null;
 let charts = {};
 let autoRefreshInterval = null;
+let knownHostIps = JSON.parse(localStorage.getItem('ampnm_known_hosts') || '[]');
+let isFirstLoad = true;
+
+// Notification sound - pleasant chime
+const notificationSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleU48teleU48teleU48teleU48teleU48teleU48j2VG3vOPLzuzq5eLg3drZ1tbV1NTT09LS0dDQz87Ozc3MzMzMzMzMzM3Nzs7P0NHR0tPU1dbX2Nnb3N7g4ePl5+nq7O7w8vT29/n7/f//');
+notificationSound.volume = 0.6;
+
+// Play notification sound
+function playNotificationSound() {
+    // Check if sound is enabled
+    if (!soundEnabled) return;
+    
+    notificationSound.currentTime = 0;
+    notificationSound.play().catch(e => console.log('Audio play failed:', e));
+}
+
+// Show new agent notification
+function showNewAgentNotification(host) {
+    // Check if notifications are enabled
+    if (!notificationsEnabled) return;
+    
+    playNotificationSound();
+    
+    notyf.open({
+        type: 'new-agent',
+        message: `<div class="flex items-center gap-2">
+            <i class="fas fa-satellite-dish"></i>
+            <div>
+                <div class="font-bold">New Agent Registered!</div>
+                <div class="text-sm opacity-90">${host.host_name || host.host_ip}</div>
+            </div>
+        </div>`,
+        dismissible: true,
+        duration: 8000
+    });
+    
+    // Also add a visual indicator
+    const summaryEl = document.getElementById('agent-status-summary');
+    if (summaryEl) {
+        summaryEl.classList.add('ring-2', 'ring-green-500', 'ring-offset-2', 'ring-offset-slate-900');
+        setTimeout(() => {
+            summaryEl.classList.remove('ring-2', 'ring-green-500', 'ring-offset-2', 'ring-offset-slate-900');
+        }, 3000);
+    }
+}
 
 // Host card template
 function createHostCard(host) {
@@ -484,6 +558,27 @@ async function loadHosts() {
         
         const container = document.getElementById('hosts-container');
         
+        // Check for new agent registrations
+        if (hosts && hosts.length > 0) {
+            const currentHostIps = hosts.map(h => h.host_ip);
+            
+            // Detect newly registered agents (not on first load)
+            if (!isFirstLoad) {
+                const newHosts = hosts.filter(h => !knownHostIps.includes(h.host_ip));
+                
+                // Show notification for each new host
+                newHosts.forEach(host => {
+                    console.log('New agent detected:', host.host_name || host.host_ip);
+                    showNewAgentNotification(host);
+                });
+            }
+            
+            // Update known hosts
+            knownHostIps = currentHostIps;
+            localStorage.setItem('ampnm_known_hosts', JSON.stringify(knownHostIps));
+            isFirstLoad = false;
+        }
+        
         // Update status summary
         updateAgentStatusSummary(hosts || []);
         
@@ -495,6 +590,7 @@ async function loadHosts() {
                     <p class="text-slate-500 text-sm mt-2">Install the Windows Agent on your servers to start monitoring</p>
                 </div>
             `;
+            isFirstLoad = false;
             return;
         }
         
@@ -1127,11 +1223,57 @@ async function deleteHostOverride() {
 // Range change handler
 document.getElementById('chart-range').addEventListener('change', loadCharts);
 
+// Notification settings
+let notificationsEnabled = localStorage.getItem('ampnm_notifications_enabled') !== 'false';
+let soundEnabled = localStorage.getItem('ampnm_sound_enabled') !== 'false';
+
+function toggleNotifications() {
+    notificationsEnabled = !notificationsEnabled;
+    localStorage.setItem('ampnm_notifications_enabled', notificationsEnabled);
+    updateNotificationToggle();
+    notyf.success(notificationsEnabled ? 'Notifications enabled' : 'Notifications disabled');
+}
+
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+    localStorage.setItem('ampnm_sound_enabled', soundEnabled);
+    updateSoundToggle();
+    notyf.success(soundEnabled ? 'Sound enabled' : 'Sound muted');
+}
+
+function updateNotificationToggle() {
+    const btn = document.getElementById('notification-toggle');
+    if (btn) {
+        btn.innerHTML = notificationsEnabled 
+            ? '<i class="fas fa-bell"></i>' 
+            : '<i class="fas fa-bell-slash"></i>';
+        btn.title = notificationsEnabled ? 'Notifications On' : 'Notifications Off';
+        btn.classList.toggle('text-green-400', notificationsEnabled);
+        btn.classList.toggle('text-slate-500', !notificationsEnabled);
+    }
+}
+
+function updateSoundToggle() {
+    const btn = document.getElementById('sound-toggle');
+    if (btn) {
+        btn.innerHTML = soundEnabled 
+            ? '<i class="fas fa-volume-up"></i>' 
+            : '<i class="fas fa-volume-mute"></i>';
+        btn.title = soundEnabled ? 'Sound On' : 'Sound Muted';
+        btn.classList.toggle('text-cyan-400', soundEnabled);
+        btn.classList.toggle('text-slate-500', !soundEnabled);
+    }
+}
+
 // Initial load
 loadHosts();
 
-// Auto-refresh hosts every 30 seconds
-setInterval(loadHosts, 30000);
+// Initialize notification toggles
+updateNotificationToggle();
+updateSoundToggle();
+
+// Auto-refresh hosts every 10 seconds for near real-time monitoring
+setInterval(loadHosts, 10000);
 </script>
 
 <?php require_once 'footer.php'; ?>
