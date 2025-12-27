@@ -2,6 +2,10 @@
 require_once 'includes/auth_check.php';
 require_once 'header.php';
 $user_role = $_SESSION['user_role'] ?? 'viewer';
+
+// Auto-detect server URL
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+$serverUrl = $protocol . $_SERVER['HTTP_HOST'];
 ?>
 
 <div class="container mx-auto px-4 py-6">
@@ -15,29 +19,16 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
         </div>
         
         <?php if ($user_role === 'admin'): ?>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
+            <button onclick="openInstallGuideModal()" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg">
+                <i class="fas fa-book-open mr-2"></i>Installation Guide
+            </button>
             <button onclick="openAlertSettingsModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors">
                 <i class="fas fa-bell mr-2"></i>Alert Thresholds
             </button>
             <button onclick="openTokenModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors">
-                <i class="fas fa-key mr-2"></i>Manage Agent Tokens
+                <i class="fas fa-key mr-2"></i>Manage Tokens
             </button>
-            <button onclick="downloadAgent()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
-                <i class="fas fa-download mr-2"></i>Download Agent
-            </button>
-            <div class="relative group">
-                <button onclick="copyInstallCommand()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
-                    <i class="fas fa-copy mr-2"></i>Copy Install Command
-                </button>
-                <!-- Tooltip -->
-                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 p-3 bg-slate-900 border border-slate-600 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <p class="text-xs text-slate-400 mb-2">PowerShell command that will be copied:</p>
-                    <code class="text-xs text-green-400 break-all leading-relaxed block">powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '&lt;server&gt;/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\AMPNM-Agent-Installer.ps1 }"</code>
-                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full">
-                        <div class="border-8 border-transparent border-t-slate-900"></div>
-                    </div>
-                </div>
-            </div>
         </div>
         <?php endif; ?>
     </div>
@@ -137,6 +128,120 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
             <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
                 <h3 class="text-sm font-medium text-slate-400 mb-3"><i class="fas fa-network-wired text-orange-400 mr-2"></i>Network Throughput</h3>
                 <canvas id="chart-network" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Installation Guide Modal -->
+<div id="install-guide-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 p-4">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-xl">
+        <div class="flex justify-between items-center p-4 border-b border-slate-700 bg-gradient-to-r from-cyan-600/20 to-blue-600/20">
+            <h3 class="text-xl font-bold text-white"><i class="fas fa-book-open text-cyan-400 mr-2"></i>Windows Agent Installation Guide</h3>
+            <button onclick="closeInstallGuideModal()" class="text-slate-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+            <!-- Step 1: Prerequisites -->
+            <div class="mb-6">
+                <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-check-circle text-green-400 mr-2"></i>Step 1: Prerequisites</h4>
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <ul class="space-y-2 text-slate-300 text-sm">
+                        <li><i class="fas fa-check text-cyan-400 mr-2"></i>Windows 10/11 or Windows Server 2016+</li>
+                        <li><i class="fas fa-check text-cyan-400 mr-2"></i>PowerShell 5.1 or higher</li>
+                        <li><i class="fas fa-check text-cyan-400 mr-2"></i>Administrator privileges</li>
+                        <li><i class="fas fa-check text-cyan-400 mr-2"></i>Internet connection to this server</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 2: Create Token -->
+            <div class="mb-6">
+                <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-key text-amber-400 mr-2"></i>Step 2: Create Agent Token</h4>
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <p class="text-slate-300 text-sm mb-3">Before installing the agent, you need to create an authentication token:</p>
+                    <button onclick="openTokenModal(); closeInstallGuideModal();" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors">
+                        <i class="fas fa-key mr-2"></i>Manage Agent Tokens
+                    </button>
+                    <p class="text-slate-400 text-xs mt-2"><i class="fas fa-info-circle mr-1"></i>Copy the token after creation - you'll need it for installation</p>
+                </div>
+            </div>
+
+            <!-- Step 3: Download & Install -->
+            <div class="mb-6">
+                <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-download text-purple-400 mr-2"></i>Step 3: Download & Install Agent</h4>
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700 space-y-4">
+                    <!-- Option 1: One-line Install -->
+                    <div>
+                        <h5 class="text-white font-medium mb-2"><i class="fas fa-bolt text-yellow-400 mr-2"></i>Option 1: One-Line Install (Recommended)</h5>
+                        <p class="text-slate-400 text-xs mb-2">Run this command in PowerShell (as Administrator):</p>
+                        <div class="bg-slate-800 rounded-lg p-3 border border-slate-600">
+                            <div class="flex items-start gap-2">
+                                <code id="install-command" class="text-xs text-green-400 leading-relaxed flex-1 break-all">powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '<?= $serverUrl ?>/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\AMPNM-Agent-Installer.ps1 }"</code>
+                                <button onclick="copyInstallCommand()" class="flex-shrink-0 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-medium transition-colors">
+                                    <i class="fas fa-copy mr-1"></i>Copy
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                            <p class="text-blue-300 text-xs"><i class="fas fa-info-circle mr-1"></i><strong>Tip:</strong> This command automatically downloads and runs the installer script</p>
+                        </div>
+                    </div>
+
+                    <!-- Option 2: Manual Download -->
+                    <div class="border-t border-slate-700 pt-4">
+                        <h5 class="text-white font-medium mb-2"><i class="fas fa-hand-pointer text-cyan-400 mr-2"></i>Option 2: Manual Download</h5>
+                        <ol class="space-y-2 text-slate-300 text-sm">
+                            <li>1. <button onclick="downloadAgent()" class="text-cyan-400 hover:text-cyan-300 underline">Download the installer script</button></li>
+                            <li>2. Right-click the downloaded file and select "Run with PowerShell"</li>
+                            <li>3. Follow the on-screen prompts</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Configuration -->
+            <div class="mb-6">
+                <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-cog text-orange-400 mr-2"></i>Step 4: Configure Agent</h4>
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <p class="text-slate-300 text-sm mb-3">During installation, you'll be prompted to enter:</p>
+                    <div class="space-y-3">
+                        <div class="bg-slate-800 rounded p-3 border border-slate-600">
+                            <p class="text-cyan-400 font-medium text-sm mb-1">Server URL:</p>
+                            <code class="text-green-400 text-xs"><?= $serverUrl ?></code>
+                        </div>
+                        <div class="bg-slate-800 rounded p-3 border border-slate-600">
+                            <p class="text-amber-400 font-medium text-sm mb-1">Agent Token:</p>
+                            <p class="text-slate-400 text-xs">Use the token you created in Step 2</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: Verification -->
+            <div class="mb-6">
+                <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-check-double text-green-400 mr-2"></i>Step 5: Verify Installation</h4>
+                <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                    <p class="text-slate-300 text-sm mb-3">After installation completes:</p>
+                    <ul class="space-y-2 text-slate-300 text-sm">
+                        <li><i class="fas fa-check text-green-400 mr-2"></i>The agent will appear in the "Monitored Hosts" section above</li>
+                        <li><i class="fas fa-check text-green-400 mr-2"></i>Status should show as <span class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">Online</span></li>
+                        <li><i class="fas fa-check text-green-400 mr-2"></i>Metrics will start appearing within 60 seconds</li>
+                        <li><i class="fas fa-check text-green-400 mr-2"></i>Check Windows Services for "AMPNM Agent" service</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                <h4 class="text-amber-400 font-bold mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Troubleshooting</h4>
+                <ul class="space-y-2 text-slate-300 text-sm">
+                    <li><i class="fas fa-circle text-amber-400 mr-2 text-xs"></i><strong>Agent not appearing:</strong> Check Windows Firewall and verify network connectivity to this server</li>
+                    <li><i class="fas fa-circle text-amber-400 mr-2 text-xs"></i><strong>Installation fails:</strong> Ensure PowerShell is run as Administrator</li>
+                    <li><i class="fas fa-circle text-amber-400 mr-2 text-xs"></i><strong>Token invalid:</strong> Verify the token is enabled in "Manage Agent Tokens"</li>
+                    <li><i class="fas fa-circle text-amber-400 mr-2 text-xs"></i><strong>Service not starting:</strong> Check Windows Event Viewer for error messages</li>
+                </ul>
             </div>
         </div>
     </div>
@@ -381,6 +486,7 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
 
 <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
 <script>
+const SERVER_URL = '<?= $serverUrl ?>';
 const notyf = new Notyf({ 
     duration: 5000, 
     position: { x: 'right', y: 'top' },
@@ -406,18 +512,68 @@ let isFirstLoad = true;
 const notificationSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleU48teleU48teleU48teleU48teleU48teleU48j2VG3vOPLzuzq5eLg3drZ1tbV1NTT09LS0dDQz87Ozc3MzMzMzMzMzM3Nzs7P0NHR0tPU1dbX2Nnb3N7g4ePl5+nq7O7w8vT29/n7/f//');
 notificationSound.volume = 0.6;
 
+// Modal functions
+function openInstallGuideModal() {
+    document.getElementById('install-guide-modal').classList.remove('hidden');
+    document.getElementById('install-guide-modal').classList.add('flex');
+}
+
+function closeInstallGuideModal() {
+    document.getElementById('install-guide-modal').classList.add('hidden');
+    document.getElementById('install-guide-modal').classList.remove('flex');
+}
+
+function downloadAgent() {
+    const downloadUrl = 'download-agent.php?file=AMPNM-Agent-Installer.ps1';
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = 'AMPNM-Agent-Installer.ps1';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    notyf.success('Agent installer downloaded');
+}
+
+function copyInstallCommand() {
+    const installCommand = document.getElementById('install-command').textContent;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(installCommand).then(() => {
+            notyf.success('Install command copied to clipboard!');
+        }).catch(() => {
+            fallbackCopy(installCommand);
+        });
+    } else {
+        fallbackCopy(installCommand);
+    }
+}
+
+function fallbackCopy(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        notyf.success('Install command copied to clipboard!');
+    } catch (err) {
+        notyf.error('Failed to copy. Please copy manually.');
+    }
+    document.body.removeChild(textArea);
+}
+
 // Play notification sound
 function playNotificationSound() {
-    // Check if sound is enabled
     if (!soundEnabled) return;
-    
     notificationSound.currentTime = 0;
     notificationSound.play().catch(e => console.log('Audio play failed:', e));
 }
 
 // Show new agent notification
 function showNewAgentNotification(host) {
-    // Check if notifications are enabled
     if (!notificationsEnabled) return;
     
     playNotificationSound();
@@ -435,7 +591,6 @@ function showNewAgentNotification(host) {
         duration: 8000
     });
     
-    // Also add a visual indicator
     const summaryEl = document.getElementById('agent-status-summary');
     if (summaryEl) {
         summaryEl.classList.add('ring-2', 'ring-green-500', 'ring-offset-2', 'ring-offset-slate-900');
@@ -448,11 +603,10 @@ function showNewAgentNotification(host) {
 // Host card template
 function createHostCard(host) {
     const lastUpdate = host.created_at ? new Date(host.created_at).toLocaleString() : 'Never';
-    const isRecent = host.created_at && (Date.now() - new Date(host.created_at).getTime()) < 300000; // 5 min
+    const isRecent = host.created_at && (Date.now() - new Date(host.created_at).getTime()) < 300000;
     const statusClass = isRecent ? 'bg-green-500' : 'bg-red-500';
     const statusText = isRecent ? 'Online' : 'Offline';
     
-    // Calculate time since first registration
     const firstSeen = host.first_seen_at ? new Date(host.first_seen_at) : null;
     const firstSeenDisplay = firstSeen ? getTimeAgo(firstSeen) : 'Unknown';
     
@@ -528,7 +682,6 @@ function createHostCard(host) {
     `;
 }
 
-// Helper function to format time ago
 function getTimeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
     
@@ -550,7 +703,6 @@ function getTimeAgo(date) {
     return 'Just now';
 }
 
-// Load all hosts
 async function loadHosts() {
     try {
         const response = await fetch('api.php?action=get_all_hosts');
@@ -558,28 +710,22 @@ async function loadHosts() {
         
         const container = document.getElementById('hosts-container');
         
-        // Check for new agent registrations
         if (hosts && hosts.length > 0) {
             const currentHostIps = hosts.map(h => h.host_ip);
             
-            // Detect newly registered agents (not on first load)
             if (!isFirstLoad) {
                 const newHosts = hosts.filter(h => !knownHostIps.includes(h.host_ip));
-                
-                // Show notification for each new host
                 newHosts.forEach(host => {
                     console.log('New agent detected:', host.host_name || host.host_ip);
                     showNewAgentNotification(host);
                 });
             }
             
-            // Update known hosts
             knownHostIps = currentHostIps;
             localStorage.setItem('ampnm_known_hosts', JSON.stringify(knownHostIps));
             isFirstLoad = false;
         }
         
-        // Update status summary
         updateAgentStatusSummary(hosts || []);
         
         if (!hosts || hosts.length === 0) {
@@ -588,6 +734,9 @@ async function loadHosts() {
                     <i class="fas fa-desktop text-4xl text-slate-600 mb-4"></i>
                     <p class="text-slate-400">No monitored hosts yet</p>
                     <p class="text-slate-500 text-sm mt-2">Install the Windows Agent on your servers to start monitoring</p>
+                    <button onclick="openInstallGuideModal()" class="mt-4 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg">
+                        <i class="fas fa-book-open mr-2"></i>View Installation Guide
+                    </button>
                 </div>
             `;
             isFirstLoad = false;
@@ -601,7 +750,6 @@ async function loadHosts() {
     }
 }
 
-// Update agent installation status summary
 function updateAgentStatusSummary(hosts) {
     const registeredCount = hosts.length;
     const onlineCount = hosts.filter(h => h.created_at && (Date.now() - new Date(h.created_at).getTime()) < 300000).length;
@@ -611,10 +759,9 @@ function updateAgentStatusSummary(hosts) {
     document.getElementById('online-count').textContent = onlineCount;
     document.getElementById('offline-count').textContent = offlineCount;
     
-    // Show recent registrations (last 24 hours)
     const recentHosts = hosts.filter(h => {
         if (!h.first_seen_at) return false;
-        return (Date.now() - new Date(h.first_seen_at).getTime()) < 86400000; // 24 hours
+        return (Date.now() - new Date(h.first_seen_at).getTime()) < 86400000;
     });
     
     const recentContainer = document.getElementById('recent-registrations');
@@ -634,18 +781,14 @@ function updateAgentStatusSummary(hosts) {
     }
 }
 
-// Select and show host details
 async function selectHost(ip, name) {
     selectedHostIp = ip;
     document.getElementById('detail-host-name').textContent = name;
     document.getElementById('host-detail').classList.remove('hidden');
-    
-    // Scroll to detail
     document.getElementById('host-detail').scrollIntoView({ behavior: 'smooth' });
     
     await loadCharts();
     
-    // Start auto-refresh
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     autoRefreshInterval = setInterval(loadCharts, 60000);
 }
@@ -656,7 +799,6 @@ function closeHostDetail() {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
 }
 
-// Load charts for selected host
 async function loadCharts() {
     if (!selectedHostIp) return;
     
@@ -673,7 +815,6 @@ async function loadCharts() {
         
         const labels = data.map(d => new Date(d.created_at));
         
-        // Initialize or update charts
         updateChart('chart-cpu', labels, data.map(d => d.cpu_percent), 'CPU %', '#22d3ee');
         updateChart('chart-memory', labels, data.map(d => d.memory_percent), 'Memory %', '#a855f7');
         updateChart('chart-disk', labels, data.map(d => d.disk_percent), 'Disk %', '#22c55e');
@@ -800,7 +941,6 @@ function updateNetworkChart(canvasId, labels, inData, outData) {
     });
 }
 
-// Token management
 function openTokenModal() {
     document.getElementById('token-modal').classList.remove('hidden');
     document.getElementById('token-modal').classList.add('flex');
@@ -885,7 +1025,6 @@ async function createToken() {
         
         if (result.success) {
             notyf.success('Token created!');
-            // Show the full token once
             alert(`Token created successfully!\n\nFull Token (copy now, it won't be shown again in full):\n\n${result.token}`);
             loadTokens();
         } else {
@@ -950,60 +1089,6 @@ function copyToken(element, token) {
     }
 }
 
-function fallbackCopy(text) {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-9999px';
-    document.body.appendChild(textArea);
-    textArea.select();
-    try {
-        document.execCommand('copy');
-        notyf.success('Token copied to clipboard');
-    } catch (err) {
-        notyf.error('Failed to copy. Please copy manually.');
-        prompt('Copy this token:', text);
-    }
-    document.body.removeChild(textArea);
-}
-
-function downloadAgent() {
-    // Use direct link element for better browser compatibility
-    const downloadUrl = 'download-agent.php?file=AMPNM-Agent-Installer.ps1';
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = 'AMPNM-Agent-Installer.ps1';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function copyInstallCommand() {
-    const serverUrl = window.location.origin;
-    const installCommand = `powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '${serverUrl}/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\\AMPNM-Agent-Installer.ps1 }"`;
-    
-    navigator.clipboard.writeText(installCommand).then(() => {
-        showToast('Install command copied to clipboard!', 'success');
-    }).catch(err => {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = installCommand;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-9999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            showToast('Install command copied to clipboard!', 'success');
-        } catch (e) {
-            showToast('Failed to copy command', 'error');
-        }
-        document.body.removeChild(textArea);
-    });
-}
-
-// Alert Settings Management
 function openAlertSettingsModal() {
     document.getElementById('alert-settings-modal').classList.remove('hidden');
     document.getElementById('alert-settings-modal').classList.add('flex');
@@ -1049,7 +1134,6 @@ async function saveAlertSettings() {
         cooldown_minutes: parseInt(document.getElementById('alert-cooldown').value) || 30
     };
     
-    // Validate thresholds
     const metrics = ['cpu', 'memory', 'disk', 'gpu'];
     for (const metric of metrics) {
         if (settings[`${metric}_warning`] >= settings[`${metric}_critical`]) {
@@ -1078,7 +1162,6 @@ async function saveAlertSettings() {
     }
 }
 
-// Per-Host Override Management
 let currentOverrideHostIp = null;
 let currentOverrideHostName = null;
 
@@ -1121,7 +1204,6 @@ async function loadHostOverride(hostIp) {
             document.getElementById('override-gpu-warning').value = data.gpu_warning ?? 80;
             document.getElementById('override-gpu-critical').value = data.gpu_critical ?? 95;
         } else {
-            // No override exists, use global defaults
             enabledCheckbox.checked = false;
             document.getElementById('override-cpu-warning').value = 80;
             document.getElementById('override-cpu-critical').value = 95;
@@ -1136,7 +1218,6 @@ async function loadHostOverride(hostIp) {
         thresholdsDiv.style.opacity = enabledCheckbox.checked ? '1' : '0.5';
         thresholdsDiv.style.pointerEvents = enabledCheckbox.checked ? 'auto' : 'none';
         
-        // Add listener for enabled toggle
         enabledCheckbox.onchange = function() {
             thresholdsDiv.style.opacity = this.checked ? '1' : '0.5';
             thresholdsDiv.style.pointerEvents = this.checked ? 'auto' : 'none';
@@ -1164,7 +1245,6 @@ async function saveHostOverride() {
         gpu_critical: parseInt(document.getElementById('override-gpu-critical').value) || 95
     };
     
-    // Validate thresholds
     const metrics = ['cpu', 'memory', 'disk', 'gpu'];
     for (const metric of metrics) {
         if (settings[`${metric}_warning`] >= settings[`${metric}_critical`]) {
@@ -1184,7 +1264,7 @@ async function saveHostOverride() {
         if (result.success) {
             notyf.success('Host thresholds saved');
             closeHostOverrideModal();
-            loadHosts(); // Refresh to show override indicator
+            loadHosts();
         } else {
             notyf.error(result.error || 'Failed to save');
         }
@@ -1220,10 +1300,8 @@ async function deleteHostOverride() {
     }
 }
 
-// Range change handler
 document.getElementById('chart-range').addEventListener('change', loadCharts);
 
-// Notification settings
 let notificationsEnabled = localStorage.getItem('ampnm_notifications_enabled') !== 'false';
 let soundEnabled = localStorage.getItem('ampnm_sound_enabled') !== 'false';
 
@@ -1265,14 +1343,9 @@ function updateSoundToggle() {
     }
 }
 
-// Initial load
 loadHosts();
-
-// Initialize notification toggles
 updateNotificationToggle();
 updateSoundToggle();
-
-// Auto-refresh hosts every 10 seconds for near real-time monitoring
 setInterval(loadHosts, 10000);
 </script>
 
