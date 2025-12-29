@@ -172,6 +172,13 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
             <div class="mb-6">
                 <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-download text-purple-400 mr-2"></i>Step 3: Download & Install Agent</h4>
                 <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700 space-y-4">
+                    <div class="bg-slate-800/80 rounded-lg p-4 border border-slate-700">
+                        <h5 class="text-white font-semibold mb-2"><i class="fas fa-gauge-high text-cyan-400 mr-2"></i>Optimized for High Performance</h5>
+                        <p class="text-slate-300 text-sm leading-relaxed">
+                            Besides powerful agentless monitoring, the AMPNM agent offers high-performance monitoring for operating systems and application-specific metrics.
+                            It uses minimal CPU and memory while remaining compatible with Linux, UNIX, and Windows environments.
+                        </p>
+                    </div>
                     <!-- Option 1: One-line Install -->
                     <div>
                         <h5 class="text-white font-medium mb-2"><i class="fas fa-bolt text-yellow-400 mr-2"></i>Option 1: One-Line Install (Recommended)</h5>
