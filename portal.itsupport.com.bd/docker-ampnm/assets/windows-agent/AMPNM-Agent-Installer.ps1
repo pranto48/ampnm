@@ -207,7 +207,11 @@ function Send-Metrics {
         $response = Invoke-RestMethod -Uri $ServerUrl -Method Post -Headers $headers -Body $body -TimeoutSec 30
         
         if ($response.success) {
-            Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Metrics sent successfully. Device: $($response.device_matched ?? 'Not linked')"
+            $deviceMatched = $response.device_matched
+            if (-not $deviceMatched) {
+                $deviceMatched = 'Not linked'
+            }
+            Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Metrics sent successfully. Device: $deviceMatched"
         } else {
             Write-Output "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Server returned: $($response | ConvertTo-Json -Compress)"
         }
