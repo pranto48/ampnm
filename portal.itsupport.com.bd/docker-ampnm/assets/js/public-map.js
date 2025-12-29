@@ -50,17 +50,165 @@ function renderMap({ map, devices, edges }) {
         unknown: "#94a3b8"
     };
 
+    const iconMap = {
+        'fa-network-wired': '\uf6ff',
+        'fa-router': '\uf8da', 
+        'fa-circle-nodes': '\ue4e3',
+        'fa-sitemap': '\uf0e8',
+        'fa-diagram-project': '\uf542',
+        'fa-share-nodes': '\uf1e0',
+        'fa-bezier-curve': '\uf55b',
+        'fa-wifi': '\uf1eb',
+        'fa-tower-broadcast': '\uf519',
+        'fa-radio': '\uf8d7',
+        'fa-signal': '\uf012',
+        'fa-broadcast-tower': '\uf519',
+        'fa-rss': '\uf09e',
+        'fa-podcast': '\uf2ce',
+        'fa-satellite-dish': '\uf7c0',
+        'fa-server': '\uf233',
+        'fa-tower-cell': '\ue585',
+        'fa-computer': '\uf108',
+        'fa-microchip': '\uf2db',
+        'fa-memory': '\uf538',
+        'fa-hard-drive': '\uf0a0',
+        'fa-hdd': '\uf0a0',
+        'fa-compact-disc': '\uf51f',
+        'fa-warehouse': '\uf494',
+        'fa-industry': '\uf275',
+        'fa-ethernet': '\uf796',
+        'fa-code-branch': '\uf126',
+        'fa-object-group': '\uf247',
+        'fa-layer-group': '\uf5fd',
+        'fa-grip-horizontal': '\uf58d',
+        'fa-bars': '\uf0c9',
+        'fa-sliders': '\uf1de',
+        'fa-table-cells': '\uf00a',
+        'fa-shield-halved': '\uf3ed',
+        'fa-shield': '\uf132',
+        'fa-lock': '\uf023',
+        'fa-shield-virus': '\ue06c',
+        'fa-user-shield': '\uf505',
+        'fa-fingerprint': '\uf577',
+        'fa-key': '\uf084',
+        'fa-user-lock': '\uf13e',
+        'fa-ban': '\uf05e',
+        'fa-circle-exclamation': '\uf06a',
+        'fa-cloud': '\uf0c2',
+        'fa-cloud-arrow-up': '\uf0ee',
+        'fa-cloud-arrow-down': '\uf0ed',
+        'fa-cloud-bolt': '\uf76c',
+        'fa-cloudflare': '\ue07d',
+        'fa-cloud-sun': '\uf6c4',
+        'fa-wind': '\uf72e',
+        'fa-database': '\uf1c0',
+        'fa-table': '\uf0ce',
+        'fa-table-columns': '\uf0db',
+        'fa-table-list': '\uf00b',
+        'fa-diagram-subtask': '\ue479',
+        'fa-cubes': '\uf1b3',
+        'fa-box-archive': '\uf187',
+        'fa-file-zipper': '\uf1c6',
+        'fa-laptop': '\uf109',
+        'fa-laptop-code': '\uf5fc',
+        'fa-laptop-file': '\ue51d',
+        'fa-desktop': '\uf390',
+        'fa-display': '\uf390',
+        'fa-tv': '\uf26c',
+        'fa-chalkboard': '\uf51b',
+        'fa-tablet-screen-button': '\uf3fa',
+        'fa-tablet': '\uf3fb',
+        'fa-tablet-button': '\uf10a',
+        'fa-square-full': '\uf45c',
+        'fa-rectangle': '\uf2fa',
+        'fa-window-maximize': '\uf2d0',
+        'fa-mobile-screen': '\uf3cf',
+        'fa-mobile-screen-button': '\uf3cd',
+        'fa-mobile': '\uf3ce',
+        'fa-mobile-retro': '\ue527',
+        'fa-phone': '\uf095',
+        'fa-phone-flip': '\uf879',
+        'fa-phone-volume': '\uf2a0',
+        'fa-walkie-talkie': '\uf8ef',
+        'fa-print': '\uf02f',
+        'fa-fax': '\uf1ac',
+        'fa-file-pdf': '\uf1c1',
+        'fa-file-image': '\uf1c5',
+        'fa-copy': '\uf0c5',
+        'fa-clone': '\uf24d',
+        'fa-images': '\uf302',
+        'fa-file': '\uf15b',
+        'fa-video': '\uf03d',
+        'fa-camera': '\uf030',
+        'fa-camera-retro': '\uf083',
+        'fa-camera-viewfinder': '\ue0da',
+        'fa-eye': '\uf06e',
+        'fa-glasses': '\uf530',
+        'fa-binoculars': '\uf1e5',
+        'fa-film': '\uf008',
+        'fa-clapperboard': '\ue131',
+        'fa-headset': '\uf590',
+        'fa-headphones': '\uf025',
+        'fa-voicemail': '\uf897',
+        'fa-microphone': '\uf130',
+        'fa-box': '\uf466',
+        'fa-boxes-stacked': '\uf468',
+        'fa-box-open': '\uf49e',
+        'fa-cube': '\uf1b2',
+        'fa-folder-open': '\uf07c',
+        'fa-folder-tree': '\uf802',
+        'fa-floppy-disk': '\uf0c7',
+        'fa-sd-card': '\uf7c2',
+        'fa-clock': '\uf017',
+        'fa-stopwatch': '\uf2f2',
+        'fa-id-card': '\uf2c2',
+        'fa-address-card': '\uf2bb',
+        'fa-user-check': '\uf4fc',
+        'fa-calendar-check': '\uf274',
+        'fa-plug': '\uf1e6',
+        'fa-battery-full': '\uf240',
+        'fa-battery-half': '\uf242',
+        'fa-car-battery': '\uf5df',
+        'fa-bolt': '\uf0e7',
+        'fa-bolt-lightning': '\ue0b7',
+        'fa-power-off': '\uf011',
+        'fa-charging-station': '\uf5e7',
+        'fa-scale-balanced': '\uf24e',
+        'fa-balance-scale': '\uf24e',
+        'fa-arrows-split-up': '\ue4bc',
+        'fa-route': '\uf4d7',
+        'fa-shuffle': '\uf074',
+        'fa-repeat': '\uf363',
+        'fa-arrows-turn-to-dots': '\ue4c1',
+        'fa-lightbulb': '\uf0eb',
+        'fa-house-signal': '\ue012',
+        'fa-temperature-half': '\uf2c9',
+        'fa-lock': '\uf023',
+        'fa-volume-high': '\uf028',
+        'fa-battery-full': '\uf240',
+        'fa-plug-circle-bolt': '\ue55b',
+        'fa-question-circle': '\uf059',
+        'fa-microchip': '\uf2db',
+        'fa-globe': '\uf0ac',
+        'fa-location-dot': '\uf3c5',
+        'fa-building': '\uf1ad',
+        'fa-layer-group': '\uf5fd',
+        'fa-door-closed': '\uf52a'
+    };
+
     const nodes = devices.map((device) => {
         const status = (device.status || "unknown").toLowerCase();
         const color = colorByStatus[status] || colorByStatus.unknown;
-        
-        return {
+        const iconClass = device.icon_class || "";
+        const iconCode = iconMap[iconClass];
+        const hasImageIcon = Boolean(device.icon_url);
+        const hasFontIcon = Boolean(iconCode);
+        const nodeSize = device.icon_size ? Number(device.icon_size) / 1.5 : 24;
+        const nodeBase = {
             id: device.id,
             label: device.name || device.ip || `Device ${device.id}`,
             title: buildTitle(device),
-            shape: device.icon_url ? "image" : "dot",
-            image: device.icon_url || undefined,
-            size: device.icon_size ? Number(device.icon_size) / 1.5 : 24,
+            size: nodeSize,
             x: device.x ?? undefined,
             y: device.y ?? undefined,
             font: { 
@@ -83,6 +231,33 @@ function renderMap({ map, devices, edges }) {
             },
             borderWidth: 2,
             borderWidthSelected: 3
+        };
+        
+        if (hasImageIcon) {
+            return {
+                ...nodeBase,
+                shape: "image",
+                image: device.icon_url
+            };
+        }
+
+        if (hasFontIcon) {
+            return {
+                ...nodeBase,
+                shape: "icon",
+                icon: {
+                    face: "'Font Awesome 6 Free'",
+                    weight: "900",
+                    code: iconCode,
+                    size: device.icon_size ? Number(device.icon_size) : 50,
+                    color
+                }
+            };
+        }
+
+        return {
+            ...nodeBase,
+            shape: "dot"
         };
     });
 
