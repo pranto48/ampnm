@@ -176,9 +176,19 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
                     <div>
                         <h5 class="text-white font-medium mb-2"><i class="fas fa-bolt text-yellow-400 mr-2"></i>Option 1: One-Line Install (Recommended)</h5>
                         <p class="text-slate-400 text-xs mb-2">Run this command in PowerShell (as Administrator):</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label for="agent-server-url" class="block text-xs font-medium text-slate-400 mb-1">Server URL</label>
+                                <input type="text" id="agent-server-url" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500" value="<?= htmlspecialchars($serverUrl . '/api.php?action=submit_metrics') ?>">
+                            </div>
+                            <div>
+                                <label for="agent-token" class="block text-xs font-medium text-slate-400 mb-1">Agent Token</label>
+                                <input type="text" id="agent-token" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500" placeholder="Paste your token here">
+                            </div>
+                        </div>
                         <div class="bg-slate-800 rounded-lg p-3 border border-slate-600">
                             <div class="flex items-start gap-2">
-                                <code id="install-command" class="text-xs text-green-400 leading-relaxed flex-1 break-all">powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '<?= $serverUrl ?>/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\AMPNM-Agent-Installer.ps1 }"</code>
+                                <code id="install-command" class="text-xs text-green-400 leading-relaxed flex-1 break-all">powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '<?= $serverUrl ?>/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\AMPNM-Agent-Installer.ps1 -ServerUrl \"<?= htmlspecialchars($serverUrl . '/api.php?action=submit_metrics') ?>\" -AgentToken \"&lt;agent-token&gt;\" }"</code>
                                 <button onclick="copyInstallCommand()" class="flex-shrink-0 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-medium transition-colors">
                                     <i class="fas fa-copy mr-1"></i>Copy
                                 </button>
@@ -209,7 +219,7 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
                     <div class="space-y-3">
                         <div class="bg-slate-800 rounded p-3 border border-slate-600">
                             <p class="text-cyan-400 font-medium text-sm mb-1">Server URL:</p>
-                            <code class="text-green-400 text-xs"><?= $serverUrl ?></code>
+                            <code class="text-green-400 text-xs"><?= htmlspecialchars($serverUrl . '/api.php?action=submit_metrics') ?></code>
                         </div>
                         <div class="bg-slate-800 rounded p-3 border border-slate-600">
                             <p class="text-amber-400 font-medium text-sm mb-1">Agent Token:</p>
@@ -523,8 +533,45 @@ function closeInstallGuideModal() {
     document.getElementById('install-guide-modal').classList.remove('flex');
 }
 
+const agentServerInput = document.getElementById('agent-server-url');
+const agentTokenInput = document.getElementById('agent-token');
+const installCommandEl = document.getElementById('install-command');
+
+function buildAgentDownloadUrl() {
+    const url = new URL('download-agent.php', window.location.href);
+    url.searchParams.set('file', 'AMPNM-Agent-Installer.ps1');
+
+    const serverUrl = agentServerInput?.value.trim();
+    const agentToken = agentTokenInput?.value.trim();
+
+    if (serverUrl) {
+        url.searchParams.set('server_url', serverUrl);
+    }
+
+    if (agentToken) {
+        url.searchParams.set('agent_token', agentToken);
+    }
+
+    return url.toString();
+}
+
+function buildInstallCommand() {
+    const serverUrl = agentServerInput?.value.trim() || '';
+    const agentToken = agentTokenInput?.value.trim() || '';
+    const downloadUrl = buildAgentDownloadUrl();
+    const serverArg = serverUrl ? `-ServerUrl "${serverUrl}"` : '-ServerUrl "<server-url>"';
+    const tokenArg = agentToken ? `-AgentToken "${agentToken}"` : '-AgentToken "<agent-token>"';
+
+    return `powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '${downloadUrl}' -OutFile 'AMPNM-Agent-Installer.ps1'; .\\AMPNM-Agent-Installer.ps1 ${serverArg} ${tokenArg} }"`;
+}
+
+function updateInstallCommand() {
+    if (!installCommandEl) return;
+    installCommandEl.textContent = buildInstallCommand();
+}
+
 function downloadAgent() {
-    const downloadUrl = 'download-agent.php?file=AMPNM-Agent-Installer.ps1';
+    const downloadUrl = buildAgentDownloadUrl();
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.download = 'AMPNM-Agent-Installer.ps1';
@@ -534,6 +581,16 @@ function downloadAgent() {
     document.body.removeChild(link);
     notyf.success('Agent installer downloaded');
 }
+
+if (agentServerInput) {
+    agentServerInput.addEventListener('input', updateInstallCommand);
+}
+
+if (agentTokenInput) {
+    agentTokenInput.addEventListener('input', updateInstallCommand);
+}
+
+updateInstallCommand();
 
 function copyInstallCommand() {
     const installCommand = document.getElementById('install-command').textContent;
