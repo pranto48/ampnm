@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $show_live_ping = isset($_POST['show_live_ping']) ? 1 : 0;
     $subchoice = $_POST['subchoice'] ?? 0;
     $icon_class = trim($_POST['icon_class'] ?? '');
+    $hasIconClassColumn = $pdo->query("SHOW COLUMNS FROM devices LIKE 'icon_class'")->rowCount() > 0;
 
     // Basic validation
     if (empty($name)) {
@@ -48,16 +49,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($max_devices > 0 && $current_devices >= $max_devices) {
                 $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">License limit reached. You cannot add more than ' . $max_devices . ' devices.</div>';
             } else {
-                $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, subchoice, icon_class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, subchoice";
+                if ($hasIconClassColumn) {
+                    $sql .= ", icon_class";
+                }
+                $sql .= ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
+                if ($hasIconClassColumn) {
+                    $sql .= ", ?";
+                }
+                $sql .= ")";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([
+                $params = [
                     $current_user_id, $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port, $monitor_method, $type, empty($description) ? null : $description, empty($map_id) ? null : $map_id,
                     100, 100, // Default X, Y positions for new devices
                     empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
                     empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
                     empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
-                    $show_live_ping, $subchoice, empty($icon_class) ? null : $icon_class
-                ]);
+                    $show_live_ping, $subchoice
+                ];
+                if ($hasIconClassColumn) {
+                    $params[] = empty($icon_class) ? null : $icon_class;
+                }
+                $stmt->execute($params);
                 // Redirect to map.php with the map_id
                 if ($map_id) {
                     header('Location: map.php?map_id=' . urlencode($map_id));
