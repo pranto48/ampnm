@@ -333,6 +333,11 @@
                 label: iconLabel
             };
 
+            if (this.typeSelect && this.typeSelect.value !== deviceType) {
+                this.typeSelect.value = deviceType;
+                this.onTypeChange();
+            }
+
             // Update hidden inputs for form submission
             if (this.hiddenIconId) {
                 this.hiddenIconId.value = `${deviceType}-${iconIndex}`;

@@ -63,6 +63,9 @@ $page_title = "Documentation - AMPNM User Manual";
                         <a href="#introduction" class="block px-3 py-2 rounded transition">
                             <i class="fas fa-info-circle mr-2"></i>Introduction
                         </a>
+                        <a href="#feature-overview" class="block px-3 py-2 rounded transition">
+                            <i class="fas fa-diagram-project mr-2"></i>Feature Overview
+                        </a>
                         <a href="#getting-started" class="block px-3 py-2 rounded transition">
                             <i class="fas fa-play-circle mr-2"></i>Getting Started
                         </a>
@@ -123,6 +126,51 @@ $page_title = "Documentation - AMPNM User Manual";
                                 <li><i class="fas fa-check text-green-400 mr-2"></i>Multi-user support with role-based access</li>
                                 <li><i class="fas fa-check text-green-400 mr-2"></i>Offline mode support (up to 30 days)</li>
                             </ul>
+                        </div>
+                    </section>
+
+                    <!-- Feature Overview -->
+                    <section id="feature-overview" class="doc-section">
+                        <h2 class="text-3xl font-bold text-cyan-400 mb-4">
+                            <i class="fas fa-diagram-project mr-2"></i>Feature Overview
+                        </h2>
+                        <p class="text-lg mb-4">
+                            AMPNM guides you through the full monitoring lifecycle—from data collection to visualization and alerting—so teams can act quickly and stay ahead of issues.
+                        </p>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div class="bg-slate-700 rounded-lg p-4 border border-slate-600">
+                                <h3 class="font-bold text-lg mb-2 text-cyan-300"><i class="fas fa-database mr-2"></i>Collect Data</h3>
+                                <ul class="space-y-2 text-sm text-slate-200">
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Agentless polling (ICMP, TCP, HTTP/HTTPS)</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Windows Agent for OS and app metrics</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>SNMP, IPMI, WMI, VMware, SSH, Telnet, Scripts</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Push & pull collection for flexible sources</li>
+                                </ul>
+                            </div>
+                            <div class="bg-slate-700 rounded-lg p-4 border border-slate-600">
+                                <h3 class="font-bold text-lg mb-2 text-cyan-300"><i class="fas fa-stethoscope mr-2"></i>Detect Problems</h3>
+                                <ul class="space-y-2 text-sm text-slate-200">
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Latency and packet-loss thresholds</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Root-cause analysis and event correlation</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Escalation scenarios and auto-recovery workflows</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Forecasting for proactive planning</li>
+                                </ul>
+                            </div>
+                            <div class="bg-slate-700 rounded-lg p-4 border border-slate-600">
+                                <h3 class="font-bold text-lg mb-2 text-cyan-300"><i class="fas fa-chart-line mr-2"></i>Visualize & Act</h3>
+                                <ul class="space-y-2 text-sm text-slate-200">
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Live dashboards, graphs, and reports</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Topology maps with real-time status</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Alerts, tickets, and API integrations</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Role-based access for shared visibility</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/70 border border-slate-600 rounded-lg p-4 mt-6">
+                            <h4 class="font-semibold text-white mb-2"><i class="fas fa-layer-group text-cyan-400 mr-2"></i>Supported Domains</h4>
+                            <p class="text-sm text-slate-300">
+                                Clouds, containers, networks, servers, databases, storage, IoT, applications, services, and web endpoints—all monitored in one unified experience.
+                            </p>
                         </div>
                     </section>
 

@@ -2,7 +2,38 @@ window.MapApp = window.MapApp || {};
 
 MapApp.utils = {
     buildNodeTitle: (deviceData) => {
-        let title = `${deviceData.name}<br>${deviceData.ip || 'No IP'}<br>Status: ${deviceData.status}`;
+        const escapeHtml = (value) => {
+            if (value === null || value === undefined) return '';
+            return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        };
+
+        const formatValue = (value, suffix = '') => {
+            if (value === null || value === undefined || value === '') return 'N/A';
+            return `${value}${suffix}`;
+        };
+
+        const lastSeen = deviceData.last_seen ? new Date(deviceData.last_seen) : null;
+        const lastSeenLabel = lastSeen && !Number.isNaN(lastSeen.getTime())
+            ? lastSeen.toLocaleString()
+            : 'Never';
+
+        const name = escapeHtml(deviceData.name || 'Unknown Device');
+        const ip = escapeHtml(deviceData.ip || 'No IP');
+        const type = escapeHtml(deviceData.type || 'Unknown');
+        const status = escapeHtml(deviceData.status || 'unknown');
+
+        let title = [
+            `Host: ${name}`,
+            `IP: ${ip}`,
+            `Status: ${status}`,
+            `Device Type: ${type}`,
+            `Last Check: ${escapeHtml(lastSeenLabel)}`,
+            `Warn Latency: ${escapeHtml(formatValue(deviceData.warning_latency_threshold, ' ms'))}`,
+            `Warn Packet Loss: ${escapeHtml(formatValue(deviceData.warning_packetloss_threshold, ' %'))}`,
+            `Critical Latency: ${escapeHtml(formatValue(deviceData.critical_latency_threshold, ' ms'))}`,
+            `Critical Packet Loss: ${escapeHtml(formatValue(deviceData.critical_packetloss_threshold, ' %'))}`
+        ].join('<br>');
+
         if (deviceData.status === 'offline' && deviceData.last_ping_output) {
             const lines = deviceData.last_ping_output.split('\n');
             let reason = 'No response';
@@ -12,7 +43,7 @@ MapApp.utils = {
                     break;
                 }
             }
-            const sanitizedReason = reason.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const sanitizedReason = escapeHtml(reason);
             title += `<br><small style="color: #fca5a5; font-family: monospace;">${sanitizedReason}</small>`;
         }
         return title;

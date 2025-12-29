@@ -134,15 +134,15 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
 </div>
 
 <!-- Installation Guide Modal -->
-<div id="install-guide-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 p-4">
-    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-xl">
+<div id="install-guide-modal" class="fixed inset-0 z-50 hidden flex items-start justify-center bg-black/70 p-4 pt-6">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-5xl h-[95vh] overflow-hidden shadow-xl">
         <div class="flex justify-between items-center p-4 border-b border-slate-700 bg-gradient-to-r from-cyan-600/20 to-blue-600/20">
             <h3 class="text-xl font-bold text-white"><i class="fas fa-book-open text-cyan-400 mr-2"></i>Windows Agent Installation Guide</h3>
             <button onclick="closeInstallGuideModal()" class="text-slate-400 hover:text-white">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div class="p-6 overflow-y-auto h-[calc(95vh-80px)]">
             <!-- Step 1: Prerequisites -->
             <div class="mb-6">
                 <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-check-circle text-green-400 mr-2"></i>Step 1: Prerequisites</h4>
@@ -172,13 +172,30 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
             <div class="mb-6">
                 <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-download text-purple-400 mr-2"></i>Step 3: Download & Install Agent</h4>
                 <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700 space-y-4">
+                    <div class="bg-slate-800/80 rounded-lg p-4 border border-slate-700">
+                        <h5 class="text-white font-semibold mb-2"><i class="fas fa-gauge-high text-cyan-400 mr-2"></i>Optimized for High Performance</h5>
+                        <p class="text-slate-300 text-sm leading-relaxed">
+                            Besides powerful agentless monitoring, the AMPNM agent offers high-performance monitoring for operating systems and application-specific metrics.
+                            It uses minimal CPU and memory while remaining compatible with Linux, UNIX, and Windows environments.
+                        </p>
+                    </div>
                     <!-- Option 1: One-line Install -->
                     <div>
                         <h5 class="text-white font-medium mb-2"><i class="fas fa-bolt text-yellow-400 mr-2"></i>Option 1: One-Line Install (Recommended)</h5>
                         <p class="text-slate-400 text-xs mb-2">Run this command in PowerShell (as Administrator):</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label for="agent-server-url" class="block text-xs font-medium text-slate-400 mb-1">Server URL</label>
+                                <input type="text" id="agent-server-url" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500" value="<?= htmlspecialchars($serverUrl . '/api.php?action=submit_metrics') ?>">
+                            </div>
+                            <div>
+                                <label for="agent-token" class="block text-xs font-medium text-slate-400 mb-1">Agent Token</label>
+                                <input type="text" id="agent-token" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500" placeholder="Paste your token here">
+                            </div>
+                        </div>
                         <div class="bg-slate-800 rounded-lg p-3 border border-slate-600">
                             <div class="flex items-start gap-2">
-                                <code id="install-command" class="text-xs text-green-400 leading-relaxed flex-1 break-all">powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '<?= $serverUrl ?>/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\AMPNM-Agent-Installer.ps1 }"</code>
+                                <code id="install-command" class="text-xs text-green-400 leading-relaxed flex-1 break-all">powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '<?= $serverUrl ?>/download-agent.php?file=AMPNM-Agent-Installer.ps1' -OutFile 'AMPNM-Agent-Installer.ps1'; .\AMPNM-Agent-Installer.ps1 -ServerUrl \"<?= htmlspecialchars($serverUrl . '/api.php?action=submit_metrics') ?>\" -AgentToken \"&lt;agent-token&gt;\" }"</code>
                                 <button onclick="copyInstallCommand()" class="flex-shrink-0 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-medium transition-colors">
                                     <i class="fas fa-copy mr-1"></i>Copy
                                 </button>
@@ -209,7 +226,7 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
                     <div class="space-y-3">
                         <div class="bg-slate-800 rounded p-3 border border-slate-600">
                             <p class="text-cyan-400 font-medium text-sm mb-1">Server URL:</p>
-                            <code class="text-green-400 text-xs"><?= $serverUrl ?></code>
+                            <code class="text-green-400 text-xs"><?= htmlspecialchars($serverUrl . '/api.php?action=submit_metrics') ?></code>
                         </div>
                         <div class="bg-slate-800 rounded p-3 border border-slate-600">
                             <p class="text-amber-400 font-medium text-sm mb-1">Agent Token:</p>
@@ -230,6 +247,7 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
                         <li><i class="fas fa-check text-green-400 mr-2"></i>Metrics will start appearing within 60 seconds</li>
                         <li><i class="fas fa-check text-green-400 mr-2"></i>Check Windows Services for "AMPNM Agent" service</li>
                     </ul>
+                    <p class="text-slate-400 text-xs mt-3"><i class="fas fa-info-circle mr-1"></i>The metrics endpoint requires the <code>X-Agent-Token</code> header, so opening <code>/api.php?action=submit_metrics</code> in a browser will show an "Invalid or missing agent token" message.</p>
                 </div>
             </div>
 
@@ -523,8 +541,45 @@ function closeInstallGuideModal() {
     document.getElementById('install-guide-modal').classList.remove('flex');
 }
 
+const agentServerInput = document.getElementById('agent-server-url');
+const agentTokenInput = document.getElementById('agent-token');
+const installCommandEl = document.getElementById('install-command');
+
+function buildAgentDownloadUrl() {
+    const url = new URL('download-agent.php', window.location.href);
+    url.searchParams.set('file', 'AMPNM-Agent-Installer.ps1');
+
+    const serverUrl = agentServerInput?.value.trim();
+    const agentToken = agentTokenInput?.value.trim();
+
+    if (serverUrl) {
+        url.searchParams.set('server_url', serverUrl);
+    }
+
+    if (agentToken) {
+        url.searchParams.set('agent_token', agentToken);
+    }
+
+    return url.toString();
+}
+
+function buildInstallCommand() {
+    const serverUrl = agentServerInput?.value.trim() || '';
+    const agentToken = agentTokenInput?.value.trim() || '';
+    const downloadUrl = buildAgentDownloadUrl();
+    const serverArg = serverUrl ? `-ServerUrl "${serverUrl}"` : '-ServerUrl "<server-url>"';
+    const tokenArg = agentToken ? `-AgentToken "${agentToken}"` : '-AgentToken "<agent-token>"';
+
+    return `powershell -ExecutionPolicy Bypass -Command "& { Invoke-WebRequest -Uri '${downloadUrl}' -OutFile 'AMPNM-Agent-Installer.ps1'; .\\AMPNM-Agent-Installer.ps1 ${serverArg} ${tokenArg} }"`;
+}
+
+function updateInstallCommand() {
+    if (!installCommandEl) return;
+    installCommandEl.textContent = buildInstallCommand();
+}
+
 function downloadAgent() {
-    const downloadUrl = 'download-agent.php?file=AMPNM-Agent-Installer.ps1';
+    const downloadUrl = buildAgentDownloadUrl();
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.download = 'AMPNM-Agent-Installer.ps1';
@@ -534,6 +589,16 @@ function downloadAgent() {
     document.body.removeChild(link);
     notyf.success('Agent installer downloaded');
 }
+
+if (agentServerInput) {
+    agentServerInput.addEventListener('input', updateInstallCommand);
+}
+
+if (agentTokenInput) {
+    agentTokenInput.addEventListener('input', updateInstallCommand);
+}
+
+updateInstallCommand();
 
 function copyInstallCommand() {
     const installCommand = document.getElementById('install-command').textContent;
