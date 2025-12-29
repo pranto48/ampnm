@@ -134,15 +134,15 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
 </div>
 
 <!-- Installation Guide Modal -->
-<div id="install-guide-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 p-4">
-    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-xl">
+<div id="install-guide-modal" class="fixed inset-0 z-50 hidden flex items-start justify-center bg-black/70 p-4 pt-6">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-5xl h-[95vh] overflow-hidden shadow-xl">
         <div class="flex justify-between items-center p-4 border-b border-slate-700 bg-gradient-to-r from-cyan-600/20 to-blue-600/20">
             <h3 class="text-xl font-bold text-white"><i class="fas fa-book-open text-cyan-400 mr-2"></i>Windows Agent Installation Guide</h3>
             <button onclick="closeInstallGuideModal()" class="text-slate-400 hover:text-white">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div class="p-6 overflow-y-auto h-[calc(95vh-80px)]">
             <!-- Step 1: Prerequisites -->
             <div class="mb-6">
                 <h4 class="text-lg font-bold text-white mb-3"><i class="fas fa-check-circle text-green-400 mr-2"></i>Step 1: Prerequisites</h4>
@@ -240,6 +240,7 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'];
                         <li><i class="fas fa-check text-green-400 mr-2"></i>Metrics will start appearing within 60 seconds</li>
                         <li><i class="fas fa-check text-green-400 mr-2"></i>Check Windows Services for "AMPNM Agent" service</li>
                     </ul>
+                    <p class="text-slate-400 text-xs mt-3"><i class="fas fa-info-circle mr-1"></i>The metrics endpoint requires the <code>X-Agent-Token</code> header, so opening <code>/api.php?action=submit_metrics</code> in a browser will show an "Invalid or missing agent token" message.</p>
                 </div>
             </div>
 
