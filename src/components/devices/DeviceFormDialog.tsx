@@ -51,7 +51,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   const [maps, setMaps] = useState<MapRow[]>([]);
 
   const [name, setName] = useState("");
-  const [mapId, setMapId] = useState<string>("");
+  const [mapId, setMapId] = useState<string>("__none__");
   const [ipAddress, setIpAddress] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("server");
@@ -78,7 +78,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   useEffect(() => {
     if (device) {
       setName(device.name);
-      setMapId(device.map_id ?? "");
+      setMapId(device.map_id ?? "__none__");
       setIpAddress(device.ip_address ?? "");
       setDescription(device.description ?? "");
       setType(device.type ?? "server");
@@ -95,7 +95,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
       setCriticalLatency(device.critical_latency_threshold ?? 500);
       setCriticalPacketloss(device.critical_packetloss_threshold ?? 50);
     } else {
-      setName(""); setMapId(""); setIpAddress(""); setDescription(""); setType("server");
+      setName(""); setMapId("__none__"); setIpAddress(""); setDescription(""); setType("server");
       setSubchoice(""); setMonitorMethod("ping"); setCheckPort("");
       setPingInterval(300); setIconUrl(""); setIconSize(40); setNameTextSize(12);
       setShowLivePing(false); setWarningLatency(100); setWarningPacketloss(10);
@@ -110,7 +110,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
 
     const payload = {
       name: name.trim(),
-      map_id: mapId || null,
+      map_id: mapId === "__none__" ? null : mapId,
       ip_address: ipAddress.trim() || null,
       description: description.trim() || null,
       type,
@@ -175,7 +175,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
                 <Select value={mapId} onValueChange={setMapId}>
                   <SelectTrigger><SelectValue placeholder="No map assigned" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
                     {maps.map((m) => (
                       <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                     ))}
