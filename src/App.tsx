@@ -10,6 +10,7 @@ import DashboardPage from "./pages/DashboardPage";
 import DevicesPage from "./pages/DevicesPage";
 import NetworkMapPage from "./pages/NetworkMapPage";
 import HistoryPage from "./pages/HistoryPage";
+import StatusLogsPage from "./pages/StatusLogsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/devices" element={<ProtectedRoute adminOnly><DevicesPage /></ProtectedRoute>} />
             <Route path="/map" element={<ProtectedRoute><NetworkMapPage /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute adminOnly><HistoryPage /></ProtectedRoute>} />
+            <Route path="/status-logs" element={<ProtectedRoute adminOnly><StatusLogsPage /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
