@@ -45,47 +45,50 @@ export default function DashboardPage() {
     supabase.from("maps").select("*").order("name").then(({ data }) => setMaps(data ?? []));
   }, []);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      let devQuery = supabase.from("devices").select("status, name, id, map_id");
+  const loadData = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    let devQuery = supabase.from("devices").select("status, name, id, map_id");
+    if (selectedMapId !== "all") {
+      devQuery = devQuery.eq("map_id", selectedMapId);
+    }
+    const { data: devices } = await devQuery;
+
+    if (devices) {
+      const c: StatusCounts = { online: 0, warning: 0, critical: 0, offline: 0, unknown: 0 };
+      devices.forEach((d) => {
+        const s = (d.status || "unknown") as keyof StatusCounts;
+        if (s in c) c[s]++;
+        else c.unknown++;
+      });
+      setCounts(c);
+
+      let logQuery = supabase
+        .from("device_status_logs")
+        .select("id, new_status, old_status, changed_at, device_id")
+        .order("changed_at", { ascending: false })
+        .limit(10);
+
       if (selectedMapId !== "all") {
-        devQuery = devQuery.eq("map_id", selectedMapId);
-      }
-      const { data: devices } = await devQuery;
-
-      if (devices) {
-        const c: StatusCounts = { online: 0, warning: 0, critical: 0, offline: 0, unknown: 0 };
-        devices.forEach((d) => {
-          const s = (d.status || "unknown") as keyof StatusCounts;
-          if (s in c) c[s]++;
-          else c.unknown++;
-        });
-        setCounts(c);
-
-        // Fetch recent activity
-        let logQuery = supabase
-          .from("device_status_logs")
-          .select("id, new_status, old_status, changed_at, device_id")
-          .order("changed_at", { ascending: false })
-          .limit(10);
-
-        if (selectedMapId !== "all") {
-          const deviceIds = devices.map(d => d.id);
-          if (deviceIds.length > 0) {
-            logQuery = logQuery.in("device_id", deviceIds);
-          }
-        }
-
-        const { data: statusLogs } = await logQuery;
-        if (statusLogs) {
-          const deviceMap = new Map(devices.map((d) => [d.id, d.name]));
-          setLogs(statusLogs.map((l) => ({ ...l, device_name: deviceMap.get(l.device_id) ?? "Unknown" })));
+        const deviceIds = devices.map(d => d.id);
+        if (deviceIds.length > 0) {
+          logQuery = logQuery.in("device_id", deviceIds);
         }
       }
-      setLoading(false);
-    };
-    load();
+
+      const { data: statusLogs } = await logQuery;
+      if (statusLogs) {
+        const deviceMap = new Map(devices.map((d) => [d.id, d.name]));
+        setLogs(statusLogs.map((l) => ({ ...l, device_name: deviceMap.get(l.device_id) ?? "Unknown" })));
+      }
+    }
+    if (showLoader) setLoading(false);
+  };
+
+  // Initial load + poll every 30s
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(() => loadData(false), 30000);
+    return () => clearInterval(interval);
   }, [selectedMapId]);
 
   const handlePing = async (e: React.FormEvent) => {
