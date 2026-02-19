@@ -66,7 +66,18 @@ export default function NetworkMapPage() {
   const [editingEdge, setEditingEdge] = useState<Edge | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [legendVisible, setLegendVisible] = useState(false);
+  const [legendVisible, setLegendVisible] = useState(() => {
+    try { return localStorage.getItem("map-legend-visible") !== "false"; } catch { return true; }
+  });
+
+  // Legend drag position
+  const [legendPos, setLegendPos] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem("map-legend-pos");
+      return saved ? JSON.parse(saved) : { x: -1, y: -1 };
+    } catch { return { x: -1, y: -1 }; }
+  });
+  const legendDragRef = useRef<{ dragging: boolean; offsetX: number; offsetY: number }>({ dragging: false, offsetX: 0, offsetY: 0 });
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ deviceId: string; x: number; y: number } | null>(null);
@@ -542,7 +553,11 @@ export default function NetworkMapPage() {
                   <input type="file" ref={importInputRef} onChange={handleImport} accept=".json" className="hidden" />
                 </>
               )}
-              <Button variant="ghost" size="icon" onClick={() => setLegendVisible(!legendVisible)} title="Connection Legend">
+              <Button variant="ghost" size="icon" onClick={() => {
+                const next = !legendVisible;
+                setLegendVisible(next);
+                try { localStorage.setItem("map-legend-visible", String(next)); } catch {}
+              }} title="Connection Legend">
                 <Network className="h-4 w-4" />
               </Button>
               <Button variant="ghost" size="icon" onClick={toggleFullscreen} title="Fullscreen">
@@ -587,45 +602,92 @@ export default function NetworkMapPage() {
             />
           </ReactFlow>
 
-          {/* Combined Legend */}
+          {/* Combined Legend - Draggable */}
           {legendVisible && (
-            <div className="absolute bottom-4 right-4 bg-card/95 backdrop-blur-sm border border-border rounded-lg p-4 shadow-xl z-10 max-w-[220px]">
-              {/* Device Status Legend */}
-              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary" />
-                Device Status
-              </h3>
-              <div className="space-y-1.5 text-xs mb-4">
-                {[
-                  { status: "online", color: "hsl(150, 100%, 40%)", label: "Online" },
-                  { status: "warning", color: "hsl(45, 100%, 55%)", label: "Warning" },
-                  { status: "critical", color: "hsl(0, 75%, 50%)", label: "Critical" },
-                  { status: "offline", color: "#64748b", label: "Offline" },
-                  { status: "unknown", color: "#94a3b8", label: "Unknown" },
-                ].map((s) => (
-                  <div key={s.status} className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color, boxShadow: `0 0 6px ${s.color}` }} />
-                    <span className="text-muted-foreground">{s.label}</span>
-                  </div>
-                ))}
+            <div
+              className="absolute bg-card/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-10 max-w-[220px] select-none"
+              style={legendPos.x >= 0 && legendPos.y >= 0
+                ? { left: legendPos.x, top: legendPos.y }
+                : { bottom: 16, right: 16 }
+              }
+            >
+              {/* Drag handle */}
+              <div
+                className="flex items-center justify-between px-4 pt-3 pb-1 cursor-grab active:cursor-grabbing"
+                onMouseDown={(e) => {
+                  const el = e.currentTarget.parentElement!;
+                  const rect = el.getBoundingClientRect();
+                  const parentRect = el.offsetParent?.getBoundingClientRect() || { left: 0, top: 0 };
+                  legendDragRef.current = { dragging: true, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top };
+
+                  const onMove = (ev: MouseEvent) => {
+                    if (!legendDragRef.current.dragging) return;
+                    const newX = ev.clientX - parentRect.left - legendDragRef.current.offsetX;
+                    const newY = ev.clientY - parentRect.top - legendDragRef.current.offsetY;
+                    setLegendPos({ x: Math.max(0, newX), y: Math.max(0, newY) });
+                  };
+                  const onUp = () => {
+                    legendDragRef.current.dragging = false;
+                    document.removeEventListener("mousemove", onMove);
+                    document.removeEventListener("mouseup", onUp);
+                    // persist
+                    setLegendPos(prev => {
+                      try { localStorage.setItem("map-legend-pos", JSON.stringify(prev)); } catch {}
+                      return prev;
+                    });
+                  };
+                  document.addEventListener("mousemove", onMove);
+                  document.addEventListener("mouseup", onUp);
+                }}
+              >
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Legend</span>
+                <span className="text-muted-foreground/50 text-xs">⠿</span>
               </div>
 
-              {/* Connection Types Legend */}
-              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                <Network className="h-4 w-4 text-primary" />
-                Connection Types
-              </h3>
-              <div className="space-y-1.5 text-xs">
-                {CONNECTION_TYPES.map((ct) => (
-                  <div key={ct.value} className="flex items-center gap-2">
-                    <div className="w-8 h-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: ct.color, boxShadow: `0 0 6px ${ct.color}` }} />
-                    <span className="text-muted-foreground">{ct.label}</span>
-                  </div>
-                ))}
+              <div className="px-4 pb-3">
+                {/* Device Status Legend */}
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" />
+                  Device Status
+                </h3>
+                <div className="space-y-1.5 text-xs mb-4">
+                  {[
+                    { status: "online", color: "hsl(150, 100%, 40%)", label: "Online" },
+                    { status: "warning", color: "hsl(45, 100%, 55%)", label: "Warning" },
+                    { status: "critical", color: "hsl(0, 75%, 50%)", label: "Critical" },
+                    { status: "offline", color: "#64748b", label: "Offline" },
+                    { status: "unknown", color: "#94a3b8", label: "Unknown" },
+                  ].map((s) => (
+                    <div key={s.status} className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color, boxShadow: `0 0 6px ${s.color}` }} />
+                      <span className="text-muted-foreground">{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Connection Types Legend */}
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <Network className="h-4 w-4 text-primary" />
+                  Connection Types
+                </h3>
+                <div className="space-y-1.5 text-xs">
+                  {CONNECTION_TYPES.map((ct) => (
+                    <div key={ct.value} className="flex items-center gap-2">
+                      <div className="w-8 h-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: ct.color, boxShadow: `0 0 6px ${ct.color}` }} />
+                      <span className="text-muted-foreground">{ct.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    setLegendVisible(false);
+                    try { localStorage.setItem("map-legend-visible", "false"); } catch {}
+                  }}
+                  className="mt-3 text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  <EyeOff className="h-3 w-3" />Hide Legend
+                </button>
               </div>
-              <button onClick={() => setLegendVisible(false)} className="mt-3 text-xs text-primary hover:underline flex items-center gap-1">
-                <EyeOff className="h-3 w-3" />Hide Legend
-              </button>
             </div>
           )}
         </div>
