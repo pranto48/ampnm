@@ -85,11 +85,28 @@ export default function DashboardPage() {
     if (showLoader) setLoading(false);
   };
 
-  // Initial load + poll every 30s
+  // Initial load + realtime subscription + polling fallback
   useEffect(() => {
     loadData();
-    const interval = setInterval(() => loadData(false), 30000);
-    return () => clearInterval(interval);
+
+    // Realtime subscription for instant updates
+    const channel = supabase
+      .channel("dashboard-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "devices" }, () => {
+        loadData(false);
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "device_status_logs" }, () => {
+        loadData(false);
+      })
+      .subscribe();
+
+    // Polling fallback every 10s
+    const interval = setInterval(() => loadData(false), 10000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, [selectedMapId]);
 
   const handlePing = async (e: React.FormEvent) => {
@@ -146,6 +163,7 @@ export default function DashboardPage() {
     { label: "Warning", count: counts.warning, icon: AlertTriangle, className: "text-warning border-warning/30 bg-warning/5" },
     { label: "Critical", count: counts.critical, icon: AlertCircle, className: "text-destructive border-destructive/30 bg-destructive/5" },
     { label: "Offline", count: counts.offline, icon: WifiOff, className: "text-muted-foreground border-border bg-muted/30" },
+    { label: "Unknown", count: counts.unknown, icon: Activity, className: "text-muted-foreground/70 border-border bg-muted/20" },
   ];
 
   const statusColor = (s: string) => {
@@ -185,7 +203,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Status Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {statusCards.map((s) => (
             <Card key={s.label} className={`border ${s.className}`}>
               <CardContent className="p-4 flex items-center gap-3">
