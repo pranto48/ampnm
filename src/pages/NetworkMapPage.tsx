@@ -131,6 +131,7 @@ export default function NetworkMapPage() {
           ip_address: d.ip_address,
           status: d.status || "unknown",
           icon: d.type || "server",
+          subchoice: d.subchoice,
           icon_url: d.icon_url,
           icon_size: d.icon_size || 40,
           name_text_size: d.name_text_size || 12,

@@ -1,18 +1,10 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import {
-  Server, Router, Printer, Laptop, Wifi, Database,
-  HardDrive, Camera, Shield, Phone, Tablet, Smartphone,
-  Radio, Plug, Box, Monitor, Cloud, Network
-} from "lucide-react";
+import { Server } from "lucide-react";
+import { getIconComponent } from "@/components/devices/DeviceIconPicker";
 
-const iconMap: Record<string, React.ElementType> = {
-  server: Server, router: Router, printer: Printer, laptop: Laptop,
-  wifi: Wifi, database: Database, box: Box, camera: Camera,
-  cloud: Cloud, firewall: Shield, ipphone: Phone, mobile: Smartphone,
-  nas: HardDrive, rack: Server, punchdevice: Plug, "radio-tower": Radio,
-  switch: Network, tablet: Tablet, "wifi-router": Wifi, other: Monitor,
-};
+const iconMap: Record<string, React.ElementType> = {};
+// Legacy fallback kept for compatibility, but getIconComponent is preferred
 
 const statusStyles: Record<string, string> = {
   online: "border-success glow-success",
@@ -31,7 +23,7 @@ const statusDot: Record<string, string> = {
 };
 
 function DeviceNodeComponent({ data }: NodeProps) {
-  const Icon = iconMap[data.icon as string] || Server;
+  const Icon = getIconComponent((data.subchoice as string) || (data.icon as string));
   const status = (data.status as string) || "unknown";
   const iconSize = (data.icon_size as number) || 40;
   const nameSize = (data.name_text_size as number) || 12;

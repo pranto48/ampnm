@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { DeviceIconPicker, getIconComponent } from "./DeviceIconPicker";
 
 type Device = Tables<"devices">;
 type MapRow = Tables<"maps">;
@@ -49,6 +50,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [maps, setMaps] = useState<MapRow[]>([]);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [mapId, setMapId] = useState<string>("__none__");
@@ -146,6 +148,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -186,21 +189,26 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
                 <Label htmlFor="desc">Description</Label>
                 <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" rows={2} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Device Type</Label>
-                  <Select value={type} onValueChange={setType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {DEVICE_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subchoice">Subchoice</Label>
-                  <Input id="subchoice" value={subchoice} onChange={(e) => setSubchoice(e.target.value)} placeholder="e.g. linux, mikrotik" />
+              <div className="space-y-2">
+                <Label>Device Icon</Label>
+                <div className="flex items-center gap-3">
+                  {(() => {
+                    const SelectedIcon = getIconComponent(subchoice || type);
+                    return (
+                      <div className="flex items-center justify-center w-12 h-12 rounded-lg border border-border bg-muted">
+                        <SelectedIcon className="h-6 w-6 text-foreground" />
+                      </div>
+                    );
+                  })()}
+                  <div className="flex-1">
+                    <Button type="button" variant="outline" className="w-full" onClick={() => setIconPickerOpen(true)}>
+                      Choose Icon...
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Type: <span className="font-medium">{type}</span>
+                      {subchoice && <> · Variant: <span className="font-medium">{subchoice}</span></>}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -289,5 +297,17 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
         </form>
       </DialogContent>
     </Dialog>
+
+    <DeviceIconPicker
+      open={iconPickerOpen}
+      onOpenChange={setIconPickerOpen}
+      selectedType={type}
+      selectedSubchoice={subchoice}
+      onSelect={(newType, newSubchoice) => {
+        setType(newType);
+        setSubchoice(newSubchoice);
+      }}
+    />
+    </>
   );
 }
