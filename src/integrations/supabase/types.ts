@@ -382,6 +382,48 @@ export type Database = {
           },
         ]
       }
+      host_metrics_history: {
+        Row: {
+          cpu_usage: number | null
+          disk_total: number | null
+          disk_usage: number | null
+          gpu_usage: number | null
+          hostname: string
+          id: string
+          memory_total: number | null
+          memory_usage: number | null
+          network_in: number | null
+          network_out: number | null
+          recorded_at: string
+        }
+        Insert: {
+          cpu_usage?: number | null
+          disk_total?: number | null
+          disk_usage?: number | null
+          gpu_usage?: number | null
+          hostname: string
+          id?: string
+          memory_total?: number | null
+          memory_usage?: number | null
+          network_in?: number | null
+          network_out?: number | null
+          recorded_at?: string
+        }
+        Update: {
+          cpu_usage?: number | null
+          disk_total?: number | null
+          disk_usage?: number | null
+          gpu_usage?: number | null
+          hostname?: string
+          id?: string
+          memory_total?: number | null
+          memory_usage?: number | null
+          network_in?: number | null
+          network_out?: number | null
+          recorded_at?: string
+        }
+        Relationships: []
+      }
       maps: {
         Row: {
           background_color: string | null

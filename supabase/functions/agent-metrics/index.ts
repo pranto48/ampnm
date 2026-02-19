@@ -94,6 +94,25 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Also insert into history for time-series tracking
+      const { error: historyErr } = await supabaseAdmin
+        .from("host_metrics_history")
+        .insert({
+          hostname,
+          cpu_usage: body.cpu ?? body.cpu_usage ?? null,
+          memory_usage: body.memory_usage ?? null,
+          memory_total: body.memory_total ?? null,
+          disk_usage: body.disk_usage ?? null,
+          disk_total: body.disk_total ?? null,
+          network_in: body.network_in ?? null,
+          network_out: body.network_out ?? null,
+          gpu_usage: body.gpu_usage ?? null,
+        });
+
+      if (historyErr) {
+        console.error("History insert error:", historyErr);
+      }
+
       return new Response(
         JSON.stringify({ status: "ok", hostname }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
