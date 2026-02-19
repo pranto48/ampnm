@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import DeviceNode from "@/components/map/DeviceNode";
 import { EdgeEditor, edgeColorMap } from "@/components/map/EdgeEditor";
+import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Map as MapIcon, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
-  Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity,
+  Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity, Edit,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -66,6 +67,14 @@ export default function NetworkMapPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
+
+  // Context menu
+  const [contextMenu, setContextMenu] = useState<{ deviceId: string; x: number; y: number } | null>(null);
+
+  // Device edit dialog
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [deviceDialogOpen, setDeviceDialogOpen] = useState(false);
+  const devicesCache = useRef<Device[]>([]);
 
   // Map settings state
   const [bgColor, setBgColor] = useState("#1e293b");
@@ -112,6 +121,11 @@ export default function NetworkMapPage() {
     }
   }, [currentMap]);
 
+  // -- Context menu handler (stable ref) --
+  const handleNodeContextMenu = useCallback((deviceId: string, x: number, y: number) => {
+    setContextMenu({ deviceId, x, y });
+  }, []);
+
   // -- Fetch devices & edges --
   const fetchMapData = useCallback(async () => {
     if (!currentMapId) return;
@@ -123,6 +137,7 @@ export default function NetworkMapPage() {
     ]);
 
     if (devRes.data) {
+      devicesCache.current = devRes.data;
       const flowNodes: Node[] = devRes.data.map((d: Device) => ({
         id: d.id,
         type: "device",
@@ -138,6 +153,7 @@ export default function NetworkMapPage() {
           name_text_size: d.name_text_size || 12,
           last_latency: d.last_latency,
           last_ping: d.last_ping,
+          onContextMenu: handleNodeContextMenu,
         },
       }));
       setNodes(flowNodes);
@@ -200,7 +216,7 @@ export default function NetworkMapPage() {
 
     let interval: ReturnType<typeof setInterval> | null = null;
     if (liveRefresh) {
-      interval = setInterval(() => fetchMapData(), 30000);
+      interval = setInterval(() => fetchMapData(), 5000);
     }
 
     return () => {
@@ -554,6 +570,7 @@ export default function NetworkMapPage() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onEdgeClick={onEdgeClick}
+            onPaneClick={() => setContextMenu(null)}
             nodeTypes={nodeTypes}
             nodesDraggable={isAdmin}
             nodesConnectable={isAdmin}
@@ -620,6 +637,79 @@ export default function NetworkMapPage() {
           </div>
         )}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={() => setContextMenu(null)}
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          {isAdmin && (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+              onClick={() => {
+                const device = devicesCache.current.find(d => d.id === contextMenu.deviceId);
+                if (device) {
+                  setEditingDevice(device);
+                  setDeviceDialogOpen(true);
+                }
+                setContextMenu(null);
+              }}
+            >
+              <Edit className="h-4 w-4" />
+              Edit Device
+            </button>
+          )}
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            onClick={async () => {
+              const deviceId = contextMenu.deviceId;
+              setContextMenu(null);
+              try {
+                await supabase.functions.invoke("ping-device", { body: { device_id: deviceId } });
+                toast({ title: "Ping sent" });
+                fetchMapData();
+              } catch (err: any) {
+                toast({ title: "Ping failed", description: err.message, variant: "destructive" });
+              }
+            }}
+          >
+            <Activity className="h-4 w-4" />
+            Ping Now
+          </button>
+          {isAdmin && (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors"
+              onClick={async () => {
+                const deviceId = contextMenu.deviceId;
+                const deviceName = devicesCache.current.find(d => d.id === deviceId)?.name || "this device";
+                setContextMenu(null);
+                if (!confirm(`Remove "${deviceName}" from this map?`)) return;
+                await supabase.from("devices").update({ map_id: null }).eq("id", deviceId);
+                toast({ title: "Device removed from map" });
+                fetchMapData();
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Remove from Map
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Device Edit Dialog */}
+      <DeviceFormDialog
+        open={deviceDialogOpen}
+        onOpenChange={setDeviceDialogOpen}
+        device={editingDevice}
+        onSaved={() => {
+          setDeviceDialogOpen(false);
+          setEditingDevice(null);
+          fetchMapData();
+        }}
+      />
 
       {/* Edge Editor */}
       <EdgeEditor
