@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Pencil, Trash2, Server, RefreshCw, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
@@ -38,6 +38,7 @@ export default function DevicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [search, setSearch] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const fetchDevices = async () => {
@@ -83,6 +84,68 @@ export default function DevicesPage() {
     fetchDevices();
   };
 
+  // --- Export devices as .amp (JSON) ---
+  const handleExport = () => {
+    const exportData = devices.map(({ id, created_at, updated_at, user_id, last_ping, last_ping_result, last_latency, status, ...rest }) => rest);
+    const blob = new Blob([JSON.stringify({ version: "1.0", format: "ampnm", exported_at: new Date().toISOString(), devices: exportData }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ampnm-devices-${new Date().toISOString().slice(0, 10)}.amp`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `Exported ${devices.length} devices` });
+  };
+
+  // --- Import devices from .amp ---
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const importDevices = parsed.devices ?? parsed;
+      if (!Array.isArray(importDevices) || importDevices.length === 0) {
+        toast({ title: "Invalid file", description: "No devices found in file.", variant: "destructive" });
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast({ title: "Not authenticated", variant: "destructive" }); return; }
+
+      let imported = 0;
+      for (const dev of importDevices) {
+        const { error } = await supabase.from("devices").insert({
+          name: dev.name || "Imported Device",
+          ip_address: dev.ip_address ?? dev.ip ?? null,
+          type: dev.type ?? "server",
+          subchoice: dev.subchoice ?? null,
+          monitor_method: dev.monitor_method ?? "ping",
+          check_port: dev.check_port ?? null,
+          ping_interval: dev.ping_interval ?? 300,
+          icon_size: dev.icon_size ?? 40,
+          name_text_size: dev.name_text_size ?? 12,
+          description: dev.description ?? null,
+          map_id: dev.map_id ?? null,
+          x: dev.x ?? 100,
+          y: dev.y ?? 100,
+          warning_latency_threshold: dev.warning_latency_threshold ?? 100,
+          warning_packetloss_threshold: dev.warning_packetloss_threshold ?? 10,
+          critical_latency_threshold: dev.critical_latency_threshold ?? 500,
+          critical_packetloss_threshold: dev.critical_packetloss_threshold ?? 50,
+          show_live_ping: dev.show_live_ping ?? false,
+          icon_url: dev.icon_url ?? null,
+          user_id: user.id,
+        });
+        if (!error) imported++;
+      }
+      toast({ title: `Imported ${imported} of ${importDevices.length} devices` });
+      fetchDevices();
+    } catch {
+      toast({ title: "Import failed", description: "Could not parse file.", variant: "destructive" });
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -92,11 +155,20 @@ export default function DevicesPage() {
             <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
             <Badge variant="secondary" className="ml-2">{devices.length}</Badge>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={fetchDevices} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={devices.length === 0}>
+              <Download className="h-4 w-4 mr-1" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-1" />
+              Import
+            </Button>
+            <input ref={fileInputRef} type="file" accept=".amp,.json" className="hidden" onChange={handleImportFile} />
             <Button size="sm" onClick={handleAdd}>
               <Plus className="h-4 w-4 mr-1" />
               Add Device
