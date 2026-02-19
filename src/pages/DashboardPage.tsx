@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wifi, WifiOff, AlertTriangle, AlertCircle, Activity, Zap } from "lucide-react";
+import { Wifi, WifiOff, AlertTriangle, AlertCircle, Activity, Zap, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [pingHost, setPingHost] = useState("192.168.1.1");
   const [pinging, setPinging] = useState(false);
   const [pingResult, setPingResult] = useState<string | null>(null);
+  const [isPingingAll, setIsPingingAll] = useState(false);
 
   // Load maps
   useEffect(() => {
@@ -118,6 +119,20 @@ export default function DashboardPage() {
     setPinging(false);
   };
 
+  const handlePingAll = async () => {
+    setIsPingingAll(true);
+    try {
+      const { data: devicesWithIp } = await supabase
+        .from("devices")
+        .select("id")
+        .not("ip_address", "is", null);
+      const ids = (devicesWithIp ?? []).map(d => d.id);
+      if (ids.length === 0) { setIsPingingAll(false); return; }
+      await supabase.functions.invoke("ping-device", { body: { device_ids: ids } });
+      loadData(false);
+    } catch {} finally { setIsPingingAll(false); }
+  };
+
   const total = counts.online + counts.warning + counts.critical + counts.offline + counts.unknown;
   const chartData = [
     { name: "Online", value: counts.online, color: "hsl(var(--success))" },
@@ -150,17 +165,23 @@ export default function DashboardPage() {
             <Activity className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           </div>
-          <Select value={selectedMapId} onValueChange={setSelectedMapId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Maps" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Maps</SelectItem>
-              {maps.map((m) => (
-                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePingAll} disabled={isPingingAll}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${isPingingAll ? "animate-spin" : ""}`} />
+              {isPingingAll ? "Pinging..." : "Ping All Devices"}
+            </Button>
+            <Select value={selectedMapId} onValueChange={setSelectedMapId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="All Maps" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Maps</SelectItem>
+                {maps.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Status Cards */}
