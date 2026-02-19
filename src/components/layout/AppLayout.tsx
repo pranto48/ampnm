@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useGlobalAutoPing } from "@/hooks/useGlobalAutoPing";
 import { useSoundAlerts } from "@/hooks/useSoundAlerts";
 import { SoundAlertSettings } from "@/components/SoundAlertSettings";
 import {
   LayoutDashboard, Map, BarChart3, Activity, Monitor,
   Server, History, FileText, Mail, Users, Key, HelpCircle,
-  LogOut, Menu, X, ChevronDown, Shield
+  LogOut, Menu, X, ChevronDown, Shield, Radio
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavItem {
   label: string;
@@ -50,6 +53,7 @@ const navItems: NavItem[] = [
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isAdmin, signOut } = useAuth();
+  const { enabled: autoPingEnabled, setEnabled: setAutoPingEnabled, monitoredCount, totalCount } = useGlobalAutoPing();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -132,8 +136,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => renderNavItem(item))}
           </nav>
 
-          {/* User + Logout */}
+          {/* Auto-Ping Indicator + User + Logout */}
           <div className="hidden md:flex items-center gap-2 ml-auto">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setAutoPingEnabled(!autoPingEnabled)}
+                  className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    autoPingEnabled
+                      ? "border-success/40 bg-success/10 text-success hover:bg-success/20"
+                      : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <Radio className={`h-3.5 w-3.5 ${autoPingEnabled ? "animate-pulse" : ""}`} />
+                  {monitoredCount}/{totalCount}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{autoPingEnabled ? `Auto-ping active: ${monitoredCount} devices monitored` : "Auto-ping disabled — click to enable"}</p>
+              </TooltipContent>
+            </Tooltip>
             <SoundAlertSettings prefs={soundPrefs} onUpdate={updateSoundPrefs} />
             <span className="text-xs text-muted-foreground">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1 text-muted-foreground hover:text-foreground">
