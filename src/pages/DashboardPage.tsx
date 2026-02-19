@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wifi, WifiOff, AlertTriangle, AlertCircle, Activity, Zap, RefreshCw } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { useAutoPing } from "@/hooks/useAutoPing";
 import type { Tables } from "@/integrations/supabase/types";
 
 interface StatusCounts {
@@ -32,7 +29,6 @@ interface StatusLog {
 type MapRow = Tables<"maps">;
 
 export default function DashboardPage() {
-  const [allDevices, setAllDevices] = useState<Tables<"devices">[]>([]);
   const [maps, setMaps] = useState<MapRow[]>([]);
   const [selectedMapId, setSelectedMapId] = useState<string>("all");
   const [counts, setCounts] = useState<StatusCounts>({ online: 0, warning: 0, critical: 0, offline: 0, unknown: 0 });
@@ -44,13 +40,6 @@ export default function DashboardPage() {
   const [pinging, setPinging] = useState(false);
   const [pingResult, setPingResult] = useState<string | null>(null);
   const [isPingingAll, setIsPingingAll] = useState(false);
-  const [autoPingEnabled, setAutoPingEnabled] = useState(true);
-
-  const handleAutoPingComplete = useCallback(() => {
-    loadData(false);
-  }, []);
-
-  useAutoPing(allDevices, autoPingEnabled, handleAutoPingComplete);
 
   // Load maps
   useEffect(() => {
@@ -59,12 +48,11 @@ export default function DashboardPage() {
 
   const loadData = async (showLoader = true) => {
     if (showLoader) setLoading(true);
-    let devQuery = supabase.from("devices").select("*");
+    let devQuery = supabase.from("devices").select("id, name, status, map_id, ip_address");
     if (selectedMapId !== "all") {
       devQuery = devQuery.eq("map_id", selectedMapId);
     }
     const { data: devices } = await devQuery;
-    if (devices) setAllDevices(devices);
 
     if (devices) {
       const c: StatusCounts = { online: 0, warning: 0, critical: 0, offline: 0, unknown: 0 };
@@ -178,10 +166,6 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-muted/30">
-              <Switch id="dash-auto-ping" checked={autoPingEnabled} onCheckedChange={setAutoPingEnabled} />
-              <Label htmlFor="dash-auto-ping" className="text-xs font-medium cursor-pointer">Auto-Ping</Label>
-            </div>
             <Button variant="outline" size="sm" onClick={handlePingAll} disabled={isPingingAll}>
               <RefreshCw className={`h-4 w-4 mr-1 ${isPingingAll ? "animate-spin" : ""}`} />
               {isPingingAll ? "Pinging..." : "Ping All Devices"}
