@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Map, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
-  Network, Eye, EyeOff, Copy, Link2, Download, Upload,
+  Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -74,6 +74,7 @@ export default function NetworkMapPage() {
 
   // Live refresh
   const [liveRefresh, setLiveRefresh] = useState(true);
+  const [isPingingAll, setIsPingingAll] = useState(false);
 
   // Fullscreen
   const mapWrapperRef = useRef<HTMLDivElement>(null);
@@ -135,6 +136,8 @@ export default function NetworkMapPage() {
           icon_url: d.icon_url,
           icon_size: d.icon_size || 40,
           name_text_size: d.name_text_size || 12,
+          last_latency: d.last_latency,
+          last_ping: d.last_ping,
         },
       }));
       setNodes(flowNodes);
@@ -386,6 +389,53 @@ export default function NetworkMapPage() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
+  // -- Ping All Devices --
+  const handlePingAll = async () => {
+    if (!currentMapId || isPingingAll) return;
+    setIsPingingAll(true);
+    try {
+      const deviceIds = nodes.filter(n => n.data.ip_address).map(n => n.id);
+      if (deviceIds.length === 0) {
+        toast({ title: "No devices with IP addresses to ping" });
+        setIsPingingAll(false);
+        return;
+      }
+      const { error } = await supabase.functions.invoke("ping-device", {
+        body: { device_ids: deviceIds },
+      });
+      if (error) throw error;
+      toast({ title: `Pinged ${deviceIds.length} devices` });
+      fetchMapData();
+    } catch (err: any) {
+      toast({ title: "Ping all failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsPingingAll(false);
+    }
+  };
+
+  // -- Auto-ping devices based on ping interval --
+  useEffect(() => {
+    if (!currentMapId || !liveRefresh) return;
+
+    // Auto-ping: find shortest interval among devices with IP and ping_interval
+    const autoPingInterval = setInterval(async () => {
+      // Get device IDs with IP addresses from current nodes
+      const deviceIds = nodes.filter(n => n.data.ip_address).map(n => n.id);
+      if (deviceIds.length === 0) return;
+      
+      try {
+        await supabase.functions.invoke("ping-device", {
+          body: { device_ids: deviceIds },
+        });
+        fetchMapData();
+      } catch (err) {
+        console.error("Auto-ping failed:", err);
+      }
+    }, 60000); // Auto-ping every 60 seconds when live refresh is on
+
+    return () => clearInterval(autoPingInterval);
+  }, [currentMapId, liveRefresh, nodes, fetchMapData]);
+
   // Public link
   const publicLink = currentMapId ? `${window.location.origin}/map/public/${currentMapId}` : "";
 
@@ -432,6 +482,10 @@ export default function NetworkMapPage() {
               </div>
               <Button variant="ghost" size="icon" onClick={fetchMapData} disabled={loading} title="Refresh">
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handlePingAll} disabled={isPingingAll || nodes.length === 0} title="Ping All Devices" className="gap-1 text-xs">
+                <Activity className={`h-4 w-4 ${isPingingAll ? "animate-spin" : ""}`} />
+                {isPingingAll ? "Pinging..." : "Ping All"}
               </Button>
               {isAdmin && (
                 <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Map Settings">
