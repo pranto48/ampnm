@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload, Activity } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload, Activity, Timer } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAutoPing } from "@/hooks/useAutoPing";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Device = Tables<"devices">;
@@ -42,8 +45,15 @@ export default function DevicesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pingingIds, setPingingIds] = useState<Set<string>>(new Set());
   const [isPingingAll, setIsPingingAll] = useState(false);
+  const [autoPingEnabled, setAutoPingEnabled] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const handleAutoPingComplete = useCallback(() => {
+    fetchDevices();
+  }, []);
+
+  useAutoPing(devices, autoPingEnabled, handleAutoPingComplete);
 
   const filteredDevices = devices.filter(d => {
     if (!search.trim()) return true;
@@ -236,6 +246,10 @@ export default function DevicesPage() {
                 Delete {selected.size}
               </Button>
             )}
+            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-muted/30">
+              <Switch id="auto-ping" checked={autoPingEnabled} onCheckedChange={setAutoPingEnabled} />
+              <Label htmlFor="auto-ping" className="text-xs font-medium cursor-pointer">Auto-Ping</Label>
+            </div>
             <Button variant="outline" size="sm" onClick={handlePingAll} disabled={isPingingAll || devices.length === 0}>
               <Activity className={`h-4 w-4 mr-1 ${isPingingAll ? "animate-spin" : ""}`} />
               {isPingingAll ? "Pinging..." : "Ping All"}
@@ -285,20 +299,21 @@ export default function DevicesPage() {
                   <TableHead>Method</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Latency</TableHead>
+                  <TableHead>Interval</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      Loading devices...
-                    </TableCell>
+                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                       Loading devices...
+                     </TableCell>
                   </TableRow>
                 ) : filteredDevices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      {search ? "No devices match your search." : 'No devices configured. Click "Add Device" to get started.'}
+                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                       {search ? "No devices match your search." : 'No devices configured. Click "Add Device" to get started.'}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -317,6 +332,12 @@ export default function DevicesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{device.last_latency != null ? `${device.last_latency}ms` : "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Timer className="h-3 w-3" />
+                          {device.ping_interval ?? 300}s
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           {device.ip_address && (
