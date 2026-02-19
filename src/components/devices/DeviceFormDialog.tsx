@@ -50,6 +50,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [maps, setMaps] = useState<MapRow[]>([]);
+  const [agentHosts, setAgentHosts] = useState<any[]>([]);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
 
   const [name, setName] = useState("");
@@ -74,8 +75,11 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   useEffect(() => {
     if (open) {
       supabase.from("maps").select("*").order("name").then(({ data }) => setMaps(data ?? []));
+      if (!device) {
+        supabase.from("host_metrics").select("hostname, ip_address").order("hostname").then(({ data }) => setAgentHosts(data ?? []));
+      }
     }
-  }, [open]);
+  }, [open, device]);
 
   useEffect(() => {
     if (device) {
@@ -163,6 +167,30 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
             </TabsList>
 
             <TabsContent value="general" className="space-y-4 mt-4">
+              {/* Agent host quick-fill */}
+              {!device && agentHosts.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Import from Agent Host</Label>
+                  <Select value="" onValueChange={(hostname) => {
+                    const host = agentHosts.find(h => h.hostname === hostname);
+                    if (host) {
+                      setName(host.hostname);
+                      setIpAddress(host.ip_address || "");
+                      setType("workstation");
+                      toast({ title: `Filled from agent host: ${host.hostname}` });
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Select an agent host to auto-fill..." /></SelectTrigger>
+                    <SelectContent>
+                      {agentHosts.map((h) => (
+                        <SelectItem key={h.hostname} value={h.hostname}>
+                          {h.hostname} {h.ip_address ? `(${h.ip_address})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Device Name *</Label>
