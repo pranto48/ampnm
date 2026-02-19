@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, useCallback } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Activity } from "lucide-react";
 import { getIconComponent } from "@/components/devices/DeviceIconPicker";
@@ -56,6 +56,15 @@ function DeviceNodeComponent({ data, id }: NodeProps) {
     }
   };
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const onContextMenu = data.onContextMenu as ((deviceId: string, x: number, y: number) => void) | undefined;
+    if (onContextMenu) {
+      onContextMenu(id, e.clientX, e.clientY);
+    }
+  }, [data, id]);
+
   const displayLatency = pingLatency ?? lastLatency;
 
   return (
@@ -68,6 +77,7 @@ function DeviceNodeComponent({ data, id }: NodeProps) {
       <div
         className={`flex flex-col items-center gap-1 rounded-lg border-2 bg-card p-3 shadow-lg transition-shadow ${statusStyles[status] || statusStyles.unknown}`}
         style={{ minWidth: 80 }}
+        onContextMenu={handleContextMenu}
       >
         {data.icon_url ? (
           <img
