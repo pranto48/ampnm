@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload, Activity } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
@@ -40,6 +40,8 @@ export default function DevicesPage() {
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pingingIds, setPingingIds] = useState<Set<string>>(new Set());
+  const [isPingingAll, setIsPingingAll] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -124,6 +126,38 @@ export default function DevicesPage() {
     fetchDevices();
   };
 
+  // --- Ping single device ---
+  const handlePingDevice = async (deviceId: string) => {
+    setPingingIds(prev => new Set(prev).add(deviceId));
+    try {
+      const { error } = await supabase.functions.invoke("ping-device", { body: { device_id: deviceId } });
+      if (error) throw error;
+      toast({ title: "Ping complete" });
+      fetchDevices();
+    } catch (err: any) {
+      toast({ title: "Ping failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPingingIds(prev => { const n = new Set(prev); n.delete(deviceId); return n; });
+    }
+  };
+
+  // --- Ping all devices ---
+  const handlePingAll = async () => {
+    const deviceIds = devices.filter(d => d.ip_address).map(d => d.id);
+    if (deviceIds.length === 0) { toast({ title: "No devices with IP addresses" }); return; }
+    setIsPingingAll(true);
+    try {
+      const { error } = await supabase.functions.invoke("ping-device", { body: { device_ids: deviceIds } });
+      if (error) throw error;
+      toast({ title: `Pinged ${deviceIds.length} devices` });
+      fetchDevices();
+    } catch (err: any) {
+      toast({ title: "Ping all failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsPingingAll(false);
+    }
+  };
+
   // --- Export devices as .amp (JSON) ---
   const handleExport = () => {
     const exportData = devices.map(({ id, created_at, updated_at, user_id, last_ping, last_ping_result, last_latency, status, ...rest }) => rest);
@@ -202,6 +236,10 @@ export default function DevicesPage() {
                 Delete {selected.size}
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={handlePingAll} disabled={isPingingAll || devices.length === 0}>
+              <Activity className={`h-4 w-4 mr-1 ${isPingingAll ? "animate-spin" : ""}`} />
+              {isPingingAll ? "Pinging..." : "Ping All"}
+            </Button>
             <Button variant="outline" size="sm" onClick={fetchDevices} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -281,6 +319,11 @@ export default function DevicesPage() {
                       <TableCell>{device.last_latency != null ? `${device.last_latency}ms` : "—"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          {device.ip_address && (
+                            <Button variant="ghost" size="icon" onClick={() => handlePingDevice(device.id)} disabled={pingingIds.has(device.id)} title="Ping device">
+                              <Activity className={`h-4 w-4 ${pingingIds.has(device.id) ? "animate-spin" : ""}`} />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" onClick={() => handleEdit(device)}>
                             <Pencil className="h-4 w-4" />
                           </Button>

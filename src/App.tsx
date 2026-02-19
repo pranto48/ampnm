@@ -18,6 +18,7 @@ import NotificationsPage from "./pages/NotificationsPage";
 import UsersPage from "./pages/UsersPage";
 import LicensePage from "./pages/LicensePage";
 import HelpPage from "./pages/HelpPage";
+import PublicMapPage from "./pages/PublicMapPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/users" element={<ProtectedRoute adminOnly><UsersPage /></ProtectedRoute>} />
             <Route path="/license" element={<ProtectedRoute adminOnly><LicensePage /></ProtectedRoute>} />
             <Route path="/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
+            <Route path="/map/public/:mapId" element={<PublicMapPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
