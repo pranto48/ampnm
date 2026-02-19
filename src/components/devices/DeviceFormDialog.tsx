@@ -211,20 +211,41 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
                   </div>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="icon_url">Custom Icon URL</Label>
+                <div className="flex items-center gap-3">
+                  {iconUrl.trim() && (
+                    <div className="flex-shrink-0 w-12 h-12 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden">
+                      <img
+                        src={iconUrl}
+                        alt="Custom icon preview"
+                        className="max-w-full max-h-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block'; }}
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <Input id="icon_url" value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="https://example.com/icon.png" />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {iconUrl.trim() ? "Custom URL overrides the icon picker above" : "Leave blank to use the icon picker above"}
+                    </p>
+                  </div>
+                  {iconUrl.trim() && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setIconUrl("")} className="text-xs text-muted-foreground">
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="icon_url">Icon URL</Label>
-                  <Input id="icon_url" value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="URL or leave blank for default" />
+                  <Label htmlFor="icon_size">Icon Size</Label>
+                  <Input id="icon_size" type="number" min={16} max={128} value={iconSize} onChange={(e) => setIconSize(Number(e.target.value))} />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="icon_size">Icon Size</Label>
-                    <Input id="icon_size" type="number" min={16} max={128} value={iconSize} onChange={(e) => setIconSize(Number(e.target.value))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="text_size">Text Size</Label>
-                    <Input id="text_size" type="number" min={8} max={32} value={nameTextSize} onChange={(e) => setNameTextSize(Number(e.target.value))} />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="text_size">Text Size</Label>
+                  <Input id="text_size" type="number" min={8} max={32} value={nameTextSize} onChange={(e) => setNameTextSize(Number(e.target.value))} />
                 </div>
               </div>
             </TabsContent>
