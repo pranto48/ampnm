@@ -31,7 +31,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Map, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
+  Map as MapIcon, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
   Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
@@ -144,20 +144,43 @@ export default function NetworkMapPage() {
     }
 
     if (edgeRes.data) {
-      const flowEdges: Edge[] = edgeRes.data.map((e: DeviceEdge) => ({
-        id: e.id,
-        source: e.source_id,
-        target: e.target_id,
-        type: "default",
-        style: { stroke: edgeColorMap[e.connection_type || "cat5"] || "#a78bfa", strokeWidth: 2 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorMap[e.connection_type || "cat5"] || "#a78bfa" },
-        data: { connection_type: e.connection_type || "cat5" },
-        label: e.connection_type || "cat5",
-        labelStyle: { fill: "#94a3b8", fontSize: 10 },
-        labelBgStyle: { fill: "hsl(220 25% 8%)", fillOpacity: 0.9 },
-        labelBgPadding: [6, 3] as [number, number],
-        labelBgBorderRadius: 4,
-      }));
+      // Build a status lookup from devices
+      const deviceStatusMap = new Map<string, string>();
+      if (devRes.data) {
+        devRes.data.forEach((d: Device) => deviceStatusMap.set(d.id, d.status || "unknown"));
+      }
+
+      const flowEdges: Edge[] = edgeRes.data.map((e: DeviceEdge) => {
+        const connType = e.connection_type || "cat5";
+        const sourceStatus = deviceStatusMap.get(e.source_id) || "unknown";
+        const targetStatus = deviceStatusMap.get(e.target_id) || "unknown";
+        const isOffline = sourceStatus === "offline" || targetStatus === "offline";
+        const isActive = sourceStatus === "online" && targetStatus === "online";
+        const baseColor = edgeColorMap[connType] || "#a78bfa";
+        const color = isOffline ? "#64748b" : baseColor;
+        const isDashed = connType === "wifi" || connType === "radio" || connType === "logical-tunneling";
+
+        return {
+          id: e.id,
+          source: e.source_id,
+          target: e.target_id,
+          type: "default",
+          animated: isActive,
+          style: {
+            stroke: color,
+            strokeWidth: 2,
+            strokeDasharray: isDashed && !isActive ? "6 4" : undefined,
+          },
+          className: isActive ? "edge-animated-flow" : "",
+          markerEnd: { type: MarkerType.ArrowClosed, color },
+          data: { connection_type: connType },
+          label: connType,
+          labelStyle: { fill: isOffline ? "#64748b" : "#94a3b8", fontSize: 10 },
+          labelBgStyle: { fill: "hsl(220 25% 8%)", fillOpacity: 0.9 },
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 4,
+        };
+      });
       setEdges(flowEdges);
     }
 
@@ -445,7 +468,7 @@ export default function NetworkMapPage() {
         {/* Top Bar: Title + Map selector + Map management buttons */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <Map className="h-7 w-7 text-primary" />
+            <MapIcon className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold tracking-tight">Network Map</h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
