@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Map, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
-  Network, Eye, EyeOff, Copy, Link2,
+  Network, Eye, EyeOff, Copy, Link2, Download, Upload,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -302,6 +302,71 @@ export default function NetworkMapPage() {
     toast({ title: "Map settings saved" });
   };
 
+  // -- Export / Import --
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    if (!currentMap) return;
+    const exportData = {
+      map: { name: currentMap.name, background_color: currentMap.background_color, background_image_url: currentMap.background_image_url },
+      devices: nodes.map((n) => ({ name: n.data.name, ip_address: n.data.ip_address, type: n.data.icon, icon_url: n.data.icon_url, x: n.position.x, y: n.position.y, icon_size: n.data.icon_size, name_text_size: n.data.name_text_size })),
+      edges: edges.map((e) => ({ source_index: nodes.findIndex((n) => n.id === e.source), target_index: nodes.findIndex((n) => n.id === e.target), connection_type: e.data?.connection_type || "cat5" })),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${currentMap.name.replace(/\s+/g, "-")}-map.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Map exported!" });
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentMapId || !user) return;
+    if (!confirm("Import will add devices and connections to the current map. Continue?")) { if (importInputRef.current) importInputRef.current.value = ""; return; }
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.devices || !Array.isArray(data.devices)) throw new Error("Invalid map file.");
+
+      const insertedIds: string[] = [];
+      for (const dev of data.devices) {
+        const { data: inserted, error } = await supabase.from("devices").insert({
+          name: dev.name || "Imported Device",
+          ip_address: dev.ip_address || null,
+          type: dev.type || "server",
+          icon_url: dev.icon_url || null,
+          x: dev.x ?? 100,
+          y: dev.y ?? 100,
+          icon_size: dev.icon_size ?? 40,
+          name_text_size: dev.name_text_size ?? 12,
+          map_id: currentMapId,
+          user_id: user.id,
+        }).select("id").single();
+        if (error) throw error;
+        if (inserted) insertedIds.push(inserted.id);
+      }
+
+      if (data.edges && Array.isArray(data.edges)) {
+        for (const edge of data.edges) {
+          const srcId = insertedIds[edge.source_index];
+          const tgtId = insertedIds[edge.target_index];
+          if (srcId && tgtId) {
+            await supabase.from("device_edges").insert({ source_id: srcId, target_id: tgtId, map_id: currentMapId, connection_type: edge.connection_type || "cat5" });
+          }
+        }
+      }
+
+      toast({ title: "Map imported successfully!" });
+      fetchMapData();
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    }
+    if (importInputRef.current) importInputRef.current.value = "";
+  };
+
   // -- Fullscreen --
   const toggleFullscreen = () => {
     if (!mapWrapperRef.current) return;
@@ -371,6 +436,17 @@ export default function NetworkMapPage() {
                 <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Map Settings">
                   <Settings className="h-4 w-4" />
                 </Button>
+              )}
+              {isAdmin && (
+                <>
+                  <Button variant="ghost" size="icon" onClick={handleExport} title="Export Map">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => importInputRef.current?.click()} title="Import Map">
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                  <input type="file" ref={importInputRef} onChange={handleImport} accept=".json" className="hidden" />
+                </>
               )}
               <Button variant="ghost" size="icon" onClick={() => setLegendVisible(!legendVisible)} title="Connection Legend">
                 <Network className="h-4 w-4" />
