@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Server, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Pencil, Trash2, Server, RefreshCw, Search } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
@@ -36,6 +37,7 @@ export default function DevicesPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDevice, setEditDevice] = useState<Device | null>(null);
+  const [search, setSearch] = useState("");
   const { toast } = useToast();
 
   const fetchDevices = async () => {
@@ -102,6 +104,17 @@ export default function DevicesPage() {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search devices..."
+            className="pl-9"
+          />
+        </div>
+
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -123,14 +136,22 @@ export default function DevicesPage() {
                       Loading devices...
                     </TableCell>
                   </TableRow>
-                ) : devices.length === 0 ? (
+                ) : devices.filter(d => {
+                  if (!search.trim()) return true;
+                  const q = search.toLowerCase();
+                  return d.name.toLowerCase().includes(q) || (d.ip_address || "").toLowerCase().includes(q);
+                }).length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No devices configured. Click "Add Device" to get started.
+                      {search ? "No devices match your search." : 'No devices configured. Click "Add Device" to get started.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  devices.map((device) => (
+                  devices.filter(d => {
+                    if (!search.trim()) return true;
+                    const q = search.toLowerCase();
+                    return d.name.toLowerCase().includes(q) || (d.ip_address || "").toLowerCase().includes(q);
+                  }).map((device) => (
                     <TableRow key={device.id}>
                       <TableCell className="font-medium">{device.name}</TableCell>
                       <TableCell className="font-mono text-sm">{device.ip_address || "—"}</TableCell>

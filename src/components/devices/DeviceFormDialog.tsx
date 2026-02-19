@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Device = Tables<"devices">;
+type MapRow = Tables<"maps">;
 
 const DEVICE_TYPES = [
   { value: "server", label: "Server" },
@@ -47,8 +48,10 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   const { user } = useAuth();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [maps, setMaps] = useState<MapRow[]>([]);
 
   const [name, setName] = useState("");
+  const [mapId, setMapId] = useState<string>("");
   const [ipAddress, setIpAddress] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("server");
@@ -65,9 +68,17 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   const [criticalLatency, setCriticalLatency] = useState(500);
   const [criticalPacketloss, setCriticalPacketloss] = useState(50);
 
+  // Fetch maps
+  useEffect(() => {
+    if (open) {
+      supabase.from("maps").select("*").order("name").then(({ data }) => setMaps(data ?? []));
+    }
+  }, [open]);
+
   useEffect(() => {
     if (device) {
       setName(device.name);
+      setMapId(device.map_id ?? "");
       setIpAddress(device.ip_address ?? "");
       setDescription(device.description ?? "");
       setType(device.type ?? "server");
@@ -84,7 +95,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
       setCriticalLatency(device.critical_latency_threshold ?? 500);
       setCriticalPacketloss(device.critical_packetloss_threshold ?? 50);
     } else {
-      setName(""); setIpAddress(""); setDescription(""); setType("server");
+      setName(""); setMapId(""); setIpAddress(""); setDescription(""); setType("server");
       setSubchoice(""); setMonitorMethod("ping"); setCheckPort("");
       setPingInterval(300); setIconUrl(""); setIconSize(40); setNameTextSize(12);
       setShowLivePing(false); setWarningLatency(100); setWarningPacketloss(10);
@@ -99,6 +110,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
 
     const payload = {
       name: name.trim(),
+      map_id: mapId || null,
       ip_address: ipAddress.trim() || null,
       description: description.trim() || null,
       type,
@@ -157,6 +169,18 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
                   <Label htmlFor="ip">IP Address / Hostname</Label>
                   <Input id="ip" value={ipAddress} onChange={(e) => setIpAddress(e.target.value)} placeholder="e.g. 192.168.1.1" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Map</Label>
+                <Select value={mapId} onValueChange={setMapId}>
+                  <SelectTrigger><SelectValue placeholder="No map assigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {maps.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="desc">Description</Label>

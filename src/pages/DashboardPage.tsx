@@ -2,8 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wifi, WifiOff, AlertTriangle, AlertCircle, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Wifi, WifiOff, AlertTriangle, AlertCircle, Activity, Zap } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface StatusCounts {
   online: number;
@@ -22,14 +26,34 @@ interface StatusLog {
   device_name?: string;
 }
 
+type MapRow = Tables<"maps">;
+
 export default function DashboardPage() {
+  const [maps, setMaps] = useState<MapRow[]>([]);
+  const [selectedMapId, setSelectedMapId] = useState<string>("all");
   const [counts, setCounts] = useState<StatusCounts>({ online: 0, warning: 0, critical: 0, offline: 0, unknown: 0 });
   const [logs, setLogs] = useState<StatusLog[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Ping test
+  const [pingHost, setPingHost] = useState("192.168.1.1");
+  const [pinging, setPinging] = useState(false);
+  const [pingResult, setPingResult] = useState<string | null>(null);
+
+  // Load maps
+  useEffect(() => {
+    supabase.from("maps").select("*").order("name").then(({ data }) => setMaps(data ?? []));
+  }, []);
+
   useEffect(() => {
     const load = async () => {
-      const { data: devices } = await supabase.from("devices").select("status, name, id");
+      setLoading(true);
+      let devQuery = supabase.from("devices").select("status, name, id, map_id");
+      if (selectedMapId !== "all") {
+        devQuery = devQuery.eq("map_id", selectedMapId);
+      }
+      const { data: devices } = await devQuery;
+
       if (devices) {
         const c: StatusCounts = { online: 0, warning: 0, critical: 0, offline: 0, unknown: 0 };
         devices.forEach((d) => {
@@ -38,22 +62,58 @@ export default function DashboardPage() {
           else c.unknown++;
         });
         setCounts(c);
-      }
 
-      const { data: statusLogs } = await supabase
-        .from("device_status_logs")
-        .select("id, new_status, old_status, changed_at, device_id")
-        .order("changed_at", { ascending: false })
-        .limit(10);
+        // Fetch recent activity
+        let logQuery = supabase
+          .from("device_status_logs")
+          .select("id, new_status, old_status, changed_at, device_id")
+          .order("changed_at", { ascending: false })
+          .limit(10);
 
-      if (statusLogs && devices) {
-        const deviceMap = new Map(devices?.map((d) => [d.id, d.name]) ?? []);
-        setLogs(statusLogs.map((l) => ({ ...l, device_name: deviceMap.get(l.device_id) ?? "Unknown" })));
+        if (selectedMapId !== "all") {
+          const deviceIds = devices.map(d => d.id);
+          if (deviceIds.length > 0) {
+            logQuery = logQuery.in("device_id", deviceIds);
+          }
+        }
+
+        const { data: statusLogs } = await logQuery;
+        if (statusLogs) {
+          const deviceMap = new Map(devices.map((d) => [d.id, d.name]));
+          setLogs(statusLogs.map((l) => ({ ...l, device_name: deviceMap.get(l.device_id) ?? "Unknown" })));
+        }
       }
       setLoading(false);
     };
     load();
-  }, []);
+  }, [selectedMapId]);
+
+  const handlePing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pingHost.trim()) return;
+    setPinging(true);
+    setPingResult(`Pinging ${pingHost}...`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ping-target", {
+        body: { host: pingHost.trim() },
+      });
+      if (error) {
+        setPingResult(`Error: ${error.message}`);
+      } else {
+        const status = data?.status || "unknown";
+        const latency = data?.latency_ms;
+        setPingResult(
+          status === "online"
+            ? `✅ ${pingHost} is reachable — Latency: ${latency}ms`
+            : `❌ ${pingHost} is unreachable`
+        );
+      }
+    } catch (err: any) {
+      setPingResult(`Failed: ${err.message}`);
+    }
+    setPinging(false);
+  };
 
   const total = counts.online + counts.warning + counts.critical + counts.offline + counts.unknown;
   const chartData = [
@@ -82,9 +142,22 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Activity className="h-7 w-7 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Activity className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          </div>
+          <Select value={selectedMapId} onValueChange={setSelectedMapId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="All Maps" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Maps</SelectItem>
+              {maps.map((m) => (
+                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Status Cards */}
@@ -124,31 +197,55 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Activity */}
+          {/* Manual Ping Test */}
           <Card>
-            <CardHeader><CardTitle className="text-base">Recent Activity</CardTitle></CardHeader>
-            <CardContent>
-              {logs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No recent activity.</p>
-              ) : (
-                <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {logs.map((log) => (
-                    <div key={log.id} className="flex items-center justify-between text-sm border-b border-border pb-2 last:border-0">
-                      <div>
-                        <span className="font-medium text-foreground">{log.device_name}</span>
-                        <span className="mx-1 text-muted-foreground">→</span>
-                        <span className={statusColor(log.new_status)}>{log.new_status}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(log.changed_at).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <CardHeader><CardTitle className="text-base">Manual Ping Test</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <form onSubmit={handlePing} className="flex gap-2">
+                <Input
+                  value={pingHost}
+                  onChange={(e) => setPingHost(e.target.value)}
+                  placeholder="Enter hostname or IP"
+                  className="flex-1"
+                />
+                <Button type="submit" disabled={pinging} size="sm">
+                  <Zap className="h-4 w-4 mr-1" />
+                  {pinging ? "Pinging..." : "Ping"}
+                </Button>
+              </form>
+              {pingResult && (
+                <pre className="bg-background rounded-md border border-border p-3 text-xs font-mono whitespace-pre-wrap text-muted-foreground">
+                  {pingResult}
+                </pre>
               )}
             </CardContent>
           </Card>
         </div>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader><CardTitle className="text-base">Recent Activity</CardTitle></CardHeader>
+          <CardContent>
+            {logs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recent activity.</p>
+            ) : (
+              <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                {logs.map((log) => (
+                  <div key={log.id} className="flex items-center justify-between text-sm border-b border-border pb-2 last:border-0">
+                    <div>
+                      <span className="font-medium text-foreground">{log.device_name}</span>
+                      <span className="mx-1 text-muted-foreground">→</span>
+                      <span className={statusColor(log.new_status)}>{log.new_status}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(log.changed_at).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );
