@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wifi, WifiOff, AlertTriangle, AlertCircle, Activity, Zap, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, AlertTriangle, AlertCircle, Activity, Zap, RefreshCw, Monitor } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -203,7 +203,16 @@ export default function DashboardPage() {
         </div>
 
         {/* Status Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <Card className="border border-primary/30 bg-primary/5">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Monitor className="h-8 w-8 text-primary" />
+              <div>
+                <p className="text-2xl font-bold text-primary">{loading ? "—" : total}</p>
+                <p className="text-xs font-medium text-primary/80">Total</p>
+              </div>
+            </CardContent>
+          </Card>
           {statusCards.map((s) => (
             <Card key={s.label} className={`border ${s.className}`}>
               <CardContent className="p-4 flex items-center gap-3">
