@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_tokens: {
+        Row: {
+          created_at: string
+          created_by: string
+          enabled: boolean
+          id: string
+          name: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          enabled?: boolean
+          id?: string
+          name: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          token?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           id: string
@@ -286,6 +313,71 @@ export type Database = {
             columns: ["map_id"]
             isOneToOne: false
             referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      host_metrics: {
+        Row: {
+          agent_token_id: string | null
+          cpu_usage: number | null
+          created_at: string
+          disk_total: number | null
+          disk_usage: number | null
+          first_seen: string
+          gpu_usage: number | null
+          hostname: string
+          id: string
+          ip_address: string | null
+          last_seen: string
+          memory_total: number | null
+          memory_usage: number | null
+          network_in: number | null
+          network_out: number | null
+          status: string
+        }
+        Insert: {
+          agent_token_id?: string | null
+          cpu_usage?: number | null
+          created_at?: string
+          disk_total?: number | null
+          disk_usage?: number | null
+          first_seen?: string
+          gpu_usage?: number | null
+          hostname: string
+          id?: string
+          ip_address?: string | null
+          last_seen?: string
+          memory_total?: number | null
+          memory_usage?: number | null
+          network_in?: number | null
+          network_out?: number | null
+          status?: string
+        }
+        Update: {
+          agent_token_id?: string | null
+          cpu_usage?: number | null
+          created_at?: string
+          disk_total?: number | null
+          disk_usage?: number | null
+          first_seen?: string
+          gpu_usage?: number | null
+          hostname?: string
+          id?: string
+          ip_address?: string | null
+          last_seen?: string
+          memory_total?: number | null
+          memory_usage?: number | null
+          network_in?: number | null
+          network_out?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_metrics_agent_token_id_fkey"
+            columns: ["agent_token_id"]
+            isOneToOne: false
+            referencedRelation: "agent_tokens"
             referencedColumns: ["id"]
           },
         ]
