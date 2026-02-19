@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -38,8 +39,47 @@ export default function DevicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const filteredDevices = devices.filter(d => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return d.name.toLowerCase().includes(q) || (d.ip_address || "").toLowerCase().includes(q);
+  });
+
+  const allSelected = filteredDevices.length > 0 && filteredDevices.every(d => selected.has(d.id));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filteredDevices.map(d => d.id)));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} selected device(s)?`)) return;
+    const ids = Array.from(selected);
+    const { error } = await supabase.from("devices").delete().in("id", ids);
+    if (error) {
+      toast({ title: "Bulk delete failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: `Deleted ${ids.length} device(s)` });
+      setSelected(new Set());
+      fetchDevices();
+    }
+  };
 
   const fetchDevices = async () => {
     setLoading(true);
@@ -156,6 +196,12 @@ export default function DevicesPage() {
             <Badge variant="secondary" className="ml-2">{devices.length}</Badge>
           </div>
           <div className="flex gap-2 flex-wrap">
+            {selected.size > 0 && (
+              <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete {selected.size}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={fetchDevices} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -192,6 +238,9 @@ export default function DevicesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>IP / Host</TableHead>
                   <TableHead>Type</TableHead>
@@ -204,27 +253,22 @@ export default function DevicesPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Loading devices...
                     </TableCell>
                   </TableRow>
-                ) : devices.filter(d => {
-                  if (!search.trim()) return true;
-                  const q = search.toLowerCase();
-                  return d.name.toLowerCase().includes(q) || (d.ip_address || "").toLowerCase().includes(q);
-                }).length === 0 ? (
+                ) : filteredDevices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       {search ? "No devices match your search." : 'No devices configured. Click "Add Device" to get started.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  devices.filter(d => {
-                    if (!search.trim()) return true;
-                    const q = search.toLowerCase();
-                    return d.name.toLowerCase().includes(q) || (d.ip_address || "").toLowerCase().includes(q);
-                  }).map((device) => (
-                    <TableRow key={device.id}>
+                  filteredDevices.map((device) => (
+                    <TableRow key={device.id} className={selected.has(device.id) ? "bg-muted/50" : ""}>
+                      <TableCell>
+                        <Checkbox checked={selected.has(device.id)} onCheckedChange={() => toggleOne(device.id)} aria-label={`Select ${device.name}`} />
+                      </TableCell>
                       <TableCell className="font-medium">{device.name}</TableCell>
                       <TableCell className="font-mono text-sm">{device.ip_address || "—"}</TableCell>
                       <TableCell className="capitalize">{device.type || "server"}{device.subchoice ? ` (${device.subchoice})` : ""}</TableCell>
