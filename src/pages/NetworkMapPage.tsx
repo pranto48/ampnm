@@ -570,17 +570,38 @@ export default function NetworkMapPage() {
             />
           </ReactFlow>
 
-          {/* Connection Type Legend */}
+          {/* Combined Legend */}
           {legendVisible && (
-            <div className="absolute bottom-4 right-4 bg-card/95 backdrop-blur-sm border border-border rounded-lg p-4 shadow-xl z-10">
-              <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <div className="absolute bottom-4 right-4 bg-card/95 backdrop-blur-sm border border-border rounded-lg p-4 shadow-xl z-10 max-w-[220px]">
+              {/* Device Status Legend */}
+              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                Device Status
+              </h3>
+              <div className="space-y-1.5 text-xs mb-4">
+                {[
+                  { status: "online", color: "hsl(150, 100%, 40%)", label: "Online" },
+                  { status: "warning", color: "hsl(45, 100%, 55%)", label: "Warning" },
+                  { status: "critical", color: "hsl(0, 75%, 50%)", label: "Critical" },
+                  { status: "offline", color: "#64748b", label: "Offline" },
+                  { status: "unknown", color: "#94a3b8", label: "Unknown" },
+                ].map((s) => (
+                  <div key={s.status} className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color, boxShadow: `0 0 6px ${s.color}` }} />
+                    <span className="text-muted-foreground">{s.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Connection Types Legend */}
+              <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                 <Network className="h-4 w-4 text-primary" />
                 Connection Types
               </h3>
-              <div className="space-y-2 text-xs">
+              <div className="space-y-1.5 text-xs">
                 {CONNECTION_TYPES.map((ct) => (
                   <div key={ct.value} className="flex items-center gap-2">
-                    <div className="w-8 h-0.5 rounded-full" style={{ backgroundColor: ct.color, boxShadow: `0 0 6px ${ct.color}` }} />
+                    <div className="w-8 h-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: ct.color, boxShadow: `0 0 6px ${ct.color}` }} />
                     <span className="text-muted-foreground">{ct.label}</span>
                   </div>
                 ))}
