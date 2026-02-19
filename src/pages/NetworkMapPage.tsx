@@ -716,15 +716,27 @@ export default function NetworkMapPage() {
                     </div>
                   ))}
                 </div>
-                <button
-                  onClick={() => {
-                    setLegendVisible(false);
-                    try { localStorage.setItem("map-legend-visible", "false"); } catch {}
-                  }}
-                  className="mt-3 text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  <EyeOff className="h-3 w-3" />Hide Legend
-                </button>
+                <div className="flex items-center gap-3 mt-3">
+                  <button
+                    onClick={() => {
+                      const defaultPos = { x: -1, y: -1 };
+                      setLegendPos(defaultPos);
+                      try { localStorage.setItem("map-legend-pos", JSON.stringify(defaultPos)); } catch {}
+                    }}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    <Maximize className="h-3 w-3" />Reset Position
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLegendVisible(false);
+                      try { localStorage.setItem("map-legend-visible", "false"); } catch {}
+                    }}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    <EyeOff className="h-3 w-3" />Hide Legend
+                  </button>
+                </div>
               </div>
             </div>
           )}
