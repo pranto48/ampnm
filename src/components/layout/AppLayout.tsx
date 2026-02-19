@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useSoundAlerts } from "@/hooks/useSoundAlerts";
+import { SoundAlertSettings } from "@/components/SoundAlertSettings";
 import {
   LayoutDashboard, Map, BarChart3, Activity, Monitor,
   Server, History, FileText, Mail, Users, Key, HelpCircle,
@@ -52,6 +54,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const { prefs: soundPrefs, updatePrefs: updateSoundPrefs } = useSoundAlerts();
 
   const handleLogout = async () => {
     await signOut();
@@ -131,6 +134,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
           {/* User + Logout */}
           <div className="hidden md:flex items-center gap-2 ml-auto">
+            <SoundAlertSettings prefs={soundPrefs} onUpdate={updateSoundPrefs} />
             <span className="text-xs text-muted-foreground">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1 text-muted-foreground hover:text-foreground">
               <LogOut className="h-4 w-4" />
