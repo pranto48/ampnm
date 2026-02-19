@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import DeviceNode from "@/components/map/DeviceNode";
 import { EdgeEditor, edgeColorMap } from "@/components/map/EdgeEditor";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Map as MapIcon, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
-  Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity, Edit,
+  Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity, Edit, MapPin,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -91,6 +92,12 @@ export default function NetworkMapPage() {
   const [bgColor, setBgColor] = useState("#1e293b");
   const [bgImageUrl, setBgImageUrl] = useState("");
   const [publicView, setPublicView] = useState(false);
+
+  // Place device dialog
+  const [placeDeviceOpen, setPlaceDeviceOpen] = useState(false);
+  const [unassignedDevices, setUnassignedDevices] = useState<Device[]>([]);
+  const [selectedPlaceIds, setSelectedPlaceIds] = useState<string[]>([]);
+  const [loadingUnassigned, setLoadingUnassigned] = useState(false);
 
   // Live refresh
   const [liveRefresh, setLiveRefresh] = useState(true);
@@ -489,6 +496,31 @@ export default function NetworkMapPage() {
   // Public link
   const publicLink = currentMapId ? `${window.location.origin}/map/public/${currentMapId}` : "";
 
+  // Fetch unassigned devices for Place Device dialog
+  const fetchUnassigned = async () => {
+    setLoadingUnassigned(true);
+    const { data } = await supabase.from("devices").select("*").is("map_id", null).order("name");
+    setUnassignedDevices(data ?? []);
+    setSelectedPlaceIds([]);
+    setLoadingUnassigned(false);
+  };
+
+  const handlePlaceDevices = async () => {
+    if (!currentMapId || selectedPlaceIds.length === 0) return;
+    // Assign selected devices to this map with staggered positions
+    for (let i = 0; i < selectedPlaceIds.length; i++) {
+      await supabase.from("devices").update({
+        map_id: currentMapId,
+        x: 150 + (i % 5) * 120,
+        y: 150 + Math.floor(i / 5) * 120,
+      }).eq("id", selectedPlaceIds[i]);
+    }
+    toast({ title: `${selectedPlaceIds.length} device(s) placed on map` });
+    setPlaceDeviceOpen(false);
+    setSelectedPlaceIds([]);
+    fetchMapData();
+  };
+
   return (
     <AppLayout>
       <div className="space-y-3">
@@ -537,6 +569,12 @@ export default function NetworkMapPage() {
                 <Activity className={`h-4 w-4 ${isPingingAll ? "animate-spin" : ""}`} />
                 {isPingingAll ? "Pinging..." : "Ping All"}
               </Button>
+              {isAdmin && (
+                <Button variant="ghost" size="sm" onClick={() => { setPlaceDeviceOpen(true); fetchUnassigned(); }} title="Place existing device on map" className="gap-1 text-xs">
+                  <MapPin className="h-4 w-4" />
+                  Place Device
+                </Button>
+              )}
               {isAdmin && (
                 <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Map Settings">
                   <Settings className="h-4 w-4" />
@@ -858,6 +896,51 @@ export default function NetworkMapPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Place Device Dialog */}
+      <Dialog open={placeDeviceOpen} onOpenChange={setPlaceDeviceOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />Place Device on Map</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">Select unassigned devices to place on this map.</p>
+            {loadingUnassigned ? (
+              <p className="text-center text-muted-foreground py-4">Loading...</p>
+            ) : unassignedDevices.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">All devices are already assigned to a map.</p>
+            ) : (
+              <div className="max-h-[300px] overflow-y-auto space-y-1">
+                {unassignedDevices.map((d) => (
+                  <label key={d.id} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={selectedPlaceIds.includes(d.id)}
+                      onChange={(e) => {
+                        setSelectedPlaceIds((prev) =>
+                          e.target.checked ? [...prev, d.id] : prev.filter((id) => id !== d.id)
+                        );
+                      }}
+                      className="rounded border-border"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{d.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{d.ip_address || "No IP"}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{d.type || "server"}</Badge>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPlaceDeviceOpen(false)}>Cancel</Button>
+            <Button onClick={handlePlaceDevices} disabled={selectedPlaceIds.length === 0}>
+              Place {selectedPlaceIds.length > 0 ? `(${selectedPlaceIds.length})` : ""}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>
