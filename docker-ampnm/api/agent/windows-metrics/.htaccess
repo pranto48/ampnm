@@ -1,0 +1,9 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Keep everything inside this folder (including /recent and /<host>/latest)
+  RewriteRule ^$ index.php [L]
+  RewriteRule ^health$ index.php [L,QSA]
+  RewriteRule ^recent$ index.php [L,QSA]
+  RewriteRule ^([^/]+)/latest$ index.php [L,QSA]
+</IfModule>
