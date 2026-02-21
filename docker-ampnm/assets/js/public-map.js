@@ -147,100 +147,116 @@ function buildTitle(device) {
     return [device.name || "Unnamed", ipLine, statusLine, extras].filter(Boolean).join("<br>");
 }
 
+// Persistent vis.js datasets and network instance
+let visNodesDataset = new vis.DataSet();
+let visEdgesDataset = new vis.DataSet();
+let visNetwork = null;
+
+function buildVisNode(device) {
+    const baseNode = {
+        id: device.id,
+        label: device.name || device.ip || `Device ${device.id}`,
+        title: buildTitle(device),
+        x: device.x ?? undefined,
+        y: device.y ?? undefined,
+        font: { color: '#e2e8f0', size: device.name_text_size ? Number(device.name_text_size) : 14, multi: true },
+    };
+
+    if (device.icon_url) {
+        return {
+            ...baseNode,
+            shape: 'image',
+            image: device.icon_url,
+            size: device.icon_size ? Number(device.icon_size) / 2 : 25,
+            color: { border: statusColorMap[device.status] || statusColorMap.unknown, background: 'transparent' },
+            borderWidth: 3,
+        };
+    }
+
+    if (device.type === 'box') {
+        return { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
+    }
+
+    const iconCode = getDeviceIconUnicode(device);
+    return {
+        ...baseNode,
+        shape: 'icon',
+        icon: { face: "'Font Awesome 6 Free'", weight: "900", code: iconCode, size: device.icon_size ? Number(device.icon_size) : 50, color: statusColorMap[device.status] || statusColorMap.unknown },
+    };
+}
+
+function buildVisEdge(edge) {
+    const color = edgeColorMap[edge.connection_type] || edgeColorMap.cat5;
+    const dashes = edgeDashMap[edge.connection_type] ?? false;
+    const label = edgeLabelMap[edge.connection_type] || edge.connection_type || '';
+    return {
+        id: edge.id,
+        from: edge.source_id,
+        to: edge.target_id,
+        color: { color, highlight: color, hover: color },
+        dashes, width: 2, label,
+        font: { color: '#e2e8f0', size: 10, strokeWidth: 0 },
+    };
+}
+
 function renderMap({ map, devices, edges }) {
     mapTitle.textContent = map?.name || "Shared network map";
     mapSubtitle.textContent = map?.public_view_enabled ? "Public viewing enabled" : "Read-only preview";
     metaSummary.textContent = `${devices.length} devices • ${edges.length} links`;
 
-    const nodes = devices.map((device) => {
-        const baseNode = {
-            id: device.id,
-            label: device.name || device.ip || `Device ${device.id}`,
-            title: buildTitle(device),
-            x: device.x ?? undefined,
-            y: device.y ?? undefined,
-            font: { color: '#e2e8f0', size: device.name_text_size ? Number(device.name_text_size) : 14, multi: true },
-        };
+    visNodesDataset.clear();
+    visNodesDataset.add(devices.map(buildVisNode));
 
-        // Custom icon URL takes precedence
-        if (device.icon_url) {
-            return {
-                ...baseNode,
-                shape: 'image',
-                image: device.icon_url,
-                size: device.icon_size ? Number(device.icon_size) / 2 : 25,
-                color: {
-                    border: statusColorMap[device.status] || statusColorMap.unknown,
-                    background: 'transparent'
-                },
-                borderWidth: 3,
-            };
-        }
+    visEdgesDataset.clear();
+    visEdgesDataset.add(edges.map(buildVisEdge));
 
-        // Box type
-        if (device.type === 'box') {
-            return {
-                ...baseNode,
-                shape: 'box',
-                color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
-                margin: 20,
-                level: -1,
-            };
-        }
-
-        // Font Awesome icon (same as main map)
-        const iconCode = getDeviceIconUnicode(device);
-        return {
-            ...baseNode,
-            shape: 'icon',
-            icon: {
-                face: "'Font Awesome 6 Free'",
-                weight: "900",
-                code: iconCode,
-                size: device.icon_size ? Number(device.icon_size) : 50,
-                color: statusColorMap[device.status] || statusColorMap.unknown,
-            },
-        };
-    });
-
-    const visEdges = edges.map((edge) => {
-        const color = edgeColorMap[edge.connection_type] || edgeColorMap.cat5;
-        const dashes = edgeDashMap[edge.connection_type] ?? false;
-        const label = edgeLabelMap[edge.connection_type] || edge.connection_type || '';
-        return {
-            from: edge.source_id,
-            to: edge.target_id,
-            color: { color: color, highlight: color, hover: color },
-            dashes: dashes,
-            width: 2,
-            label: label,
-            font: { color: '#e2e8f0', size: 10, strokeWidth: 0 },
-        };
-    });
-
-    const data = {
-        nodes: new vis.DataSet(nodes),
-        edges: new vis.DataSet(visEdges),
-    };
-
-    const options = {
-        interaction: { hover: true, dragNodes: false, zoomView: true, dragView: true },
-        physics: { stabilization: true, barnesHut: { damping: 0.18 } },
-        layout: { improvedLayout: true },
-        edges: { smooth: { type: "dynamic" } },
-        nodes: { borderWidth: 1, shadow: true },
-    };
-
-    if (map?.background_color) {
-        canvas.style.background = map.background_color;
-    }
+    if (map?.background_color) canvas.style.background = map.background_color;
     if (map?.background_image_url) {
         canvas.style.backgroundImage = `url(${map.background_image_url})`;
         canvas.style.backgroundSize = "cover";
         canvas.style.backgroundPosition = "center";
     }
 
-    new vis.Network(canvas, data, options);
+    if (!visNetwork) {
+        visNetwork = new vis.Network(canvas, { nodes: visNodesDataset, edges: visEdgesDataset }, {
+            interaction: { hover: true, dragNodes: false, zoomView: true, dragView: true },
+            physics: { stabilization: true, barnesHut: { damping: 0.18 } },
+            layout: { improvedLayout: true },
+            edges: { smooth: { type: "dynamic" } },
+            nodes: { borderWidth: 1, shadow: true },
+        });
+    }
+}
+
+/**
+ * In-place status update — only updates node icon colors and titles without resetting the network
+ */
+function refreshStatuses(devices) {
+    metaSummary.textContent = `${devices.length} devices • ${visEdgesDataset.length} links`;
+
+    const updates = devices.map(device => {
+        const existing = visNodesDataset.get(device.id);
+        if (!existing) return null;
+
+        const update = { id: device.id, title: buildTitle(device) };
+
+        if (device.icon_url) {
+            update.color = { border: statusColorMap[device.status] || statusColorMap.unknown, background: 'transparent' };
+        } else if (device.type !== 'box' && existing.icon) {
+            update.icon = { ...existing.icon, color: statusColorMap[device.status] || statusColorMap.unknown };
+        }
+
+        // Update label with live ping info if available
+        let label = device.name || device.ip || `Device ${device.id}`;
+        if (device.show_live_ping && device.status === 'online' && device.last_avg_time !== null) {
+            label += `\n${device.last_avg_time}ms | TTL:${device.last_ttl || 'N/A'}`;
+        }
+        update.label = label;
+
+        return update;
+    }).filter(Boolean);
+
+    if (updates.length > 0) visNodesDataset.update(updates);
 }
 
 async function fetchWithTimeout(url, options = {}, timeout = 12000) {
@@ -274,14 +290,9 @@ async function loadMap() {
     });
 
     try {
-        const response = await fetchWithTimeout(
-            `api.php?action=get_public_map_data&map_id=${mapId}`,
-            {},
-            12000
-        );
+        const response = await fetchWithTimeout(`api.php?action=get_public_map_data&map_id=${mapId}`, {}, 12000);
         if (!response.ok) {
-            const detail = await response.text();
-            showError("The map could not be loaded.", detail);
+            showError("The map could not be loaded.", await response.text());
             return;
         }
         const payload = await response.json();
@@ -308,3 +319,17 @@ async function loadMap() {
 }
 
 loadMap();
+
+// Auto-refresh every 15 seconds — updates statuses in-place without resetting the map view
+setInterval(async () => {
+    if (!mapId || !visNetwork) return;
+    try {
+        const response = await fetchWithTimeout(`api.php?action=get_public_map_data&map_id=${mapId}`, {}, 12000);
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!payload?.map || !Array.isArray(payload.devices)) return;
+        refreshStatuses(payload.devices);
+    } catch (e) {
+        console.warn("Auto-refresh failed:", e.message);
+    }
+}, 15000);
