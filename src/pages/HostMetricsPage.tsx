@@ -12,6 +12,7 @@ import { AlertSettingsDialog } from "@/components/host-metrics/AlertSettingsDial
 import { ExportButton } from "@/components/host-metrics/ExportButton";
 import { UptimeCards } from "@/components/host-metrics/UptimeCards";
 import { ProcessList } from "@/components/host-metrics/ProcessList";
+import { HostHealthGrid } from "@/components/host-metrics/HostHealthGrid";
 
 interface HostMetric {
   id: string;
@@ -160,6 +161,9 @@ export default function HostMetricsPage() {
             <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </div>
+
+        {/* Host Health Summary Grid */}
+        <HostHealthGrid hosts={hosts} onSelectHost={setSelectedHost} selectedHost={selectedHost} />
 
         {/* Snapshot cards */}
         {host && <HostSnapshotCards host={host} />}
