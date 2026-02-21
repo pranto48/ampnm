@@ -20,6 +20,10 @@ services:
       - DB_PASSWORD=password
       - MYSQL_ROOT_PASSWORD=rootpassword
       - ADMIN_PASSWORD=password
+      # Cloud Monitoring Bridge - connect Docker ICMP pings to Lovable Cloud
+      - CLOUD_SYNC_URL=https://ynjuvlzvzvnqhvvfdjdc.supabase.co/functions/v1/cloud-monitor
+      - CLOUD_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluanV2bHp2enZucWh2dmZkamRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0NTg2MzksImV4cCI6MjA4MjAzNDYzOX0.IiKXzf4GD20GCkkpmh5e0URrUOeDFtyzrQfuRcHeZmY
+      - CLOUD_POLL_INTERVAL=15
     restart: unless-stopped
     # network_mode: host is required for the ping command to work correctly.
     network_mode: "host"
