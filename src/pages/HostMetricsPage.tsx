@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,8 @@ import { TimeRangeSelector } from "@/components/host-metrics/TimeRangeSelector";
 import { MetricsCharts } from "@/components/host-metrics/MetricsCharts";
 import { AlertSettingsDialog } from "@/components/host-metrics/AlertSettingsDialog";
 import { ExportButton } from "@/components/host-metrics/ExportButton";
+import { UptimeCards } from "@/components/host-metrics/UptimeCards";
+import { ProcessList } from "@/components/host-metrics/ProcessList";
 
 interface HostMetric {
   id: string;
@@ -25,6 +27,10 @@ interface HostMetric {
   ip_address: string | null;
   status: string;
   last_seen: string;
+  first_seen: string;
+  uptime_seconds?: number | null;
+  boot_time?: string | null;
+  os_version?: string | null;
 }
 
 interface HistoryPoint {
@@ -91,6 +97,23 @@ export default function HostMetricsPage() {
 
   const host = hosts.find((h) => h.hostname === selectedHost);
 
+  // Calculate availability % from history (ratio of data points within expected intervals)
+  const availabilityPct = useMemo(() => {
+    if (history.length < 2) return null;
+    const firstTime = new Date(history[0].recorded_at).getTime();
+    const lastTime = new Date(history[history.length - 1].recorded_at).getTime();
+    const spanMinutes = (lastTime - firstTime) / 60000;
+    if (spanMinutes < 1) return null;
+    // Assume ~1 report per minute as ideal; count gaps > 5 min as downtime
+    let downtimeMinutes = 0;
+    for (let i = 1; i < history.length; i++) {
+      const gap = (new Date(history[i].recorded_at).getTime() - new Date(history[i - 1].recorded_at).getTime()) / 60000;
+      if (gap > 5) downtimeMinutes += gap - 1;
+    }
+    const availability = Math.max(0, Math.min(100, ((spanMinutes - downtimeMinutes) / spanMinutes) * 100));
+    return availability;
+  }, [history]);
+
   return (
     <AppLayout>
       <div className="space-y-4">
@@ -141,6 +164,11 @@ export default function HostMetricsPage() {
         {/* Snapshot cards */}
         {host && <HostSnapshotCards host={host} />}
 
+        {/* Uptime & Availability */}
+        {host && (
+          <UptimeCards host={host as any} availabilityPct={availabilityPct} />
+        )}
+
         {/* Charts */}
         <MetricsCharts
           history={history}
@@ -148,6 +176,9 @@ export default function HostMetricsPage() {
           primaryLabel={selectedHost}
           comparisonLabel={compareHost}
         />
+
+        {/* Process & Service List */}
+        {selectedHost && <ProcessList hostname={selectedHost} />}
       </div>
     </AppLayout>
   );

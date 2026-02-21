@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // GET /health - public health check
+    // GET /health
     if (req.method === "GET" && (path === "health" || path === "health/")) {
       return new Response(
         JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }),
@@ -41,7 +41,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Validate token
       const { data: tokenRow, error: tokenErr } = await supabaseAdmin
         .from("agent_tokens")
         .select("id, enabled")
@@ -64,7 +63,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Upsert host metrics
+      // Upsert host metrics (including uptime fields)
       const { error: upsertErr } = await supabaseAdmin
         .from("host_metrics")
         .upsert(
@@ -79,6 +78,9 @@ Deno.serve(async (req) => {
             network_in: body.network_in ?? null,
             network_out: body.network_out ?? null,
             gpu_usage: body.gpu_usage ?? null,
+            uptime_seconds: body.uptime_seconds ?? null,
+            boot_time: body.boot_time ?? null,
+            os_version: body.os_version ?? null,
             agent_token_id: tokenRow.id,
             status: "online",
             last_seen: new Date().toISOString(),
@@ -94,7 +96,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Also insert into history for time-series tracking
+      // Insert into history
       const { error: historyErr } = await supabaseAdmin
         .from("host_metrics_history")
         .insert({
@@ -113,13 +115,41 @@ Deno.serve(async (req) => {
         console.error("History insert error:", historyErr);
       }
 
+      // Store processes/services if provided
+      if (Array.isArray(body.processes) && body.processes.length > 0) {
+        // Delete old process snapshot for this host
+        await supabaseAdmin
+          .from("host_processes")
+          .delete()
+          .eq("hostname", hostname);
+
+        // Insert new process list (limit to top 50)
+        const processRows = body.processes.slice(0, 50).map((p: any) => ({
+          hostname,
+          process_name: p.name || p.process_name || "unknown",
+          pid: p.pid ?? null,
+          cpu_percent: p.cpu ?? p.cpu_percent ?? null,
+          memory_mb: p.memory_mb ?? p.mem ?? null,
+          status: p.status ?? "running",
+          process_type: p.type ?? p.process_type ?? "process",
+        }));
+
+        const { error: procErr } = await supabaseAdmin
+          .from("host_processes")
+          .insert(processRows);
+
+        if (procErr) {
+          console.error("Process insert error:", procErr);
+        }
+      }
+
       return new Response(
         JSON.stringify({ status: "ok", hostname }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // GET /recent - list recent hosts (requires auth)
+    // GET /recent
     if (req.method === "GET" && (path === "recent" || path === "recent/")) {
       const limit = Math.min(
         Math.max(parseInt(url.searchParams.get("limit") || "50"), 1),
@@ -130,6 +160,31 @@ Deno.serve(async (req) => {
         .select("*")
         .order("last_seen", { ascending: false })
         .limit(limit);
+
+      if (error) throw error;
+
+      return new Response(
+        JSON.stringify({ items: data }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // GET /processes?hostname=XXX
+    if (req.method === "GET" && (path === "processes" || path === "processes/")) {
+      const hostname = url.searchParams.get("hostname");
+      if (!hostname) {
+        return new Response(
+          JSON.stringify({ error: "hostname query param required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("host_processes")
+        .select("*")
+        .eq("hostname", hostname)
+        .order("cpu_percent", { ascending: false })
+        .limit(50);
 
       if (error) throw error;
 
