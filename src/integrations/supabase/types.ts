@@ -425,6 +425,7 @@ export type Database = {
       host_metrics: {
         Row: {
           agent_token_id: string | null
+          boot_time: string | null
           cpu_usage: number | null
           created_at: string
           disk_total: number | null
@@ -439,10 +440,13 @@ export type Database = {
           memory_usage: number | null
           network_in: number | null
           network_out: number | null
+          os_version: string | null
           status: string
+          uptime_seconds: number | null
         }
         Insert: {
           agent_token_id?: string | null
+          boot_time?: string | null
           cpu_usage?: number | null
           created_at?: string
           disk_total?: number | null
@@ -457,10 +461,13 @@ export type Database = {
           memory_usage?: number | null
           network_in?: number | null
           network_out?: number | null
+          os_version?: string | null
           status?: string
+          uptime_seconds?: number | null
         }
         Update: {
           agent_token_id?: string | null
+          boot_time?: string | null
           cpu_usage?: number | null
           created_at?: string
           disk_total?: number | null
@@ -475,7 +482,9 @@ export type Database = {
           memory_usage?: number | null
           network_in?: number | null
           network_out?: number | null
+          os_version?: string | null
           status?: string
+          uptime_seconds?: number | null
         }
         Relationships: [
           {
@@ -526,6 +535,42 @@ export type Database = {
           network_in?: number | null
           network_out?: number | null
           recorded_at?: string
+        }
+        Relationships: []
+      }
+      host_processes: {
+        Row: {
+          cpu_percent: number | null
+          hostname: string
+          id: string
+          memory_mb: number | null
+          pid: number | null
+          process_name: string
+          process_type: string | null
+          recorded_at: string
+          status: string | null
+        }
+        Insert: {
+          cpu_percent?: number | null
+          hostname: string
+          id?: string
+          memory_mb?: number | null
+          pid?: number | null
+          process_name: string
+          process_type?: string | null
+          recorded_at?: string
+          status?: string | null
+        }
+        Update: {
+          cpu_percent?: number | null
+          hostname?: string
+          id?: string
+          memory_mb?: number | null
+          pid?: number | null
+          process_name?: string
+          process_type?: string | null
+          recorded_at?: string
+          status?: string | null
         }
         Relationships: []
       }
