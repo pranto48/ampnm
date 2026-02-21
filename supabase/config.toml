@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.delete-user]
 verify_jwt = false
+
+[functions.ping-device]
+verify_jwt = false
