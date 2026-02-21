@@ -8,6 +8,119 @@ const mapTitle = document.getElementById("mapTitle");
 const mapSubtitle = document.getElementById("mapSubtitle");
 const copyLinkBtn = document.getElementById("copyLinkBtn");
 
+// --- Icon & Config ---
+const statusColorMap = {
+    online: '#22c55e', warning: '#f59e0b', critical: '#ef4444',
+    offline: '#64748b', unknown: '#94a3b8'
+};
+
+const edgeColorMap = {
+    cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8',
+    radio: '#84cc16', lan: '#60a5fa', 'logical-tunneling': '#c084fc'
+};
+
+const edgeDashMap = {
+    cat5: false, fiber: false, wifi: true,
+    radio: true, lan: false, 'logical-tunneling': [6, 4]
+};
+
+const edgeLabelMap = {
+    cat5: '🔌 CAT5', fiber: '💡 Fiber', wifi: '📡 WiFi',
+    radio: '📻 Radio', lan: '🌐 LAN', 'logical-tunneling': '🔒 Tunnel'
+};
+
+// Comprehensive Font Awesome unicode map (matches mapManager.js)
+const iconUnicodeMap = {
+    'fa-network-wired': '\uf6ff', 'fa-router': '\uf8da', 'fa-circle-nodes': '\ue4e3',
+    'fa-sitemap': '\uf0e8', 'fa-diagram-project': '\uf542', 'fa-share-nodes': '\uf1e0',
+    'fa-bezier-curve': '\uf55b',
+    'fa-wifi': '\uf1eb', 'fa-tower-broadcast': '\uf519', 'fa-radio': '\uf8d7',
+    'fa-signal': '\uf012', 'fa-broadcast-tower': '\uf519', 'fa-rss': '\uf09e',
+    'fa-podcast': '\uf2ce', 'fa-satellite-dish': '\uf7c0',
+    'fa-server': '\uf233', 'fa-tower-cell': '\ue585', 'fa-computer': '\uf108',
+    'fa-microchip': '\uf2db', 'fa-memory': '\uf538', 'fa-hard-drive': '\uf0a0',
+    'fa-hdd': '\uf0a0', 'fa-compact-disc': '\uf51f', 'fa-warehouse': '\uf494',
+    'fa-industry': '\uf275',
+    'fa-ethernet': '\uf796', 'fa-code-branch': '\uf126', 'fa-object-group': '\uf247',
+    'fa-layer-group': '\uf5fd', 'fa-grip-horizontal': '\uf58d', 'fa-bars': '\uf0c9',
+    'fa-sliders': '\uf1de', 'fa-table-cells': '\uf00a',
+    'fa-shield-halved': '\uf3ed', 'fa-shield': '\uf132', 'fa-lock': '\uf023',
+    'fa-shield-virus': '\ue06c', 'fa-user-shield': '\uf505', 'fa-fingerprint': '\uf577',
+    'fa-key': '\uf084', 'fa-user-lock': '\uf13e', 'fa-ban': '\uf05e',
+    'fa-circle-exclamation': '\uf06a',
+    'fa-cloud': '\uf0c2', 'fa-cloud-arrow-up': '\uf0ee', 'fa-cloud-arrow-down': '\uf0ed',
+    'fa-cloud-bolt': '\uf76c', 'fa-cloud-sun': '\uf6c4', 'fa-wind': '\uf72e',
+    'fa-database': '\uf1c0', 'fa-table': '\uf0ce', 'fa-table-columns': '\uf0db',
+    'fa-table-list': '\uf00b', 'fa-cubes': '\uf1b3', 'fa-box-archive': '\uf187',
+    'fa-file-zipper': '\uf1c6',
+    'fa-laptop': '\uf109', 'fa-laptop-code': '\uf5fc', 'fa-laptop-file': '\ue51d',
+    'fa-desktop': '\uf390', 'fa-display': '\uf390', 'fa-tv': '\uf26c',
+    'fa-chalkboard': '\uf51b',
+    'fa-tablet-screen-button': '\uf3fa', 'fa-tablet': '\uf3fb', 'fa-tablet-button': '\uf10a',
+    'fa-square-full': '\uf45c', 'fa-rectangle': '\uf2fa', 'fa-window-maximize': '\uf2d0',
+    'fa-mobile-screen': '\uf3cf', 'fa-mobile-screen-button': '\uf3cd', 'fa-mobile': '\uf3ce',
+    'fa-mobile-retro': '\ue527', 'fa-phone': '\uf095', 'fa-phone-flip': '\uf879',
+    'fa-phone-volume': '\uf2a0', 'fa-walkie-talkie': '\uf8ef',
+    'fa-print': '\uf02f', 'fa-fax': '\uf1ac', 'fa-file-pdf': '\uf1c1',
+    'fa-file-image': '\uf1c5', 'fa-copy': '\uf0c5', 'fa-clone': '\uf24d',
+    'fa-images': '\uf302', 'fa-file': '\uf15b',
+    'fa-video': '\uf03d', 'fa-camera': '\uf030', 'fa-camera-retro': '\uf083',
+    'fa-eye': '\uf06e', 'fa-glasses': '\uf530', 'fa-binoculars': '\uf1e5',
+    'fa-film': '\uf008', 'fa-clapperboard': '\ue131',
+    'fa-headset': '\uf590', 'fa-headphones': '\uf025', 'fa-voicemail': '\uf897',
+    'fa-microphone': '\uf130',
+    'fa-box': '\uf466', 'fa-boxes-stacked': '\uf468', 'fa-box-open': '\uf49e',
+    'fa-cube': '\uf1b2', 'fa-folder-open': '\uf07c', 'fa-folder-tree': '\uf802',
+    'fa-floppy-disk': '\uf0c7', 'fa-sd-card': '\uf7c2',
+    'fa-clock': '\uf017', 'fa-stopwatch': '\uf2f2', 'fa-id-card': '\uf2c2',
+    'fa-address-card': '\uf2bb', 'fa-user-check': '\uf4fc', 'fa-calendar-check': '\uf274',
+    'fa-plug': '\uf1e6',
+    'fa-battery-full': '\uf240', 'fa-battery-half': '\uf242', 'fa-car-battery': '\uf5df',
+    'fa-bolt': '\uf0e7', 'fa-bolt-lightning': '\ue0b7', 'fa-power-off': '\uf011',
+    'fa-charging-station': '\uf5e7',
+    'fa-scale-balanced': '\uf24e', 'fa-balance-scale': '\uf24e',
+    'fa-route': '\uf4d7', 'fa-shuffle': '\uf074', 'fa-repeat': '\uf363',
+    'fa-arrows-turn-to-dots': '\ue4c1', 'fa-arrows-split-up-and-left': '\ue4bc',
+    'fa-lightbulb': '\uf0eb', 'fa-temperature-half': '\uf2c9', 'fa-door-open': '\uf52b',
+    'fa-bell': '\uf0f3', 'fa-gauge': '\uf624',
+    'fa-keyboard': '\uf11c', 'fa-computer-mouse': '\uf8cc', 'fa-gamepad': '\uf11b',
+    'fa-pen-to-square': '\uf044', 'fa-hand-pointer': '\uf25a', 'fa-square-pen': '\uf14b',
+    'fa-circle': '\uf111', 'fa-square': '\uf0c8', 'fa-diamond': '\uf219',
+    'fa-star': '\uf005', 'fa-asterisk': '\uf069', 'fa-circle-dot': '\uf192',
+    'fa-bullseye': '\uf140', 'fa-crosshairs': '\uf05b', 'fa-location-dot': '\uf3c5',
+    'fa-map-pin': '\uf276',
+    'fa-diagram-subtask': '\ue479', 'fa-satellite': '\uf7bf',
+    'fa-grip-vertical': '\uf58e',
+};
+
+// Default icon map (type -> first FA unicode) as fallback
+const defaultIconMap = {
+    server: '\uf233', router: '\uf6ff', switch: '\uf796', printer: '\uf02f', nas: '\uf0a0',
+    camera: '\uf030', other: '\uf108', firewall: '\uf3ed', ipphone: '\uf095',
+    punchdevice: '\uf2c2', 'wifi-router': '\uf1eb', 'radio-tower': '\uf519',
+    rack: '\uf1b3', laptop: '\uf109', tablet: '\uf3fa', mobile: '\uf3cd',
+    cloud: '\uf0c2', database: '\uf1c0', box: '\uf49e', ups: '\uf1e6',
+    modem: '\uf796', loadbalancer: '\uf24e', iot: '\uf2db', monitor: '\uf390',
+    keyboard: '\uf11c'
+};
+
+/**
+ * Get icon unicode for a device, using subchoice-aware lookup
+ */
+function getDeviceIconUnicode(device) {
+    if (!window.deviceIconsLibrary) {
+        return defaultIconMap[device.type] || '\uf111';
+    }
+    const typeData = window.deviceIconsLibrary[device.type];
+    if (!typeData || !typeData.icons) {
+        return defaultIconMap[device.type] || '\uf111';
+    }
+    const index = parseInt(device.subchoice, 10) || 0;
+    const iconData = typeData.icons[index];
+    const iconClass = (iconData && iconData.icon) ? iconData.icon : (typeData.icons[0]?.icon || 'fa-circle');
+    return iconUnicodeMap[iconClass] || '\uf111';
+}
+
 function showError(message, detail = "") {
     loader.hidden = true;
     errorCard.hidden = false;
@@ -40,42 +153,68 @@ function renderMap({ map, devices, edges }) {
     metaSummary.textContent = `${devices.length} devices • ${edges.length} links`;
 
     const nodes = devices.map((device) => {
-        const colorByStatus = {
-            online: "#22c55e",
-            offline: "#ef4444",
-            warning: "#f59e0b",
-        };
-        return {
+        const baseNode = {
             id: device.id,
             label: device.name || device.ip || `Device ${device.id}`,
             title: buildTitle(device),
-            shape: device.icon_url ? "image" : "dot",
-            image: device.icon_url || undefined,
-            size: device.icon_size ? Number(device.icon_size) / 1.5 : 18,
             x: device.x ?? undefined,
             y: device.y ?? undefined,
-            font: { color: "#e2e8f0", size: device.name_text_size ? Number(device.name_text_size) : 14 },
-            color: colorByStatus[device.status] || "#38bdf8",
+            font: { color: '#e2e8f0', size: device.name_text_size ? Number(device.name_text_size) : 14, multi: true },
+        };
+
+        // Custom icon URL takes precedence
+        if (device.icon_url) {
+            return {
+                ...baseNode,
+                shape: 'image',
+                image: device.icon_url,
+                size: device.icon_size ? Number(device.icon_size) / 2 : 25,
+                color: {
+                    border: statusColorMap[device.status] || statusColorMap.unknown,
+                    background: 'transparent'
+                },
+                borderWidth: 3,
+            };
+        }
+
+        // Box type
+        if (device.type === 'box') {
+            return {
+                ...baseNode,
+                shape: 'box',
+                color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
+                margin: 20,
+                level: -1,
+            };
+        }
+
+        // Font Awesome icon (same as main map)
+        const iconCode = getDeviceIconUnicode(device);
+        return {
+            ...baseNode,
+            shape: 'icon',
+            icon: {
+                face: "'Font Awesome 6 Free'",
+                weight: "900",
+                code: iconCode,
+                size: device.icon_size ? Number(device.icon_size) : 50,
+                color: statusColorMap[device.status] || statusColorMap.unknown,
+            },
         };
     });
 
-    const edgeStyles = {
-        cat5: { color: "#38bdf8", dashes: false },
-        fiber: { color: "#a78bfa", dashes: false },
-        wifi: { color: "#fbbf24", dashes: true },
-        radio: { color: "#f472b6", dashes: true },
-        lan: { color: "#22d3ee", dashes: false },
-        "logical-tunneling": { color: "#94a3b8", dashes: [6, 4] },
-    };
-
     const visEdges = edges.map((edge) => {
-        const style = edgeStyles[edge.connection_type] || edgeStyles.cat5;
+        const color = edgeColorMap[edge.connection_type] || edgeColorMap.cat5;
+        const dashes = edgeDashMap[edge.connection_type] ?? false;
+        const label = edgeLabelMap[edge.connection_type] || edge.connection_type || '';
         return {
             from: edge.source_id,
             to: edge.target_id,
-            color: { color: style.color },
-            dashes: style.dashes,
+            color: { color: color, highlight: color, hover: color },
+            dashes: dashes,
             width: 2,
+            label: label,
+            font: { color: '#e2e8f0', size: 10, strokeWidth: 0 },
         };
     });
 
@@ -85,7 +224,7 @@ function renderMap({ map, devices, edges }) {
     };
 
     const options = {
-        interaction: { hover: true },
+        interaction: { hover: true, dragNodes: false, zoomView: true, dragView: true },
         physics: { stabilization: true, barnesHut: { damping: 0.18 } },
         layout: { improvedLayout: true },
         edges: { smooth: { type: "dynamic" } },
@@ -107,7 +246,6 @@ function renderMap({ map, devices, edges }) {
 async function fetchWithTimeout(url, options = {}, timeout = 12000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
-
     try {
         const response = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(id);
