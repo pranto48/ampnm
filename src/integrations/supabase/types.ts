@@ -317,6 +317,111 @@ export type Database = {
           },
         ]
       }
+      host_alert_overrides: {
+        Row: {
+          cpu_critical: number | null
+          cpu_warning: number | null
+          created_at: string
+          disk_critical: number | null
+          disk_warning: number | null
+          enabled: boolean | null
+          gpu_critical: number | null
+          gpu_warning: number | null
+          host_ip: string | null
+          hostname: string
+          id: string
+          memory_critical: number | null
+          memory_warning: number | null
+          status_delay_seconds: number | null
+          updated_at: string
+        }
+        Insert: {
+          cpu_critical?: number | null
+          cpu_warning?: number | null
+          created_at?: string
+          disk_critical?: number | null
+          disk_warning?: number | null
+          enabled?: boolean | null
+          gpu_critical?: number | null
+          gpu_warning?: number | null
+          host_ip?: string | null
+          hostname: string
+          id?: string
+          memory_critical?: number | null
+          memory_warning?: number | null
+          status_delay_seconds?: number | null
+          updated_at?: string
+        }
+        Update: {
+          cpu_critical?: number | null
+          cpu_warning?: number | null
+          created_at?: string
+          disk_critical?: number | null
+          disk_warning?: number | null
+          enabled?: boolean | null
+          gpu_critical?: number | null
+          gpu_warning?: number | null
+          host_ip?: string | null
+          hostname?: string
+          id?: string
+          memory_critical?: number | null
+          memory_warning?: number | null
+          status_delay_seconds?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      host_alert_settings: {
+        Row: {
+          cooldown_minutes: number | null
+          cpu_critical_threshold: number | null
+          cpu_warning_threshold: number | null
+          created_at: string
+          disk_critical_threshold: number | null
+          disk_warning_threshold: number | null
+          enabled: boolean | null
+          gpu_critical_threshold: number | null
+          gpu_warning_threshold: number | null
+          id: string
+          memory_critical_threshold: number | null
+          memory_warning_threshold: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cooldown_minutes?: number | null
+          cpu_critical_threshold?: number | null
+          cpu_warning_threshold?: number | null
+          created_at?: string
+          disk_critical_threshold?: number | null
+          disk_warning_threshold?: number | null
+          enabled?: boolean | null
+          gpu_critical_threshold?: number | null
+          gpu_warning_threshold?: number | null
+          id?: string
+          memory_critical_threshold?: number | null
+          memory_warning_threshold?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cooldown_minutes?: number | null
+          cpu_critical_threshold?: number | null
+          cpu_warning_threshold?: number | null
+          created_at?: string
+          disk_critical_threshold?: number | null
+          disk_warning_threshold?: number | null
+          enabled?: boolean | null
+          gpu_critical_threshold?: number | null
+          gpu_warning_threshold?: number | null
+          id?: string
+          memory_critical_threshold?: number | null
+          memory_warning_threshold?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       host_metrics: {
         Row: {
           agent_token_id: string | null
