@@ -242,6 +242,73 @@ try {
             `setting_value` TEXT NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR AGENT TOKENS (Windows Agent authentication)
+        "CREATE TABLE IF NOT EXISTS `agent_tokens` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `name` VARCHAR(100) NOT NULL,
+            `token` VARCHAR(255) NOT NULL UNIQUE,
+            `enabled` BOOLEAN DEFAULT TRUE,
+            `last_used_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR HOST METRICS (Windows Agent telemetry)
+        "CREATE TABLE IF NOT EXISTS `host_metrics` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `hostname` VARCHAR(255) NOT NULL,
+            `ip_address` VARCHAR(45) NULL,
+            `os_version` VARCHAR(255) NULL,
+            `cpu_usage` DECIMAL(5,2) NULL,
+            `memory_usage` DECIMAL(5,2) NULL,
+            `memory_total` DECIMAL(12,2) NULL,
+            `disk_usage` DECIMAL(5,2) NULL,
+            `disk_total` DECIMAL(12,2) NULL,
+            `gpu_usage` DECIMAL(5,2) NULL,
+            `network_in` BIGINT NULL,
+            `network_out` BIGINT NULL,
+            `uptime_seconds` BIGINT NULL,
+            `boot_time` TIMESTAMP NULL,
+            `status` VARCHAR(20) DEFAULT 'online',
+            `agent_token_id` INT(6) UNSIGNED NULL,
+            `first_seen` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `last_seen` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `hostname_unique` (`hostname`),
+            FOREIGN KEY (`agent_token_id`) REFERENCES `agent_tokens`(`id`) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR HOST METRICS HISTORY
+        "CREATE TABLE IF NOT EXISTS `host_metrics_history` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `hostname` VARCHAR(255) NOT NULL,
+            `cpu_usage` DECIMAL(5,2) NULL,
+            `memory_usage` DECIMAL(5,2) NULL,
+            `memory_total` DECIMAL(12,2) NULL,
+            `disk_usage` DECIMAL(5,2) NULL,
+            `disk_total` DECIMAL(12,2) NULL,
+            `gpu_usage` DECIMAL(5,2) NULL,
+            `network_in` BIGINT NULL,
+            `network_out` BIGINT NULL,
+            `recorded_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_hostname_recorded` (`hostname`, `recorded_at` DESC)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR HOST PROCESSES
+        "CREATE TABLE IF NOT EXISTS `host_processes` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `hostname` VARCHAR(255) NOT NULL,
+            `process_name` VARCHAR(255) NOT NULL,
+            `process_type` ENUM('process','service') DEFAULT 'process',
+            `pid` INT(10) NULL,
+            `cpu_percent` DECIMAL(5,2) NULL,
+            `memory_mb` DECIMAL(10,2) NULL,
+            `status` VARCHAR(50) NULL,
+            `recorded_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_hostname_recorded` (`hostname`, `recorded_at` DESC)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     ];
 

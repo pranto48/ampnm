@@ -90,7 +90,9 @@ MapApp.network = {
         contextMenu.addEventListener('click', async (e) => {
             const target = e.target.closest('.context-menu-item');
             if (target) {
-                const { action, id } = target.dataset;
+                const { action } = target.dataset;
+                // Parse ID as number to match vis.js integer node IDs from MySQL AUTO_INCREMENT
+                const id = isNaN(target.dataset.id) ? target.dataset.id : Number(target.dataset.id);
                 closeContextMenu();
 
                 if (window.userRole === 'admin') {
