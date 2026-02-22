@@ -228,8 +228,8 @@ switch ($action) {
         $name = $input['name'] ?? 'Windows Agent ' . date('Y-m-d H:i');
         $token = bin2hex(random_bytes(32)); // 64 character hex token
         
-        $stmt = $pdo->prepare("INSERT INTO agent_tokens (token, name) VALUES (?, ?)");
-        $stmt->execute([$token, $name]);
+        $stmt = $pdo->prepare("INSERT INTO agent_tokens (user_id, token, name) VALUES (?, ?, ?)");
+        $stmt->execute([$current_user_id, $token, $name]);
         
         echo json_encode([
             'success' => true,

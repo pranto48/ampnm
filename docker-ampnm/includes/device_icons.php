@@ -1,9 +1,9 @@
 <?php
 /**
- * Device Icons Library - EXPANDED EDITION
+ * Device Icons Library - EXPANDED EDITION v2
  * Provides comprehensive icon options for different device types
  * Organized by category with multiple variants per device type
- * Total: 200+ icon variants across 25+ device types
+ * Total: 350+ icon variants across 35+ device types
  */
 
 return [
@@ -308,6 +308,177 @@ return [
             ['icon' => 'fa-square-pen', 'label' => 'Input (Square Pen)'],
         ]
     ],
+
+    // ===== NEW DEVICE ICON PACKS =====
+
+    'accesspoint' => [
+        'label' => 'Access Point',
+        'icons' => [
+            ['icon' => 'fa-wifi', 'label' => 'AP (WiFi)'],
+            ['icon' => 'fa-tower-broadcast', 'label' => 'AP (Tower)'],
+            ['icon' => 'fa-signal', 'label' => 'AP (Signal)'],
+            ['icon' => 'fa-circle-radiation', 'label' => 'AP (Radiation)'],
+            ['icon' => 'fa-circle-dot', 'label' => 'AP (Dot)'],
+            ['icon' => 'fa-bullseye', 'label' => 'AP (Bullseye)'],
+            ['icon' => 'fa-satellite-dish', 'label' => 'AP (Dish)'],
+            ['icon' => 'fa-podcast', 'label' => 'AP (Podcast)'],
+        ]
+    ],
+    'vpn' => [
+        'label' => 'VPN / Tunnel',
+        'icons' => [
+            ['icon' => 'fa-shield-halved', 'label' => 'VPN (Shield)'],
+            ['icon' => 'fa-lock', 'label' => 'VPN (Lock)'],
+            ['icon' => 'fa-key', 'label' => 'VPN (Key)'],
+            ['icon' => 'fa-tunnel', 'label' => 'VPN (Tunnel)'],
+            ['icon' => 'fa-mask', 'label' => 'VPN (Mask)'],
+            ['icon' => 'fa-user-secret', 'label' => 'VPN (Secret)'],
+            ['icon' => 'fa-globe', 'label' => 'VPN (Globe)'],
+            ['icon' => 'fa-earth-americas', 'label' => 'VPN (Americas)'],
+        ]
+    ],
+    'dns' => [
+        'label' => 'DNS Server',
+        'icons' => [
+            ['icon' => 'fa-globe', 'label' => 'DNS (Globe)'],
+            ['icon' => 'fa-earth-europe', 'label' => 'DNS (Europe)'],
+            ['icon' => 'fa-earth-asia', 'label' => 'DNS (Asia)'],
+            ['icon' => 'fa-earth-americas', 'label' => 'DNS (Americas)'],
+            ['icon' => 'fa-earth-africa', 'label' => 'DNS (Africa)'],
+            ['icon' => 'fa-earth-oceania', 'label' => 'DNS (Oceania)'],
+            ['icon' => 'fa-magnifying-glass', 'label' => 'DNS (Search)'],
+            ['icon' => 'fa-signs-post', 'label' => 'DNS (Signpost)'],
+        ]
+    ],
+    'mailserver' => [
+        'label' => 'Mail Server',
+        'icons' => [
+            ['icon' => 'fa-envelope', 'label' => 'Mail (Envelope)'],
+            ['icon' => 'fa-envelope-open', 'label' => 'Mail (Open)'],
+            ['icon' => 'fa-at', 'label' => 'Mail (At)'],
+            ['icon' => 'fa-inbox', 'label' => 'Mail (Inbox)'],
+            ['icon' => 'fa-paper-plane', 'label' => 'Mail (Send)'],
+            ['icon' => 'fa-envelope-circle-check', 'label' => 'Mail (Verified)'],
+            ['icon' => 'fa-mailbox', 'label' => 'Mail (Mailbox)'],
+            ['icon' => 'fa-message', 'label' => 'Mail (Message)'],
+        ]
+    ],
+    'webserver' => [
+        'label' => 'Web Server',
+        'icons' => [
+            ['icon' => 'fa-globe', 'label' => 'Web (Globe)'],
+            ['icon' => 'fa-code', 'label' => 'Web (Code)'],
+            ['icon' => 'fa-file-code', 'label' => 'Web (File)'],
+            ['icon' => 'fa-window-restore', 'label' => 'Web (Window)'],
+            ['icon' => 'fa-browser', 'label' => 'Web (Browser)'],
+            ['icon' => 'fa-sitemap', 'label' => 'Web (Sitemap)'],
+            ['icon' => 'fa-link', 'label' => 'Web (Link)'],
+            ['icon' => 'fa-terminal', 'label' => 'Web (Terminal)'],
+        ]
+    ],
+    'container' => [
+        'label' => 'Docker / Container',
+        'icons' => [
+            ['icon' => 'fa-docker', 'label' => 'Docker (Logo)'],
+            ['icon' => 'fa-cube', 'label' => 'Container (Cube)'],
+            ['icon' => 'fa-cubes', 'label' => 'Container (Cubes)'],
+            ['icon' => 'fa-box', 'label' => 'Container (Box)'],
+            ['icon' => 'fa-boxes-stacked', 'label' => 'Container (Stacked)'],
+            ['icon' => 'fa-box-open', 'label' => 'Container (Open)'],
+            ['icon' => 'fa-ship', 'label' => 'Container (Ship)'],
+            ['icon' => 'fa-layer-group', 'label' => 'Container (Layers)'],
+        ]
+    ],
+    'virtualmachine' => [
+        'label' => 'Virtual Machine',
+        'icons' => [
+            ['icon' => 'fa-clone', 'label' => 'VM (Clone)'],
+            ['icon' => 'fa-computer', 'label' => 'VM (Computer)'],
+            ['icon' => 'fa-desktop', 'label' => 'VM (Desktop)'],
+            ['icon' => 'fa-window-restore', 'label' => 'VM (Window)'],
+            ['icon' => 'fa-copy', 'label' => 'VM (Copy)'],
+            ['icon' => 'fa-object-ungroup', 'label' => 'VM (Ungroup)'],
+            ['icon' => 'fa-diagram-project', 'label' => 'VM (Diagram)'],
+            ['icon' => 'fa-server', 'label' => 'VM (Server)'],
+        ]
+    ],
+    'smartdevice' => [
+        'label' => 'Smart Home',
+        'icons' => [
+            ['icon' => 'fa-house-signal', 'label' => 'Smart (House Signal)'],
+            ['icon' => 'fa-house', 'label' => 'Smart (House)'],
+            ['icon' => 'fa-lightbulb', 'label' => 'Smart (Lightbulb)'],
+            ['icon' => 'fa-fan', 'label' => 'Smart (Fan)'],
+            ['icon' => 'fa-temperature-half', 'label' => 'Smart (Thermostat)'],
+            ['icon' => 'fa-plug', 'label' => 'Smart (Plug)'],
+            ['icon' => 'fa-toggle-on', 'label' => 'Smart (Toggle)'],
+            ['icon' => 'fa-robot', 'label' => 'Smart (Robot)'],
+        ]
+    ],
+    'mediaplayer' => [
+        'label' => 'Media Player / Streaming',
+        'icons' => [
+            ['icon' => 'fa-play', 'label' => 'Media (Play)'],
+            ['icon' => 'fa-tv', 'label' => 'Media (TV)'],
+            ['icon' => 'fa-music', 'label' => 'Media (Music)'],
+            ['icon' => 'fa-headphones', 'label' => 'Media (Headphones)'],
+            ['icon' => 'fa-volume-high', 'label' => 'Media (Volume)'],
+            ['icon' => 'fa-photo-film', 'label' => 'Media (Film)'],
+            ['icon' => 'fa-circle-play', 'label' => 'Media (Circle Play)'],
+            ['icon' => 'fa-record-vinyl', 'label' => 'Media (Vinyl)'],
+        ]
+    ],
+    'scanner' => [
+        'label' => 'Barcode / QR Scanner',
+        'icons' => [
+            ['icon' => 'fa-barcode', 'label' => 'Scanner (Barcode)'],
+            ['icon' => 'fa-qrcode', 'label' => 'Scanner (QR Code)'],
+            ['icon' => 'fa-scanner-gun', 'label' => 'Scanner (Gun)'],
+            ['icon' => 'fa-scanner-touchscreen', 'label' => 'Scanner (Touchscreen)'],
+            ['icon' => 'fa-magnifying-glass', 'label' => 'Scanner (Search)'],
+            ['icon' => 'fa-crosshairs', 'label' => 'Scanner (Crosshair)'],
+        ]
+    ],
+    'gateway' => [
+        'label' => 'Internet Gateway',
+        'icons' => [
+            ['icon' => 'fa-door-open', 'label' => 'Gateway (Door)'],
+            ['icon' => 'fa-right-to-bracket', 'label' => 'Gateway (Enter)'],
+            ['icon' => 'fa-right-from-bracket', 'label' => 'Gateway (Exit)'],
+            ['icon' => 'fa-arrows-left-right', 'label' => 'Gateway (Arrows)'],
+            ['icon' => 'fa-route', 'label' => 'Gateway (Route)'],
+            ['icon' => 'fa-road', 'label' => 'Gateway (Road)'],
+            ['icon' => 'fa-signs-post', 'label' => 'Gateway (Signpost)'],
+            ['icon' => 'fa-map-signs', 'label' => 'Gateway (Map Signs)'],
+        ]
+    ],
+    'pdu' => [
+        'label' => 'PDU / Power Distribution',
+        'icons' => [
+            ['icon' => 'fa-plug-circle-bolt', 'label' => 'PDU (Plug Bolt)'],
+            ['icon' => 'fa-plug-circle-check', 'label' => 'PDU (Plug Check)'],
+            ['icon' => 'fa-plug-circle-xmark', 'label' => 'PDU (Plug X)'],
+            ['icon' => 'fa-plug', 'label' => 'PDU (Plug)'],
+            ['icon' => 'fa-bolt', 'label' => 'PDU (Bolt)'],
+            ['icon' => 'fa-outlet', 'label' => 'PDU (Outlet)'],
+            ['icon' => 'fa-solar-panel', 'label' => 'PDU (Solar)'],
+            ['icon' => 'fa-car-battery', 'label' => 'PDU (Battery)'],
+        ]
+    ],
+    'controller' => [
+        'label' => 'Controller / PLC',
+        'icons' => [
+            ['icon' => 'fa-gears', 'label' => 'Controller (Gears)'],
+            ['icon' => 'fa-gear', 'label' => 'Controller (Gear)'],
+            ['icon' => 'fa-wrench', 'label' => 'Controller (Wrench)'],
+            ['icon' => 'fa-screwdriver-wrench', 'label' => 'Controller (Tools)'],
+            ['icon' => 'fa-toolbox', 'label' => 'Controller (Toolbox)'],
+            ['icon' => 'fa-gauge-high', 'label' => 'Controller (Gauge)'],
+            ['icon' => 'fa-robot', 'label' => 'Controller (Robot)'],
+            ['icon' => 'fa-microchip', 'label' => 'Controller (Chip)'],
+        ]
+    ],
+
     'box' => [
         'label' => 'Group / Container',
         'icons' => [
