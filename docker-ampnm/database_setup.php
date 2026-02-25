@@ -309,6 +309,46 @@ try {
             `status` VARCHAR(50) NULL,
             `recorded_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX `idx_hostname_recorded` (`hostname`, `recorded_at` DESC)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR HOST ALERT SETTINGS (global thresholds per user)
+        "CREATE TABLE IF NOT EXISTS `host_alert_settings` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `enabled` BOOLEAN DEFAULT TRUE,
+            `cpu_warning_threshold` DECIMAL(5,2) DEFAULT 80.00,
+            `cpu_critical_threshold` DECIMAL(5,2) DEFAULT 95.00,
+            `memory_warning_threshold` DECIMAL(5,2) DEFAULT 80.00,
+            `memory_critical_threshold` DECIMAL(5,2) DEFAULT 95.00,
+            `disk_warning_threshold` DECIMAL(5,2) DEFAULT 80.00,
+            `disk_critical_threshold` DECIMAL(5,2) DEFAULT 95.00,
+            `gpu_warning_threshold` DECIMAL(5,2) DEFAULT 80.00,
+            `gpu_critical_threshold` DECIMAL(5,2) DEFAULT 95.00,
+            `cooldown_minutes` INT(11) DEFAULT 30,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `user_id_unique` (`user_id`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR PER-HOST ALERT OVERRIDES
+        "CREATE TABLE IF NOT EXISTS `host_alert_overrides` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `hostname` VARCHAR(255) NOT NULL,
+            `host_ip` VARCHAR(45) NULL,
+            `enabled` BOOLEAN DEFAULT TRUE,
+            `cpu_warning` DECIMAL(5,2) NULL,
+            `cpu_critical` DECIMAL(5,2) NULL,
+            `memory_warning` DECIMAL(5,2) NULL,
+            `memory_critical` DECIMAL(5,2) NULL,
+            `disk_warning` DECIMAL(5,2) NULL,
+            `disk_critical` DECIMAL(5,2) NULL,
+            `gpu_warning` DECIMAL(5,2) NULL,
+            `gpu_critical` DECIMAL(5,2) NULL,
+            `status_delay_seconds` INT(11) DEFAULT 0,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `hostname_unique` (`hostname`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     ];
 

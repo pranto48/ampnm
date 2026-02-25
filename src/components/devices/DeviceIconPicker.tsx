@@ -26,9 +26,21 @@ import {
   Keyboard, Mouse, Gamepad, PenSquare, Pointer,
   Box, Package, Boxes as CubeIcon, Group,
   Circle, Square, Diamond, Star, Asterisk, Target, Crosshair, MapPin,
+  // New icons for expanded categories
+  Globe, Earth, Search, Signpost,
+  Mail, MailOpen, AtSign, Inbox, Send, MailCheck, MessageSquare,
+  Code, FileCode, Link, Terminal, AppWindow,
+  Container, Ship,
+  Home, Fan, ToggleRight, Bot,
+  Play, Music, Volume2, Clapperboard, Disc3,
+  Barcode, QrCode, ScanLine,
+  LogIn, LogOut, ArrowLeftRight, MapPinned,
+  PlugZap, Unplug, SunMedium,
+  Wrench, Settings, Settings2, Hammer, GaugeCircle,
+  UserX, ShieldAlert,
   type LucideIcon,
 } from "lucide-react";
-import { Search } from "lucide-react";
+import { Search as SearchIcon } from "lucide-react";
 
 export interface IconOption {
   id: string;
@@ -242,6 +254,151 @@ export const DEVICE_ICON_CATEGORIES: IconCategory[] = [
       { id: "pointer", label: "Pointer", icon: Pointer },
     ],
   },
+  // ===== NEW ICON PACKS (matching Docker version) =====
+  {
+    key: "accesspoint", label: "Access Point",
+    icons: [
+      { id: "ap-wifi", label: "WiFi", icon: Wifi },
+      { id: "ap-tower", label: "Tower", icon: TowerControl },
+      { id: "ap-signal", label: "Signal", icon: Signal },
+      { id: "ap-dot", label: "Dot", icon: CircleDot },
+      { id: "ap-target", label: "Target", icon: Target },
+      { id: "ap-rss", label: "Broadcast", icon: Rss },
+    ],
+  },
+  {
+    key: "vpn", label: "VPN / Tunnel",
+    icons: [
+      { id: "vpn-shield", label: "Shield", icon: ShieldAlert },
+      { id: "vpn-lock", label: "Lock", icon: Lock },
+      { id: "vpn-key", label: "Key", icon: Key },
+      { id: "vpn-mask", label: "Mask", icon: UserX },
+      { id: "vpn-globe", label: "Globe", icon: Globe },
+      { id: "vpn-earth", label: "Earth", icon: Earth },
+    ],
+  },
+  {
+    key: "dns", label: "DNS Server",
+    icons: [
+      { id: "dns-globe", label: "Globe", icon: Globe },
+      { id: "dns-earth", label: "Earth", icon: Earth },
+      { id: "dns-search", label: "Search", icon: Search },
+      { id: "dns-signpost", label: "Signpost", icon: Signpost },
+      { id: "dns-network", label: "Network", icon: Network },
+    ],
+  },
+  {
+    key: "mailserver", label: "Mail Server",
+    icons: [
+      { id: "mail-envelope", label: "Envelope", icon: Mail },
+      { id: "mail-open", label: "Open", icon: MailOpen },
+      { id: "mail-at", label: "At", icon: AtSign },
+      { id: "mail-inbox", label: "Inbox", icon: Inbox },
+      { id: "mail-send", label: "Send", icon: Send },
+      { id: "mail-check", label: "Verified", icon: MailCheck },
+      { id: "mail-message", label: "Message", icon: MessageSquare },
+    ],
+  },
+  {
+    key: "webserver", label: "Web Server",
+    icons: [
+      { id: "web-globe", label: "Globe", icon: Globe },
+      { id: "web-code", label: "Code", icon: Code },
+      { id: "web-file", label: "File Code", icon: FileCode },
+      { id: "web-window", label: "Window", icon: AppWindow },
+      { id: "web-link", label: "Link", icon: Link },
+      { id: "web-terminal", label: "Terminal", icon: Terminal },
+    ],
+  },
+  {
+    key: "container", label: "Docker / Container",
+    icons: [
+      { id: "docker-cube", label: "Cube", icon: Box },
+      { id: "docker-cubes", label: "Cubes", icon: Boxes },
+      { id: "docker-box", label: "Box", icon: Package },
+      { id: "docker-container", label: "Container", icon: Container },
+      { id: "docker-ship", label: "Ship", icon: Ship },
+      { id: "docker-layers", label: "Layers", icon: Layers },
+    ],
+  },
+  {
+    key: "virtualmachine", label: "Virtual Machine",
+    icons: [
+      { id: "vm-copy", label: "Clone", icon: Copy },
+      { id: "vm-monitor", label: "Monitor", icon: Monitor },
+      { id: "vm-window", label: "Window", icon: AppWindow },
+      { id: "vm-server", label: "Server", icon: Server },
+      { id: "vm-layers", label: "Layers", icon: Layers },
+    ],
+  },
+  {
+    key: "smartdevice", label: "Smart Home",
+    icons: [
+      { id: "smart-home", label: "House", icon: Home },
+      { id: "smart-light", label: "Lightbulb", icon: Lightbulb },
+      { id: "smart-fan", label: "Fan", icon: Fan },
+      { id: "smart-thermo", label: "Thermostat", icon: Thermometer },
+      { id: "smart-plug", label: "Plug", icon: Plug },
+      { id: "smart-toggle", label: "Toggle", icon: ToggleRight },
+      { id: "smart-robot", label: "Robot", icon: Bot },
+    ],
+  },
+  {
+    key: "mediaplayer", label: "Media Player / Streaming",
+    icons: [
+      { id: "media-play", label: "Play", icon: Play },
+      { id: "media-tv", label: "TV", icon: Tv },
+      { id: "media-music", label: "Music", icon: Music },
+      { id: "media-headphones", label: "Headphones", icon: Headphones },
+      { id: "media-volume", label: "Volume", icon: Volume2 },
+      { id: "media-film", label: "Film", icon: Clapperboard },
+      { id: "media-vinyl", label: "Vinyl", icon: Disc3 },
+    ],
+  },
+  {
+    key: "scanner", label: "Barcode / QR Scanner",
+    icons: [
+      { id: "scanner-barcode", label: "Barcode", icon: Barcode },
+      { id: "scanner-qr", label: "QR Code", icon: QrCode },
+      { id: "scanner-scan", label: "Scan", icon: ScanLine },
+      { id: "scanner-search", label: "Search", icon: Search },
+      { id: "scanner-crosshair", label: "Crosshair", icon: Crosshair },
+    ],
+  },
+  {
+    key: "gateway", label: "Internet Gateway",
+    icons: [
+      { id: "gw-door", label: "Door", icon: DoorOpen },
+      { id: "gw-login", label: "Enter", icon: LogIn },
+      { id: "gw-logout", label: "Exit", icon: LogOut },
+      { id: "gw-arrows", label: "Arrows", icon: ArrowLeftRight },
+      { id: "gw-route", label: "Route", icon: Route },
+      { id: "gw-signpost", label: "Signpost", icon: Signpost },
+    ],
+  },
+  {
+    key: "pdu", label: "PDU / Power Distribution",
+    icons: [
+      { id: "pdu-plug-bolt", label: "Plug Bolt", icon: PlugZap },
+      { id: "pdu-unplug", label: "Unplug", icon: Unplug },
+      { id: "pdu-plug", label: "Plug", icon: Plug },
+      { id: "pdu-bolt", label: "Bolt", icon: Zap },
+      { id: "pdu-solar", label: "Solar", icon: SunMedium },
+      { id: "pdu-battery", label: "Battery", icon: BatteryFull },
+    ],
+  },
+  {
+    key: "controller", label: "Controller / PLC",
+    icons: [
+      { id: "ctrl-gears", label: "Gears", icon: Settings },
+      { id: "ctrl-gear", label: "Gear", icon: Settings2 },
+      { id: "ctrl-wrench", label: "Wrench", icon: Wrench },
+      { id: "ctrl-hammer", label: "Tools", icon: Hammer },
+      { id: "ctrl-gauge", label: "Gauge", icon: GaugeCircle },
+      { id: "ctrl-robot", label: "Robot", icon: Bot },
+      { id: "ctrl-chip", label: "Chip", icon: Cpu },
+    ],
+  },
   {
     key: "box", label: "Group / Container",
     icons: [
@@ -312,7 +469,7 @@ export function DeviceIconPicker({ open, onOpenChange, selectedType, selectedSub
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
