@@ -1,5 +1,6 @@
 <?php
 // Public map viewer (no auth required)
+$deviceIconsLibrary = require_once 'includes/device_icons.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,6 +50,10 @@
         </section>
     </div>
 
+    <!-- Load device icons library for JavaScript icon mapping -->
+    <script>
+        window.deviceIconsLibrary = <?= json_encode($deviceIconsLibrary) ?>;
+    </script>
     <script src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
     <script type="module" src="assets/js/public-map.js"></script>
 </body>

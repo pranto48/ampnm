@@ -7,7 +7,7 @@ set AGENT_TOKEN=CHANGE_ME
 echo Collecting Windows metrics and sending to %SERVER_URL%
 
 powershell -NoProfile -Command ^
-  "$cpu = (Get-Counter '\\Processor(_Total)\\% Processor Time').CounterSamples[0].CookedValue; ^
+  "$cpu = (Get-Counter '\\Processor(_Total)\\%% Processor Time').CounterSamples[0].CookedValue; ^
    $os = Get-CimInstance Win32_OperatingSystem; ^
    $totalMemGB = [math]::Round($os.TotalVisibleMemorySize/1MB,2); ^
    $freeMemGB = [math]::Round($os.FreePhysicalMemory/1MB,2); ^
@@ -23,8 +23,18 @@ powershell -NoProfile -Command ^
    $gpuCounters = Get-Counter -Counter '\\GPU Engine(*)\\Utilization Percentage' -ErrorAction SilentlyContinue; ^
    $gpuAvg = if ($gpuCounters.CounterSamples) { [math]::Round(($gpuCounters.CounterSamples | Measure-Object CookedValue -Average).Average,2) } else { $null }; ^
    $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '169.*' -and $_.IPAddress -ne '127.0.0.1' } | Select-Object -First 1 -ExpandProperty IPAddress); ^
-   $payload = @{ host_name=$env:COMPUTERNAME; host_ip=$ip; cpu_percent=[math]::Round($cpu,2); memory_percent=$memPercent; disk_free_gb=$diskFree; disk_total_gb=$diskTotal; network_in_mbps=$inMbps; network_out_mbps=$outMbps; gpu_percent=$gpuAvg }; ^
-   Invoke-RestMethod -Method Post -Uri '%SERVER_URL%' -Headers @{ 'X-Agent-Token'='%AGENT_TOKEN%' } -Body ($payload | ConvertTo-Json) -ContentType 'application/json' -ErrorAction Stop"
+   $bootTime = $os.LastBootUpTime.ToString('o'); ^
+   $uptimeSec = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalSeconds); ^
+   $osVer = \"$($os.Caption) $($os.Version)\"; ^
+   $procs = Get-Process | Sort-Object CPU -Descending | Select-Object -First 30 | ForEach-Object { ^
+     @{ name=$_.ProcessName; pid=$_.Id; cpu=[math]::Round($_.CPU,1); memory_mb=[math]::Round($_.WorkingSet64/1MB,1); status='running'; type='process' } ^
+   }; ^
+   $svcs = Get-Service | Where-Object { $_.Status -eq 'Running' } | Select-Object -First 20 | ForEach-Object { ^
+     @{ name=$_.DisplayName; pid=$null; cpu=$null; memory_mb=$null; status='running'; type='service' } ^
+   }; ^
+   $allProcs = @($procs) + @($svcs); ^
+   $payload = @{ host_name=$env:COMPUTERNAME; host_ip=$ip; cpu_percent=[math]::Round($cpu,2); memory_percent=$memPercent; disk_free_gb=$diskFree; disk_total_gb=$diskTotal; network_in_mbps=$inMbps; network_out_mbps=$outMbps; gpu_percent=$gpuAvg; uptime_seconds=$uptimeSec; boot_time=$bootTime; os_version=$osVer; processes=$allProcs }; ^
+   Invoke-RestMethod -Method Post -Uri '%SERVER_URL%' -Headers @{ 'X-Agent-Token'='%AGENT_TOKEN%' } -Body ($payload | ConvertTo-Json -Depth 3) -ContentType 'application/json' -ErrorAction Stop"
 
 if %ERRORLEVEL% EQU 0 (
   echo Metrics sent successfully.

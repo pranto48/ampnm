@@ -1,1 +1,13 @@
 project_id = "ynjuvlzvzvnqhvvfdjdc"
+
+[functions.agent-metrics]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.ping-device]
+verify_jwt = false
+
+[functions.cloud-monitor]
+verify_jwt = false

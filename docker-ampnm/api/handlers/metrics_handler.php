@@ -228,8 +228,10 @@ switch ($action) {
         $name = $input['name'] ?? 'Windows Agent ' . date('Y-m-d H:i');
         $token = bin2hex(random_bytes(32)); // 64 character hex token
         
-        $stmt = $pdo->prepare("INSERT INTO agent_tokens (token, name) VALUES (?, ?)");
-        $stmt->execute([$token, $name]);
+        $userId = $_SESSION['user_id'] ?? null;
+        if (!$userId) { http_response_code(401); echo json_encode(['error' => 'Not authenticated']); exit; }
+        $stmt = $pdo->prepare("INSERT INTO agent_tokens (user_id, token, name) VALUES (?, ?, ?)");
+        $stmt->execute([$userId, $token, $name]);
         
         echo json_encode([
             'success' => true,
@@ -359,7 +361,7 @@ switch ($action) {
         } else {
             $sql = "INSERT INTO host_alert_overrides 
                     (host_ip, host_name, enabled, cpu_warning, cpu_critical, memory_warning, memory_critical, disk_warning, disk_critical, gpu_warning, gpu_critical, status_delay_seconds)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $pdo->prepare($sql)->execute([
                 $hostIp,
                 $input['host_name'] ?? $hostIp,
