@@ -9,5 +9,10 @@ MapApp.state = {
     pingIntervals: {},
     animationFrameId: null,
     tick: 0,
-    globalRefreshIntervalId: null
+    globalRefreshIntervalId: null,
+    // Consecutive failure tracking per device: { deviceId: failCount }
+    deviceFailCounts: {},
+    // Agent registration tracking
+    knownHostnames: new Set(),
+    agentPollIntervalId: null
 };

@@ -30,6 +30,7 @@ function initMap() {
             clearInterval(state.globalRefreshIntervalId);
             state.globalRefreshIntervalId = null;
         }
+        deviceManager.stopAgentPolling();
         if (state.network) {
             state.network.destroy();
             state.network = null;
@@ -556,6 +557,9 @@ function initMap() {
 
     // Initial Load
     (async () => {
+        // Start agent registration polling for real-time notifications
+        deviceManager.startAgentPolling();
+
         // Set live refresh to ON by default for viewers
         if (window.userRole === 'viewer') {
             els.liveRefreshToggle.checked = true;

@@ -1,5 +1,8 @@
 window.MapApp = window.MapApp || {};
 
+// Number of consecutive failures before marking a device as offline
+const OFFLINE_FAIL_THRESHOLD = 3;
+
 MapApp.deviceManager = {
     pingSingleDevice: async (deviceId) => {
         const node = MapApp.state.nodes.get(deviceId);
@@ -11,7 +14,22 @@ MapApp.deviceManager = {
         
         try {
             const result = await MapApp.api.post('check_device', { id: deviceId });
-            const newStatus = result.status;
+            const rawStatus = result.status;
+
+            // --- Consecutive failure logic ---
+            let newStatus = rawStatus;
+            if (rawStatus === 'offline') {
+                // Increment failure counter
+                MapApp.state.deviceFailCounts[deviceId] = (MapApp.state.deviceFailCounts[deviceId] || 0) + 1;
+                if (MapApp.state.deviceFailCounts[deviceId] < OFFLINE_FAIL_THRESHOLD) {
+                    // Not enough consecutive failures yet – keep old status
+                    newStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
+                }
+                // else: threshold reached, newStatus stays 'offline'
+            } else {
+                // Success or non-offline status → reset counter, show immediately
+                MapApp.state.deviceFailCounts[deviceId] = 0;
+            }
 
             if (newStatus !== oldStatus) {
                 if (newStatus === 'warning') {
@@ -53,12 +71,12 @@ MapApp.deviceManager = {
         try {
             const result = await MapApp.api.post('ping_all_devices', { map_id: MapApp.state.currentMapId });
             
-            if (!result.success) { // Check result.success explicitly
-                console.error("Bulk refresh API returned failure:", result); // Added detailed log
+            if (!result.success) {
+                console.error("Bulk refresh API returned failure:", result);
                 throw new Error(result.message || 'Failed to refresh device statuses due to an unknown server issue.');
             }
-            if (!result.updated_devices) { // Still check for updated_devices array
-                console.error("Bulk refresh API returned no updated_devices:", result); // Added detailed log
+            if (!result.updated_devices) {
+                console.error("Bulk refresh API returned no updated_devices:", result);
                 throw new Error('Invalid response from server during bulk refresh: missing device data.');
             }
 
@@ -67,29 +85,42 @@ MapApp.deviceManager = {
                 const node = MapApp.state.nodes.get(device.id);
                 if (!node) return null;
 
-                if (device.old_status !== device.status) {
+                const oldStatus = device.old_status;
+                const rawStatus = device.status;
+
+                // --- Consecutive failure logic for bulk refresh ---
+                let effectiveStatus = rawStatus;
+                if (rawStatus === 'offline') {
+                    MapApp.state.deviceFailCounts[device.id] = (MapApp.state.deviceFailCounts[device.id] || 0) + 1;
+                    if (MapApp.state.deviceFailCounts[device.id] < OFFLINE_FAIL_THRESHOLD) {
+                        effectiveStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
+                    }
+                } else {
+                    MapApp.state.deviceFailCounts[device.id] = 0;
+                }
+
+                if (effectiveStatus !== oldStatus) {
                     statusChanges++;
-                    if (device.status === 'warning') {
+                    if (effectiveStatus === 'warning') {
                         SoundManager.play('warning');
-                    } else if (device.status === 'critical') {
+                    } else if (effectiveStatus === 'critical') {
                         SoundManager.play('critical');
-                    } else if (device.status === 'offline') {
+                    } else if (effectiveStatus === 'offline') {
                         SoundManager.play('offline');
-                    } else if (device.status === 'online' && (device.old_status === 'offline' || device.old_status === 'critical' || device.old_status === 'warning')) {
+                    } else if (effectiveStatus === 'online' && (oldStatus === 'offline' || oldStatus === 'critical' || oldStatus === 'warning')) {
                         SoundManager.play('online');
                     }
                     
-                    if (device.status === 'critical' || device.status === 'offline') {
-                        window.notyf.error({ message: `Device '${device.name}' is now ${device.status}.`, duration: 5000, dismissible: true });
-                    } else if (device.status === 'online' && (device.old_status === 'critical' || device.old_status === 'offline')) {
+                    if (effectiveStatus === 'critical' || effectiveStatus === 'offline') {
+                        window.notyf.error({ message: `Device '${device.name}' is now ${effectiveStatus}.`, duration: 5000, dismissible: true });
+                    } else if (effectiveStatus === 'online' && (oldStatus === 'critical' || oldStatus === 'offline')) {
                         window.notyf.success({ message: `Device '${device.name}' is back online.`, duration: 5000 });
                     } else {
-                        // Show info toast for all status changes for all roles
-                        window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
+                        window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${effectiveStatus}.`, duration: 5000 });
                     }
                 }
 
-                const updatedDeviceData = { ...node.deviceData, ...device };
+                const updatedDeviceData = { ...node.deviceData, ...device, status: effectiveStatus };
                 let label = updatedDeviceData.name;
                 if (updatedDeviceData.show_live_ping && updatedDeviceData.status === 'online' && updatedDeviceData.last_avg_time !== null) {
                     label += `\n${updatedDeviceData.last_avg_time}ms | TTL:${updatedDeviceData.last_ttl || 'N/A'}`;
@@ -98,7 +129,7 @@ MapApp.deviceManager = {
                 return {
                     id: device.id,
                     deviceData: updatedDeviceData,
-                    icon: { ...node.icon, color: MapApp.config.statusColorMap[device.status] || MapApp.config.statusColorMap.unknown },
+                    icon: { ...node.icon, color: MapApp.config.statusColorMap[effectiveStatus] || MapApp.config.statusColorMap.unknown },
                     title: MapApp.utils.buildNodeTitle(updatedDeviceData),
                     label: label
                 };
@@ -127,11 +158,76 @@ MapApp.deviceManager = {
     setupAutoPing: (devices) => {
         Object.values(MapApp.state.pingIntervals).forEach(clearInterval);
         MapApp.state.pingIntervals = {};
+        // Reset fail counters when setting up fresh
+        MapApp.state.deviceFailCounts = {};
         // Enable auto-ping functionality for all roles
         devices.forEach(device => {
             if (device.ping_interval > 0 && device.ip) {
                 MapApp.state.pingIntervals[device.id] = setInterval(() => MapApp.deviceManager.pingSingleDevice(device.id), device.ping_interval * 1000);
             }
         });
+    },
+
+    // --- New Agent Registration Detection ---
+    startAgentPolling: () => {
+        // Load known hostnames from localStorage
+        const stored = localStorage.getItem('ampnm_known_hostnames');
+        if (stored) {
+            try {
+                JSON.parse(stored).forEach(h => MapApp.state.knownHostnames.add(h));
+            } catch (e) { /* ignore */ }
+        }
+
+        // Initial fetch to seed known hosts (no notifications on first load)
+        MapApp.deviceManager._fetchAndCheckAgents(true);
+
+        // Poll every 10 seconds
+        MapApp.state.agentPollIntervalId = setInterval(() => {
+            MapApp.deviceManager._fetchAndCheckAgents(false);
+        }, 10000);
+    },
+
+    stopAgentPolling: () => {
+        if (MapApp.state.agentPollIntervalId) {
+            clearInterval(MapApp.state.agentPollIntervalId);
+            MapApp.state.agentPollIntervalId = null;
+        }
+    },
+
+    _fetchAndCheckAgents: async (isSeed) => {
+        try {
+            const res = await fetch(`${MapApp.config.API_URL}?action=get_all_hosts&handler=metrics`);
+            if (!res.ok) return;
+            const hosts = await res.json();
+            if (!Array.isArray(hosts)) return;
+
+            hosts.forEach(host => {
+                const hostname = host.host_name || host.hostname || host.name;
+                if (!hostname) return;
+
+                if (!MapApp.state.knownHostnames.has(hostname)) {
+                    MapApp.state.knownHostnames.add(hostname);
+                    // Persist
+                    localStorage.setItem('ampnm_known_hostnames', JSON.stringify([...MapApp.state.knownHostnames]));
+
+                    if (!isSeed) {
+                        // Show notification for new agent
+                        const ip = host.host_ip || host.ip_address || '';
+                        const msg = ip
+                            ? `New agent registered: ${hostname} (${ip})`
+                            : `New agent registered: ${hostname}`;
+                        window.notyf.success({ message: msg, duration: 8000, dismissible: true });
+
+                        // Play online sound for new agent
+                        const agentSoundPref = localStorage.getItem('ampnm_agent_sound') !== 'false';
+                        if (agentSoundPref) {
+                            SoundManager.play('online');
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            // Silently fail – host metrics API may not exist in all setups
+        }
     }
 };
