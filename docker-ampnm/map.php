@@ -32,6 +32,52 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     <div class="flex items-center gap-2">
                         <button id="scanNetworkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Scan Network" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-search"></i></button>
                         <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses"><i class="fas fa-sync-alt"></i></button>
+
+                        <!-- Sound Alert Settings -->
+                        <div class="relative inline-block">
+                            <button id="soundSettingsBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Sound Alert Settings">
+                                <i id="soundMasterIcon" class="fas fa-volume-up"></i>
+                            </button>
+                            <div id="soundSettingsPopover" class="hidden absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm font-semibold text-white">Sound Alerts</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="soundMasterToggle" class="sr-only peer" checked>
+                                        <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                                    </label>
+                                </div>
+                                <div class="space-y-2 pl-1" id="soundTypeToggles">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs text-slate-400 capitalize">Online</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" data-sound="online" class="sr-only peer sound-toggle" checked>
+                                            <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs text-slate-400 capitalize">Offline</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" data-sound="offline" class="sr-only peer sound-toggle" checked>
+                                            <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs text-slate-400 capitalize">Warning</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" data-sound="warning" class="sr-only peer sound-toggle" checked>
+                                            <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs text-slate-400 capitalize">Critical</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" data-sound="critical" class="sr-only peer sound-toggle" checked>
+                                            <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         
                         <div class="flex items-center space-x-2 pl-2 ml-2 border-l border-slate-700">
                             <label for="liveRefreshToggle" class="text-sm text-slate-400 select-none cursor-pointer">Live Status</label>
@@ -255,6 +301,47 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
 <!-- Load device icons library for JavaScript icon mapping -->
 <script>
     window.deviceIconsLibrary = <?= json_encode($deviceIconsLibrary) ?>;
+</script>
+
+<!-- Sound Settings Popover Logic -->
+<script>
+(function() {
+    const btn = document.getElementById('soundSettingsBtn');
+    const popover = document.getElementById('soundSettingsPopover');
+    const masterToggle = document.getElementById('soundMasterToggle');
+    const masterIcon = document.getElementById('soundMasterIcon');
+    const typeTogglesContainer = document.getElementById('soundTypeToggles');
+
+    // Sync UI with SoundManager prefs
+    function syncUI() {
+        const p = SoundManager.prefs;
+        masterToggle.checked = p.enabled;
+        masterIcon.className = p.enabled ? 'fas fa-volume-up' : 'fas fa-volume-mute text-slate-500';
+        document.querySelectorAll('.sound-toggle').forEach(t => {
+            t.checked = p[t.dataset.sound];
+            t.disabled = !p.enabled;
+        });
+    }
+    syncUI();
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        popover.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+        if (!popover.contains(e.target) && e.target !== btn) popover.classList.add('hidden');
+    });
+
+    masterToggle.addEventListener('change', () => {
+        SoundManager.updatePref('enabled', masterToggle.checked);
+        syncUI();
+    });
+    document.querySelectorAll('.sound-toggle').forEach(t => {
+        t.addEventListener('change', () => {
+            SoundManager.updatePref(t.dataset.sound, t.checked);
+        });
+    });
+})();
 </script>
 
 <!-- Ensure map refreshes after returning from edit page (bfcache) -->
