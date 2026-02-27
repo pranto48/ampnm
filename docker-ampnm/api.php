@@ -4,6 +4,7 @@ require_once 'includes/functions.php';
 header('Content-Type: application/json');
 
 $action = $_GET['action'] ?? '';
+$handler = $_GET['handler'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
 try {
@@ -111,6 +112,8 @@ try {
         'health', 'get_current_license_info',
         // Host metrics viewing
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',
+        // Floor plan viewing
+        'get_floor_plans', 'get_racks', 'get_panels', 'get_switch_ports', 'get_cables', 'get_devices',
     ];
 
     // Define specific POST actions that 'viewer' role can perform
@@ -177,6 +180,9 @@ try {
         require __DIR__ . '/api/handlers/license_handler.php';
     } elseif (in_array($action, $metricsActions)) {
         require __DIR__ . '/api/handlers/metrics_handler.php';
+    } elseif ($handler === 'floor_plan') {
+        require __DIR__ . '/api/handlers/floor_plan_handler.php';
+        echo json_encode(handleFloorPlanAction($action, $input, $pdo));
     } elseif ($action === 'health') {
         echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
     } else {

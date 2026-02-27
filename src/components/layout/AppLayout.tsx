@@ -7,7 +7,7 @@ import { AutoPingDropdown } from "@/components/AutoPingDropdown";
 import {
   LayoutDashboard, Map, BarChart3, Activity, Monitor,
   Server, History, FileText, Mail, Users, Key, HelpCircle,
-  LogOut, Menu, X, ChevronDown, Shield
+  LogOut, Menu, X, ChevronDown, Shield, Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
     label: "Network", icon: Map,
     children: [
       { label: "Map", to: "/map", icon: Map },
+      { label: "Floor Plan", to: "/floor-plan", icon: Building2 },
       { label: "Network Graphs", to: "/network-graphs", icon: BarChart3 },
     ],
   },
