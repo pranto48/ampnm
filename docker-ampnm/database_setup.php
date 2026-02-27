@@ -349,6 +349,77 @@ try {
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY `hostname_unique` (`hostname`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR FLOOR PLANS
+        "CREATE TABLE IF NOT EXISTS `floor_plans` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `name` VARCHAR(255) NOT NULL DEFAULT 'Floor Plan',
+            `image_url` TEXT NULL,
+            `width` INT DEFAULT 1200,
+            `height` INT DEFAULT 800,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR RACK LOCATIONS
+        "CREATE TABLE IF NOT EXISTS `rack_locations` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `floor_plan_id` INT(6) UNSIGNED NOT NULL,
+            `name` VARCHAR(255) NOT NULL,
+            `x` DECIMAL(10,2) DEFAULT 0,
+            `y` DECIMAL(10,2) DEFAULT 0,
+            `rack_units` INT DEFAULT 42,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`floor_plan_id`) REFERENCES `floor_plans`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR PATCH PANELS
+        "CREATE TABLE IF NOT EXISTS `patch_panels` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `rack_id` INT(6) UNSIGNED NOT NULL,
+            `name` VARCHAR(255) NOT NULL,
+            `port_count` INT DEFAULT 24,
+            `rack_position` INT DEFAULT 1,
+            `panel_type` VARCHAR(50) DEFAULT 'rj45',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`rack_id`) REFERENCES `rack_locations`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR SWITCH PORTS
+        "CREATE TABLE IF NOT EXISTS `switch_ports` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `device_id` INT(6) UNSIGNED NOT NULL,
+            `port_number` INT NOT NULL,
+            `port_label` VARCHAR(50) NULL,
+            `status` VARCHAR(50) DEFAULT 'inactive',
+            `speed` VARCHAR(20) DEFAULT '1G',
+            `vlan` VARCHAR(50) NULL,
+            `connected_device` VARCHAR(255) NULL,
+            `notes` TEXT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR CABLE RUNS
+        "CREATE TABLE IF NOT EXISTS `cable_runs` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `floor_plan_id` INT(6) UNSIGNED NULL,
+            `cable_type` VARCHAR(50) DEFAULT 'cat6',
+            `cable_color` VARCHAR(50) DEFAULT 'blue',
+            `cable_length` VARCHAR(50) NULL,
+            `label` VARCHAR(255) NULL,
+            `source_type` VARCHAR(50) NOT NULL DEFAULT 'patch_panel',
+            `source_id` INT(6) UNSIGNED NOT NULL,
+            `source_port` INT NOT NULL,
+            `dest_type` VARCHAR(50) NOT NULL DEFAULT 'switch',
+            `dest_id` INT(6) UNSIGNED NOT NULL,
+            `dest_port` INT NOT NULL,
+            `notes` TEXT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`floor_plan_id`) REFERENCES `floor_plans`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     ];
 

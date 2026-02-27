@@ -20,6 +20,7 @@ import UsersPage from "./pages/UsersPage";
 import LicensePage from "./pages/LicensePage";
 import HelpPage from "./pages/HelpPage";
 import PublicMapPage from "./pages/PublicMapPage";
+import FloorPlanPage from "./pages/FloorPlanPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/map" element={<ProtectedRoute><NetworkMapPage /></ProtectedRoute>} />
               <Route path="/network-graphs" element={<ProtectedRoute><NetworkGraphsPage /></ProtectedRoute>} />
+              <Route path="/floor-plan" element={<ProtectedRoute><FloorPlanPage /></ProtectedRoute>} />
               <Route path="/host-metrics" element={<ProtectedRoute><HostMetricsPage /></ProtectedRoute>} />
               <Route path="/windows-agent" element={<ProtectedRoute><WindowsAgentPage /></ProtectedRoute>} />
               <Route path="/devices" element={<ProtectedRoute adminOnly><DevicesPage /></ProtectedRoute>} />

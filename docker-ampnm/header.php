@@ -57,6 +57,7 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
                             </button>
                             <div class="nav-group-items">
                                 <a href="map.php" class="nav-link nav-sublink"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
+                                <a href="floor_plan.php" class="nav-link nav-sublink"><i class="fas fa-building fa-fw mr-2"></i>Floor Plan</a>
                                 <a href="network_graphs.php" class="nav-link nav-sublink"><i class="fas fa-chart-line fa-fw mr-2"></i>Network Graphs</a>
                             </div>
                         </div>

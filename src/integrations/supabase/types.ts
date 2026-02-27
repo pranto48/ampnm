@@ -62,6 +62,65 @@ export type Database = {
         }
         Relationships: []
       }
+      cable_runs: {
+        Row: {
+          cable_color: string | null
+          cable_length: string | null
+          cable_type: string | null
+          created_at: string
+          dest_id: string
+          dest_port: number
+          dest_type: string
+          floor_plan_id: string | null
+          id: string
+          label: string | null
+          notes: string | null
+          source_id: string
+          source_port: number
+          source_type: string
+        }
+        Insert: {
+          cable_color?: string | null
+          cable_length?: string | null
+          cable_type?: string | null
+          created_at?: string
+          dest_id: string
+          dest_port: number
+          dest_type?: string
+          floor_plan_id?: string | null
+          id?: string
+          label?: string | null
+          notes?: string | null
+          source_id: string
+          source_port: number
+          source_type?: string
+        }
+        Update: {
+          cable_color?: string | null
+          cable_length?: string | null
+          cable_type?: string | null
+          created_at?: string
+          dest_id?: string
+          dest_port?: number
+          dest_type?: string
+          floor_plan_id?: string | null
+          id?: string
+          label?: string | null
+          notes?: string | null
+          source_id?: string
+          source_port?: number
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cable_runs_floor_plan_id_fkey"
+            columns: ["floor_plan_id"]
+            isOneToOne: false
+            referencedRelation: "floor_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       device_edges: {
         Row: {
           connection_type: string | null
@@ -316,6 +375,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      floor_plans: {
+        Row: {
+          created_at: string
+          height: number | null
+          id: string
+          image_url: string | null
+          name: string
+          updated_at: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          height?: number | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          updated_at?: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          height?: number | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: []
       }
       host_alert_overrides: {
         Row: {
@@ -634,6 +726,44 @@ export type Database = {
         }
         Relationships: []
       }
+      patch_panels: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          panel_type: string | null
+          port_count: number | null
+          rack_id: string
+          rack_position: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          panel_type?: string | null
+          port_count?: number | null
+          rack_id: string
+          rack_position?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          panel_type?: string | null
+          port_count?: number | null
+          rack_id?: string
+          rack_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patch_panels_rack_id_fkey"
+            columns: ["rack_id"]
+            isOneToOne: false
+            referencedRelation: "rack_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ping_results: {
         Row: {
           checked_at: string
@@ -696,6 +826,44 @@ export type Database = {
         }
         Relationships: []
       }
+      rack_locations: {
+        Row: {
+          created_at: string
+          floor_plan_id: string
+          id: string
+          name: string
+          rack_units: number | null
+          x: number | null
+          y: number | null
+        }
+        Insert: {
+          created_at?: string
+          floor_plan_id: string
+          id?: string
+          name: string
+          rack_units?: number | null
+          x?: number | null
+          y?: number | null
+        }
+        Update: {
+          created_at?: string
+          floor_plan_id?: string
+          id?: string
+          name?: string
+          rack_units?: number | null
+          x?: number | null
+          y?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rack_locations_floor_plan_id_fkey"
+            columns: ["floor_plan_id"]
+            isOneToOne: false
+            referencedRelation: "floor_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       smtp_settings: {
         Row: {
           created_at: string
@@ -740,6 +908,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      switch_ports: {
+        Row: {
+          connected_device: string | null
+          created_at: string
+          device_id: string
+          id: string
+          notes: string | null
+          port_label: string | null
+          port_number: number
+          speed: string | null
+          status: string | null
+          vlan: string | null
+        }
+        Insert: {
+          connected_device?: string | null
+          created_at?: string
+          device_id: string
+          id?: string
+          notes?: string | null
+          port_label?: string | null
+          port_number: number
+          speed?: string | null
+          status?: string | null
+          vlan?: string | null
+        }
+        Update: {
+          connected_device?: string | null
+          created_at?: string
+          device_id?: string
+          id?: string
+          notes?: string | null
+          port_label?: string | null
+          port_number?: number
+          speed?: string | null
+          status?: string | null
+          vlan?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "switch_ports_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       targets: {
         Row: {
