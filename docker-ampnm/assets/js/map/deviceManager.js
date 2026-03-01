@@ -1,34 +1,32 @@
 window.MapApp = window.MapApp || {};
 
-// Number of consecutive failures before marking a device as offline
-const OFFLINE_FAIL_THRESHOLD = 3;
-
 MapApp.deviceManager = {
     pingSingleDevice: async (deviceId) => {
         const node = MapApp.state.nodes.get(deviceId);
         if (!node || node.deviceData.type === 'box') return;
         
         const oldStatus = node.deviceData.status;
-        // Temporarily set status to 'unknown' (blue) while pinging
-        MapApp.state.nodes.update({ id: deviceId, icon: { ...node.icon, color: '#06b6d4' } });
+        // No blue flicker – device keeps its current color silently
         
         try {
             const result = await MapApp.api.post('check_device', { id: deviceId });
             const rawStatus = result.status;
 
-            // --- Consecutive failure logic ---
+            // --- Time-based failure logic ---
             let newStatus = rawStatus;
             if (rawStatus === 'offline') {
-                // Increment failure counter
-                MapApp.state.deviceFailCounts[deviceId] = (MapApp.state.deviceFailCounts[deviceId] || 0) + 1;
-                if (MapApp.state.deviceFailCounts[deviceId] < OFFLINE_FAIL_THRESHOLD) {
-                    // Not enough consecutive failures yet – keep old status
+                if (!MapApp.state.deviceFirstFailTime[deviceId]) {
+                    // First failure – record timestamp, keep old status silently
+                    MapApp.state.deviceFirstFailTime[deviceId] = Date.now();
+                    newStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
+                } else if (Date.now() - MapApp.state.deviceFirstFailTime[deviceId] < 5000) {
+                    // Less than 5 seconds since first failure – keep old status
                     newStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
                 }
-                // else: threshold reached, newStatus stays 'offline'
+                // else: 5+ seconds elapsed, newStatus stays 'offline'
             } else {
-                // Success or non-offline status → reset counter, show immediately
-                MapApp.state.deviceFailCounts[deviceId] = 0;
+                // Success or non-offline status → clear timestamp, show immediately
+                delete MapApp.state.deviceFirstFailTime[deviceId];
             }
 
             if (newStatus !== oldStatus) {
@@ -58,8 +56,7 @@ MapApp.deviceManager = {
             MapApp.state.nodes.update({ id: deviceId, deviceData: updatedDeviceData, icon: { ...node.icon, color: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown }, title: MapApp.utils.buildNodeTitle(updatedDeviceData), label: label });
         } catch (error) {
             console.error("Failed to ping device:", error);
-            window.notyf.error(error.message || "Failed to ping device.");
-            // Revert to old status or mark as unknown if ping fails
+            // Silent – no error toast for transient network issues
             MapApp.state.nodes.update({ id: deviceId, icon: { ...node.icon, color: MapApp.config.statusColorMap[oldStatus] || MapApp.config.statusColorMap.unknown } });
         }
     },
@@ -88,15 +85,17 @@ MapApp.deviceManager = {
                 const oldStatus = device.old_status;
                 const rawStatus = device.status;
 
-                // --- Consecutive failure logic for bulk refresh ---
+                // --- Time-based failure logic for bulk refresh ---
                 let effectiveStatus = rawStatus;
                 if (rawStatus === 'offline') {
-                    MapApp.state.deviceFailCounts[device.id] = (MapApp.state.deviceFailCounts[device.id] || 0) + 1;
-                    if (MapApp.state.deviceFailCounts[device.id] < OFFLINE_FAIL_THRESHOLD) {
+                    if (!MapApp.state.deviceFirstFailTime[device.id]) {
+                        MapApp.state.deviceFirstFailTime[device.id] = Date.now();
+                        effectiveStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
+                    } else if (Date.now() - MapApp.state.deviceFirstFailTime[device.id] < 5000) {
                         effectiveStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
                     }
                 } else {
-                    MapApp.state.deviceFailCounts[device.id] = 0;
+                    delete MapApp.state.deviceFirstFailTime[device.id];
                 }
 
                 if (effectiveStatus !== oldStatus) {
@@ -139,10 +138,7 @@ MapApp.deviceManager = {
                 MapApp.state.nodes.update(nodeUpdates);
             }
 
-            // Only show "All device statuses are stable" message for admin, not for viewers
-            if (statusChanges === 0 && result.updated_devices.length > 0 && window.userRole === 'admin') {
-                window.notyf.success({ message: 'All device statuses are stable.', duration: 2000 });
-            }
+            // Removed "All device statuses are stable" toast to reduce notification noise
 
             return result.updated_devices.length;
 
@@ -158,8 +154,8 @@ MapApp.deviceManager = {
     setupAutoPing: (devices) => {
         Object.values(MapApp.state.pingIntervals).forEach(clearInterval);
         MapApp.state.pingIntervals = {};
-        // Reset fail counters when setting up fresh
-        MapApp.state.deviceFailCounts = {};
+        // Reset failure timestamps when setting up fresh
+        MapApp.state.deviceFirstFailTime = {};
         // Enable auto-ping functionality for all roles
         devices.forEach(device => {
             if (device.ping_interval > 0 && device.ip) {
