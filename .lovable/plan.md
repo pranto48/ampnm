@@ -1,143 +1,59 @@
 
 
-# Phase 2 + 3: Authentication System, Login Page, Layout and Navigation
+# Quiet Background Offline Detection for Docker Map
 
-## What will be built
+## Problem
+The current system shows notifications on every ping check, causing frequent popup spam. The "blue/unknown" color flicker during pings is also visually noisy. Users want a calm map that only updates when a device has been confirmed offline for 5 seconds.
 
-This step removes the old simple ping monitor UI and replaces it with the full AMPNM application shell -- a login system, app layout with navigation, and a basic dashboard placeholder.
+## Solution: Silent Background Health Check
 
----
+### How it works
 
-## Step 1: Remove old files
+1. **Remove the blue "pinging" flicker** -- the map icon stays its current color during a ping check, no visual change while checking.
 
-Delete the following files that belong to the old ping monitor:
-- `src/components/AddTargetDialog.tsx`
-- `src/components/NavLink.tsx`
-- `src/components/StatusSummary.tsx`
-- `src/components/TargetCard.tsx`
-- `src/components/TargetGrid.tsx`
-- `src/hooks/useTargets.ts`
-- `src/pages/Index.tsx` (will be rewritten)
+2. **Track the first failure timestamp** instead of counting consecutive failures. When a device first fails a ping, record `Date.now()`. On subsequent failures, check if 5 seconds have elapsed since that first failure. Only then mark the device as offline and show the notification.
 
----
+3. **Online transitions remain instant** -- a single successful ping immediately marks the device online and shows the notification.
 
-## Step 2: Authentication hook (`src/hooks/useAuth.ts`)
+4. **No "all statuses stable" toast** -- remove the repetitive bulk-refresh success message.
 
-- Uses `supabase.auth.onAuthStateChange` to track session state
-- `signIn(email, password)` and `signUp(email, password, username)` functions
-- `signOut()` function
-- Fetches user role from `user_roles` table
-- Exposes `user`, `session`, `role`, `loading`, `isAdmin` values
-- Context provider pattern (`AuthProvider` + `useAuth` hook)
+5. **Same logic applies to both `pingSingleDevice` and `performBulkRefresh`**.
 
 ---
 
-## Step 3: Login page (`src/pages/LoginPage.tsx`)
+## Technical Details
 
-- Matches the Docker app's dark animated gradient background login screen
-- Email + password form (no username -- Supabase Auth uses email)
-- Error display for invalid credentials
-- AMPNM branding with shield icon
-- Redirects to dashboard if already logged in
-- Sign-up toggle to allow first user registration
+### File: `docker-ampnm/assets/js/map/state.js`
+- Replace `deviceFailCounts: {}` with `deviceFirstFailTime: {}` to track timestamps instead of counts.
 
----
+### File: `docker-ampnm/assets/js/map/deviceManager.js`
 
-## Step 4: App layout (`src/components/layout/AppLayout.tsx`)
+**Remove the blue flicker (line 13):**
+- Delete the line that sets the icon color to cyan (`#06b6d4`) while pinging. The device keeps its current color silently.
 
-- Wraps all authenticated pages
-- Top navigation bar matching Docker app's `header.php`:
-  - AMPNM logo/brand on left
-  - Navigation links with dropdown submenus
-  - Mobile sidebar with hamburger toggle
-- Navigation structure:
-  - Dashboard
-  - Network (Map, Network Graphs)
-  - Monitoring (Host Metrics, Windows Agent)
-  - Administration (admin only): Devices, History, Status Logs, Email Notifications, Users, License
-  - Help
-  - Logout
-- Active link highlighting
-- Dark slate theme (`bg-slate-900`, `bg-slate-800/50` navbar)
+**Replace consecutive-count logic with time-based logic in `pingSingleDevice`:**
+- Remove `OFFLINE_FAIL_THRESHOLD` constant.
+- When `rawStatus === 'offline'`:
+  - If no `deviceFirstFailTime[deviceId]` exists, set it to `Date.now()` and keep the old status (silent).
+  - If it exists and `Date.now() - deviceFirstFailTime[deviceId] >= 5000`, allow the offline transition (show notification + update map).
+  - If it exists but less than 5 seconds, keep old status (silent).
+- When `rawStatus !== 'offline'`: clear `deviceFirstFailTime[deviceId]` and transition immediately.
 
----
+**Same time-based logic in `performBulkRefresh`:**
+- Apply identical 5-second timestamp check for each device in the bulk results.
+- Remove the "All device statuses are stable" notyf message (line 143-145).
 
-## Step 5: Protected route wrapper (`src/components/auth/ProtectedRoute.tsx`)
+**Remove error toast on ping network failure (line 61):**
+- Remove the `window.notyf.error` call when a ping API call throws an exception, to avoid spamming notifications for transient network issues. Keep the `console.error` for debugging.
 
-- Checks authentication state
-- Redirects to `/login` if not authenticated
-- Optional `adminOnly` prop to restrict pages to admin role
-- Shows loading spinner while checking auth
+### Summary of behavior changes
 
----
-
-## Step 6: Dashboard page (`src/pages/DashboardPage.tsx`)
-
-- Placeholder dashboard with:
-  - Status counter cards (Online, Warning, Critical, Offline) reading from `devices` table
-  - Device status doughnut chart (using recharts PieChart)
-  - Manual ping test form
-  - Recent activity feed from `device_status_logs`
-- Map selector dropdown reading from `maps` table
-
----
-
-## Step 7: Update routing (`src/App.tsx`)
-
-- Add `AuthProvider` wrapper
-- Routes:
-  - `/login` -> LoginPage (public)
-  - `/` -> DashboardPage (protected)
-  - All other pages as placeholder `NotFound` for now
-- Remove old Index route
-
----
-
-## Step 8: Update global styles (`src/index.css`)
-
-- Add the animated gradient background keyframes for login page
-- Add status indicator CSS classes
-- Set dark theme defaults (slate-900 background, Inter font)
-
----
-
-## Technical details
-
-### New files to create:
-- `src/hooks/useAuth.tsx` -- Auth context provider + hook
-- `src/components/auth/ProtectedRoute.tsx` -- Route guard
-- `src/components/layout/AppLayout.tsx` -- Main layout with navigation
-- `src/pages/LoginPage.tsx` -- Login/signup page
-- `src/pages/DashboardPage.tsx` -- Main dashboard
-
-### Files to modify:
-- `src/App.tsx` -- New routing structure
-- `src/index.css` -- Dark theme + animations
-
-### Files to delete:
-- `src/components/AddTargetDialog.tsx`
-- `src/components/NavLink.tsx`
-- `src/components/StatusSummary.tsx`
-- `src/components/TargetCard.tsx`
-- `src/components/TargetGrid.tsx`
-- `src/hooks/useTargets.ts`
-- `src/pages/Index.tsx`
-
-### Auth flow:
-```text
-User visits / --> ProtectedRoute checks session
-  |-- No session --> Redirect to /login
-  |-- Has session --> Fetch role from user_roles table
-       |-- Render AppLayout with DashboardPage
-```
-
-### Role checking:
-- Uses existing `has_role()` database function
-- Client-side role is fetched for UI display only (show/hide admin menu)
-- RLS policies on tables enforce actual access control server-side
-
-### First user setup:
-- The existing `handle_new_user()` trigger auto-assigns `admin` role to the first registered user
-- Subsequent users get `viewer` role
-- Sign-up available on login page for initial setup
+| Scenario | Before | After |
+|----------|--------|-------|
+| Device fails 1 ping | Blue flicker, counter incremented | No visual change, timestamp recorded silently |
+| Device fails for less than 5s | Stays old color after 3 checks | Stays old color, no notification |
+| Device offline for 5+ seconds | After 3 consecutive fails | After 5 seconds elapsed since first fail -- notification + map update |
+| Device comes back online | Immediate | Immediate (unchanged) |
+| Every bulk refresh | "All statuses stable" toast | No toast if nothing changed |
+| Ping API network error | Error popup notification | Silent (console only) |
 
