@@ -369,6 +369,7 @@ function initMap() {
                 document.getElementById('mapBgColor').value = currentMap.background_color || '#1e293b';
                 document.getElementById('mapBgColorHex').value = currentMap.background_color || '#1e293b';
                 document.getElementById('mapBgImageUrl').value = currentMap.background_image_url || '';
+                document.getElementById('offlineDelaySeconds').value = currentMap.offline_delay_seconds ?? 5;
                 els.publicViewToggle.checked = currentMap.public_view_enabled;
                 MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
                 openModal('mapSettingsModal');
@@ -410,10 +411,12 @@ function initMap() {
 
         els.mapSettingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const offlineDelay = parseInt(document.getElementById('offlineDelaySeconds').value, 10);
             const updates = {
                 background_color: document.getElementById('mapBgColorHex').value,
                 background_image_url: document.getElementById('mapBgImageUrl').value,
-                public_view_enabled: els.publicViewToggle.checked
+                public_view_enabled: els.publicViewToggle.checked,
+                offline_delay_seconds: (offlineDelay >= 1 && offlineDelay <= 300) ? offlineDelay : 5
             };
             try {
                 await api.post('update_map', { id: state.currentMapId, updates });

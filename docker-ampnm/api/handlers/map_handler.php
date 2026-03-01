@@ -44,7 +44,7 @@ switch ($action) {
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Map ID and updates are required']); exit; }
             
-            $allowed_fields = ['name', 'background_color', 'background_image_url', 'public_view_enabled'];
+            $allowed_fields = ['name', 'background_color', 'background_image_url', 'public_view_enabled', 'offline_delay_seconds'];
             $fields = []; $params = [];
             foreach ($updates as $key => $value) {
                 if (in_array($key, $allowed_fields)) {

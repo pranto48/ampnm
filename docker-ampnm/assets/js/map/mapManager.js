@@ -274,6 +274,8 @@ MapApp.mapManager = {
             mapEl.style.backgroundPosition = 'center';
             // Update public view link display
             MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
+            // Apply offline delay setting
+            MapApp.config.offlineDelayMs = (currentMap.offline_delay_seconds || 5) * 1000;
         }
         
         // Correctly extract the 'devices' array from the API response
