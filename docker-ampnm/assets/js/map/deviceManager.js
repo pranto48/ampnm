@@ -19,7 +19,7 @@ MapApp.deviceManager = {
                     // First failure – record timestamp, keep old status silently
                     MapApp.state.deviceFirstFailTime[deviceId] = Date.now();
                     newStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
-                } else if (Date.now() - MapApp.state.deviceFirstFailTime[deviceId] < 5000) {
+                } else if (Date.now() - MapApp.state.deviceFirstFailTime[deviceId] < MapApp.config.offlineDelayMs) {
                     // Less than 5 seconds since first failure – keep old status
                     newStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
                 }
@@ -91,7 +91,7 @@ MapApp.deviceManager = {
                     if (!MapApp.state.deviceFirstFailTime[device.id]) {
                         MapApp.state.deviceFirstFailTime[device.id] = Date.now();
                         effectiveStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
-                    } else if (Date.now() - MapApp.state.deviceFirstFailTime[device.id] < 5000) {
+                    } else if (Date.now() - MapApp.state.deviceFirstFailTime[device.id] < MapApp.config.offlineDelayMs) {
                         effectiveStatus = oldStatus !== 'unknown' ? oldStatus : 'offline';
                     }
                 } else {

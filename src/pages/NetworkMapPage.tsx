@@ -92,6 +92,7 @@ export default function NetworkMapPage() {
   const [bgColor, setBgColor] = useState("#1e293b");
   const [bgImageUrl, setBgImageUrl] = useState("");
   const [publicView, setPublicView] = useState(false);
+  const [offlineDelay, setOfflineDelay] = useState(5);
 
   // Place device dialog
   const [placeDeviceOpen, setPlaceDeviceOpen] = useState(false);
@@ -136,6 +137,7 @@ export default function NetworkMapPage() {
       setBgColor(currentMap.background_color || "#1e293b");
       setBgImageUrl(currentMap.background_image_url || "");
       setPublicView(currentMap.public_view_enabled || false);
+      setOfflineDelay((currentMap as any).offline_delay_seconds ?? 5);
     }
   }, [currentMap]);
 
@@ -352,13 +354,15 @@ export default function NetworkMapPage() {
   // -- Map settings save --
   const handleSaveSettings = async () => {
     if (!currentMapId) return;
+    const clampedDelay = Math.max(1, Math.min(300, offlineDelay));
     const { error } = await supabase.from("maps").update({
       background_color: bgColor,
       background_image_url: bgImageUrl.trim() || null,
       public_view_enabled: publicView,
-    }).eq("id", currentMapId);
+      offline_delay_seconds: clampedDelay,
+    } as any).eq("id", currentMapId);
     if (error) { toast({ title: "Failed", description: error.message, variant: "destructive" }); return; }
-    setMaps((prev) => prev.map((m) => m.id === currentMapId ? { ...m, background_color: bgColor, background_image_url: bgImageUrl.trim() || null, public_view_enabled: publicView } : m));
+    setMaps((prev) => prev.map((m) => m.id === currentMapId ? { ...m, background_color: bgColor, background_image_url: bgImageUrl.trim() || null, public_view_enabled: publicView, offline_delay_seconds: clampedDelay } as any : m));
     setSettingsOpen(false);
     toast({ title: "Map settings saved" });
   };
@@ -856,6 +860,11 @@ export default function NetworkMapPage() {
                 <Label htmlFor="public-view">Enable Public View</Label>
               </div>
               <p className="text-xs text-muted-foreground">Allow anyone with the link to view this map without logging in.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Offline Delay (seconds)</Label>
+              <Input type="number" min={1} max={300} value={offlineDelay} onChange={(e) => setOfflineDelay(parseInt(e.target.value) || 5)} />
+              <p className="text-xs text-muted-foreground">How many seconds a device must fail pings before being marked offline.</p>
             </div>
             {publicView && (
               <div className="space-y-1">

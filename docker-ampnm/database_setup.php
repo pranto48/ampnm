@@ -124,7 +124,8 @@ try {
             `background_color` VARCHAR(20) NULL,
             `background_image_url` VARCHAR(255) NULL,
             `is_default` BOOLEAN DEFAULT FALSE,
-            `public_view_enabled` BOOLEAN DEFAULT FALSE, /* NEW COLUMN */
+            `public_view_enabled` BOOLEAN DEFAULT FALSE,
+            `offline_delay_seconds` INT(6) NOT NULL DEFAULT 5,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE

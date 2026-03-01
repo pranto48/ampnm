@@ -673,6 +673,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          offline_delay_seconds: number
           public_view_enabled: boolean | null
           updated_at: string
           user_id: string
@@ -683,6 +684,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          offline_delay_seconds?: number
           public_view_enabled?: boolean | null
           updated_at?: string
           user_id: string
@@ -693,6 +695,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          offline_delay_seconds?: number
           public_view_enabled?: boolean | null
           updated_at?: string
           user_id?: string

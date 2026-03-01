@@ -1,0 +1,1 @@
+ALTER TABLE public.maps ADD COLUMN offline_delay_seconds integer NOT NULL DEFAULT 5;
