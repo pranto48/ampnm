@@ -10,8 +10,8 @@ MapApp.state = {
     animationFrameId: null,
     tick: 0,
     globalRefreshIntervalId: null,
-    // Consecutive failure tracking per device: { deviceId: failCount }
-    deviceFailCounts: {},
+    // Time-based failure tracking per device: { deviceId: timestamp }
+    deviceFirstFailTime: {},
     // Agent registration tracking
     knownHostnames: new Set(),
     agentPollIntervalId: null
