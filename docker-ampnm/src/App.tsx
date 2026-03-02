@@ -8,7 +8,8 @@ import NotFound from "./pages/NotFound";
 import AddDevicePage from "./pages/AddDevicePage";
 import EditDevicePage from "./pages/EditDevicePage";
 import LicenseManagementPage from "./pages/LicenseManagementPage";
-import PublicMapPage from "./pages/PublicMapPage"; // Import new page
+import PublicMapPage from "./pages/PublicMapPage";
+import DockerMapPage from "./pages/DockerMapPage";
 
 const queryClient = new QueryClient();
 
@@ -23,7 +24,8 @@ const App = () => (
           <Route path="/add-device" element={<AddDevicePage />} />
           <Route path="/edit-device/:id" element={<EditDevicePage />} />
           <Route path="/license-management" element={<LicenseManagementPage />} />
-          <Route path="/public-map/:mapId" element={<PublicMapPage />} /> {/* New route */}
+          <Route path="/public-map/:mapId" element={<PublicMapPage />} />
+          <Route path="/docker-map" element={<DockerMapPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
