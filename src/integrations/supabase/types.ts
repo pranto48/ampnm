@@ -376,6 +376,139 @@ export type Database = {
           },
         ]
       }
+      docker_containers: {
+        Row: {
+          container_id: string
+          created_at: string
+          host_id: string
+          id: string
+          image: string | null
+          internal_ip: string | null
+          name: string
+          networks: Json | null
+          ports: Json | null
+          state: string
+          status_text: string | null
+        }
+        Insert: {
+          container_id: string
+          created_at?: string
+          host_id: string
+          id?: string
+          image?: string | null
+          internal_ip?: string | null
+          name: string
+          networks?: Json | null
+          ports?: Json | null
+          state?: string
+          status_text?: string | null
+        }
+        Update: {
+          container_id?: string
+          created_at?: string
+          host_id?: string
+          id?: string
+          image?: string | null
+          internal_ip?: string | null
+          name?: string
+          networks?: Json | null
+          ports?: Json | null
+          state?: string
+          status_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docker_containers_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "docker_hosts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      docker_hosts: {
+        Row: {
+          active_containers: number
+          created_at: string
+          docker_version: string | null
+          hostname: string
+          id: string
+          ip: string | null
+          last_synced: string | null
+          orphaned_volumes: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          active_containers?: number
+          created_at?: string
+          docker_version?: string | null
+          hostname: string
+          id?: string
+          ip?: string | null
+          last_synced?: string | null
+          orphaned_volumes?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          active_containers?: number
+          created_at?: string
+          docker_version?: string | null
+          hostname?: string
+          id?: string
+          ip?: string | null
+          last_synced?: string | null
+          orphaned_volumes?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      docker_networks: {
+        Row: {
+          connected_containers: Json | null
+          created_at: string
+          driver: string | null
+          gateway: string | null
+          host_id: string
+          id: string
+          name: string
+          scope: string | null
+          subnet: string | null
+        }
+        Insert: {
+          connected_containers?: Json | null
+          created_at?: string
+          driver?: string | null
+          gateway?: string | null
+          host_id: string
+          id?: string
+          name: string
+          scope?: string | null
+          subnet?: string | null
+        }
+        Update: {
+          connected_containers?: Json | null
+          created_at?: string
+          driver?: string | null
+          gateway?: string | null
+          host_id?: string
+          id?: string
+          name?: string
+          scope?: string | null
+          subnet?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docker_networks_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "docker_hosts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       floor_plans: {
         Row: {
           created_at: string

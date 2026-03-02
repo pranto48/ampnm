@@ -18,6 +18,7 @@ import { Search } from "lucide-react";
 import DockerHostNode, { type DockerHostData } from "./DockerHostNode";
 import NetworkBridgeNode, { type NetworkBridgeData } from "./NetworkBridgeNode";
 import ContainerNode, { type ContainerData } from "./ContainerNode";
+import NetworkGroupNode, { type NetworkGroupData } from "./NetworkGroupNode";
 import PortBindingEdge from "./PortBindingEdge";
 import ContainerInspector from "./ContainerInspector";
 
@@ -26,6 +27,7 @@ const nodeTypes = {
   dockerHost: DockerHostNode,
   networkBridge: NetworkBridgeNode,
   container: ContainerNode,
+  networkGroup: NetworkGroupNode,
 };
 
 const edgeTypes = {
@@ -34,6 +36,34 @@ const edgeTypes = {
 
 // ---------- Demo data ----------
 const demoNodes: Node[] = [
+  // Network group bounding boxes (rendered behind other nodes with lower zIndex)
+  {
+    id: "group-app-network",
+    type: "networkGroup",
+    position: { x: 5, y: 390 },
+    data: { label: "app_network", driver: "bridge", width: 430, height: 200 } satisfies NetworkGroupData,
+    style: { zIndex: -1 },
+    selectable: false,
+    draggable: false,
+  },
+  {
+    id: "group-swarm-overlay",
+    type: "networkGroup",
+    position: { x: 480, y: 390 },
+    data: { label: "swarm_overlay", driver: "overlay", width: 250, height: 100 } satisfies NetworkGroupData,
+    style: { zIndex: -1 },
+    selectable: false,
+    draggable: false,
+  },
+  {
+    id: "group-host-network",
+    type: "networkGroup",
+    position: { x: 500, y: 520 },
+    data: { label: "host_network", driver: "host", width: 200, height: 100 } satisfies NetworkGroupData,
+    style: { zIndex: -1 },
+    selectable: false,
+    draggable: false,
+  },
   // Host 1
   {
     id: "host-1",
