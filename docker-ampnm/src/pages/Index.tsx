@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Wifi, Server, Clock, RefreshCw, Monitor, Network, WifiOff } from "lucide-react";
+import { Activity, Wifi, Server, Clock, RefreshCw, Monitor, Network, WifiOff, Container } from "lucide-react";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import PingTest from "@/components/PingTest";
 import NetworkStatus from "@/components/NetworkStatus";
@@ -12,6 +12,7 @@ import ServerPingTest from "@/components/ServerPingTest";
 import PingHistory from "@/components/PingHistory";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import NetworkMap from "@/components/NetworkMap";
+import DockerNetworkMap from "@/components/docker-map/DockerNetworkMap";
 import { 
   getDevices, 
   NetworkDevice, 
@@ -218,6 +219,10 @@ const Index = () => {
               <Network className="h-4 w-4" />
               Network Map
             </TabsTrigger>
+            <TabsTrigger value="docker-map" className="flex items-center gap-2">
+              <Container className="h-4 w-4" />
+              Docker Map
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
@@ -390,6 +395,10 @@ const Index = () => {
           
           <TabsContent value="map">
             <NetworkMap devices={devices} onMapUpdate={fetchDevices} />
+          </TabsContent>
+
+          <TabsContent value="docker-map">
+            <DockerNetworkMap />
           </TabsContent>
         </Tabs>
 
