@@ -2,6 +2,8 @@ import { BaseEdge, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
 
 export interface PortBindingEdgeData {
   portLabel?: string;
+  sourcePort?: string;
+  targetPort?: string;
 }
 
 const PortBindingEdge = ({
@@ -39,17 +41,19 @@ const PortBindingEdge = ({
           ...style,
         }}
       />
-      {d?.portLabel && (
+      {(d?.portLabel || (d?.sourcePort && d?.targetPort)) && (
         <foreignObject
-          x={labelX - 60}
+          x={labelX - 70}
           y={labelY - 12}
-          width={120}
+          width={140}
           height={24}
           requiredExtensions="http://www.w3.org/1999/xhtml"
         >
           <div className="flex items-center justify-center">
             <span className="text-[9px] font-mono bg-muted/90 backdrop-blur-sm text-muted-foreground border border-border rounded px-2 py-0.5 whitespace-nowrap shadow-sm">
-              {d.portLabel}
+              {d?.sourcePort && d?.targetPort
+                ? `${d.sourcePort} ↔ ${d.targetPort}`
+                : d?.portLabel}
             </span>
           </div>
         </foreignObject>

@@ -21,6 +21,38 @@ import ContainerNode, { type ContainerData } from "./ContainerNode";
 import NetworkGroupNode, { type NetworkGroupData } from "./NetworkGroupNode";
 import PortBindingEdge from "./PortBindingEdge";
 import ContainerInspector from "./ContainerInspector";
+import DeviceInspector, { type DeviceInspectorData } from "./DeviceInspector";
+import type { DevicePort } from "./DevicePortGrid";
+
+// ---------- Port generator helpers ----------
+function generatePorts(
+  deviceType: "server" | "switch" | "router" | "firewall",
+  overrides?: Partial<Record<string, Pick<DevicePort, "status" | "connectedTo">>>
+): DevicePort[] {
+  const ports: DevicePort[] = [];
+  const o = overrides || {};
+
+  const make = (name: string, type: DevicePort["type"], speed: string) => {
+    const ov = o[name];
+    ports.push({ id: name, name, type, status: ov?.status || "down", speed, connectedTo: ov?.connectedTo });
+  };
+
+  if (deviceType === "switch") {
+    for (let i = 1; i <= 24; i++) make(`G0/${i}`, "gigabit", "1Gbps");
+    for (let i = 1; i <= 4; i++) make(`SFP0${i}`, "sfp", "10Gbps");
+  } else if (deviceType === "router") {
+    for (let i = 0; i <= 3; i++) make(`G0/${i}`, "gigabit", "1Gbps");
+    for (let i = 0; i <= 1; i++) make(`S0/${i}`, "serial", "1.544Mbps");
+    make("SFP01", "sfp", "10Gbps");
+  } else if (deviceType === "firewall") {
+    for (let i = 0; i <= 7; i++) make(`G0/${i}`, "gigabit", "1Gbps");
+    for (let i = 0; i <= 1; i++) make(`Mgmt0/${i}`, "mgmt", "1Gbps");
+  } else {
+    // server
+    for (let i = 0; i <= 3; i++) make(`G0/${i}`, "gigabit", "1Gbps");
+  }
+  return ports;
+}
 
 // ---------- Node & Edge types ----------
 const nodeTypes = {
@@ -35,12 +67,45 @@ const edgeTypes = {
 };
 
 // ---------- Demo data ----------
+const host1Ports = generatePorts("server", {
+  "G0/0": { status: "up", connectedTo: "app_network (G0/1)" },
+  "G0/1": { status: "up", connectedTo: "host_network (G0/3)" },
+  "G0/2": { status: "up", connectedTo: "nginx-proxy" },
+  "G0/3": { status: "down" },
+});
+
+const host2Ports = generatePorts("server", {
+  "G0/0": { status: "up", connectedTo: "swarm_overlay (G0/5)" },
+  "G0/1": { status: "down" },
+  "G0/2": { status: "down" },
+  "G0/3": { status: "down" },
+});
+
+const bridgePorts = generatePorts("switch", {
+  "G0/1": { status: "up", connectedTo: "prod-server-01 (G0/0)" },
+  "G0/2": { status: "up", connectedTo: "nginx-proxy" },
+  "G0/3": { status: "up", connectedTo: "backend-api" },
+  "G0/4": { status: "up", connectedTo: "postgres-db" },
+  "G0/5": { status: "up", connectedTo: "bg-worker" },
+});
+
+const overlayPorts = generatePorts("switch", {
+  "G0/1": { status: "up", connectedTo: "redis-cache" },
+  "G0/2": { status: "up", connectedTo: "backend-api" },
+  "G0/5": { status: "up", connectedTo: "dev-server-02 (G0/0)" },
+});
+
+const hostNetPorts = generatePorts("router", {
+  "G0/0": { status: "up", connectedTo: "prometheus" },
+  "G0/3": { status: "up", connectedTo: "prod-server-01 (G0/1)" },
+});
+
 const demoNodes: Node[] = [
-  // Network group bounding boxes (rendered behind other nodes with lower zIndex)
+  // Network group bounding boxes
   {
     id: "group-app-network",
     type: "networkGroup",
-    position: { x: 5, y: 390 },
+    position: { x: 5, y: 420 },
     data: { label: "app_network", driver: "bridge", width: 430, height: 200 } satisfies NetworkGroupData,
     style: { zIndex: -1 },
     selectable: false,
@@ -49,7 +114,7 @@ const demoNodes: Node[] = [
   {
     id: "group-swarm-overlay",
     type: "networkGroup",
-    position: { x: 480, y: 390 },
+    position: { x: 480, y: 420 },
     data: { label: "swarm_overlay", driver: "overlay", width: 250, height: 100 } satisfies NetworkGroupData,
     style: { zIndex: -1 },
     selectable: false,
@@ -58,7 +123,7 @@ const demoNodes: Node[] = [
   {
     id: "group-host-network",
     type: "networkGroup",
-    position: { x: 500, y: 520 },
+    position: { x: 500, y: 550 },
     data: { label: "host_network", driver: "host", width: 200, height: 100 } satisfies NetworkGroupData,
     style: { zIndex: -1 },
     selectable: false,
@@ -68,48 +133,60 @@ const demoNodes: Node[] = [
   {
     id: "host-1",
     type: "dockerHost",
-    position: { x: 100, y: 50 },
-    data: { label: "prod-server-01", os: "Ubuntu 22.04 LTS", ip: "192.168.1.10", containersCount: 4, status: "running" } satisfies DockerHostData,
+    position: { x: 100, y: 20 },
+    data: {
+      label: "prod-server-01", os: "Ubuntu 22.04 LTS", ip: "192.168.1.10",
+      containersCount: 4, status: "running", deviceType: "server", ports: host1Ports,
+    } satisfies DockerHostData,
   },
   // Host 2
   {
     id: "host-2",
     type: "dockerHost",
-    position: { x: 600, y: 50 },
-    data: { label: "dev-server-02", os: "Debian 12", ip: "192.168.1.11", containersCount: 2, status: "running" } satisfies DockerHostData,
+    position: { x: 600, y: 20 },
+    data: {
+      label: "dev-server-02", os: "Debian 12", ip: "192.168.1.11",
+      containersCount: 2, status: "running", deviceType: "server", ports: host2Ports,
+    } satisfies DockerHostData,
   },
-  // Bridge network
+  // Bridge network (switch)
   {
     id: "net-bridge-1",
     type: "networkBridge",
-    position: { x: 60, y: 220 },
-    data: { label: "app_network", driver: "bridge", subnet: "172.18.0.0/16", gateway: "172.18.0.1", scope: "local" } satisfies NetworkBridgeData,
+    position: { x: 30, y: 220 },
+    data: {
+      label: "app_network", driver: "bridge", subnet: "172.18.0.0/16",
+      gateway: "172.18.0.1", scope: "local", ports: bridgePorts,
+    } satisfies NetworkBridgeData,
   },
   // Overlay network
   {
     id: "net-overlay-1",
     type: "networkBridge",
     position: { x: 500, y: 220 },
-    data: { label: "swarm_overlay", driver: "overlay", subnet: "10.0.1.0/24", gateway: "10.0.1.1", scope: "swarm" } satisfies NetworkBridgeData,
+    data: {
+      label: "swarm_overlay", driver: "overlay", subnet: "10.0.1.0/24",
+      gateway: "10.0.1.1", scope: "swarm", ports: overlayPorts,
+    } satisfies NetworkBridgeData,
   },
-  // Host network
+  // Host network (router-like)
   {
     id: "net-host-1",
     type: "networkBridge",
     position: { x: 340, y: 220 },
-    data: { label: "host_network", driver: "host", subnet: "—", gateway: "—", scope: "local" } satisfies NetworkBridgeData,
+    data: {
+      label: "host_network", driver: "host", subnet: "—",
+      gateway: "—", scope: "local", ports: hostNetPorts,
+    } satisfies NetworkBridgeData,
   },
   // Containers
   {
     id: "c-nginx",
     type: "container",
-    position: { x: 20, y: 420 },
+    position: { x: 20, y: 450 },
     data: {
-      label: "nginx-proxy",
-      image: "nginx:1.25-alpine",
-      containerId: "a3f8b2c1d4e5",
-      internalIp: "172.18.0.2",
-      state: "running",
+      label: "nginx-proxy", image: "nginx:1.25-alpine", containerId: "a3f8b2c1d4e5",
+      internalIp: "172.18.0.2", state: "running",
       ports: [{ external: 80, internal: 80, protocol: "tcp" }, { external: 443, internal: 443, protocol: "tcp" }],
       networks: ["app_network"],
     } satisfies ContainerData,
@@ -117,13 +194,10 @@ const demoNodes: Node[] = [
   {
     id: "c-api",
     type: "container",
-    position: { x: 220, y: 420 },
+    position: { x: 220, y: 450 },
     data: {
-      label: "backend-api",
-      image: "node:20-slim",
-      containerId: "b7e9d1f3a2c4",
-      internalIp: "172.18.0.3",
-      state: "running",
+      label: "backend-api", image: "node:20-slim", containerId: "b7e9d1f3a2c4",
+      internalIp: "172.18.0.3", state: "running",
       ports: [{ external: 3000, internal: 3000, protocol: "tcp" }],
       networks: ["app_network", "swarm_overlay"],
     } satisfies ContainerData,
@@ -131,13 +205,10 @@ const demoNodes: Node[] = [
   {
     id: "c-db",
     type: "container",
-    position: { x: 420, y: 420 },
+    position: { x: 420, y: 450 },
     data: {
-      label: "postgres-db",
-      image: "postgres:16",
-      containerId: "c2d4e6f8a1b3",
-      internalIp: "172.18.0.4",
-      state: "running",
+      label: "postgres-db", image: "postgres:16", containerId: "c2d4e6f8a1b3",
+      internalIp: "172.18.0.4", state: "running",
       ports: [{ external: 5432, internal: 5432, protocol: "tcp" }],
       networks: ["app_network"],
     } satisfies ContainerData,
@@ -145,13 +216,10 @@ const demoNodes: Node[] = [
   {
     id: "c-redis",
     type: "container",
-    position: { x: 620, y: 420 },
+    position: { x: 620, y: 450 },
     data: {
-      label: "redis-cache",
-      image: "redis:7-alpine",
-      containerId: "d5f7a9b1c3e2",
-      internalIp: "10.0.1.5",
-      state: "running",
+      label: "redis-cache", image: "redis:7-alpine", containerId: "d5f7a9b1c3e2",
+      internalIp: "10.0.1.5", state: "running",
       ports: [{ external: 6379, internal: 6379, protocol: "tcp" }],
       networks: ["swarm_overlay"],
     } satisfies ContainerData,
@@ -159,27 +227,19 @@ const demoNodes: Node[] = [
   {
     id: "c-worker",
     type: "container",
-    position: { x: 300, y: 550 },
+    position: { x: 300, y: 580 },
     data: {
-      label: "bg-worker",
-      image: "python:3.12-slim",
-      containerId: "e8a1b3c5d7f9",
-      internalIp: "172.18.0.6",
-      state: "stopped",
-      ports: [],
-      networks: ["app_network"],
+      label: "bg-worker", image: "python:3.12-slim", containerId: "e8a1b3c5d7f9",
+      internalIp: "172.18.0.6", state: "stopped", ports: [], networks: ["app_network"],
     } satisfies ContainerData,
   },
   {
     id: "c-monitor",
     type: "container",
-    position: { x: 520, y: 550 },
+    position: { x: 520, y: 580 },
     data: {
-      label: "prometheus",
-      image: "prom/prometheus:v2.51",
-      containerId: "f1a2b3c4d5e6",
-      internalIp: "—",
-      state: "running",
+      label: "prometheus", image: "prom/prometheus:v2.51", containerId: "f1a2b3c4d5e6",
+      internalIp: "—", state: "running",
       ports: [{ external: 9090, internal: 9090, protocol: "tcp" }],
       networks: ["host_network"],
     } satisfies ContainerData,
@@ -187,20 +247,20 @@ const demoNodes: Node[] = [
 ];
 
 const demoEdges: Edge[] = [
-  // Host → Networks
-  { id: "e-h1-nb1", source: "host-1", target: "net-bridge-1", type: "smoothstep", animated: true, style: { stroke: "hsl(var(--muted-foreground))", strokeWidth: 1 } },
-  { id: "e-h1-nh1", source: "host-1", target: "net-host-1", type: "smoothstep", animated: true, style: { stroke: "hsl(var(--muted-foreground))", strokeWidth: 1 } },
-  { id: "e-h2-no1", source: "host-2", target: "net-overlay-1", type: "smoothstep", animated: true, style: { stroke: "hsl(var(--muted-foreground))", strokeWidth: 1 } },
-  // Networks → Containers
-  { id: "e-nb1-nginx", source: "net-bridge-1", target: "c-nginx", type: "portBinding", data: { portLabel: "Ext: 80 ➔ Int: 80/tcp" } },
-  { id: "e-nb1-api", source: "net-bridge-1", target: "c-api", type: "portBinding", data: { portLabel: "Ext: 3000 ➔ Int: 3000/tcp" } },
-  { id: "e-nb1-db", source: "net-bridge-1", target: "c-db", type: "portBinding", data: { portLabel: "Ext: 5432 ➔ Int: 5432/tcp" } },
-  { id: "e-nb1-worker", source: "net-bridge-1", target: "c-worker", type: "smoothstep", style: { stroke: "hsl(var(--muted-foreground))", strokeWidth: 1, strokeDasharray: "4 4" } },
-  { id: "e-no1-redis", source: "net-overlay-1", target: "c-redis", type: "portBinding", data: { portLabel: "Ext: 6379 ➔ Int: 6379/tcp" } },
-  { id: "e-no1-api", source: "net-overlay-1", target: "c-api", type: "smoothstep", style: { stroke: "hsl(var(--muted-foreground))", strokeWidth: 1 } },
-  { id: "e-nh1-mon", source: "net-host-1", target: "c-monitor", type: "portBinding", data: { portLabel: "Ext: 9090 ➔ Int: 9090/tcp" } },
-  // Host → Container direct (port binding edges)
-  { id: "e-h1-nginx", source: "host-1", target: "c-nginx", type: "portBinding", data: { portLabel: "Ext: 443 ➔ Int: 443/tcp" } },
+  // Host → Networks (port-to-port)
+  { id: "e-h1-nb1", source: "host-1", target: "net-bridge-1", type: "portBinding", data: { sourcePort: "G0/0", targetPort: "G0/1" } },
+  { id: "e-h1-nh1", source: "host-1", target: "net-host-1", type: "portBinding", data: { sourcePort: "G0/1", targetPort: "G0/3" } },
+  { id: "e-h2-no1", source: "host-2", target: "net-overlay-1", type: "portBinding", data: { sourcePort: "G0/0", targetPort: "G0/5" } },
+  // Networks → Containers (port-to-port)
+  { id: "e-nb1-nginx", source: "net-bridge-1", target: "c-nginx", type: "portBinding", data: { sourcePort: "G0/2", targetPort: "eth0" } },
+  { id: "e-nb1-api", source: "net-bridge-1", target: "c-api", type: "portBinding", data: { sourcePort: "G0/3", targetPort: "eth0" } },
+  { id: "e-nb1-db", source: "net-bridge-1", target: "c-db", type: "portBinding", data: { sourcePort: "G0/4", targetPort: "eth0" } },
+  { id: "e-nb1-worker", source: "net-bridge-1", target: "c-worker", type: "portBinding", data: { sourcePort: "G0/5", targetPort: "eth0" } },
+  { id: "e-no1-redis", source: "net-overlay-1", target: "c-redis", type: "portBinding", data: { sourcePort: "G0/1", targetPort: "eth0" } },
+  { id: "e-no1-api", source: "net-overlay-1", target: "c-api", type: "portBinding", data: { sourcePort: "G0/2", targetPort: "eth1" } },
+  { id: "e-nh1-mon", source: "net-host-1", target: "c-monitor", type: "portBinding", data: { sourcePort: "G0/0", targetPort: "eth0" } },
+  // Host → Container direct
+  { id: "e-h1-nginx", source: "host-1", target: "c-nginx", type: "portBinding", data: { sourcePort: "G0/2", targetPort: "eth0" } },
 ];
 
 // ---------- Component ----------
@@ -210,8 +270,9 @@ const DockerNetworkMap = () => {
   const [networkFilter, setNetworkFilter] = useState("all");
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState<ContainerData | null>(null);
+  const [deviceInspectorOpen, setDeviceInspectorOpen] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<DeviceInspectorData | null>(null);
 
-  // Extract unique hosts & network drivers for filter dropdowns
   const hosts = useMemo(() => demoNodes.filter((n) => n.type === "dockerHost"), []);
   const networkDrivers = useMemo(() => {
     const drivers = new Set<string>();
@@ -223,10 +284,8 @@ const DockerNetworkMap = () => {
     return Array.from(drivers);
   }, []);
 
-  // Filtering logic
   const filteredNodes = useMemo(() => {
     let nodes = demoNodes;
-
     if (search) {
       const q = search.toLowerCase();
       nodes = nodes.filter((n) => {
@@ -236,29 +295,21 @@ const DockerNetworkMap = () => {
                (d.ip || "").toLowerCase().includes(q);
       });
     }
-
     if (hostFilter !== "all") {
-      const hostNode = hosts.find((h) => h.id === hostFilter);
-      if (hostNode) {
-        // Keep the host, its networks, and connected containers
-        const hostEdges = demoEdges.filter((e) => e.source === hostFilter || e.target === hostFilter);
-        const connectedIds = new Set([hostFilter, ...hostEdges.map((e) => e.source), ...hostEdges.map((e) => e.target)]);
-        // Also find containers connected to those networks
-        demoEdges.forEach((e) => {
-          if (connectedIds.has(e.source)) connectedIds.add(e.target);
-          if (connectedIds.has(e.target)) connectedIds.add(e.source);
-        });
-        nodes = nodes.filter((n) => connectedIds.has(n.id));
-      }
+      const hostEdges = demoEdges.filter((e) => e.source === hostFilter || e.target === hostFilter);
+      const connectedIds = new Set([hostFilter, ...hostEdges.map((e) => e.source), ...hostEdges.map((e) => e.target)]);
+      demoEdges.forEach((e) => {
+        if (connectedIds.has(e.source)) connectedIds.add(e.target);
+        if (connectedIds.has(e.target)) connectedIds.add(e.source);
+      });
+      nodes = nodes.filter((n) => connectedIds.has(n.id));
     }
-
     if (networkFilter !== "all") {
       nodes = nodes.filter((n) => {
         if (n.type === "networkBridge") return (n.data as unknown as NetworkBridgeData).driver === networkFilter;
         if (n.type === "dockerHost") return true;
         if (n.type === "container") {
           const cData = n.data as unknown as ContainerData;
-          // Check if any network this container belongs to matches the driver filter
           return demoNodes.some(
             (nn) =>
               nn.type === "networkBridge" &&
@@ -269,7 +320,6 @@ const DockerNetworkMap = () => {
         return true;
       });
     }
-
     return nodes;
   }, [search, hostFilter, networkFilter, hosts]);
 
@@ -282,6 +332,27 @@ const DockerNetworkMap = () => {
     if (node.type === "container") {
       setSelectedContainer(node.data as unknown as ContainerData);
       setInspectorOpen(true);
+    } else if (node.type === "dockerHost") {
+      const d = node.data as unknown as DockerHostData;
+      setSelectedDevice({
+        label: d.label,
+        deviceType: d.deviceType || "server",
+        ip: d.ip,
+        os: d.os,
+        ports: d.ports || [],
+      });
+      setDeviceInspectorOpen(true);
+    } else if (node.type === "networkBridge") {
+      const d = node.data as unknown as NetworkBridgeData;
+      setSelectedDevice({
+        label: d.label,
+        deviceType: "switch",
+        driver: d.driver,
+        subnet: d.subnet,
+        gateway: d.gateway,
+        ports: d.ports || [],
+      });
+      setDeviceInspectorOpen(true);
     }
   }, []);
 
@@ -309,8 +380,7 @@ const DockerNetworkMap = () => {
               <SelectItem key={h.id} value={h.id}>
                 {(h.data as unknown as DockerHostData).label}
               </SelectItem>
-            ))
-            }
+            ))}
           </SelectContent>
         </Select>
 
@@ -324,8 +394,7 @@ const DockerNetworkMap = () => {
               <SelectItem key={d} value={d} className="capitalize">
                 {d}
               </SelectItem>
-            ))
-            }
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -358,11 +427,18 @@ const DockerNetworkMap = () => {
         </ReactFlow>
       </div>
 
-      {/* Inspector sidebar */}
+      {/* Container Inspector */}
       <ContainerInspector
         open={inspectorOpen}
         onOpenChange={setInspectorOpen}
         container={selectedContainer}
+      />
+
+      {/* Device Inspector (hosts & bridges) */}
+      <DeviceInspector
+        open={deviceInspectorOpen}
+        onOpenChange={setDeviceInspectorOpen}
+        device={selectedDevice}
       />
     </div>
   );

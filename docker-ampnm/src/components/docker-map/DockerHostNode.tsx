@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Server } from "lucide-react";
+import { Server, Shield, Router } from "lucide-react";
+import DevicePortGrid, { type DevicePort } from "./DevicePortGrid";
 
 export interface DockerHostData {
   label: string;
@@ -8,11 +9,21 @@ export interface DockerHostData {
   ip: string;
   containersCount: number;
   status: "running" | "stopped";
+  deviceType?: "server" | "switch" | "router" | "firewall";
+  ports?: DevicePort[];
 }
+
+const deviceIcons = {
+  server: Server,
+  switch: Server,
+  router: Router,
+  firewall: Shield,
+};
 
 const DockerHostNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as DockerHostData;
   const isRunning = d.status === "running";
+  const Icon = deviceIcons[d.deviceType || "server"] || Server;
 
   return (
     <div
@@ -25,7 +36,7 @@ const DockerHostNode = memo(({ data, selected }: NodeProps) => {
 
       <div className="flex items-center gap-3 mb-2">
         <div className="p-2 rounded-lg bg-blue-500/20">
-          <Server className="h-6 w-6 text-blue-400" />
+          <Icon className="h-6 w-6 text-blue-400" />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-sm text-foreground truncate">{d.label}</h3>
@@ -37,6 +48,13 @@ const DockerHostNode = memo(({ data, selected }: NodeProps) => {
         <span className="font-mono">{d.ip}</span>
         <span>{d.containersCount} containers</span>
       </div>
+
+      {/* Port strip */}
+      {d.ports && d.ports.length > 0 && (
+        <div className="border-t border-border pt-2 mt-2">
+          <DevicePortGrid ports={d.ports} compact />
+        </div>
+      )}
     </div>
   );
 });
