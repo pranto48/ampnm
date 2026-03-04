@@ -67,10 +67,19 @@ function initMap() {
             e.preventDefault();
             const id = document.getElementById('edgeId').value;
             const connection_type = document.getElementById('connectionType').value;
+            const source_port_label = document.getElementById('edgeSourcePort').value || null;
+            const target_port_label = document.getElementById('edgeTargetPort').value || null;
             try {
-                await api.post('update_edge', { id, connection_type });
+                await api.post('update_edge', { id, connection_type, source_port_label, target_port_label });
                 closeModal('edgeModal');
-                state.edges.update({ id, connection_type, label: connection_type });
+                // Build label with port info
+                let edgeLabel = connection_type;
+                if (source_port_label && target_port_label) {
+                    edgeLabel = `${source_port_label} ↔ ${target_port_label}`;
+                } else if (source_port_label || target_port_label) {
+                    edgeLabel = `${source_port_label || '—'} ↔ ${target_port_label || '—'}`;
+                }
+                state.edges.update({ id, connection_type, source_port_label, target_port_label, label: edgeLabel });
                 window.notyf.success('Connection updated.');
                 // Trigger color update
                 MapApp.ui.updateEdgeColorsAndDashes();
@@ -79,6 +88,10 @@ function initMap() {
                 window.notyf.error(error.message || "An error occurred while updating connection.");
             }
         });
+
+        // Port select change listeners for live preview
+        document.getElementById('edgeSourcePort').addEventListener('change', () => MapApp.ui._updatePortPreview());
+        document.getElementById('edgeTargetPort').addEventListener('change', () => MapApp.ui._updatePortPreview());
     } else {
         // Disable edge form elements for viewers
         if (els.edgeForm) {

@@ -504,7 +504,15 @@ try {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `router_api_port` INT(5) NULL AFTER `router_api_password`;");
         message("Upgraded 'devices' table: added 'router_api_port' column.");
     }
-
+    // NEW MIGRATION: Add port labels to device_edges for Cisco Packet Tracer-style port mapping
+    if (!columnExists($pdo, $dbname, 'device_edges', 'source_port_label')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `source_port_label` VARCHAR(50) NULL AFTER `connection_type`;");
+        message("Upgraded 'device_edges' table: added 'source_port_label' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'device_edges', 'target_port_label')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `target_port_label` VARCHAR(50) NULL AFTER `source_port_label`;");
+        message("Upgraded 'device_edges' table: added 'target_port_label' column.");
+    }
 
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");

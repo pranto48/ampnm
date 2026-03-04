@@ -96,9 +96,17 @@ switch ($action) {
     case 'create_edge':
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can create edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type, source_port_label, target_port_label) VALUES (?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$current_user_id, $input['source_id'], $input['target_id'], $input['map_id'], $input['connection_type'] ?? 'cat5']);
+            $stmt->execute([
+                $current_user_id, 
+                $input['source_id'], 
+                $input['target_id'], 
+                $input['map_id'], 
+                $input['connection_type'] ?? 'cat5',
+                $input['source_port_label'] ?? null,
+                $input['target_port_label'] ?? null
+            ]);
             $lastId = $pdo->lastInsertId();
             $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
             $stmt->execute([$lastId, $current_user_id]);
@@ -112,9 +120,11 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $connection_type = $input['connection_type'] ?? 'cat5';
+            $source_port_label = $input['source_port_label'] ?? null;
+            $target_port_label = $input['target_port_label'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
-            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ? WHERE id = ? AND user_id = ?");
-            $stmt->execute([$connection_type, $id, $current_user_id]);
+            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ?, source_port_label = ?, target_port_label = ? WHERE id = ? AND user_id = ?");
+            $stmt->execute([$connection_type, $source_port_label, $target_port_label, $id, $current_user_id]);
             $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
             $stmt->execute([$id, $current_user_id]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);

@@ -89,7 +89,82 @@ MapApp.ui = {
         }
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || '';
+
+        // Populate port dropdowns with switch_ports data for source and target devices
+        const sourceNode = MapApp.state.nodes.get(edge.from);
+        const targetNode = MapApp.state.nodes.get(edge.to);
+
+        const srcNameEl = document.getElementById('edgeSourceDeviceName');
+        const tgtNameEl = document.getElementById('edgeTargetDeviceName');
+        srcNameEl.textContent = sourceNode ? sourceNode.deviceData.name : 'Source';
+        tgtNameEl.textContent = targetNode ? targetNode.deviceData.name : 'Target';
+
+        // Build port options from switch_ports or generate defaults based on device type
+        MapApp.ui._populatePortSelect('edgeSourcePort', sourceNode, edge.source_port_label || '');
+        MapApp.ui._populatePortSelect('edgeTargetPort', targetNode, edge.target_port_label || '');
+
+        // Update port preview
+        MapApp.ui._updatePortPreview();
+
         openModal('edgeModal'); // Call the shared openModal function
+    },
+
+    _populatePortSelect: (selectId, node, selectedValue) => {
+        const sel = document.getElementById(selectId);
+        sel.innerHTML = '<option value="">None</option>';
+
+        if (!node || !node.deviceData) return;
+
+        // Check if device has switch_ports loaded
+        const deviceId = node.deviceData.id;
+        const deviceType = node.deviceData.type || 'server';
+
+        // Generate standard port options based on device type
+        const ports = MapApp.ui._generatePortOptions(deviceType);
+        ports.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            if (p === selectedValue) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    },
+
+    _generatePortOptions: (deviceType) => {
+        const ports = [];
+        const dt = (deviceType || '').toLowerCase();
+
+        if (dt === 'switch' || dt === 'network_switch' || dt.includes('switch')) {
+            for (let i = 1; i <= 24; i++) ports.push(`G0/${i}`);
+            for (let i = 1; i <= 4; i++) ports.push(`SFP0${i}`);
+        } else if (dt === 'router' || dt.includes('router')) {
+            for (let i = 0; i <= 3; i++) ports.push(`G0/${i}`);
+            for (let i = 0; i <= 1; i++) ports.push(`S0/${i}`);
+            ports.push('SFP01');
+        } else if (dt === 'firewall' || dt.includes('firewall') || dt.includes('security')) {
+            for (let i = 0; i <= 7; i++) ports.push(`G0/${i}`);
+            for (let i = 0; i <= 1; i++) ports.push(`Mgmt0/${i}`);
+        } else {
+            // Server / generic - 4 GigE ports
+            for (let i = 0; i <= 3; i++) ports.push(`G0/${i}`);
+        }
+        return ports;
+    },
+
+    _updatePortPreview: () => {
+        const srcPort = document.getElementById('edgeSourcePort').value;
+        const tgtPort = document.getElementById('edgeTargetPort').value;
+        const preview = document.getElementById('portPreview');
+        const srcLabel = document.getElementById('portPreviewSource');
+        const tgtLabel = document.getElementById('portPreviewTarget');
+
+        if (srcPort || tgtPort) {
+            preview.classList.remove('hidden');
+            srcLabel.textContent = srcPort || '—';
+            tgtLabel.textContent = tgtPort || '—';
+        } else {
+            preview.classList.add('hidden');
+        }
     },
 
     updateAndAnimateEdges: () => {
