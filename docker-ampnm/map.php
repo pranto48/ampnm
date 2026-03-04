@@ -163,7 +163,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
     <!-- The old deviceModal HTML is removed as it's replaced by React components -->
 
     <div id="edgeModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
             <h2 class="text-xl font-semibold text-white mb-4"><i class="fas fa-project-diagram mr-2 text-cyan-400"></i>Edit Connection</h2>
             <form id="edgeForm">
                 <input type="hidden" id="edgeId">
@@ -188,8 +188,44 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         </div>
                     </div>
                 </div>
+
+                <!-- Port-to-Port Connection (Cisco Packet Tracer style) -->
+                <div class="border border-slate-600 rounded-lg p-4 mb-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-cyan-400 flex items-center gap-2">
+                        <i class="fas fa-ethernet"></i> Port-to-Port Mapping
+                    </h3>
+                    <p class="text-xs text-slate-500">Specify which physical ports are used on each device (like Cisco Packet Tracer).</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">
+                                <i class="fas fa-arrow-right mr-1 text-green-400"></i>Source Port
+                            </label>
+                            <div id="edgeSourceDeviceName" class="text-xs text-slate-500 mb-1 truncate"></div>
+                            <select id="edgeSourcePort" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">
+                                <i class="fas fa-arrow-left mr-1 text-blue-400"></i>Target Port
+                            </label>
+                            <div id="edgeTargetDeviceName" class="text-xs text-slate-500 mb-1 truncate"></div>
+                            <select id="edgeTargetPort" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="portPreview" class="hidden bg-slate-900/50 rounded-lg p-2 mt-2">
+                        <div class="flex items-center justify-center gap-2 text-sm">
+                            <span id="portPreviewSource" class="font-mono text-green-400"></span>
+                            <i class="fas fa-arrows-left-right text-cyan-400"></i>
+                            <span id="portPreviewTarget" class="font-mono text-blue-400"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-slate-900/50 p-3 rounded-lg mb-4">
-                    <p class="text-xs text-slate-400"><i class="fas fa-info-circle mr-1 text-cyan-400"></i><strong>Tip:</strong> Each connection type has a unique color on the map for easy identification.</p>
+                    <p class="text-xs text-slate-400"><i class="fas fa-info-circle mr-1 text-cyan-400"></i><strong>Tip:</strong> Each connection type has a unique color. Select ports to show which interface is used (e.g., G0/1 ↔ SFP01).</p>
                 </div>
                 <div class="flex justify-end gap-3 mt-6">
                     <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition">Cancel</button>
