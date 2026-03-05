@@ -15,7 +15,46 @@ MapApp.utils = {
             const sanitizedReason = reason.replace(/</g, "&lt;").replace(/>/g, "&gt;");
             title += `<br><small style="color: #fca5a5; font-family: monospace;">${sanitizedReason}</small>`;
         }
+
+        // Add port summary
+        const ports = MapApp.utils.getPortsForType(deviceData.type);
+        if (ports.length > 0) {
+            title += `<br><br><b>Ports (${ports.length})</b>:<br>`;
+            const portGroups = {};
+            ports.forEach(p => {
+                const type = p.replace(/[0-9/]/g, '').replace(/^(G|S|SFP|Mgmt).*/, '$1') || 'Port';
+                const key = p.startsWith('G') ? 'GE' : p.startsWith('S0') ? 'Serial' : p.startsWith('SFP') ? 'SFP' : p.startsWith('Mgmt') ? 'Mgmt' : 'Port';
+                if (!portGroups[key]) portGroups[key] = [];
+                portGroups[key].push(p);
+            });
+            for (const [type, list] of Object.entries(portGroups)) {
+                const color = type === 'GE' ? '#22d3ee' : type === 'SFP' ? '#a78bfa' : type === 'Serial' ? '#f59e0b' : '#f472b6';
+                title += `<span style="color:${color}">■</span> ${type}: ${list.length}x (${list[0]}–${list[list.length-1]})<br>`;
+            }
+        }
+
         return title;
+    },
+
+    getPortsForType: (deviceType) => {
+        const ports = [];
+        const dt = (deviceType || '').toLowerCase();
+        if (dt === 'switch' || dt === 'network_switch' || dt.includes('switch')) {
+            for (let i = 1; i <= 24; i++) ports.push('G0/' + i);
+            for (let i = 1; i <= 4; i++) ports.push('SFP0' + i);
+        } else if (dt === 'router' || dt.includes('router')) {
+            for (let i = 0; i <= 3; i++) ports.push('G0/' + i);
+            for (let i = 0; i <= 1; i++) ports.push('S0/' + i);
+            ports.push('SFP01');
+        } else if (dt === 'firewall' || dt.includes('firewall') || dt.includes('security')) {
+            for (let i = 0; i <= 7; i++) ports.push('G0/' + i);
+            for (let i = 0; i <= 1; i++) ports.push('Mgmt0/' + i);
+        } else if (dt === 'server' || dt.includes('server')) {
+            for (let i = 0; i <= 3; i++) ports.push('G0/' + i);
+        } else {
+            for (let i = 0; i <= 1; i++) ports.push('G0/' + i);
+        }
+        return ports;
     },
 
     buildPublicMapUrl: (mapId) => {

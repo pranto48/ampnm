@@ -28,7 +28,13 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         <div id="map-container" class="hidden">
             <div id="map-controls" class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 mb-6">
                 <div class="flex items-center justify-between">
-                    <h2 id="currentMapName" class="text-xl font-semibold text-white"></h2>
+                    <div class="flex items-center gap-3">
+                        <h2 id="currentMapName" class="text-xl font-semibold text-white"></h2>
+                        <span id="offlineDelayBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300 border border-slate-600" title="Offline detection delay">
+                            <i class="fas fa-clock text-amber-400"></i>
+                            <span id="offlineDelayValue">5</span>s delay
+                        </span>
+                    </div>
                     <div class="flex items-center gap-2">
                         <button id="scanNetworkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Scan Network" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-search"></i></button>
                         <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses"><i class="fas fa-sync-alt"></i></button>
