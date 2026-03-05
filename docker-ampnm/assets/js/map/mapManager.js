@@ -275,7 +275,11 @@ MapApp.mapManager = {
             // Update public view link display
             MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
             // Apply offline delay setting
-            MapApp.config.offlineDelayMs = (currentMap.offline_delay_seconds || 5) * 1000;
+            const delaySeconds = currentMap.offline_delay_seconds || 5;
+            MapApp.config.offlineDelayMs = delaySeconds * 1000;
+            // Update offline delay badge in toolbar
+            const delayBadge = document.getElementById('offlineDelayValue');
+            if (delayBadge) delayBadge.textContent = delaySeconds;
         }
         
         // Correctly extract the 'devices' array from the API response

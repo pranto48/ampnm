@@ -114,6 +114,8 @@ try {
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',
         // Floor plan viewing
         'get_floor_plans', 'get_racks', 'get_panels', 'get_switch_ports', 'get_cables', 'get_devices',
+        // Port usage
+        'get_device_used_ports',
     ];
 
     // Define specific POST actions that 'viewer' role can perform
@@ -149,7 +151,7 @@ try {
     // Group actions by handler
     $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
     $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip']; // ping_all_devices removed
-    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'import_map', 'update_map', 'upload_map_background'];
+    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports'];
     $dashboardActions = ['get_dashboard_data'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs'];
