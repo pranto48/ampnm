@@ -167,6 +167,28 @@ include 'header.php';
                     <div id="iconPickerContainer" class="icon-picker-container"></div>
                 </div>
 
+                <!-- Network Ports Visualization -->
+                <fieldset class="border border-slate-600 rounded-lg p-4">
+                    <legend class="text-sm font-medium text-slate-400 px-2"><i class="fas fa-ethernet mr-1"></i> Network Ports</legend>
+                    <div id="devicePortPanel">
+                        <div class="grid grid-cols-3 gap-3 mb-4" id="portSummaryCards">
+                            <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-cyan-400" id="totalPortCount">0</div>
+                                <div class="text-xs text-slate-400">Total Ports</div>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-green-400" id="freePortCount">0</div>
+                                <div class="text-xs text-slate-400">Free Ports</div>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-center">
+                                <div class="text-2xl font-bold text-amber-400" id="usedPortCount">0</div>
+                                <div class="text-xs text-slate-400">Used Ports</div>
+                            </div>
+                        </div>
+                        <div id="portGridContainer" class="flex flex-wrap gap-1.5"></div>
+                    </div>
+                </fieldset>
+
                 <div>
                     <label for="map_id" class="block text-sm font-medium text-slate-400 mb-1">Map Assignment (Optional)</label>
                     <select id="map_id" name="map_id" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
@@ -267,5 +289,78 @@ include 'header.php';
 
 <!-- Load enhanced icon picker -->
 <script src="assets/icon-picker.js"></script>
+
+<!-- Port Grid Visualization -->
+<script>
+(function() {
+    const portConfigs = {
+        switch:   { ports: [
+            ...Array.from({length:24}, (_,i) => ({name:'G0/'+(i+1), type:'GE'})),
+            ...Array.from({length:4},  (_,i) => ({name:'SFP0'+(i+1), type:'SFP'}))
+        ]},
+        router:   { ports: [
+            ...Array.from({length:4}, (_,i) => ({name:'G0/'+i, type:'GE'})),
+            ...Array.from({length:2}, (_,i) => ({name:'S0/'+i, type:'Serial'})),
+            {name:'SFP01', type:'SFP'}
+        ]},
+        firewall: { ports: [
+            ...Array.from({length:8}, (_,i) => ({name:'G0/'+i, type:'GE'})),
+            ...Array.from({length:2}, (_,i) => ({name:'Mgmt0/'+i, type:'Mgmt'}))
+        ]},
+        server:   { ports: Array.from({length:4}, (_,i) => ({name:'G0/'+i, type:'GE'})) }
+    };
+    const defaultPorts = Array.from({length:2}, (_,i) => ({name:'G0/'+i, type:'GE'}));
+
+    const typeColors = {GE:'#22d3ee', SFP:'#a78bfa', Serial:'#f59e0b', Mgmt:'#f472b6'};
+
+    function renderPortGrid(deviceType) {
+        const cfg = portConfigs[deviceType] || {ports: defaultPorts};
+        const ports = cfg.ports;
+        const total = ports.length;
+        const used = 0; // New device = 0 used
+        const free = total - used;
+
+        document.getElementById('totalPortCount').textContent = total;
+        document.getElementById('freePortCount').textContent = free;
+        document.getElementById('usedPortCount').textContent = used;
+
+        const container = document.getElementById('portGridContainer');
+        container.innerHTML = '';
+
+        ports.forEach(function(p) {
+            const color = typeColors[p.type] || '#94a3b8';
+            const el = document.createElement('div');
+            el.title = p.name + ' (' + p.type + ') — Free';
+            el.className = 'port-indicator';
+            el.style.cssText = 'width:36px;height:28px;border:2px solid '+color+';border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:default;background:rgba(0,0,0,0.3);transition:all .15s;position:relative;';
+            el.innerHTML = '<span style="font-size:8px;font-family:monospace;color:'+color+';font-weight:600;line-height:1;text-align:center;">'+p.name+'</span>'
+                + '<span style="position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 4px #22c55e;"></span>';
+            el.addEventListener('mouseenter', function(){ el.style.background='rgba(255,255,255,0.08)'; });
+            el.addEventListener('mouseleave', function(){ el.style.background='rgba(0,0,0,0.3)'; });
+            container.appendChild(el);
+        });
+
+        // Add legend
+        let legend = document.getElementById('portLegend');
+        if (!legend) {
+            legend = document.createElement('div');
+            legend.id = 'portLegend';
+            legend.style.cssText = 'margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;';
+            container.parentNode.appendChild(legend);
+        }
+        legend.innerHTML = Object.entries(typeColors).map(function(e) {
+            return '<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#94a3b8;">'
+                + '<span style="width:10px;height:10px;border-radius:2px;background:'+e[1]+';display:inline-block;"></span>'
+                + e[0] + '</span>';
+        }).join('');
+    }
+
+    const typeSelect = document.getElementById('type');
+    if (typeSelect) {
+        typeSelect.addEventListener('change', function(){ renderPortGrid(this.value); });
+        renderPortGrid(typeSelect.value);
+    }
+})();
+</script>
 
 <?php include 'footer.php'; ?>

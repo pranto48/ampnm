@@ -82,7 +82,7 @@ function initMap() {
                 state.edges.update({ id, connection_type, source_port_label, target_port_label, label: edgeLabel });
                 window.notyf.success('Connection updated.');
                 // Trigger color update
-                MapApp.ui.updateEdgeColorsAndDashes();
+                MapApp.ui.updateAndAnimateEdges();
             } catch (error) {
                 console.error("Failed to update connection:", error);
                 window.notyf.error(error.message || "An error occurred while updating connection.");
