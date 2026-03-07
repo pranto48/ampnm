@@ -63,59 +63,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $critical_latency_threshold = $_POST['critical_latency_threshold'] ?? null;
     $critical_packetloss_threshold = $_POST['critical_packetloss_threshold'] ?? null;
     $show_live_ping = isset($_POST['show_live_ping']) ? 1 : 0;
+    $port_config = trim($_POST['port_config'] ?? '');
 
-    // Basic validation
     if (empty($name)) {
         $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Device name is required.</div>';
     } else {
         try {
             $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
-
+            $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
             $schemaWarning = '';
 
             if ($hasSubchoice) {
-                $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, subchoice = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
+                $fields = "name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, subchoice = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?";
+                $values = [
+                    $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                    $monitor_method, $type, is_numeric($subchoice) ? (int)$subchoice : 0,
+                    empty($description) ? null : $description, empty($map_id) ? null : $map_id,
+                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                    empty($icon_url) ? null : $icon_url,
+                    empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                    empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                    empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                    empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                    $show_live_ping
+                ];
+                if ($hasPortConfig) {
+                    $fields .= ", port_config = ?";
+                    $values[] = empty($port_config) ? null : $port_config;
+                }
+                $fields .= ", updated_at = CURRENT_TIMESTAMP";
+                $values[] = $device_id;
+                $values[] = $current_user_id;
+                $sql = "UPDATE devices SET $fields WHERE id = ? AND user_id = ?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $name,
-                    empty($ip) ? null : $ip,
-                    empty($check_port) ? null : $check_port,
-                    $monitor_method,
-                    $type,
-                    is_numeric($subchoice) ? (int)$subchoice : 0,
-                    empty($description) ? null : $description,
-                    empty($map_id) ? null : $map_id,
-                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
-                    empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                    empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
-                    $show_live_ping, $device_id, $current_user_id
-                ]);
+                $stmt->execute($values);
             } else {
-                // Graceful fallback for older/fresh DB missing devices.subchoice
                 $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $name,
-                    empty($ip) ? null : $ip,
-                    empty($check_port) ? null : $check_port,
-                    $monitor_method,
-                    $type,
-                    empty($description) ? null : $description,
+                    $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                    $monitor_method, $type, empty($description) ? null : $description,
                     empty($map_id) ? null : $map_id,
-                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
-                    empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                    empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                    empty($icon_url) ? null : $icon_url,
+                    empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                    empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                    empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                    empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
                     $show_live_ping, $device_id, $current_user_id
                 ]);
-
                 $schemaWarning = '<div class="bg-amber-500/20 border border-amber-500/30 text-amber-200 text-sm rounded-lg p-3 text-center mb-3">'
-                    . '<strong>Database update needed:</strong> Your database is missing <code>devices.subchoice</code> (icon variant). Icon variant changes will not persist until you run:<br>'
-                    . '<code>ALTER TABLE devices ADD COLUMN subchoice TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER type;</code><br>'
-                    . 'Or run <code>docker-ampnm/FIX_SUBCHOICE_COMPLETE.sql</code>.'
+                    . '<strong>Database update needed:</strong> Run database setup to add missing columns.'
                     . '</div>';
             }
             $message = $schemaWarning . '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">Device "' . htmlspecialchars($name) . '" updated successfully!</div>';
-            // Re-fetch device data to show updated values in the form
             $stmt_device->execute([$device_id, $current_user_id]);
             $device = $stmt_device->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
