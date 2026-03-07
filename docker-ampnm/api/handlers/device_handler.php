@@ -430,6 +430,7 @@ switch ($action) {
                 d.warning_latency_threshold, d.warning_packetloss_threshold,
                 d.critical_latency_threshold, d.critical_packetloss_threshold,
                 d.last_avg_time, d.last_ttl, d.show_live_ping, d.status, d.last_seen,
+                d.port_config,
                 m.name as map_name,
                 p.output as last_ping_output
             FROM 
