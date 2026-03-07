@@ -167,9 +167,20 @@ include 'header.php';
                     <div id="iconPickerContainer" class="icon-picker-container"></div>
                 </div>
 
-                <!-- Network Ports Visualization -->
+                <!-- Network Ports Configuration -->
                 <fieldset class="border border-slate-600 rounded-lg p-4">
                     <legend class="text-sm font-medium text-slate-400 px-2"><i class="fas fa-ethernet mr-1"></i> Network Ports</legend>
+                    <input type="hidden" id="port_config" name="port_config" value="">
+
+                    <!-- Port Group Builder -->
+                    <div class="mb-4">
+                        <label class="block text-xs font-medium text-slate-400 mb-2">Port Groups</label>
+                        <div id="portGroupRows" class="space-y-2"></div>
+                        <button type="button" id="addPortGroupBtn" class="mt-2 px-3 py-1.5 bg-cyan-700 text-white text-xs rounded-lg hover:bg-cyan-600">
+                            <i class="fas fa-plus mr-1"></i>Add Port Group
+                        </button>
+                    </div>
+
                     <div id="devicePortPanel">
                         <div class="grid grid-cols-3 gap-3 mb-4" id="portSummaryCards">
                             <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-center">
