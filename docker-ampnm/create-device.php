@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $critical_latency_threshold = $_POST['critical_latency_threshold'] ?? null;
     $critical_packetloss_threshold = $_POST['critical_packetloss_threshold'] ?? null;
     $show_live_ping = isset($_POST['show_live_ping']) ? 1 : 0;
+    $port_config = trim($_POST['port_config'] ?? '');
 
     // Basic validation
     if (empty($name)) {
@@ -55,52 +56,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">License limit reached. You cannot add more than ' . $max_devices . ' devices.</div>';
             } else {
                 $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
+                $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
                 if ($hasSubchoice) {
-                    $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        $current_user_id,
-                        $name,
-                        empty($ip) ? null : $ip,
-                        empty($check_port) ? null : $check_port,
-                        $monitor_method,
-                        $type,
-                        is_numeric($subchoice) ? (int)$subchoice : 0,
-                        empty($description) ? null : $description,
-                        empty($map_id) ? null : $map_id,
-                        100, 100, // Default X, Y positions for new devices
-                        empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
-                        empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                        empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                    $cols = "user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping";
+                    $placeholders = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
+                    $values = [
+                        $current_user_id, $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                        $monitor_method, $type, is_numeric($subchoice) ? (int)$subchoice : 0,
+                        empty($description) ? null : $description, empty($map_id) ? null : $map_id,
+                        100, 100, empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                        empty($icon_url) ? null : $icon_url,
+                        empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                        empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                        empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                        empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
                         $show_live_ping
-                    ]);
+                    ];
+                    if ($hasPortConfig) {
+                        $cols .= ", port_config";
+                        $placeholders .= ", ?";
+                        $values[] = empty($port_config) ? null : $port_config;
+                    }
+                    $sql = "INSERT INTO devices ($cols) VALUES ($placeholders)";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute($values);
                 } else {
-                    // Graceful fallback for older/fresh DB missing devices.subchoice
                     $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute([
-                        $current_user_id,
-                        $name,
-                        empty($ip) ? null : $ip,
-                        empty($check_port) ? null : $check_port,
-                        $monitor_method,
-                        $type,
-                        empty($description) ? null : $description,
-                        empty($map_id) ? null : $map_id,
-                        100, 100,
-                        empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
-                        empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                        empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                        $current_user_id, $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                        $monitor_method, $type, empty($description) ? null : $description, empty($map_id) ? null : $map_id,
+                        100, 100, empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                        empty($icon_url) ? null : $icon_url,
+                        empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                        empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                        empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                        empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
                         $show_live_ping
                     ]);
                 }
-                // Redirect to map.php with the map_id
                 if ($map_id) {
                     header('Location: map.php?map_id=' . urlencode($map_id));
                 } else {
-                    header('Location: map.php'); // If no map_id, go to map page without specific map
+                    header('Location: map.php');
                 }
-                exit; // Important to exit after redirect
+                exit;
             }
         } catch (PDOException $e) {
             $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Error adding device: ' . htmlspecialchars($e->getMessage()) . '</div>';
