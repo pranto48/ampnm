@@ -16,24 +16,52 @@ MapApp.utils = {
             title += `<br><small style="color: #fca5a5; font-family: monospace;">${sanitizedReason}</small>`;
         }
 
-        // Add port summary
-        const ports = MapApp.utils.getPortsForType(deviceData.type);
+        // Get ports from port_config or fallback to type-based defaults
+        const ports = MapApp.utils.getPortsFromDevice(deviceData);
         if (ports.length > 0) {
             title += `<br><br><b>Ports (${ports.length})</b>:<br>`;
             const portGroups = {};
             ports.forEach(p => {
-                const type = p.replace(/[0-9/]/g, '').replace(/^(G|S|SFP|Mgmt).*/, '$1') || 'Port';
-                const key = p.startsWith('G') ? 'GE' : p.startsWith('S0') ? 'Serial' : p.startsWith('SFP') ? 'SFP' : p.startsWith('Mgmt') ? 'Mgmt' : 'Port';
+                const key = p.type || (p.name.startsWith('G') ? 'GE' : p.name.startsWith('S0') ? 'Serial' : p.name.startsWith('SFP') ? 'SFP' : p.name.startsWith('Mgmt') ? 'Mgmt' : 'Port');
                 if (!portGroups[key]) portGroups[key] = [];
-                portGroups[key].push(p);
+                portGroups[key].push(p.name);
             });
+            const colorMap = {GE:'#22d3ee', SFP:'#a78bfa', Serial:'#f59e0b', Mgmt:'#f472b6', Console:'#ec4899', Port:'#94a3b8'};
             for (const [type, list] of Object.entries(portGroups)) {
-                const color = type === 'GE' ? '#22d3ee' : type === 'SFP' ? '#a78bfa' : type === 'Serial' ? '#f59e0b' : '#f472b6';
+                const color = colorMap[type] || '#94a3b8';
                 title += `<span style="color:${color}">■</span> ${type}: ${list.length}x (${list[0]}–${list[list.length-1]})<br>`;
             }
         }
 
         return title;
+    },
+
+    /**
+     * Get structured port list from device's port_config or type-based defaults
+     * Returns array of {name, type} objects
+     */
+    getPortsFromDevice: (deviceData) => {
+        // Try custom port_config first
+        if (deviceData.port_config) {
+            try {
+                const groups = typeof deviceData.port_config === 'string' ? JSON.parse(deviceData.port_config) : deviceData.port_config;
+                if (Array.isArray(groups) && groups.length > 0) {
+                    const ports = [];
+                    groups.forEach(g => {
+                        for (let i = 0; i < (g.count || 0); i++) {
+                            ports.push({ name: (g.prefix || '') + ((g.start || 0) + i), type: g.type || 'Port' });
+                        }
+                    });
+                    return ports;
+                }
+            } catch (e) { /* fall through */ }
+        }
+        // Fallback: generate from type
+        const rawPorts = MapApp.utils.getPortsForType(deviceData.type);
+        return rawPorts.map(name => {
+            const type = name.startsWith('G') ? 'GE' : name.startsWith('S0') ? 'Serial' : name.startsWith('SFP') ? 'SFP' : name.startsWith('Mgmt') ? 'Mgmt' : 'Port';
+            return { name, type };
+        });
     },
 
     getPortsForType: (deviceType) => {

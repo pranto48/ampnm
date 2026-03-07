@@ -513,6 +513,11 @@ try {
         $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `target_port_label` VARCHAR(50) NULL AFTER `source_port_label`;");
         message("Upgraded 'device_edges' table: added 'target_port_label' column.");
     }
+    // NEW MIGRATION: Add port_config column for custom port type/count definitions per device
+    if (!columnExists($pdo, $dbname, 'devices', 'port_config')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `port_config` TEXT NULL AFTER `subchoice`;");
+        message("Migrated 'devices' table: added 'port_config' column for custom port layouts.");
+    }
 
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");

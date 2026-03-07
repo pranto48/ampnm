@@ -78,7 +78,6 @@ MapApp.ui = {
             window.notyf.error('You do not have permission to edit connections.');
             return;
         }
-        // Explicitly cast edgeId to a Number to ensure type consistency
         const edge = MapApp.state.edges.get(Number(edgeId));
         console.log('openEdgeModal called with edge ID:', edgeId);
         console.log('Retrieved edge object:', edge);
@@ -90,7 +89,6 @@ MapApp.ui = {
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || '';
 
-        // Populate port dropdowns with switch_ports data for source and target devices
         const sourceNode = MapApp.state.nodes.get(edge.from);
         const targetNode = MapApp.state.nodes.get(edge.to);
 
@@ -99,28 +97,89 @@ MapApp.ui = {
         srcNameEl.textContent = sourceNode ? sourceNode.deviceData.name : 'Source';
         tgtNameEl.textContent = targetNode ? targetNode.deviceData.name : 'Target';
 
-        // Build port options from switch_ports or generate defaults based on device type
-        MapApp.ui._populatePortSelect('edgeSourcePort', sourceNode, edge.source_port_label || '');
-        MapApp.ui._populatePortSelect('edgeTargetPort', targetNode, edge.target_port_label || '');
+        // Populate port dropdowns with used-port filtering
+        MapApp.ui._populatePortSelectAsync('edgeSourcePort', sourceNode, edge.source_port_label || '', edge.id);
+        MapApp.ui._populatePortSelectAsync('edgeTargetPort', targetNode, edge.target_port_label || '', edge.id);
 
-        // Update port preview
         MapApp.ui._updatePortPreview();
-
-        openModal('edgeModal'); // Call the shared openModal function
+        openModal('edgeModal');
     },
 
-    _populatePortSelect: (selectId, node, selectedValue) => {
+    /**
+     * Populate port select with ports from port_config and disable already-used ports.
+     * @param {string} selectId - DOM id of the <select>
+     * @param {object} node - vis.js node with deviceData
+     * @param {string} selectedValue - currently selected port label
+     * @param {number|string} currentEdgeId - the edge being edited (so its ports stay selectable)
+     */
+    _populatePortSelectAsync: (selectId, node, selectedValue, currentEdgeId) => {
         const sel = document.getElementById(selectId);
         sel.innerHTML = '<option value="">None</option>';
 
         if (!node || !node.deviceData) return;
 
-        // Check if device has switch_ports loaded
         const deviceId = node.deviceData.id;
         const deviceType = node.deviceData.type || 'server';
 
-        // Generate standard port options based on device type
-        const ports = MapApp.ui._generatePortOptions(deviceType);
+        // Generate ports from port_config (custom) or fallback to type defaults
+        const ports = MapApp.ui._getPortsFromConfig(node.deviceData);
+
+        // Fetch used ports for this device, excluding current edge
+        fetch(`api.php?action=get_device_used_ports&device_id=${encodeURIComponent(deviceId)}&exclude_edge_id=${encodeURIComponent(currentEdgeId || '')}`)
+            .then(r => r.json())
+            .then(data => {
+                const usedSet = new Set((data.ports || []).map(p => p.toLowerCase()));
+                ports.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    const isUsed = usedSet.has(p.toLowerCase());
+                    opt.textContent = isUsed ? p + ' (In Use)' : p;
+                    opt.disabled = isUsed;
+                    opt.style.color = isUsed ? '#f59e0b' : '';
+                    if (p === selectedValue) { opt.selected = true; opt.disabled = false; opt.textContent = p; }
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                // Fallback: just add all ports without used-port info
+                ports.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    opt.textContent = p;
+                    if (p === selectedValue) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            });
+    },
+
+    /**
+     * Get port list from device's port_config JSON or fall back to type-based defaults
+     */
+    _getPortsFromConfig: (deviceData) => {
+        // Try custom port_config first
+        if (deviceData.port_config) {
+            try {
+                const groups = typeof deviceData.port_config === 'string' ? JSON.parse(deviceData.port_config) : deviceData.port_config;
+                if (Array.isArray(groups) && groups.length > 0) {
+                    const ports = [];
+                    groups.forEach(g => {
+                        for (let i = 0; i < (g.count || 0); i++) {
+                            ports.push((g.prefix || '') + ((g.start || 0) + i));
+                        }
+                    });
+                    return ports;
+                }
+            } catch (e) { /* fall through */ }
+        }
+        // Fallback to hardcoded type-based defaults
+        return MapApp.ui._generatePortOptions(deviceData.type || 'server');
+    },
+
+    _populatePortSelect: (selectId, node, selectedValue) => {
+        const sel = document.getElementById(selectId);
+        sel.innerHTML = '<option value="">None</option>';
+        if (!node || !node.deviceData) return;
+        const ports = MapApp.ui._getPortsFromConfig(node.deviceData);
         ports.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p;

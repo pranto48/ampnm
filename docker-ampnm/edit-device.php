@@ -63,59 +63,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $critical_latency_threshold = $_POST['critical_latency_threshold'] ?? null;
     $critical_packetloss_threshold = $_POST['critical_packetloss_threshold'] ?? null;
     $show_live_ping = isset($_POST['show_live_ping']) ? 1 : 0;
+    $port_config = trim($_POST['port_config'] ?? '');
 
-    // Basic validation
     if (empty($name)) {
         $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Device name is required.</div>';
     } else {
         try {
             $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
-
+            $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
             $schemaWarning = '';
 
             if ($hasSubchoice) {
-                $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, subchoice = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
+                $fields = "name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, subchoice = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?";
+                $values = [
+                    $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                    $monitor_method, $type, is_numeric($subchoice) ? (int)$subchoice : 0,
+                    empty($description) ? null : $description, empty($map_id) ? null : $map_id,
+                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                    empty($icon_url) ? null : $icon_url,
+                    empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                    empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                    empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                    empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                    $show_live_ping
+                ];
+                if ($hasPortConfig) {
+                    $fields .= ", port_config = ?";
+                    $values[] = empty($port_config) ? null : $port_config;
+                }
+                $fields .= ", updated_at = CURRENT_TIMESTAMP";
+                $values[] = $device_id;
+                $values[] = $current_user_id;
+                $sql = "UPDATE devices SET $fields WHERE id = ? AND user_id = ?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $name,
-                    empty($ip) ? null : $ip,
-                    empty($check_port) ? null : $check_port,
-                    $monitor_method,
-                    $type,
-                    is_numeric($subchoice) ? (int)$subchoice : 0,
-                    empty($description) ? null : $description,
-                    empty($map_id) ? null : $map_id,
-                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
-                    empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                    empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
-                    $show_live_ping, $device_id, $current_user_id
-                ]);
+                $stmt->execute($values);
             } else {
-                // Graceful fallback for older/fresh DB missing devices.subchoice
                 $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $name,
-                    empty($ip) ? null : $ip,
-                    empty($check_port) ? null : $check_port,
-                    $monitor_method,
-                    $type,
-                    empty($description) ? null : $description,
+                    $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                    $monitor_method, $type, empty($description) ? null : $description,
                     empty($map_id) ? null : $map_id,
-                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
-                    empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                    empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                    empty($icon_url) ? null : $icon_url,
+                    empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                    empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                    empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                    empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
                     $show_live_ping, $device_id, $current_user_id
                 ]);
-
                 $schemaWarning = '<div class="bg-amber-500/20 border border-amber-500/30 text-amber-200 text-sm rounded-lg p-3 text-center mb-3">'
-                    . '<strong>Database update needed:</strong> Your database is missing <code>devices.subchoice</code> (icon variant). Icon variant changes will not persist until you run:<br>'
-                    . '<code>ALTER TABLE devices ADD COLUMN subchoice TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER type;</code><br>'
-                    . 'Or run <code>docker-ampnm/FIX_SUBCHOICE_COMPLETE.sql</code>.'
+                    . '<strong>Database update needed:</strong> Run database setup to add missing columns.'
                     . '</div>';
             }
             $message = $schemaWarning . '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">Device "' . htmlspecialchars($name) . '" updated successfully!</div>';
-            // Re-fetch device data to show updated values in the form
             $stmt_device->execute([$device_id, $current_user_id]);
             $device = $stmt_device->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -191,9 +192,20 @@ $form_data = $device ?? [];
                     <div id="iconPickerContainer" class="icon-picker-container"></div>
                 </div>
 
-                <!-- Network Ports Visualization -->
+                <!-- Network Ports Configuration -->
                 <fieldset class="border border-slate-600 rounded-lg p-4">
                     <legend class="text-sm font-medium text-slate-400 px-2"><i class="fas fa-ethernet mr-1"></i> Network Ports</legend>
+                    <input type="hidden" id="port_config" name="port_config" value="<?= htmlspecialchars($form_data['port_config'] ?? '') ?>">
+
+                    <!-- Port Group Builder -->
+                    <div class="mb-4">
+                        <label class="block text-xs font-medium text-slate-400 mb-2">Port Groups</label>
+                        <div id="portGroupRows" class="space-y-2"></div>
+                        <button type="button" id="addPortGroupBtn" class="mt-2 px-3 py-1.5 bg-cyan-700 text-white text-xs rounded-lg hover:bg-cyan-600">
+                            <i class="fas fa-plus mr-1"></i>Add Port Group
+                        </button>
+                    </div>
+
                     <div id="devicePortPanel">
                         <div class="grid grid-cols-3 gap-3 mb-4" id="portSummaryCards">
                             <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-center">
@@ -315,44 +327,86 @@ $form_data = $device ?? [];
 <!-- Load enhanced icon picker -->
 <script src="assets/icon-picker.js"></script>
 
-<!-- Port Grid Visualization with Used Port Detection -->
+<!-- Port Group Builder + Grid Visualization with Used Port Detection -->
 <script>
 (function() {
     const deviceId = <?= json_encode($device_id) ?>;
-    const portConfigs = {
-        switch:   { ports: [
-            ...Array.from({length:24}, (_,i) => ({name:'G0/'+(i+1), type:'GE'})),
-            ...Array.from({length:4},  (_,i) => ({name:'SFP0'+(i+1), type:'SFP'}))
-        ]},
-        router:   { ports: [
-            ...Array.from({length:4}, (_,i) => ({name:'G0/'+i, type:'GE'})),
-            ...Array.from({length:2}, (_,i) => ({name:'S0/'+i, type:'Serial'})),
-            {name:'SFP01', type:'SFP'}
-        ]},
-        firewall: { ports: [
-            ...Array.from({length:8}, (_,i) => ({name:'G0/'+i, type:'GE'})),
-            ...Array.from({length:2}, (_,i) => ({name:'Mgmt0/'+i, type:'Mgmt'}))
-        ]},
-        server:   { ports: Array.from({length:4}, (_,i) => ({name:'G0/'+i, type:'GE'})) }
-    };
-    const defaultPorts = Array.from({length:2}, (_,i) => ({name:'G0/'+i, type:'GE'}));
-    const typeColors = {GE:'#22d3ee', SFP:'#a78bfa', Serial:'#f59e0b', Mgmt:'#f472b6'};
+    const savedPortConfig = <?= json_encode($form_data['port_config'] ?? '') ?>;
+    const deviceType = <?= json_encode($form_data['type'] ?? 'server') ?>;
 
-    // Fetch used ports for this device from edge connections
+    const defaultGroupsByType = {
+        switch:   [{ type:'GE', prefix:'G0/', start:1, count:24 }, { type:'SFP', prefix:'SFP', start:1, count:4 }],
+        network_switch: [{ type:'GE', prefix:'G0/', start:1, count:24 }, { type:'SFP', prefix:'SFP', start:1, count:4 }],
+        router:   [{ type:'GE', prefix:'G0/', start:0, count:4 }, { type:'Serial', prefix:'S0/', start:0, count:2 }, { type:'SFP', prefix:'SFP', start:1, count:1 }],
+        firewall: [{ type:'GE', prefix:'G0/', start:0, count:8 }, { type:'Mgmt', prefix:'Mgmt0/', start:0, count:2 }],
+        server:   [{ type:'GE', prefix:'G0/', start:0, count:4 }]
+    };
+    const typeColors = {GE:'#22d3ee', SFP:'#a78bfa', Serial:'#f59e0b', Mgmt:'#f472b6', Console:'#ec4899'};
+    const portTypes = ['GE','SFP','Serial','Mgmt','Console'];
+    const defaultPrefixes = {GE:'G0/', SFP:'SFP', Serial:'S0/', Mgmt:'Mgmt0/', Console:'Con'};
+
     let usedPorts = new Set();
     function fetchUsedPorts(cb) {
         fetch('api.php?action=get_device_used_ports&device_id=' + encodeURIComponent(deviceId))
             .then(r => r.json())
-            .then(data => {
-                usedPorts = new Set((data.ports || []).map(p => p.toLowerCase()));
-                cb();
-            })
+            .then(data => { usedPorts = new Set((data.ports || []).map(p => p.toLowerCase())); cb(); })
             .catch(() => cb());
     }
 
-    function renderPortGrid(deviceType) {
-        const cfg = portConfigs[deviceType] || {ports: defaultPorts};
-        const ports = cfg.ports;
+    function createPortGroupRow(group) {
+        const row = document.createElement('div');
+        row.className = 'port-group-row flex items-center gap-2';
+        row.innerHTML = `
+            <select class="pg-type bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-24">
+                ${portTypes.map(t => `<option value="${t}" ${t===group.type?'selected':''}>${t}</option>`).join('')}
+            </select>
+            <input type="text" class="pg-prefix bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-20" value="${group.prefix}" placeholder="Prefix">
+            <input type="number" class="pg-start bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-16" value="${group.start}" min="0" placeholder="Start">
+            <input type="number" class="pg-count bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-16" value="${group.count}" min="1" placeholder="Count">
+            <button type="button" class="pg-remove text-red-400 hover:text-red-300 text-xs px-1" title="Remove"><i class="fas fa-times"></i></button>
+        `;
+        row.querySelector('.pg-type').addEventListener('change', function() {
+            row.querySelector('.pg-prefix').value = defaultPrefixes[this.value] || '';
+            syncPortConfig();
+        });
+        row.querySelector('.pg-remove').addEventListener('click', function() { row.remove(); syncPortConfig(); });
+        ['pg-prefix','pg-start','pg-count'].forEach(cls => {
+            row.querySelector('.'+cls).addEventListener('input', syncPortConfig);
+        });
+        return row;
+    }
+
+    function getPortGroups() {
+        const groups = [];
+        document.querySelectorAll('.port-group-row').forEach(row => {
+            groups.push({
+                type: row.querySelector('.pg-type').value,
+                prefix: row.querySelector('.pg-prefix').value,
+                start: parseInt(row.querySelector('.pg-start').value) || 0,
+                count: parseInt(row.querySelector('.pg-count').value) || 0
+            });
+        });
+        return groups;
+    }
+
+    function expandGroups(groups) {
+        const ports = [];
+        groups.forEach(g => {
+            for (let i = 0; i < g.count; i++) {
+                ports.push({ name: g.prefix + (g.start + i), type: g.type });
+            }
+        });
+        return ports;
+    }
+
+    function syncPortConfig() {
+        const groups = getPortGroups();
+        document.getElementById('port_config').value = JSON.stringify(groups);
+        renderPortGrid(groups);
+    }
+
+    function renderPortGrid(groups) {
+        const ports = expandGroups(groups);
         const total = ports.length;
         const used = ports.filter(p => usedPorts.has(p.name.toLowerCase())).length;
         const free = total - used;
@@ -363,7 +417,6 @@ $form_data = $device ?? [];
 
         const container = document.getElementById('portGridContainer');
         container.innerHTML = '';
-
         ports.forEach(function(p) {
             const color = typeColors[p.type] || '#94a3b8';
             const isUsed = usedPorts.has(p.name.toLowerCase());
@@ -372,33 +425,47 @@ $form_data = $device ?? [];
             el.style.cssText = 'width:36px;height:28px;border:2px solid '+(isUsed?'#f59e0b':color)+';border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:default;background:'+(isUsed?'rgba(245,158,11,0.15)':'rgba(0,0,0,0.3)')+';transition:all .15s;position:relative;';
             el.innerHTML = '<span style="font-size:8px;font-family:monospace;color:'+(isUsed?'#fbbf24':color)+';font-weight:600;line-height:1;text-align:center;">'+p.name+'</span>'
                 + '<span style="position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:'+(isUsed?'#f59e0b':'#22c55e')+';box-shadow:0 0 4px '+(isUsed?'#f59e0b':'#22c55e')+';"></span>';
-            el.addEventListener('mouseenter', function(){ el.style.background=isUsed?'rgba(245,158,11,0.25)':'rgba(255,255,255,0.08)'; });
-            el.addEventListener('mouseleave', function(){ el.style.background=isUsed?'rgba(245,158,11,0.15)':'rgba(0,0,0,0.3)'; });
             container.appendChild(el);
         });
 
         let legend = document.getElementById('portLegend');
-        if (!legend) {
-            legend = document.createElement('div');
-            legend.id = 'portLegend';
-            legend.style.cssText = 'margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;';
-            container.parentNode.appendChild(legend);
-        }
-        const items = Object.entries(typeColors).map(function(e) {
-            return '<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#94a3b8;">'
-                + '<span style="width:10px;height:10px;border-radius:2px;background:'+e[1]+';display:inline-block;"></span>'
-                + e[0] + '</span>';
-        });
+        if (!legend) { legend = document.createElement('div'); legend.id = 'portLegend'; legend.style.cssText = 'margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;'; container.parentNode.appendChild(legend); }
+        const items = Object.entries(typeColors).map(e => '<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#94a3b8;"><span style="width:10px;height:10px;border-radius:2px;background:'+e[1]+';display:inline-block;"></span>'+e[0]+'</span>');
         items.push('<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#94a3b8;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block;"></span>In Use</span>');
         items.push('<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#94a3b8;"><span style="width:10px;height:10px;border-radius:2px;background:#22c55e;display:inline-block;"></span>Free</span>');
         legend.innerHTML = items.join('');
     }
 
+    function loadGroups(groups) {
+        const container = document.getElementById('portGroupRows');
+        container.innerHTML = '';
+        groups.forEach(g => container.appendChild(createPortGroupRow(g)));
+        syncPortConfig();
+    }
+
+    document.getElementById('addPortGroupBtn').addEventListener('click', function() {
+        document.getElementById('portGroupRows').appendChild(createPortGroupRow({ type:'GE', prefix:'G0/', start:0, count:1 }));
+        syncPortConfig();
+    });
+
+    // Initialize: parse saved port_config or fall back to type defaults
+    let initialGroups;
+    try {
+        initialGroups = savedPortConfig ? JSON.parse(savedPortConfig) : null;
+    } catch(e) { initialGroups = null; }
+    if (!initialGroups || !Array.isArray(initialGroups) || initialGroups.length === 0) {
+        initialGroups = defaultGroupsByType[deviceType] || [{ type:'GE', prefix:'G0/', start:0, count:2 }];
+    }
+
     const typeSelect = document.getElementById('type');
     if (typeSelect) {
-        typeSelect.addEventListener('change', function(){ renderPortGrid(this.value); });
-        fetchUsedPorts(function(){ renderPortGrid(typeSelect.value); });
+        typeSelect.addEventListener('change', function() {
+            const dg = defaultGroupsByType[this.value] || [{ type:'GE', prefix:'G0/', start:0, count:2 }];
+            loadGroups(dg);
+        });
     }
+
+    fetchUsedPorts(function() { loadGroups(initialGroups); });
 })();
 </script>
 

@@ -271,21 +271,26 @@ switch ($action) {
 
     case 'get_device_used_ports':
         $device_id = $_GET['device_id'] ?? null;
+        $exclude_edge_id = $_GET['exclude_edge_id'] ?? null;
         if (!$device_id) { http_response_code(400); echo json_encode(['error' => 'device_id is required']); exit; }
 
-        // Check if source_port_label/target_port_label columns exist
         try {
-            $stmt = $pdo->prepare("SELECT source_port_label, target_port_label FROM device_edges WHERE source_id = ? OR target_id = ?");
+            $stmt = $pdo->prepare("SELECT id, source_id, target_id, source_port_label, target_port_label FROM device_edges WHERE source_id = ? OR target_id = ?");
             $stmt->execute([$device_id, $device_id]);
             $edges = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $ports = [];
             foreach ($edges as $e) {
-                if (!empty($e['source_port_label'])) $ports[] = $e['source_port_label'];
-                if (!empty($e['target_port_label'])) $ports[] = $e['target_port_label'];
+                // Skip the edge being currently edited so its port remains selectable
+                if ($exclude_edge_id && $e['id'] == $exclude_edge_id) continue;
+                if ($e['source_id'] == $device_id && !empty($e['source_port_label'])) {
+                    $ports[] = $e['source_port_label'];
+                }
+                if ($e['target_id'] == $device_id && !empty($e['target_port_label'])) {
+                    $ports[] = $e['target_port_label'];
+                }
             }
             echo json_encode(['ports' => array_values(array_unique($ports))]);
         } catch (PDOException $ex) {
-            // Columns may not exist yet
             echo json_encode(['ports' => []]);
         }
         break;
