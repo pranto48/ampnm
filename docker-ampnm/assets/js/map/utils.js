@@ -23,13 +23,16 @@ MapApp.utils = {
             const portGroups = {};
             ports.forEach(p => {
                 const key = p.type || (p.name.startsWith('G') ? 'GE' : p.name.startsWith('S0') ? 'Serial' : p.name.startsWith('SFP') ? 'SFP' : p.name.startsWith('Mgmt') ? 'Mgmt' : 'Port');
-                if (!portGroups[key]) portGroups[key] = [];
-                portGroups[key].push(p.name);
+                if (!portGroups[key]) { portGroups[key] = { names: [], vlan: p.vlan || '' }; }
+                portGroups[key].names.push(p.name);
+                if (p.vlan) portGroups[key].vlan = p.vlan;
             });
             const colorMap = {GE:'#22d3ee', SFP:'#a78bfa', Serial:'#f59e0b', Mgmt:'#f472b6', Console:'#ec4899', Port:'#94a3b8'};
-            for (const [type, list] of Object.entries(portGroups)) {
+            for (const [type, group] of Object.entries(portGroups)) {
                 const color = colorMap[type] || '#94a3b8';
-                title += `<span style="color:${color}">■</span> ${type}: ${list.length}x (${list[0]}–${list[list.length-1]})<br>`;
+                let line = `<span style="color:${color}">■</span> ${type}: ${group.names.length}x (${group.names[0]}–${group.names[group.names.length-1]})`;
+                if (group.vlan) line += ` <span style="color:#fbbf24;font-size:10px;">[VLAN ${group.vlan}]</span>`;
+                title += line + '<br>';
             }
         }
 
@@ -49,7 +52,7 @@ MapApp.utils = {
                     const ports = [];
                     groups.forEach(g => {
                         for (let i = 0; i < (g.count || 0); i++) {
-                            ports.push({ name: (g.prefix || '') + ((g.start || 0) + i), type: g.type || 'Port' });
+                            ports.push({ name: (g.prefix || '') + ((g.start || 0) + i), type: g.type || 'Port', vlan: g.vlan || '' });
                         }
                     });
                     return ports;
@@ -60,7 +63,7 @@ MapApp.utils = {
         const rawPorts = MapApp.utils.getPortsForType(deviceData.type);
         return rawPorts.map(name => {
             const type = name.startsWith('G') ? 'GE' : name.startsWith('S0') ? 'Serial' : name.startsWith('SFP') ? 'SFP' : name.startsWith('Mgmt') ? 'Mgmt' : 'Port';
-            return { name, type };
+            return { name, type, vlan: '' };
         });
     },
 

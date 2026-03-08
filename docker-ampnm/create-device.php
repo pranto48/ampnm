@@ -325,6 +325,7 @@ include 'header.php';
             <input type="text" class="pg-prefix bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-20" value="${group.prefix}" placeholder="Prefix">
             <input type="number" class="pg-start bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-16" value="${group.start}" min="0" placeholder="Start">
             <input type="number" class="pg-count bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-16" value="${group.count}" min="1" placeholder="Count">
+            <input type="text" class="pg-vlan bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-20" value="${group.vlan || ''}" placeholder="VLAN">
             <button type="button" class="pg-remove text-red-400 hover:text-red-300 text-xs px-1" title="Remove"><i class="fas fa-times"></i></button>
         `;
         row.querySelector('.pg-type').addEventListener('change', function() {
@@ -332,7 +333,7 @@ include 'header.php';
             syncPortConfig();
         });
         row.querySelector('.pg-remove').addEventListener('click', function() { row.remove(); syncPortConfig(); });
-        ['pg-prefix','pg-start','pg-count'].forEach(cls => {
+        ['pg-prefix','pg-start','pg-count','pg-vlan'].forEach(cls => {
             row.querySelector('.'+cls).addEventListener('input', syncPortConfig);
         });
         return row;
@@ -345,7 +346,8 @@ include 'header.php';
                 type: row.querySelector('.pg-type').value,
                 prefix: row.querySelector('.pg-prefix').value,
                 start: parseInt(row.querySelector('.pg-start').value) || 0,
-                count: parseInt(row.querySelector('.pg-count').value) || 0
+                count: parseInt(row.querySelector('.pg-count').value) || 0,
+                vlan: row.querySelector('.pg-vlan').value.trim()
             });
         });
         return groups;
@@ -355,7 +357,7 @@ include 'header.php';
         const ports = [];
         groups.forEach(g => {
             for (let i = 0; i < g.count; i++) {
-                ports.push({ name: g.prefix + (g.start + i), type: g.type });
+                ports.push({ name: g.prefix + (g.start + i), type: g.type, vlan: g.vlan || '' });
             }
         });
         return ports;
@@ -379,10 +381,13 @@ include 'header.php';
         ports.forEach(function(p) {
             const color = typeColors[p.type] || '#94a3b8';
             const el = document.createElement('div');
-            el.title = p.name + ' (' + p.type + ') — Free';
+            let tooltip = p.name + ' (' + p.type + ') — Free';
+            if (p.vlan) tooltip += ' | VLAN ' + p.vlan;
+            el.title = tooltip;
             el.style.cssText = 'width:36px;height:28px;border:2px solid '+color+';border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:default;background:rgba(0,0,0,0.3);transition:all .15s;position:relative;';
             el.innerHTML = '<span style="font-size:8px;font-family:monospace;color:'+color+';font-weight:600;line-height:1;text-align:center;">'+p.name+'</span>'
-                + '<span style="position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 4px #22c55e;"></span>';
+                + '<span style="position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 4px #22c55e;"></span>'
+                + (p.vlan ? '<span style="position:absolute;bottom:1px;left:1px;font-size:6px;color:#fbbf24;font-weight:700;">V'+p.vlan+'</span>' : '');
             container.appendChild(el);
         });
 

@@ -9,14 +9,14 @@ MapApp.config = {
         camera: '\uf030', other: '\uf108', firewall: '\uf3ed', ipphone: '\uf87d',
         punchdevice: '\uf2c2', 'wifi-router': '\uf1eb', 'radio-tower': '\uf519',
         rack: '\uf1b3', laptop: '\uf109', tablet: '\uf3fa', mobile: '\uf3cd',
-        cloud: '\uf0c2', database: '\uf1c0', box: '\uf49e'
+        cloud: '\uf0c2', database: '\uf1c0', box: '\uf0fe'
     },
     statusColorMap: {
         online: '#22c55e', warning: '#f59e0b', critical: '#ef4444',
         offline: '#64748b', unknown: '#94a3b8'
     },
     edgeColorMap: {
-        cat5: '#a78bfa',              // Purple - CAT5 Cable
+        cat6: '#a78bfa',              // Purple - CAT6 Cable
         fiber: '#f97316',             // Orange - Fiber Optic
         wifi: '#38bdf8',              // Light Blue - WiFi
         radio: '#84cc16',             // Lime Green - Radio
@@ -24,7 +24,7 @@ MapApp.config = {
         'logical-tunneling': '#c084fc' // Light Purple - Logical Tunneling
     },
     edgeLabelMap: {
-        cat5: '🔌 CAT5',
+        cat6: '🔌 CAT6',
         fiber: '💡 Fiber',
         wifi: '📡 WiFi',
         radio: '📻 Radio',

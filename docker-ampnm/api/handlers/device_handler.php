@@ -683,7 +683,7 @@ switch ($action) {
                 $suffix++;
             }
 
-            $insertSql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $insertSql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, port_config, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $insertStmt = $pdo->prepare($insertSql);
             $insertStmt->execute([
                 $current_user_id,
@@ -692,6 +692,8 @@ switch ($action) {
                 $device['check_port'],
                 $device['monitor_method'] ?? 'ping',
                 $device['type'],
+                $device['subchoice'] ?? 0,
+                $device['port_config'] ?? null,
                 $device['description'],
                 $device['map_id'],
                 $device['x'],
@@ -858,7 +860,7 @@ switch ($action) {
                             $new_source_id,
                             $new_target_id,
                             $map_id, // Assign to the current map_id
-                            $edge['connection_type'] ?? 'cat5'
+                            $edge['connection_type'] ?? 'cat6'
                         ]);
                     }
                 }

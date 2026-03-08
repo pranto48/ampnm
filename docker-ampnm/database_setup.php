@@ -173,7 +173,7 @@ try {
             `source_id` INT(6) UNSIGNED NOT NULL,
             `target_id` INT(6) UNSIGNED NOT NULL,
             `map_id` INT(6) UNSIGNED NOT NULL,
-            `connection_type` VARCHAR(50) DEFAULT 'cat5',
+            `connection_type` VARCHAR(50) DEFAULT 'cat6',
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`source_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
@@ -518,6 +518,9 @@ try {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `port_config` TEXT NULL AFTER `subchoice`;");
         message("Migrated 'devices' table: added 'port_config' column for custom port layouts.");
     }
+    // MIGRATION: Rename cat5 to cat6 in device_edges
+    $pdo->exec("UPDATE `device_edges` SET `connection_type` = 'cat6' WHERE `connection_type` = 'cat5'");
+    message("Migrated 'device_edges': renamed 'cat5' connections to 'cat6'.");
 
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");

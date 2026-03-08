@@ -40,6 +40,7 @@ MapApp.ui = {
             resetMapBgBtn: document.getElementById('resetMapBgBtn'),
             mapBgUpload: document.getElementById('mapBgUpload'),
             placeDeviceBtn: document.getElementById('placeDeviceBtn'),
+            addGroupBoxBtn: document.getElementById('addGroupBoxBtn'),
             placeDeviceModal: document.getElementById('placeDeviceModal'),
             closePlaceDeviceModal: document.getElementById('closePlaceDeviceModal'),
             placeDeviceList: document.getElementById('placeDeviceList'),
@@ -122,31 +123,33 @@ MapApp.ui = {
         const deviceType = node.deviceData.type || 'server';
 
         // Generate ports from port_config (custom) or fallback to type defaults
-        const ports = MapApp.ui._getPortsFromConfig(node.deviceData);
+        const portObjects = MapApp.ui._getPortObjectsFromConfig(node.deviceData);
 
         // Fetch used ports for this device, excluding current edge
         fetch(`api.php?action=get_device_used_ports&device_id=${encodeURIComponent(deviceId)}&exclude_edge_id=${encodeURIComponent(currentEdgeId || '')}`)
             .then(r => r.json())
             .then(data => {
                 const usedSet = new Set((data.ports || []).map(p => p.toLowerCase()));
-                ports.forEach(p => {
+                portObjects.forEach(po => {
                     const opt = document.createElement('option');
-                    opt.value = p;
-                    const isUsed = usedSet.has(p.toLowerCase());
-                    opt.textContent = isUsed ? p + ' (In Use)' : p;
+                    opt.value = po.name;
+                    const isUsed = usedSet.has(po.name.toLowerCase());
+                    let label = po.name;
+                    if (po.vlan) label += ` [VLAN ${po.vlan}]`;
+                    if (isUsed) label += ' (In Use)';
+                    opt.textContent = label;
                     opt.disabled = isUsed;
                     opt.style.color = isUsed ? '#f59e0b' : '';
-                    if (p === selectedValue) { opt.selected = true; opt.disabled = false; opt.textContent = p; }
+                    if (po.name === selectedValue) { opt.selected = true; opt.disabled = false; opt.textContent = po.name + (po.vlan ? ` [VLAN ${po.vlan}]` : ''); }
                     sel.appendChild(opt);
                 });
             })
             .catch(() => {
-                // Fallback: just add all ports without used-port info
-                ports.forEach(p => {
+                portObjects.forEach(po => {
                     const opt = document.createElement('option');
-                    opt.value = p;
-                    opt.textContent = p;
-                    if (p === selectedValue) opt.selected = true;
+                    opt.value = po.name;
+                    opt.textContent = po.name + (po.vlan ? ` [VLAN ${po.vlan}]` : '');
+                    if (po.name === selectedValue) opt.selected = true;
                     sel.appendChild(opt);
                 });
             });
@@ -156,7 +159,13 @@ MapApp.ui = {
      * Get port list from device's port_config JSON or fall back to type-based defaults
      */
     _getPortsFromConfig: (deviceData) => {
-        // Try custom port_config first
+        return MapApp.ui._getPortObjectsFromConfig(deviceData).map(po => po.name);
+    },
+
+    /**
+     * Get port objects (with VLAN info) from device's port_config JSON or type defaults
+     */
+    _getPortObjectsFromConfig: (deviceData) => {
         if (deviceData.port_config) {
             try {
                 const groups = typeof deviceData.port_config === 'string' ? JSON.parse(deviceData.port_config) : deviceData.port_config;
@@ -164,15 +173,14 @@ MapApp.ui = {
                     const ports = [];
                     groups.forEach(g => {
                         for (let i = 0; i < (g.count || 0); i++) {
-                            ports.push((g.prefix || '') + ((g.start || 0) + i));
+                            ports.push({ name: (g.prefix || '') + ((g.start || 0) + i), vlan: g.vlan || '' });
                         }
                     });
                     return ports;
                 }
             } catch (e) { /* fall through */ }
         }
-        // Fallback to hardcoded type-based defaults
-        return MapApp.ui._generatePortOptions(deviceData.type || 'server');
+        return MapApp.ui._generatePortOptions(deviceData.type || 'server').map(p => ({ name: p, vlan: '' }));
     },
 
     _populatePortSelect: (selectId, node, selectedValue) => {
@@ -238,7 +246,7 @@ MapApp.ui = {
                 const targetStatus = deviceStatusMap.get(edge.to);
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 const isActive = sourceStatus === 'online' && targetStatus === 'online';
-                const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat5);
+                const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
                 let dashes = false;
                 if (isActive) { dashes = animatedDashes; } 
                 else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') { dashes = [5, 5]; }

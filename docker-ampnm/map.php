@@ -99,6 +99,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <div class="pl-2 ml-2 border-l border-slate-700 flex items-center gap-2">
                             <button id="placeDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Place Existing Device" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-download"></i></button>
                             <a href="create-device.php" id="addDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add New Device" <?= $is_admin ? '' : 'style="display:none;"' ?>><i class="fas fa-plus"></i></a>
+                            <button id="addGroupBoxBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Group Box" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-vector-square"></i></button>
                             <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
                             <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
@@ -123,7 +124,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     <div class="space-y-2 text-xs">
                         <div class="flex items-center gap-2">
                             <div class="w-8 h-0.5 rounded-full" style="background-color: #a78bfa; box-shadow: 0 0 6px #a78bfa;"></div>
-                            <span class="text-slate-300">🔌 CAT5 Cable</span>
+                            <span class="text-slate-300">🔌 CAT6 Cable</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <div class="w-8 h-0.5 rounded-full" style="background-color: #f97316; box-shadow: 0 0 6px #f97316;"></div>
@@ -177,7 +178,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     <label class="block text-sm font-medium text-slate-300 mb-2">Connection Type</label>
                     <select id="connectionType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white">
                         <option value="" disabled selected>Select a connection type</option>
-                        <option value="cat5" data-color="#a78bfa">🔌 CAT5 Cable</option>
+                        <option value="cat6" data-color="#a78bfa">🔌 CAT6 Cable</option>
                         <option value="fiber" data-color="#f97316">💡 Fiber Optic</option>
                         <option value="wifi" data-color="#38bdf8">📡 WiFi</option>
                         <option value="radio" data-color="#84cc16">📻 Radio</option>
