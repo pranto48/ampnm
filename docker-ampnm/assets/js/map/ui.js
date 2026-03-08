@@ -158,7 +158,13 @@ MapApp.ui = {
      * Get port list from device's port_config JSON or fall back to type-based defaults
      */
     _getPortsFromConfig: (deviceData) => {
-        // Try custom port_config first
+        return MapApp.ui._getPortObjectsFromConfig(deviceData).map(po => po.name);
+    },
+
+    /**
+     * Get port objects (with VLAN info) from device's port_config JSON or type defaults
+     */
+    _getPortObjectsFromConfig: (deviceData) => {
         if (deviceData.port_config) {
             try {
                 const groups = typeof deviceData.port_config === 'string' ? JSON.parse(deviceData.port_config) : deviceData.port_config;
@@ -166,15 +172,14 @@ MapApp.ui = {
                     const ports = [];
                     groups.forEach(g => {
                         for (let i = 0; i < (g.count || 0); i++) {
-                            ports.push((g.prefix || '') + ((g.start || 0) + i));
+                            ports.push({ name: (g.prefix || '') + ((g.start || 0) + i), vlan: g.vlan || '' });
                         }
                     });
                     return ports;
                 }
             } catch (e) { /* fall through */ }
         }
-        // Fallback to hardcoded type-based defaults
-        return MapApp.ui._generatePortOptions(deviceData.type || 'server');
+        return MapApp.ui._generatePortOptions(deviceData.type || 'server').map(p => ({ name: p, vlan: '' }));
     },
 
     _populatePortSelect: (selectId, node, selectedValue) => {
