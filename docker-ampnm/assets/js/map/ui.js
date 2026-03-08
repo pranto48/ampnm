@@ -238,7 +238,7 @@ MapApp.ui = {
                 const targetStatus = deviceStatusMap.get(edge.to);
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 const isActive = sourceStatus === 'online' && targetStatus === 'online';
-                const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat5);
+                const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
                 let dashes = false;
                 if (isActive) { dashes = animatedDashes; } 
                 else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') { dashes = [5, 5]; }
