@@ -4,6 +4,35 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/license_guard.php';
 require_once __DIR__ . '/includes/license_manager.php';
 
+// Handle license key submission
+$license_error = '';
+$license_success = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['license_key'])) {
+    $license_key = trim($_POST['license_key']);
+    if (!empty($license_key)) {
+        try {
+            setAppLicenseKey($license_key);
+            // Clear cached license session data
+            unset($_SESSION['license_last_verified']);
+            unset($_SESSION['license_last_verified_key']);
+            unset($_SESSION['license_status_code']);
+            unset($_SESSION['license_message']);
+            // Force re-verification
+            verifyLicenseWithPortal(true);
+            if (isset($_SESSION['license_status_code']) && ($_SESSION['license_status_code'] === 'active' || $_SESSION['license_status_code'] === 'grace_period')) {
+                header('Location: index.php');
+                exit;
+            } else {
+                $license_error = $_SESSION['license_message'] ?? 'License verification failed. Please check your license key.';
+            }
+        } catch (Exception $e) {
+            $license_error = 'Error: ' . htmlspecialchars($e->getMessage());
+        }
+    } else {
+        $license_error = 'Please enter a valid license key.';
+    }
+}
+
 // If license is somehow active or in grace period, redirect to index
 if (isset($_SESSION['license_status_code']) && ($_SESSION['license_status_code'] === 'active' || $_SESSION['license_status_code'] === 'grace_period')) {
     header('Location: index.php');
@@ -79,6 +108,42 @@ if (isset($_GET['api']) || strpos($_SERVER['REQUEST_URI'], '/api.php') !== false
                     <p class="text-red-800 font-semibold text-lg">
                         <?= htmlspecialchars($_SESSION['license_message'] ?? 'Your license has been disabled. The application is now non-functional.') ?>
                     </p>
+                </div>
+
+                <!-- Add License Key Section -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
+                    <button type="button" id="toggleLicenseForm" class="w-full text-left px-6 py-4 flex items-center justify-between hover:bg-blue-100 transition-colors">
+                        <span class="font-bold text-blue-800 flex items-center">
+                            <i class="fas fa-key mr-2 text-blue-600"></i>
+                            Add License Key
+                        </span>
+                        <i id="toggleIcon" class="fas fa-chevron-down text-blue-600 transition-transform"></i>
+                    </button>
+                    <div id="licenseFormContainer" class="hidden px-6 pb-6">
+                        <?php if ($license_error): ?>
+                        <div class="bg-red-100 border border-red-300 text-red-700 p-3 rounded-lg mb-4 text-sm">
+                            <i class="fas fa-exclamation-circle mr-1"></i> <?= htmlspecialchars($license_error) ?>
+                        </div>
+                        <?php endif; ?>
+                        <form method="POST" class="space-y-4">
+                            <div>
+                                <label for="license_key" class="block text-sm font-medium text-gray-700 mb-1">License Key</label>
+                                <input type="text" id="license_key" name="license_key" required
+                                    placeholder="Enter your license key (e.g., XXXX-XXXX-XXXX-XXXX)"
+                                    class="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-mono text-lg"
+                                    value="<?= htmlspecialchars($_POST['license_key'] ?? '') ?>">
+                            </div>
+                            <button type="submit"
+                                class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition-all shadow-lg">
+                                <i class="fas fa-check-circle mr-2"></i>
+                                Verify & Activate License
+                            </button>
+                        </form>
+                        <p class="text-xs text-gray-500 mt-3">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Enter your license key to activate the application. The key will be verified with the licensing server.
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Security Notice -->
@@ -171,6 +236,26 @@ if (isset($_GET['api']) || strpos($_SERVER['REQUEST_URI'], '/api.php') !== false
     </div>
 
     <script>
+        // Toggle license form visibility
+        const toggleBtn = document.getElementById('toggleLicenseForm');
+        const formContainer = document.getElementById('licenseFormContainer');
+        const toggleIcon = document.getElementById('toggleIcon');
+
+        <?php if ($license_error): ?>
+        // Auto-expand if there was an error
+        formContainer.classList.remove('hidden');
+        toggleIcon.style.transform = 'rotate(180deg)';
+        <?php endif; ?>
+
+        toggleBtn.addEventListener('click', function() {
+            formContainer.classList.toggle('hidden');
+            if (formContainer.classList.contains('hidden')) {
+                toggleIcon.style.transform = 'rotate(0deg)';
+            } else {
+                toggleIcon.style.transform = 'rotate(180deg)';
+            }
+        });
+
         // Disable right-click on this page
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
@@ -178,29 +263,12 @@ if (isset($_GET['api']) || strpos($_SERVER['REQUEST_URI'], '/api.php') !== false
 
         // Disable common developer shortcuts
         document.addEventListener('keydown', function(e) {
-            // F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
             if (e.keyCode === 123 ||
                 (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) ||
                 (e.ctrlKey && e.keyCode === 85)) {
                 e.preventDefault();
                 return false;
             }
-        });
-
-        // Block all AJAX/API calls
-        const originalFetch = window.fetch;
-        window.fetch = function() {
-            console.error('API access blocked: License required');
-            return Promise.reject(new Error('License expired - API access denied'));
-        };
-
-        // Prevent form submissions
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                alert('Application is disabled due to invalid license.');
-                return false;
-            });
         });
     </script>
 </body>

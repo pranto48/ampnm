@@ -357,7 +357,7 @@ include 'header.php';
         const ports = [];
         groups.forEach(g => {
             for (let i = 0; i < g.count; i++) {
-                ports.push({ name: g.prefix + (g.start + i), type: g.type });
+                ports.push({ name: g.prefix + (g.start + i), type: g.type, vlan: g.vlan || '' });
             }
         });
         return ports;

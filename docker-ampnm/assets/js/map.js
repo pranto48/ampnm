@@ -287,8 +287,49 @@ function initMap() {
             state.network.addEdgeMode();
             window.notyf.info('Click on a node to start a connection.');
         });
+
+        // Add Group Box button
+        els.addGroupBoxBtn.addEventListener('click', async () => {
+            if (!state.currentMapId) {
+                window.notyf.error('No map selected.');
+                return;
+            }
+            const name = prompt('Enter a name for the group box:', 'Group');
+            if (!name || !name.trim()) return;
+            try {
+                const viewPosition = state.network.getViewPosition();
+                const canvasPosition = state.network.canvas.DOMtoCanvas(viewPosition);
+                const newDevice = await api.post('create_device', {
+                    name: name.trim(),
+                    type: 'box',
+                    map_id: state.currentMapId,
+                    x: canvasPosition.x,
+                    y: canvasPosition.y
+                });
+                const visNode = {
+                    id: newDevice.id,
+                    label: newDevice.name,
+                    title: newDevice.name,
+                    x: newDevice.x,
+                    y: newDevice.y,
+                    shape: 'box',
+                    color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
+                    font: { color: 'white', size: 16, multi: true },
+                    margin: 20,
+                    widthConstraint: { minimum: 150 },
+                    heightConstraint: { minimum: 80 },
+                    deviceData: newDevice
+                };
+                state.nodes.add(visNode);
+                window.notyf.success(`Group box "${name.trim()}" added.`);
+            } catch (error) {
+                console.error('Failed to create group box:', error);
+                window.notyf.error(error.message || 'Failed to create group box.');
+            }
+        });
     } else {
         if (els.addEdgeBtn) els.addEdgeBtn.disabled = true;
+        if (els.addGroupBoxBtn) els.addGroupBoxBtn.disabled = true;
     }
 
     els.cancelEdgeBtn.addEventListener('click', () => closeModal('edgeModal'));
