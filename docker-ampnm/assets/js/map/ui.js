@@ -122,31 +122,33 @@ MapApp.ui = {
         const deviceType = node.deviceData.type || 'server';
 
         // Generate ports from port_config (custom) or fallback to type defaults
-        const ports = MapApp.ui._getPortsFromConfig(node.deviceData);
+        const portObjects = MapApp.ui._getPortObjectsFromConfig(node.deviceData);
 
         // Fetch used ports for this device, excluding current edge
         fetch(`api.php?action=get_device_used_ports&device_id=${encodeURIComponent(deviceId)}&exclude_edge_id=${encodeURIComponent(currentEdgeId || '')}`)
             .then(r => r.json())
             .then(data => {
                 const usedSet = new Set((data.ports || []).map(p => p.toLowerCase()));
-                ports.forEach(p => {
+                portObjects.forEach(po => {
                     const opt = document.createElement('option');
-                    opt.value = p;
-                    const isUsed = usedSet.has(p.toLowerCase());
-                    opt.textContent = isUsed ? p + ' (In Use)' : p;
+                    opt.value = po.name;
+                    const isUsed = usedSet.has(po.name.toLowerCase());
+                    let label = po.name;
+                    if (po.vlan) label += ` [VLAN ${po.vlan}]`;
+                    if (isUsed) label += ' (In Use)';
+                    opt.textContent = label;
                     opt.disabled = isUsed;
                     opt.style.color = isUsed ? '#f59e0b' : '';
-                    if (p === selectedValue) { opt.selected = true; opt.disabled = false; opt.textContent = p; }
+                    if (po.name === selectedValue) { opt.selected = true; opt.disabled = false; opt.textContent = po.name + (po.vlan ? ` [VLAN ${po.vlan}]` : ''); }
                     sel.appendChild(opt);
                 });
             })
             .catch(() => {
-                // Fallback: just add all ports without used-port info
-                ports.forEach(p => {
+                portObjects.forEach(po => {
                     const opt = document.createElement('option');
-                    opt.value = p;
-                    opt.textContent = p;
-                    if (p === selectedValue) opt.selected = true;
+                    opt.value = po.name;
+                    opt.textContent = po.name + (po.vlan ? ` [VLAN ${po.vlan}]` : '');
+                    if (po.name === selectedValue) opt.selected = true;
                     sel.appendChild(opt);
                 });
             });
