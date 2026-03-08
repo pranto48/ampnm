@@ -177,7 +177,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     <label class="block text-sm font-medium text-slate-300 mb-2">Connection Type</label>
                     <select id="connectionType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white">
                         <option value="" disabled selected>Select a connection type</option>
-                        <option value="cat5" data-color="#a78bfa">🔌 CAT5 Cable</option>
+                        <option value="cat6" data-color="#a78bfa">🔌 CAT6 Cable</option>
                         <option value="fiber" data-color="#f97316">💡 Fiber Optic</option>
                         <option value="wifi" data-color="#38bdf8">📡 WiFi</option>
                         <option value="radio" data-color="#84cc16">📻 Radio</option>
