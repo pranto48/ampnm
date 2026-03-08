@@ -363,6 +363,7 @@ $form_data = $device ?? [];
             <input type="text" class="pg-prefix bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-20" value="${group.prefix}" placeholder="Prefix">
             <input type="number" class="pg-start bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-16" value="${group.start}" min="0" placeholder="Start">
             <input type="number" class="pg-count bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-16" value="${group.count}" min="1" placeholder="Count">
+            <input type="text" class="pg-vlan bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs w-20" value="${group.vlan || ''}" placeholder="VLAN">
             <button type="button" class="pg-remove text-red-400 hover:text-red-300 text-xs px-1" title="Remove"><i class="fas fa-times"></i></button>
         `;
         row.querySelector('.pg-type').addEventListener('change', function() {
@@ -370,7 +371,7 @@ $form_data = $device ?? [];
             syncPortConfig();
         });
         row.querySelector('.pg-remove').addEventListener('click', function() { row.remove(); syncPortConfig(); });
-        ['pg-prefix','pg-start','pg-count'].forEach(cls => {
+        ['pg-prefix','pg-start','pg-count','pg-vlan'].forEach(cls => {
             row.querySelector('.'+cls).addEventListener('input', syncPortConfig);
         });
         return row;
@@ -383,7 +384,8 @@ $form_data = $device ?? [];
                 type: row.querySelector('.pg-type').value,
                 prefix: row.querySelector('.pg-prefix').value,
                 start: parseInt(row.querySelector('.pg-start').value) || 0,
-                count: parseInt(row.querySelector('.pg-count').value) || 0
+                count: parseInt(row.querySelector('.pg-count').value) || 0,
+                vlan: row.querySelector('.pg-vlan').value.trim()
             });
         });
         return groups;
@@ -393,7 +395,7 @@ $form_data = $device ?? [];
         const ports = [];
         groups.forEach(g => {
             for (let i = 0; i < g.count; i++) {
-                ports.push({ name: g.prefix + (g.start + i), type: g.type });
+                ports.push({ name: g.prefix + (g.start + i), type: g.type, vlan: g.vlan || '' });
             }
         });
         return ports;
