@@ -381,10 +381,13 @@ include 'header.php';
         ports.forEach(function(p) {
             const color = typeColors[p.type] || '#94a3b8';
             const el = document.createElement('div');
-            el.title = p.name + ' (' + p.type + ') — Free';
+            let tooltip = p.name + ' (' + p.type + ') — Free';
+            if (p.vlan) tooltip += ' | VLAN ' + p.vlan;
+            el.title = tooltip;
             el.style.cssText = 'width:36px;height:28px;border:2px solid '+color+';border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:default;background:rgba(0,0,0,0.3);transition:all .15s;position:relative;';
             el.innerHTML = '<span style="font-size:8px;font-family:monospace;color:'+color+';font-weight:600;line-height:1;text-align:center;">'+p.name+'</span>'
-                + '<span style="position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 4px #22c55e;"></span>';
+                + '<span style="position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 4px #22c55e;"></span>'
+                + (p.vlan ? '<span style="position:absolute;bottom:1px;left:1px;font-size:6px;color:#fbbf24;font-weight:700;">V'+p.vlan+'</span>' : '');
             container.appendChild(el);
         });
 
