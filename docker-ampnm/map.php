@@ -99,6 +99,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <div class="pl-2 ml-2 border-l border-slate-700 flex items-center gap-2">
                             <button id="placeDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Place Existing Device" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-download"></i></button>
                             <a href="create-device.php" id="addDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add New Device" <?= $is_admin ? '' : 'style="display:none;"' ?>><i class="fas fa-plus"></i></a>
+                            <button id="addGroupBoxBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Group Box" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-vector-square"></i></button>
                             <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
                             <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>

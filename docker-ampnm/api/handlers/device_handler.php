@@ -860,7 +860,7 @@ switch ($action) {
                             $new_source_id,
                             $new_target_id,
                             $map_id, // Assign to the current map_id
-                            $edge['connection_type'] ?? 'cat5'
+                            $edge['connection_type'] ?? 'cat6'
                         ]);
                     }
                 }

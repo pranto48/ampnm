@@ -40,6 +40,7 @@ MapApp.ui = {
             resetMapBgBtn: document.getElementById('resetMapBgBtn'),
             mapBgUpload: document.getElementById('mapBgUpload'),
             placeDeviceBtn: document.getElementById('placeDeviceBtn'),
+            addGroupBoxBtn: document.getElementById('addGroupBoxBtn'),
             placeDeviceModal: document.getElementById('placeDeviceModal'),
             closePlaceDeviceModal: document.getElementById('closePlaceDeviceModal'),
             placeDeviceList: document.getElementById('placeDeviceList'),

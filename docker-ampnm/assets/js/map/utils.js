@@ -52,7 +52,7 @@ MapApp.utils = {
                     const ports = [];
                     groups.forEach(g => {
                         for (let i = 0; i < (g.count || 0); i++) {
-                            ports.push({ name: (g.prefix || '') + ((g.start || 0) + i), type: g.type || 'Port' });
+                            ports.push({ name: (g.prefix || '') + ((g.start || 0) + i), type: g.type || 'Port', vlan: g.vlan || '' });
                         }
                     });
                     return ports;
@@ -63,7 +63,7 @@ MapApp.utils = {
         const rawPorts = MapApp.utils.getPortsForType(deviceData.type);
         return rawPorts.map(name => {
             const type = name.startsWith('G') ? 'GE' : name.startsWith('S0') ? 'Serial' : name.startsWith('SFP') ? 'SFP' : name.startsWith('Mgmt') ? 'Mgmt' : 'Port';
-            return { name, type };
+            return { name, type, vlan: '' };
         });
     },
 

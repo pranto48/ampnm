@@ -518,6 +518,9 @@ try {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `port_config` TEXT NULL AFTER `subchoice`;");
         message("Migrated 'devices' table: added 'port_config' column for custom port layouts.");
     }
+    // MIGRATION: Rename cat5 to cat6 in device_edges
+    $pdo->exec("UPDATE `device_edges` SET `connection_type` = 'cat6' WHERE `connection_type` = 'cat5'");
+    message("Migrated 'device_edges': renamed 'cat5' connections to 'cat6'.");
 
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
