@@ -173,7 +173,7 @@ try {
             `source_id` INT(6) UNSIGNED NOT NULL,
             `target_id` INT(6) UNSIGNED NOT NULL,
             `map_id` INT(6) UNSIGNED NOT NULL,
-            `connection_type` VARCHAR(50) DEFAULT 'cat5',
+            `connection_type` VARCHAR(50) DEFAULT 'cat6',
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`source_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
