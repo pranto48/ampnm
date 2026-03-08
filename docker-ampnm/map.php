@@ -123,7 +123,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     <div class="space-y-2 text-xs">
                         <div class="flex items-center gap-2">
                             <div class="w-8 h-0.5 rounded-full" style="background-color: #a78bfa; box-shadow: 0 0 6px #a78bfa;"></div>
-                            <span class="text-slate-300">🔌 CAT5 Cable</span>
+                            <span class="text-slate-300">🔌 CAT6 Cable</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <div class="w-8 h-0.5 rounded-full" style="background-color: #f97316; box-shadow: 0 0 6px #f97316;"></div>
