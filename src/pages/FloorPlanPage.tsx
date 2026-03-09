@@ -19,6 +19,7 @@ import { FloorPlanCanvas } from "@/components/floor-plan/FloorPlanCanvas";
 import { CanvasToolbar, type ToolMode } from "@/components/floor-plan/CanvasToolbar";
 import { PropertiesPanel, type SelectedItem } from "@/components/floor-plan/PropertiesPanel";
 import { FloorPlanUploader } from "@/components/floor-plan/FloorPlanUploader";
+import { CanvasContextMenu, type ContextMenuState } from "@/components/floor-plan/CanvasContextMenu";
 
 /* ─── types ─── */
 interface FloorPlan { id: string; name: string; image_url: string | null; width: number; height: number; }
