@@ -2,24 +2,97 @@ window.MapApp = window.MapApp || {};
 
 MapApp.utils = {
     buildNodeTitle: (deviceData) => {
-        let title = `${deviceData.name}<br>${deviceData.ip || 'No IP'}<br>Status: ${deviceData.status}`;
-        if (deviceData.status === 'offline' && deviceData.last_ping_output) {
+        const statusColors = {
+            online: '#22c55e', warning: '#eab308', critical: '#ef4444',
+            offline: '#64748b', unknown: '#94a3b8'
+        };
+        const status = deviceData.status || 'unknown';
+        const statusColor = statusColors[status] || statusColors.unknown;
+        const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+
+        let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 220px; max-width: 320px; padding: 2px;">`;
+
+        // Header: Name + Status badge
+        title += `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">`;
+        title += `<b style="font-size:14px; color:#f1f5f9;">${deviceData.name}</b>`;
+        title += `<span style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; color:#fff; background:${statusColor};">${statusLabel}</span>`;
+        title += `</div>`;
+
+        // Divider
+        title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-bottom:8px;"></div>`;
+
+        // Details grid
+        title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px;">`;
+
+        // IP
+        title += `<span style="color:#94a3b8;">IP Address:</span>`;
+        title += `<span style="color:#e2e8f0; font-family:monospace;">${deviceData.ip || 'N/A'}</span>`;
+
+        // Type
+        const typeLabel = (deviceData.type || 'server').charAt(0).toUpperCase() + (deviceData.type || 'server').slice(1);
+        title += `<span style="color:#94a3b8;">Type:</span>`;
+        title += `<span style="color:#e2e8f0;">${typeLabel}${deviceData.subchoice ? ' (#' + deviceData.subchoice + ')' : ''}</span>`;
+
+        // Monitor method
+        if (deviceData.monitor_method) {
+            title += `<span style="color:#94a3b8;">Monitor:</span>`;
+            title += `<span style="color:#e2e8f0;">${deviceData.monitor_method}${deviceData.check_port ? ':' + deviceData.check_port : ''}</span>`;
+        }
+
+        // Latency
+        if (deviceData.last_avg_time !== null && deviceData.last_avg_time !== undefined) {
+            const latency = parseFloat(deviceData.last_avg_time);
+            const latColor = latency < 50 ? '#22c55e' : latency < 150 ? '#eab308' : '#ef4444';
+            title += `<span style="color:#94a3b8;">Latency:</span>`;
+            title += `<span style="color:${latColor}; font-weight:600;">${latency}ms</span>`;
+        }
+
+        // TTL
+        if (deviceData.last_ttl) {
+            title += `<span style="color:#94a3b8;">TTL:</span>`;
+            title += `<span style="color:#e2e8f0;">${deviceData.last_ttl}</span>`;
+        }
+
+        // Ping interval
+        if (deviceData.ping_interval) {
+            title += `<span style="color:#94a3b8;">Interval:</span>`;
+            title += `<span style="color:#e2e8f0;">${deviceData.ping_interval}s</span>`;
+        }
+
+        // Last seen
+        if (deviceData.last_seen) {
+            title += `<span style="color:#94a3b8;">Last Seen:</span>`;
+            title += `<span style="color:#e2e8f0;">${deviceData.last_seen}</span>`;
+        }
+
+        title += `</div>`;
+
+        // Offline reason
+        if (status === 'offline' && deviceData.last_ping_output) {
             const lines = deviceData.last_ping_output.split('\n');
             let reason = 'No response';
             for (const line of lines) {
                 if (line.toLowerCase().includes('unreachable') || line.toLowerCase().includes('timed out') || line.toLowerCase().includes('could not find host')) {
-                    reason = line.trim();
-                    break;
+                    reason = line.trim(); break;
                 }
             }
-            const sanitizedReason = reason.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            title += `<br><small style="color: #fca5a5; font-family: monospace;">${sanitizedReason}</small>`;
+            const sanitized = reason.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            title += `<div style="margin-top:8px; padding:6px 8px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:6px; font-size:11px;">`;
+            title += `<span style="color:#fca5a5; font-family:monospace;">⚠ ${sanitized}</span>`;
+            title += `</div>`;
         }
 
-        // Get ports from port_config or fallback to type-based defaults
+        // Description
+        if (deviceData.description) {
+            const desc = deviceData.description.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            title += `<div style="margin-top:6px; font-size:11px; color:#94a3b8; font-style:italic;">${desc}</div>`;
+        }
+
+        // Ports summary
         const ports = MapApp.utils.getPortsFromDevice(deviceData);
         if (ports.length > 0) {
-            title += `<br><br><b>Ports (${ports.length})</b>:<br>`;
+            title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-top:8px; padding-top:6px;">`;
+            title += `<div style="font-size:11px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">Ports (${ports.length})</div>`;
             const portGroups = {};
             ports.forEach(p => {
                 const key = p.type || (p.name.startsWith('G') ? 'GE' : p.name.startsWith('S0') ? 'Serial' : p.name.startsWith('SFP') ? 'SFP' : p.name.startsWith('Mgmt') ? 'Mgmt' : 'Port');
@@ -32,10 +105,12 @@ MapApp.utils = {
                 const color = colorMap[type] || '#94a3b8';
                 let line = `<span style="color:${color}">■</span> ${type}: ${group.names.length}x (${group.names[0]}–${group.names[group.names.length-1]})`;
                 if (group.vlan) line += ` <span style="color:#fbbf24;font-size:10px;">[VLAN ${group.vlan}]</span>`;
-                title += line + '<br>';
+                title += `<div style="font-size:11px; color:#e2e8f0;">${line}</div>`;
             }
+            title += `</div>`;
         }
 
+        title += `</div>`;
         return title;
     },
 
