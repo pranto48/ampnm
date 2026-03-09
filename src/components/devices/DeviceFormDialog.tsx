@@ -176,9 +176,10 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Tabs defaultValue="general">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+              <TabsTrigger value="ports">Ports</TabsTrigger>
               <TabsTrigger value="thresholds">Thresholds</TabsTrigger>
             </TabsList>
 
