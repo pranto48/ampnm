@@ -434,7 +434,7 @@ export default function NetworkMapPage() {
           const srcId = insertedIds[edge.source_index];
           const tgtId = insertedIds[edge.target_index];
           if (srcId && tgtId) {
-            await supabase.from("device_edges").insert({ source_id: srcId, target_id: tgtId, map_id: currentMapId, connection_type: edge.connection_type || "cat5" });
+            await supabase.from("device_edges").insert({ source_id: srcId, target_id: tgtId, map_id: currentMapId, connection_type: edge.connection_type || "cat6" });
           }
         }
       }
