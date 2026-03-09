@@ -290,7 +290,7 @@ export default function NetworkMapPage() {
       if (!isAdmin || !currentMapId) return;
       const { data, error } = await supabase
         .from("device_edges")
-        .insert({ source_id: connection.source!, target_id: connection.target!, map_id: currentMapId, connection_type: "cat5" })
+        .insert({ source_id: connection.source!, target_id: connection.target!, map_id: currentMapId, connection_type: "cat6" })
         .select()
         .single();
 
