@@ -83,6 +83,17 @@ export default function DevicesPage() {
 
   useEffect(() => { fetchDevices(); }, []);
 
+  // Realtime subscription for automatic updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("devices-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "devices" }, () => {
+        fetchDevices();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const handleDelete = async (device: Device) => {
     if (!confirm(`Delete device "${device.name}"?`)) return;
     const { error } = await supabase.from("devices").delete().eq("id", device.id);
