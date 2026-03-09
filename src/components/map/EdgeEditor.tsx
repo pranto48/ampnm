@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 
 const connectionTypes = [
-  { value: "cat5", label: "🔌 CAT5 Cable", color: "#a78bfa" },
+  { value: "cat6", label: "🔌 CAT6 Cable", color: "#a78bfa" },
   { value: "fiber", label: "💡 Fiber Optic", color: "#f97316" },
   { value: "wifi", label: "📡 WiFi", color: "#38bdf8" },
   { value: "radio", label: "📻 Radio", color: "#84cc16" },

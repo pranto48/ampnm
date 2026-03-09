@@ -35,6 +35,7 @@ import {
 import {
   Map as MapIcon, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
   Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity, Edit, MapPin,
+  Clock, Square,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -45,7 +46,7 @@ type MapRow = Tables<"maps">;
 const nodeTypes = { device: DeviceNode };
 
 const CONNECTION_TYPES = [
-  { value: "cat5", label: "🔌 CAT5 Cable", color: "#a78bfa" },
+  { value: "cat6", label: "🔌 CAT6 Cable", color: "#a78bfa" },
   { value: "fiber", label: "💡 Fiber Optic", color: "#f97316" },
   { value: "wifi", label: "📡 WiFi", color: "#38bdf8" },
   { value: "radio", label: "📻 Radio", color: "#84cc16" },
@@ -158,24 +159,38 @@ export default function NetworkMapPage() {
 
     if (devRes.data) {
       devicesCache.current = devRes.data;
-      const flowNodes: Node[] = devRes.data.map((d: Device) => ({
-        id: d.id,
-        type: "device",
-        position: { x: Number(d.x) || 100, y: Number(d.y) || 100 },
-        data: {
-          name: d.name,
-          ip_address: d.ip_address,
-          status: d.status || "unknown",
-          icon: d.type || "server",
-          subchoice: d.subchoice,
-          icon_url: d.icon_url,
-          icon_size: d.icon_size || 40,
-          name_text_size: d.name_text_size || 12,
-          last_latency: d.last_latency,
-          last_ping: d.last_ping,
-          onContextMenu: handleNodeContextMenu,
-        },
-      }));
+      const flowNodes: Node[] = devRes.data.map((d: Device) => {
+        const isBox = d.type === "box";
+        return {
+          id: d.id,
+          type: isBox ? "group" : "device",
+          position: { x: Number(d.x) || 100, y: Number(d.y) || 100 },
+          style: isBox ? {
+            width: 250,
+            height: 180,
+            background: "hsla(215, 25%, 27%, 0.4)",
+            border: "2px dashed hsl(215, 20%, 45%)",
+            borderRadius: 12,
+            padding: 16,
+            zIndex: -1,
+          } : undefined,
+          data: isBox ? {
+            label: d.name,
+          } : {
+            name: d.name,
+            ip_address: d.ip_address,
+            status: d.status || "unknown",
+            icon: d.type || "server",
+            subchoice: d.subchoice,
+            icon_url: d.icon_url,
+            icon_size: d.icon_size || 40,
+            name_text_size: d.name_text_size || 12,
+            last_latency: d.last_latency,
+            last_ping: d.last_ping,
+            onContextMenu: handleNodeContextMenu,
+          },
+        };
+      });
       setNodes(flowNodes);
     }
 
@@ -187,7 +202,7 @@ export default function NetworkMapPage() {
       }
 
       const flowEdges: Edge[] = edgeRes.data.map((e: DeviceEdge) => {
-        const connType = e.connection_type || "cat5";
+        const connType = e.connection_type || "cat6";
         const sourceStatus = deviceStatusMap.get(e.source_id) || "unknown";
         const targetStatus = deviceStatusMap.get(e.target_id) || "unknown";
         const isOffline = sourceStatus === "offline" || targetStatus === "offline";
@@ -275,7 +290,7 @@ export default function NetworkMapPage() {
       if (!isAdmin || !currentMapId) return;
       const { data, error } = await supabase
         .from("device_edges")
-        .insert({ source_id: connection.source!, target_id: connection.target!, map_id: currentMapId, connection_type: "cat5" })
+        .insert({ source_id: connection.source!, target_id: connection.target!, map_id: currentMapId, connection_type: "cat6" })
         .select()
         .single();
 
@@ -284,9 +299,9 @@ export default function NetworkMapPage() {
       } else if (data) {
         const newEdge: Edge = {
           id: data.id, source: data.source_id, target: data.target_id,
-          style: { stroke: edgeColorMap["cat5"], strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorMap["cat5"] },
-          data: { connection_type: "cat5" }, label: "cat5",
+          style: { stroke: edgeColorMap["cat6"], strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorMap["cat6"] },
+          data: { connection_type: "cat6" }, label: "cat6",
           labelStyle: { fill: "#94a3b8", fontSize: 10 },
           labelBgStyle: { fill: "hsl(220 25% 8%)", fillOpacity: 0.9 },
           labelBgPadding: [6, 3] as [number, number], labelBgBorderRadius: 4,
@@ -375,7 +390,7 @@ export default function NetworkMapPage() {
     const exportData = {
       map: { name: currentMap.name, background_color: currentMap.background_color, background_image_url: currentMap.background_image_url },
       devices: nodes.map((n) => ({ name: n.data.name, ip_address: n.data.ip_address, type: n.data.icon, icon_url: n.data.icon_url, x: n.position.x, y: n.position.y, icon_size: n.data.icon_size, name_text_size: n.data.name_text_size })),
-      edges: edges.map((e) => ({ source_index: nodes.findIndex((n) => n.id === e.source), target_index: nodes.findIndex((n) => n.id === e.target), connection_type: e.data?.connection_type || "cat5" })),
+      edges: edges.map((e) => ({ source_index: nodes.findIndex((n) => n.id === e.source), target_index: nodes.findIndex((n) => n.id === e.target), connection_type: e.data?.connection_type || "cat6" })),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -419,7 +434,7 @@ export default function NetworkMapPage() {
           const srcId = insertedIds[edge.source_index];
           const tgtId = insertedIds[edge.target_index];
           if (srcId && tgtId) {
-            await supabase.from("device_edges").insert({ source_id: srcId, target_id: tgtId, map_id: currentMapId, connection_type: edge.connection_type || "cat5" });
+            await supabase.from("device_edges").insert({ source_id: srcId, target_id: tgtId, map_id: currentMapId, connection_type: edge.connection_type || "cat6" });
           }
         }
       }
@@ -509,6 +524,28 @@ export default function NetworkMapPage() {
     setLoadingUnassigned(false);
   };
 
+  // -- Add Group Box --
+  const handleAddGroupBox = async () => {
+    if (!currentMapId || !user) return;
+    const name = prompt("Group box label:", "Group");
+    if (!name?.trim()) return;
+    const { error } = await supabase.from("devices").insert({
+      name: name.trim(),
+      type: "box",
+      map_id: currentMapId,
+      user_id: user.id,
+      monitor_method: "none",
+      x: 200,
+      y: 200,
+    });
+    if (error) {
+      toast({ title: "Failed to create group box", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Group box added" });
+      fetchMapData();
+    }
+  };
+
   const handlePlaceDevices = async () => {
     if (!currentMapId || selectedPlaceIds.length === 0) return;
     // Assign selected devices to this map with staggered positions
@@ -560,7 +597,13 @@ export default function NetworkMapPage() {
         {/* Controls Bar */}
         {currentMap && (
           <div className="flex items-center justify-between flex-wrap gap-2 bg-card border border-border rounded-lg px-4 py-2">
-            <span className="font-semibold text-foreground">{currentMap.name}</span>
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-foreground">{currentMap.name}</span>
+              <Badge variant="outline" className="gap-1 text-xs font-medium border-border text-muted-foreground" title="Offline detection delay">
+                <Clock className="h-3 w-3 text-warning" />
+                {offlineDelay}s delay
+              </Badge>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 border-r border-border pr-2 mr-1">
                 <Label htmlFor="live-toggle" className="text-xs text-muted-foreground cursor-pointer">Live Status</Label>
@@ -577,6 +620,12 @@ export default function NetworkMapPage() {
                 <Button variant="ghost" size="sm" onClick={() => { setPlaceDeviceOpen(true); fetchUnassigned(); }} title="Place existing device on map" className="gap-1 text-xs">
                   <MapPin className="h-4 w-4" />
                   Place Device
+                </Button>
+              )}
+              {isAdmin && (
+                <Button variant="ghost" size="sm" onClick={handleAddGroupBox} title="Add a visual grouping rectangle" className="gap-1 text-xs">
+                  <Square className="h-4 w-4" />
+                  Group Box
                 </Button>
               )}
               {isAdmin && (
@@ -831,7 +880,7 @@ export default function NetworkMapPage() {
       <EdgeEditor
         open={!!editingEdge}
         onOpenChange={(open) => { if (!open) setEditingEdge(null); }}
-        currentType={(editingEdge?.data?.connection_type as string) || "cat5"}
+        currentType={(editingEdge?.data?.connection_type as string) || "cat6"}
         onSave={handleEdgeSave}
         onDelete={handleEdgeDelete}
       />

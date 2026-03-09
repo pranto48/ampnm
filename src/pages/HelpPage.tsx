@@ -6,7 +6,7 @@ import { HelpCircle, Map, Server, Activity, Mail, Users, Monitor } from "lucide-
 const sections = [
   {
     icon: Map, title: "Network Map",
-    content: "The Network Map provides an interactive drag-and-drop canvas showing all your network devices. Drag devices to rearrange, connect them by dragging between handles, and click edges to change connection types (CAT5, Fiber, WiFi, Radio, LAN, Tunnel). Device nodes show real-time status with color-coded borders.",
+    content: "The Network Map provides an interactive drag-and-drop canvas showing all your network devices. Drag devices to rearrange, connect them by dragging between handles, and click edges to change connection types (CAT6, Fiber, WiFi, Radio, LAN, Tunnel). Device nodes show real-time status with color-coded borders.",
   },
   {
     icon: Server, title: "Device Management",

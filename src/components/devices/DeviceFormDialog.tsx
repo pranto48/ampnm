@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { DeviceIconPicker, getIconComponent } from "./DeviceIconPicker";
 
@@ -37,6 +37,14 @@ const MONITOR_METHODS = [
   { value: "http", label: "HTTP Check" },
   { value: "none", label: "None (Manual)" },
 ];
+
+interface PortGroup {
+  type: string;
+  prefix: string;
+  start: number;
+  count: number;
+  vlan: string;
+}
 
 interface Props {
   open: boolean;
@@ -70,6 +78,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   const [warningPacketloss, setWarningPacketloss] = useState(10);
   const [criticalLatency, setCriticalLatency] = useState(500);
   const [criticalPacketloss, setCriticalPacketloss] = useState(50);
+  const [portGroups, setPortGroups] = useState<PortGroup[]>([]);
 
   // Fetch maps
   useEffect(() => {
@@ -100,12 +109,18 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
       setWarningPacketloss(device.warning_packetloss_threshold ?? 10);
       setCriticalLatency(device.critical_latency_threshold ?? 500);
       setCriticalPacketloss(device.critical_packetloss_threshold ?? 50);
+      // Parse port_config
+      try {
+        const pc = (device as any).port_config;
+        if (pc && Array.isArray(pc)) setPortGroups(pc);
+        else setPortGroups([]);
+      } catch { setPortGroups([]); }
     } else {
       setName(""); setMapId("__none__"); setIpAddress(""); setDescription(""); setType("server");
       setSubchoice(""); setMonitorMethod("ping"); setCheckPort("");
       setPingInterval(300); setIconUrl(""); setIconSize(40); setNameTextSize(12);
       setShowLivePing(false); setWarningLatency(100); setWarningPacketloss(10);
-      setCriticalLatency(500); setCriticalPacketloss(50);
+      setCriticalLatency(500); setCriticalPacketloss(50); setPortGroups([]);
     }
   }, [device, open]);
 
@@ -133,7 +148,8 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
       critical_latency_threshold: criticalLatency,
       critical_packetloss_threshold: criticalPacketloss,
       user_id: device?.user_id ?? user.id,
-    };
+      port_config: portGroups.length > 0 ? portGroups : null,
+    } as any;
 
     let error;
     if (device) {
@@ -160,9 +176,10 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Tabs defaultValue="general">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+              <TabsTrigger value="ports">Ports</TabsTrigger>
               <TabsTrigger value="thresholds">Thresholds</TabsTrigger>
             </TabsList>
 
@@ -309,6 +326,89 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
                 <Switch checked={showLivePing} onCheckedChange={setShowLivePing} id="live_ping" />
                 <Label htmlFor="live_ping">Show live ping on map</Label>
               </div>
+            </TabsContent>
+
+            <TabsContent value="ports" className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">Define custom port groups for this device. Each group generates a range of ports with an optional VLAN tag.</p>
+              {portGroups.map((pg, idx) => (
+                <div key={idx} className="grid grid-cols-6 gap-2 items-end bg-muted/30 rounded-lg p-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Type</Label>
+                    <Select value={pg.type} onValueChange={(v) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, type: v };
+                      setPortGroups(updated);
+                    }}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["GE", "SFP", "Serial", "Mgmt", "Console"].map(t => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Prefix</Label>
+                    <Input className="h-8 text-xs" value={pg.prefix} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, prefix: e.target.value };
+                      setPortGroups(updated);
+                    }} placeholder="G0/" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Start</Label>
+                    <Input className="h-8 text-xs" type="number" min={0} value={pg.start} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, start: parseInt(e.target.value) || 0 };
+                      setPortGroups(updated);
+                    }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Count</Label>
+                    <Input className="h-8 text-xs" type="number" min={1} value={pg.count} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, count: parseInt(e.target.value) || 1 };
+                      setPortGroups(updated);
+                    }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">VLAN</Label>
+                    <Input className="h-8 text-xs" value={pg.vlan} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, vlan: e.target.value };
+                      setPortGroups(updated);
+                    }} placeholder="e.g. 100" />
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
+                    setPortGroups(portGroups.filter((_, i) => i !== idx));
+                  }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => {
+                setPortGroups([...portGroups, { type: "GE", prefix: "G0/", start: 1, count: 4, vlan: "" }]);
+              }} className="gap-1">
+                <Plus className="h-4 w-4" />
+                Add Port Group
+              </Button>
+              {portGroups.length > 0 && (
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Preview: {portGroups.reduce((sum, g) => sum + g.count, 0)} total ports</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {portGroups.flatMap((g) =>
+                      Array.from({ length: g.count }, (_, i) => {
+                        const portName = `${g.prefix}${g.start + i}`;
+                        return (
+                          <span key={`${portName}-${i}`} className="text-[10px] font-mono bg-card border border-border rounded px-1.5 py-0.5">
+                            {portName}{g.vlan && <span className="text-primary ml-0.5">v{g.vlan}</span>}
+                          </span>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="thresholds" className="space-y-4 mt-4">

@@ -297,6 +297,7 @@ export type Database = {
           name: string
           name_text_size: number | null
           ping_interval: number | null
+          port_config: Json | null
           show_live_ping: boolean | null
           status: string | null
           subchoice: string | null
@@ -326,6 +327,7 @@ export type Database = {
           name: string
           name_text_size?: number | null
           ping_interval?: number | null
+          port_config?: Json | null
           show_live_ping?: boolean | null
           status?: string | null
           subchoice?: string | null
@@ -355,6 +357,7 @@ export type Database = {
           name?: string
           name_text_size?: number | null
           ping_interval?: number | null
+          port_config?: Json | null
           show_live_ping?: boolean | null
           status?: string | null
           subchoice?: string | null
