@@ -524,6 +524,28 @@ export default function NetworkMapPage() {
     setLoadingUnassigned(false);
   };
 
+  // -- Add Group Box --
+  const handleAddGroupBox = async () => {
+    if (!currentMapId || !user) return;
+    const name = prompt("Group box label:", "Group");
+    if (!name?.trim()) return;
+    const { error } = await supabase.from("devices").insert({
+      name: name.trim(),
+      type: "box",
+      map_id: currentMapId,
+      user_id: user.id,
+      monitor_method: "none",
+      x: 200,
+      y: 200,
+    });
+    if (error) {
+      toast({ title: "Failed to create group box", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Group box added" });
+      fetchMapData();
+    }
+  };
+
   const handlePlaceDevices = async () => {
     if (!currentMapId || selectedPlaceIds.length === 0) return;
     // Assign selected devices to this map with staggered positions
