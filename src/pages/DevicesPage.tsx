@@ -300,7 +300,7 @@ export default function DevicesPage() {
                   </TableRow>
                 ) : filteredDevices.length === 0 ? (
                   <TableRow>
-                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                   <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                        {search ? "No devices match your search." : 'No devices configured. Click "Add Device" to get started.'}
                     </TableCell>
                   </TableRow>
