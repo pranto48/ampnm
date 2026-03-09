@@ -280,6 +280,7 @@ export default function DevicesPage() {
                   <TableHead className="w-10">
                     <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
                   </TableHead>
+                  <TableHead className="w-10">Icon</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>IP / Host</TableHead>
                   <TableHead>Type</TableHead>
