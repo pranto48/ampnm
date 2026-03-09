@@ -310,6 +310,16 @@ export default function DevicesPage() {
                       <TableCell>
                         <Checkbox checked={selected.has(device.id)} onCheckedChange={() => toggleOne(device.id)} aria-label={`Select ${device.name}`} />
                       </TableCell>
+                      <TableCell>
+                        {device.icon_url ? (
+                          <img src={device.icon_url} alt={device.name} className="h-6 w-6 object-contain rounded" />
+                        ) : (
+                          (() => {
+                            const DevIcon = getIconComponent(device.subchoice || device.type);
+                            return <DevIcon className="h-5 w-5 text-muted-foreground" />;
+                          })()
+                        )}
+                      </TableCell>
                       <TableCell className="font-medium">{device.name}</TableCell>
                       <TableCell className="font-mono text-sm">{device.ip_address || "—"}</TableCell>
                       <TableCell className="capitalize">{device.type || "server"}{device.subchoice ? ` (${device.subchoice})` : ""}</TableCell>
