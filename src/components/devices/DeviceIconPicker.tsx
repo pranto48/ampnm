@@ -517,9 +517,35 @@ interface DeviceIconPickerProps {
   onSelect: (type: string, subchoice: string) => void;
 }
 
+const RECENT_ICONS_KEY = "ampnm-recent-icons";
+const MAX_RECENT = 10;
+
+function getRecentIcons(): string[] {
+  try {
+    const stored = localStorage.getItem(RECENT_ICONS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+}
+
+function saveRecentIcon(iconId: string) {
+  const recent = getRecentIcons().filter((id) => id !== iconId);
+  recent.unshift(iconId);
+  localStorage.setItem(RECENT_ICONS_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
+}
+
 export function DeviceIconPicker({ open, onOpenChange, selectedType, selectedSubchoice, onSelect }: DeviceIconPickerProps) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [recentIds, setRecentIds] = useState<string[]>(getRecentIcons);
+
+  const recentIcons = useMemo(() => {
+    return recentIds
+      .map((id) => {
+        const icon = iconLookup.get(id);
+        return icon ? { id, label: id, icon } : null;
+      })
+      .filter(Boolean) as IconOption[];
+  }, [recentIds]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
