@@ -78,6 +78,7 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
   const [warningPacketloss, setWarningPacketloss] = useState(10);
   const [criticalLatency, setCriticalLatency] = useState(500);
   const [criticalPacketloss, setCriticalPacketloss] = useState(50);
+  const [portGroups, setPortGroups] = useState<PortGroup[]>([]);
 
   // Fetch maps
   useEffect(() => {
