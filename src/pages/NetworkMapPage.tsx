@@ -35,6 +35,7 @@ import {
 import {
   Map as MapIcon, RefreshCw, Plus, Pencil, Trash2, Share2, Settings, Maximize,
   Network, Eye, EyeOff, Copy, Link2, Download, Upload, Activity, Edit, MapPin,
+  Clock, Square,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
