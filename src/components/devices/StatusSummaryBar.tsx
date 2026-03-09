@@ -23,16 +23,16 @@ export function StatusSummaryBar({ devices }: StatusSummaryBarProps) {
     <Card className="p-4 mb-4">
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm font-medium text-muted-foreground">Status Summary:</span>
-        <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+        <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
           Online: {counts.online}
         </Badge>
-        <Badge variant="default" className="bg-yellow-600 hover:bg-yellow-700">
+        <Badge variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-700">
           Warning: {counts.warning}
         </Badge>
         <Badge variant="destructive">
           Critical: {counts.critical}
         </Badge>
-        <Badge variant="default" className="bg-gray-600 hover:bg-gray-700">
+        <Badge variant="outline" className="border-slate-300 bg-slate-100 text-slate-700">
           Offline: {counts.offline}
         </Badge>
         <Badge variant="outline">
