@@ -144,6 +144,12 @@ export function FloorPlanCanvas({
     }
   };
 
+  const handleItemContextMenu = (kind: string, id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onCtxMenu?.(kind, id, e.clientX, e.clientY);
+  };
+
   // Cursor style based on tool
   const cursorStyle = activeTool === "select" ? (isPanning ? "grabbing" : "default") :
     activeTool === "draw-cable" ? "crosshair" : "cell";
