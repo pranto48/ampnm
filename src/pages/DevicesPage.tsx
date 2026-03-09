@@ -268,7 +268,7 @@ export default function DevicesPage() {
           </div>
         </div>
 
-        <StatusSummaryBar devices={filteredDevices} />
+        <StatusSummaryBar devices={devices} activeFilter={statusFilter} onFilterChange={setStatusFilter} />
 
         <Card>
           <CardContent className="p-0">
