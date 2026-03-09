@@ -325,7 +325,7 @@ function renderMap({ map, devices, edges }) {
     visNodesDataset.add(devices.map(buildVisNode));
 
     visEdgesDataset.clear();
-    visEdgesDataset.add(edges.map(buildVisEdge));
+    visEdgesDataset.add(edges.map(e => buildVisEdge(e, devices)));
 
     if (map?.background_color) canvas.style.background = map.background_color;
     if (map?.background_image_url) {
