@@ -27,7 +27,7 @@ function handleFloorPlanAction($action, $data, $pdo) {
 
         // Devices (for dropdowns)
         case 'get_devices':
-            $stmt = $pdo->query("SELECT id, name, type FROM devices ORDER BY name ASC");
+            $stmt = $pdo->query("SELECT id, name, type, ip, port_config, subchoice FROM devices ORDER BY name ASC");
             return ['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
 
         // Racks
