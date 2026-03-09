@@ -512,6 +512,56 @@ export type Database = {
           },
         ]
       }
+      floor_plan_annotations: {
+        Row: {
+          color: string
+          created_at: string
+          floor_plan_id: string
+          font_size: number
+          height: number | null
+          id: string
+          text: string
+          type: string
+          width: number | null
+          x: number
+          y: number
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          floor_plan_id: string
+          font_size?: number
+          height?: number | null
+          id?: string
+          text?: string
+          type?: string
+          width?: number | null
+          x?: number
+          y?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          floor_plan_id?: string
+          font_size?: number
+          height?: number | null
+          id?: string
+          text?: string
+          type?: string
+          width?: number | null
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_plan_annotations_floor_plan_id_fkey"
+            columns: ["floor_plan_id"]
+            isOneToOne: false
+            referencedRelation: "floor_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       floor_plans: {
         Row: {
           created_at: string
@@ -970,8 +1020,10 @@ export type Database = {
           created_at: string
           floor_plan_id: string
           id: string
+          label_visible: boolean
           name: string
           rack_units: number | null
+          rotation: number
           x: number | null
           y: number | null
         }
@@ -979,8 +1031,10 @@ export type Database = {
           created_at?: string
           floor_plan_id: string
           id?: string
+          label_visible?: boolean
           name: string
           rack_units?: number | null
+          rotation?: number
           x?: number | null
           y?: number | null
         }
@@ -988,8 +1042,10 @@ export type Database = {
           created_at?: string
           floor_plan_id?: string
           id?: string
+          label_visible?: boolean
           name?: string
           rack_units?: number | null
+          rotation?: number
           x?: number | null
           y?: number | null
         }

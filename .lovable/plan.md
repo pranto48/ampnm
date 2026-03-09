@@ -1,61 +1,44 @@
 
 
-## Floor Plan Interactive Drawing System
+# Fix map.php Edge Error + Add Port Visualization to create-device.php
 
-### Overview
-Transform the current tab-based CRUD Floor Plan page into an interactive CAD-style canvas where users can upload floor plan images, drag-and-drop racks/devices, draw cable runs visually, and add text annotations -- all on an SVG canvas with pan/zoom.
+## Problem 1: `updateEdgeColorsAndDashes is not a function`
 
-### Database Changes (SQL Migration)
+**Root cause**: In `docker-ampnm/assets/js/map.js` line 85, the edge form submit handler calls `MapApp.ui.updateEdgeColorsAndDashes()`, but the actual function name in `ui.js` is `MapApp.ui.updateAndAnimateEdges()`.
 
-1. **Storage bucket** `floor-plan-files` for uploaded floor plan images (public read, authenticated upload)
-2. **New table** `floor_plan_annotations` -- stores text labels and zone markers placed on the canvas:
-   - `id uuid PK`, `floor_plan_id uuid`, `x numeric`, `y numeric`, `text text`, `font_size int default 14`, `color text default '#ffffff'`, `type text default 'label'` (label | zone), `width numeric`, `height numeric`, `created_at timestamptz`
-   - RLS: admin ALL, authenticated SELECT
-3. **Alter `rack_locations`** -- add `rotation integer default 0`, `label_visible boolean default true`
+**Fix**: Change line 85 in `map.js` from `updateEdgeColorsAndDashes()` to `updateAndAnimateEdges()`.
 
-### New Components (8 files)
+## Problem 2: Port Visualization on create-device.php
 
-| Component | Purpose |
-|-----------|---------|
-| `src/components/floor-plan/FloorPlanCanvas.tsx` | Main SVG canvas with pan (drag empty space), zoom (scroll wheel), transform matrix state. Renders background image, racks, devices, cables, and annotations as SVG elements. Handles mouse events for all drawing modes. |
-| `src/components/floor-plan/CanvasToolbar.tsx` | Vertical toolbar: Select, Add Rack, Add Device, Draw Cable, Add Label, Zoom In/Out/Reset, Upload. Active tool highlighted. |
-| `src/components/floor-plan/CanvasRackNode.tsx` | SVG `<g>` rendering a rack as a labeled rectangle with rack-unit count. Draggable in select mode. Shows selection handles when active. |
-| `src/components/floor-plan/CanvasDeviceNode.tsx` | SVG `<g>` rendering a device icon (circle + type icon) at x/y. Draggable. Tooltip on hover with device details. |
-| `src/components/floor-plan/CanvasCableLine.tsx` | SVG `<line>` or `<path>` colored by `cable_color`, connecting source and dest equipment positions. Hover shows cable details. |
-| `src/components/floor-plan/CanvasAnnotation.tsx` | SVG `<text>` or `<rect>` + `<text>` for labels/zones. Draggable in select mode. |
-| `src/components/floor-plan/PropertiesPanel.tsx` | Right-side slide-out panel showing editable fields for the selected canvas item (rack, device, cable, annotation). Saves inline on change. |
-| `src/components/floor-plan/FloorPlanUploader.tsx` | File input (PNG/JPG/PDF) that uploads to `floor-plan-files` bucket, returns public URL, updates `floor_plans.image_url`. |
+Add a visual port panel to the Add New Device form that shows networking port counts and a visual port grid based on the selected device type. When the user selects switch, router, firewall, or server, they see:
+- Total ports, used ports, and free ports
+- A visual grid of port indicators (like the Docker map's DevicePortGrid)
 
-### Modified File
+### Changes to `docker-ampnm/create-device.php`
 
-**`src/pages/FloorPlanPage.tsx`** -- Restructured layout:
-- Top: floor plan selector + "New Floor Plan" button (kept)
-- Below: two-column layout -- left: `CanvasToolbar`, center: `FloorPlanCanvas`, right: `PropertiesPanel` (shown when item selected)
-- Existing CRUD logic (savePlan, saveRack, saveCable, etc.) stays but is called from canvas interactions and properties panel instead of tab dialogs
-- Tabs removed; overview stats shown as floating badges on canvas or in a collapsible summary bar
-- All existing dialogs kept as fallback for complex forms (cable endpoints, port config)
+Add a new fieldset section after the Device Type selector:
 
-### Canvas Interaction Model
+- Title: "Network Ports"
+- Summary cards: Total Ports | Used Ports | Free Ports
+- Visual port grid showing all ports as small colored rectangles with port names
+- Port grid updates dynamically when device type changes
 
-- **Select mode (default)**: Click item to select (shows PropertiesPanel). Drag to move. Double-click to edit. Right-click for delete.
-- **Add Rack mode**: Click canvas to place rack at coordinates. Mini-dialog for name/units, then saves to DB with x/y.
-- **Add Device mode**: Shows dropdown of existing devices. Click canvas to place at position. Saves device's floor plan position.
-- **Draw Cable mode**: Click first endpoint (rack/device), then click second endpoint. Draws line. Opens cable dialog for details (type, color, etc.).
-- **Add Label mode**: Click canvas to place text. Inline text editing.
-- **Pan**: Drag on empty canvas space (in any mode). **Zoom**: Mouse wheel.
+Port counts per device type:
+- **Switch**: 24x GigabitEthernet (G0/1-G0/24) + 4x SFP (SFP01-SFP04) = 28 ports
+- **Router**: 4x GigabitEthernet (G0/0-G0/3) + 2x Serial (S0/0-S0/1) + 1x SFP (SFP01) = 7 ports
+- **Firewall**: 8x GigabitEthernet (G0/0-G0/7) + 2x Management (Mgmt0/0-Mgmt0/1) = 10 ports
+- **Server**: 4x GigabitEthernet (G0/0-G0/3) = 4 ports
+- **Other device types**: 2x GigabitEthernet (G0/0-G0/1) = 2 ports
 
-### File Upload Flow
+### Implementation
 
-- `FloorPlanUploader` component handles file selection and upload to `floor-plan-files` storage bucket
-- Accepted formats: `.png, .jpg, .jpeg` (direct image display)
-- PDF support: uploaded to bucket, rendered via `<object>` tag as fallback; primary recommendation is image upload
-- After upload, `floor_plans.image_url` is updated to the public storage URL
-- Image displayed as SVG `<image>` background element on the canvas
+Add inline JavaScript (or extend `icon-picker.js`) that listens to the `#type` select change event and renders port grid HTML into a new container `#devicePortPanel`. Each port is a small rectangle with:
+- Green border = free/available
+- Port name tooltip on hover
+- Summary counts above the grid
 
-### Key Technical Decisions
+### Files to modify
 
-- **SVG canvas**: No new dependencies. DOM-based hit detection, React-friendly. Transform matrix for pan/zoom.
-- **Existing tables reused**: `rack_locations.x/y` already exist for positioning. `cable_runs` links source/dest. Canvas is a visual layer on top of existing data.
-- **Grid snapping**: Optional 20px grid snap for precise placement, toggled from toolbar.
-- **Backwards compatible**: All existing data works. The old tab UI is replaced but all CRUD operations are preserved.
+1. **`docker-ampnm/assets/js/map.js`** (line 85) -- Fix function name: `updateEdgeColorsAndDashes` → `updateAndAnimateEdges`
+2. **`docker-ampnm/create-device.php`** -- Add port visualization fieldset with inline JS after the device type selector
 
