@@ -299,9 +299,9 @@ export default function NetworkMapPage() {
       } else if (data) {
         const newEdge: Edge = {
           id: data.id, source: data.source_id, target: data.target_id,
-          style: { stroke: edgeColorMap["cat5"], strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorMap["cat5"] },
-          data: { connection_type: "cat5" }, label: "cat5",
+          style: { stroke: edgeColorMap["cat6"], strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorMap["cat6"] },
+          data: { connection_type: "cat6" }, label: "cat6",
           labelStyle: { fill: "#94a3b8", fontSize: 10 },
           labelBgStyle: { fill: "hsl(220 25% 8%)", fillOpacity: 0.9 },
           labelBgPadding: [6, 3] as [number, number], labelBgBorderRadius: 4,
