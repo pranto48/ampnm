@@ -32,6 +32,7 @@ interface FloorPlanCanvasProps {
   onPanChange: (x: number, y: number) => void;
   onZoomChange: (z: number) => void;
   svgRef?: React.RefObject<SVGSVGElement | null>;
+  onContextMenu?: (kind: string, id: string, clientX: number, clientY: number) => void;
 }
 
 // Resolve positions for cable endpoints
@@ -47,7 +48,7 @@ export function FloorPlanCanvas({
   backgroundUrl, width, height, racks, devices, cables, annotations,
   activeTool, snapToGrid, selectedItem, onSelectItem, onMoveItem,
   onCanvasClick, onCableEndpointClick, zoom, panX, panY, onPanChange, onZoomChange,
-  svgRef: externalSvgRef,
+  svgRef: externalSvgRef, onContextMenu: onCtxMenu,
 }: FloorPlanCanvasProps) {
   const internalRef = useRef<SVGSVGElement>(null);
   const svgRef = externalSvgRef || internalRef;
@@ -143,6 +144,12 @@ export function FloorPlanCanvas({
     }
   };
 
+  const handleItemContextMenu = (kind: string, id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onCtxMenu?.(kind, id, e.clientX, e.clientY);
+  };
+
   // Cursor style based on tool
   const cursorStyle = activeTool === "select" ? (isPanning ? "grabbing" : "default") :
     activeTool === "draw-cable" ? "crosshair" : "cell";
@@ -187,13 +194,15 @@ export function FloorPlanCanvas({
 
         {/* Annotations (back layer) */}
         {annotations.filter(a => a.type === "zone").map(a => (
-          <CanvasAnnotation
-            key={a.id} id={a.id} x={a.x} y={a.y} text={a.text}
-            fontSize={a.font_size} color={a.color} type={a.type}
-            width={a.width} height={a.height}
-            selected={selectedItem?.kind === "annotation" && selectedItem.id === a.id}
-            onMouseDown={e => startDrag("annotation", a.id, e)}
-          />
+          <g key={a.id} onContextMenu={e => handleItemContextMenu("annotation", a.id, e)}>
+            <CanvasAnnotation
+              id={a.id} x={a.x} y={a.y} text={a.text}
+              fontSize={a.font_size} color={a.color} type={a.type}
+              width={a.width} height={a.height}
+              selected={selectedItem?.kind === "annotation" && selectedItem.id === a.id}
+              onMouseDown={e => startDrag("annotation", a.id, e)}
+            />
+          </g>
         ))}
 
         {/* Cable runs */}
@@ -202,51 +211,56 @@ export function FloorPlanCanvas({
           const dstPos = findPos(cable.dest_id, racks, devices);
           if (!srcPos || !dstPos) return null;
           return (
-            <CanvasCableLine
-              key={cable.id}
-              id={cable.id}
-              x1={srcPos.x} y1={srcPos.y}
-              x2={dstPos.x} y2={dstPos.y}
-              cableColor={cable.cable_color}
-              cableType={cable.cable_type}
-              label={cable.label}
-              selected={selectedItem?.kind === "cable" && selectedItem.id === cable.id}
-              onMouseDown={e => startDrag("cable", cable.id, e)}
-            />
+            <g key={cable.id} onContextMenu={e => handleItemContextMenu("cable", cable.id, e)}>
+              <CanvasCableLine
+                id={cable.id}
+                x1={srcPos.x} y1={srcPos.y}
+                x2={dstPos.x} y2={dstPos.y}
+                cableColor={cable.cable_color}
+                cableType={cable.cable_type}
+                label={cable.label}
+                selected={selectedItem?.kind === "cable" && selectedItem.id === cable.id}
+                onMouseDown={e => startDrag("cable", cable.id, e)}
+              />
+            </g>
           );
         })}
 
         {/* Racks */}
         {racks.map(rack => (
-          <CanvasRackNode
-            key={rack.id}
-            id={rack.id} x={rack.x} y={rack.y} name={rack.name}
-            rackUnits={rack.rack_units} rotation={rack.rotation}
-            labelVisible={rack.label_visible}
-            selected={selectedItem?.kind === "rack" && selectedItem.id === rack.id}
-            onMouseDown={e => startDrag("rack", rack.id, e)}
-          />
+          <g key={rack.id} onContextMenu={e => handleItemContextMenu("rack", rack.id, e)}>
+            <CanvasRackNode
+              id={rack.id} x={rack.x} y={rack.y} name={rack.name}
+              rackUnits={rack.rack_units} rotation={rack.rotation}
+              labelVisible={rack.label_visible}
+              selected={selectedItem?.kind === "rack" && selectedItem.id === rack.id}
+              onMouseDown={e => startDrag("rack", rack.id, e)}
+            />
+          </g>
         ))}
 
         {/* Devices */}
         {devices.map(dev => (
-          <CanvasDeviceNode
-            key={dev.id}
-            {...dev}
-            selected={selectedItem?.kind === "device" && selectedItem.id === dev.id}
-            onMouseDown={e => startDrag("device", dev.id, e)}
-          />
+          <g key={dev.id} onContextMenu={e => handleItemContextMenu("device", dev.id, e)}>
+            <CanvasDeviceNode
+              {...dev}
+              selected={selectedItem?.kind === "device" && selectedItem.id === dev.id}
+              onMouseDown={e => startDrag("device", dev.id, e)}
+            />
+          </g>
         ))}
 
         {/* Label annotations (front layer) */}
         {annotations.filter(a => a.type === "label").map(a => (
-          <CanvasAnnotation
-            key={a.id} id={a.id} x={a.x} y={a.y} text={a.text}
-            fontSize={a.font_size} color={a.color} type={a.type}
-            width={a.width} height={a.height}
-            selected={selectedItem?.kind === "annotation" && selectedItem.id === a.id}
-            onMouseDown={e => startDrag("annotation", a.id, e)}
-          />
+          <g key={a.id} onContextMenu={e => handleItemContextMenu("annotation", a.id, e)}>
+            <CanvasAnnotation
+              id={a.id} x={a.x} y={a.y} text={a.text}
+              fontSize={a.font_size} color={a.color} type={a.type}
+              width={a.width} height={a.height}
+              selected={selectedItem?.kind === "annotation" && selectedItem.id === a.id}
+              onMouseDown={e => startDrag("annotation", a.id, e)}
+            />
+          </g>
         ))}
       </g>
 

@@ -19,6 +19,7 @@ import { FloorPlanCanvas } from "@/components/floor-plan/FloorPlanCanvas";
 import { CanvasToolbar, type ToolMode } from "@/components/floor-plan/CanvasToolbar";
 import { PropertiesPanel, type SelectedItem } from "@/components/floor-plan/PropertiesPanel";
 import { FloorPlanUploader } from "@/components/floor-plan/FloorPlanUploader";
+import { CanvasContextMenu, type ContextMenuState } from "@/components/floor-plan/CanvasContextMenu";
 
 /* ─── types ─── */
 interface FloorPlan { id: string; name: string; image_url: string | null; width: number; height: number; }
@@ -77,8 +78,9 @@ export default function FloorPlanPage() {
   const [labelDialog, setLabelDialog] = useState(false);
   const [pendingLabelPos, setPendingLabelPos] = useState<{ x: number; y: number } | null>(null);
 
-  // Cable drawing
+  // Cable drawing & context menu
   const [cableSource, setCableSource] = useState<{ kind: string; id: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -309,6 +311,54 @@ export default function FloorPlanPage() {
     setSelectedItem(null); toast.success("Deleted");
   };
 
+  const handleContextMenu = (kind: string, id: string, clientX: number, clientY: number) => {
+    setContextMenu({ kind, id, x: clientX, y: clientY });
+  };
+
+  const handleCtxEdit = (kind: string, id: string) => {
+    // Select the item to open properties panel
+    if (kind === "rack") {
+      const r = racks.find(r => r.id === id);
+      if (r) setSelectedItem({ kind: "rack", id: r.id, name: r.name, rack_units: r.rack_units, x: r.x, y: r.y, rotation: r.rotation, label_visible: r.label_visible });
+    } else if (kind === "device") {
+      const d = devices.find(d => d.id === id);
+      if (d) setSelectedItem({ kind: "device", id: d.id, name: d.name, type: d.type, x: d.x ?? 0, y: d.y ?? 0 });
+    } else if (kind === "cable") {
+      const c = cables.find(c => c.id === id);
+      if (c) setSelectedItem({ kind: "cable", id: c.id, cable_type: c.cable_type, cable_color: c.cable_color, cable_length: c.cable_length, label: c.label, notes: c.notes });
+    } else if (kind === "annotation") {
+      const a = annotations.find(a => a.id === id);
+      if (a) setSelectedItem({ kind: "annotation", id: a.id, text: a.text, font_size: a.font_size, color: a.color, type: a.type, width: a.width, height: a.height });
+    }
+  };
+
+  const handleCtxDelete = async (kind: string, id: string) => {
+    if (!confirm("Delete this item?")) return;
+    if (kind === "rack") { await supabase.from("rack_locations").delete().eq("id", id); setRacks(prev => prev.filter(r => r.id !== id)); }
+    else if (kind === "cable") { await supabase.from("cable_runs").delete().eq("id", id); setCables(prev => prev.filter(c => c.id !== id)); }
+    else if (kind === "annotation") { await supabase.from("floor_plan_annotations").delete().eq("id", id); setAnnotations(prev => prev.filter(a => a.id !== id)); }
+    else if (kind === "device") { await supabase.from("devices").update({ x: null, y: null }).eq("id", id); setDevices(prev => prev.map(d => d.id === id ? { ...d, x: null, y: null } : d)); }
+    if (selectedItem?.id === id) setSelectedItem(null);
+    toast.success("Deleted");
+  };
+
+  const handleCtxDuplicate = async (kind: string, id: string) => {
+    if (!selectedPlan) return;
+    if (kind === "rack") {
+      const r = racks.find(r => r.id === id);
+      if (!r) return;
+      const { data } = await supabase.from("rack_locations").insert({ floor_plan_id: selectedPlan.id, name: r.name + " (copy)", x: (r.x || 0) + 40, y: (r.y || 0) + 40, rack_units: r.rack_units, rotation: r.rotation, label_visible: r.label_visible }).select().single();
+      if (data) setRacks(prev => [...prev, data as any]);
+      toast.success("Rack duplicated");
+    } else if (kind === "annotation") {
+      const a = annotations.find(a => a.id === id);
+      if (!a) return;
+      const { data } = await supabase.from("floor_plan_annotations").insert({ floor_plan_id: selectedPlan.id, x: a.x + 40, y: a.y + 40, text: a.text + " (copy)", font_size: a.font_size, color: a.color, type: a.type, width: a.width, height: a.height }).select().single();
+      if (data) setAnnotations(prev => [...prev, data as any]);
+      toast.success("Annotation duplicated");
+    }
+  };
+
   const handleImageUploaded = (url: string) => {
     if (selectedPlan) {
       setSelectedPlan({ ...selectedPlan, image_url: url });
@@ -409,12 +459,25 @@ export default function FloorPlanPage() {
                 zoom={zoom} panX={panX} panY={panY}
                 onPanChange={(x, y) => { setPanX(x); setPanY(y); }} onZoomChange={setZoom}
                 svgRef={canvasSvgRef}
+                onContextMenu={handleContextMenu}
               />
             </div>
             {selectedItem && (
               <PropertiesPanel item={selectedItem} onUpdate={handlePropertyUpdate} onClose={() => setSelectedItem(null)} isAdmin={isAdmin} />
             )}
           </div>
+        )}
+
+        {/* Context menu */}
+        {contextMenu && (
+          <CanvasContextMenu
+            menu={contextMenu}
+            onClose={() => setContextMenu(null)}
+            onEdit={handleCtxEdit}
+            onDelete={handleCtxDelete}
+            onDuplicate={handleCtxDuplicate}
+            isAdmin={isAdmin}
+          />
         )}
 
         {/* ═══════════ LIST VIEW ═══════════ */}
