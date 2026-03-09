@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   Network, Router, CircleDot, Share2, GitBranch, Workflow,
-  Wifi, Radio, Signal, Rss, TowerControl,
+  Wifi, Radio, Signal, Rss, TowerControl, Antenna, SatelliteDish,
   Server, Cpu, HardDrive, MemoryStick, Warehouse, Factory,
   Cable, CodeXml, Layers, GripHorizontal, Sliders, LayoutGrid,
   Shield, ShieldCheck, Lock, Fingerprint, Key, Ban, AlertCircle,
