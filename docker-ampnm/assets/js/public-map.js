@@ -138,13 +138,79 @@ function showError(message, detail = "") {
 }
 
 function buildTitle(device) {
-    const status = device.status || "unknown";
-    const statusLine = `Status: ${status}`;
-    const ipLine = device.ip ? `IP: ${device.ip}` : "No IP assigned";
-    const latency = device.last_avg_time ? `Latency: ${device.last_avg_time}ms` : null;
-    const ttl = device.last_ttl ? `TTL: ${device.last_ttl}` : null;
-    const extras = [latency, ttl].filter(Boolean).join(" · ");
-    return [device.name || "Unnamed", ipLine, statusLine, extras].filter(Boolean).join("<br>");
+    const statusColors = {
+        online: '#22c55e', warning: '#eab308', critical: '#ef4444',
+        offline: '#64748b', unknown: '#94a3b8'
+    };
+    const status = device.status || 'unknown';
+    const statusColor = statusColors[status] || statusColors.unknown;
+    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+
+    let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 220px; max-width: 320px; padding: 2px;">`;
+
+    // Header: Name + Status badge
+    title += `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">`;
+    title += `<b style="font-size:14px; color:#f1f5f9;">${device.name || 'Unnamed'}</b>`;
+    title += `<span style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; color:#fff; background:${statusColor};">${statusLabel}</span>`;
+    title += `</div>`;
+
+    // Divider
+    title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-bottom:8px;"></div>`;
+
+    // Details grid
+    title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px;">`;
+
+    // IP
+    title += `<span style="color:#94a3b8;">IP Address:</span>`;
+    title += `<span style="color:#e2e8f0; font-family:monospace;">${device.ip || 'N/A'}</span>`;
+
+    // Type
+    const typeLabel = (device.type || 'server').charAt(0).toUpperCase() + (device.type || 'server').slice(1);
+    title += `<span style="color:#94a3b8;">Type:</span>`;
+    title += `<span style="color:#e2e8f0;">${typeLabel}${device.subchoice ? ' (#' + device.subchoice + ')' : ''}</span>`;
+
+    // Monitor method
+    if (device.monitor_method) {
+        title += `<span style="color:#94a3b8;">Monitor:</span>`;
+        title += `<span style="color:#e2e8f0;">${device.monitor_method}${device.check_port ? ':' + device.check_port : ''}</span>`;
+    }
+
+    // Latency
+    if (device.last_avg_time !== null && device.last_avg_time !== undefined) {
+        const latency = parseFloat(device.last_avg_time);
+        const latColor = latency < 50 ? '#22c55e' : latency < 150 ? '#eab308' : '#ef4444';
+        title += `<span style="color:#94a3b8;">Latency:</span>`;
+        title += `<span style="color:${latColor}; font-weight:600;">${latency}ms</span>`;
+    }
+
+    // TTL
+    if (device.last_ttl) {
+        title += `<span style="color:#94a3b8;">TTL:</span>`;
+        title += `<span style="color:#e2e8f0;">${device.last_ttl}</span>`;
+    }
+
+    // Ping interval
+    if (device.ping_interval) {
+        title += `<span style="color:#94a3b8;">Interval:</span>`;
+        title += `<span style="color:#e2e8f0;">${device.ping_interval}s</span>`;
+    }
+
+    // Last seen
+    if (device.last_seen) {
+        title += `<span style="color:#94a3b8;">Last Seen:</span>`;
+        title += `<span style="color:#e2e8f0;">${device.last_seen}</span>`;
+    }
+
+    title += `</div>`;
+
+    // Description
+    if (device.description) {
+        const desc = device.description.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        title += `<div style="margin-top:6px; font-size:11px; color:#94a3b8; font-style:italic;">${desc}</div>`;
+    }
+
+    title += `</div>`;
+    return title;
 }
 
 // Persistent vis.js datasets and network instance
