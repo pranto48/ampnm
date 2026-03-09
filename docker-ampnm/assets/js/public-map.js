@@ -251,7 +251,57 @@ function buildVisNode(device) {
     };
 }
 
-function buildVisEdge(edge) {
+function buildEdgeTitle(edge, devices) {
+    const typeLabels = {
+        cat6: '🔌 CAT6 Cable', cat5: '🔌 CAT5 Cable', fiber: '💡 Fiber Optic',
+        wifi: '📡 WiFi', radio: '📻 Radio', lan: '🌐 LAN',
+        'logical-tunneling': '🔒 Logical Tunnel'
+    };
+    const typeColors = {
+        cat6: '#a78bfa', cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8',
+        radio: '#84cc16', lan: '#60a5fa', 'logical-tunneling': '#c084fc'
+    };
+    const connType = edge.connection_type || 'unknown';
+    const connLabel = typeLabels[connType] || connType;
+    const connColor = typeColors[connType] || '#94a3b8';
+    const statusDotColors = { online: '#22c55e', warning: '#eab308', critical: '#ef4444', offline: '#64748b', unknown: '#94a3b8' };
+
+    const srcDevice = devices.find(d => d.id === edge.source_id || d.id == edge.source_id);
+    const tgtDevice = devices.find(d => d.id === edge.target_id || d.id == edge.target_id);
+    const srcName = srcDevice ? srcDevice.name : 'Unknown';
+    const tgtName = tgtDevice ? tgtDevice.name : 'Unknown';
+    const srcStatus = srcDevice ? (srcDevice.status || 'unknown') : 'unknown';
+    const tgtStatus = tgtDevice ? (tgtDevice.status || 'unknown') : 'unknown';
+
+    let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 200px; max-width: 300px; padding: 2px;">`;
+    title += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">`;
+    title += `<div style="width:12px; height:3px; border-radius:2px; background:${connColor};"></div>`;
+    title += `<b style="font-size:13px; color:#f1f5f9;">${connLabel}</b>`;
+    title += `</div>`;
+    title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-bottom:8px;"></div>`;
+    title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px;">`;
+    title += `<span style="color:#94a3b8;">Source:</span>`;
+    title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[srcStatus]}; margin-right:4px;"></span>${srcName}</span>`;
+    title += `<span style="color:#94a3b8;">Target:</span>`;
+    title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[tgtStatus]}; margin-right:4px;"></span>${tgtName}</span>`;
+    if (edge.source_port_label || edge.target_port_label) {
+        title += `<span style="color:#94a3b8;">Ports:</span>`;
+        title += `<span style="color:#22d3ee; font-family:monospace; font-weight:600;">${edge.source_port_label || '—'} ↔ ${edge.target_port_label || '—'}</span>`;
+    }
+    title += `</div>`;
+    if (edge.source_port_label && edge.target_port_label) {
+        title += `<div style="margin-top:8px; padding:6px 8px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); border-radius:6px; text-align:center;">`;
+        title += `<span style="font-size:11px; color:#94a3b8;">Port Mapping</span><br>`;
+        title += `<span style="font-size:13px; font-family:monospace; color:#22d3ee; font-weight:600;">${edge.source_port_label}</span>`;
+        title += `<span style="font-size:11px; color:#64748b; margin:0 6px;">⟷</span>`;
+        title += `<span style="font-size:13px; font-family:monospace; color:#22d3ee; font-weight:600;">${edge.target_port_label}</span>`;
+        title += `</div>`;
+    }
+    title += `</div>`;
+    return title;
+}
+
+function buildVisEdge(edge, devices) {
     const color = edgeColorMap[edge.connection_type] || edgeColorMap.cat5;
     const dashes = edgeDashMap[edge.connection_type] ?? false;
     const label = edgeLabelMap[edge.connection_type] || edge.connection_type || '';
@@ -262,6 +312,7 @@ function buildVisEdge(edge) {
         color: { color, highlight: color, hover: color },
         dashes, width: 2, label,
         font: { color: '#e2e8f0', size: 10, strokeWidth: 0 },
+        title: buildEdgeTitle(edge, devices || []),
     };
 }
 

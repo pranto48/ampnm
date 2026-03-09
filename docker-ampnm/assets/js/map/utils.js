@@ -171,6 +171,70 @@ MapApp.utils = {
     },
 
     /**
+     * Build rich HTML tooltip for a connection edge
+     */
+    buildEdgeTitle: (edge, srcDevice, tgtDevice) => {
+        const typeLabels = {
+            cat6: '🔌 CAT6 Cable', cat5: '🔌 CAT5 Cable', fiber: '💡 Fiber Optic',
+            wifi: '📡 WiFi', radio: '📻 Radio', lan: '🌐 LAN',
+            'logical-tunneling': '🔒 Logical Tunnel'
+        };
+        const typeColors = {
+            cat6: '#a78bfa', cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8',
+            radio: '#84cc16', lan: '#60a5fa', 'logical-tunneling': '#c084fc'
+        };
+        const connType = edge.connection_type || 'unknown';
+        const connLabel = typeLabels[connType] || connType;
+        const connColor = typeColors[connType] || '#94a3b8';
+
+        let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 200px; max-width: 300px; padding: 2px;">`;
+
+        // Header
+        title += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">`;
+        title += `<div style="width:12px; height:3px; border-radius:2px; background:${connColor};"></div>`;
+        title += `<b style="font-size:13px; color:#f1f5f9;">${connLabel}</b>`;
+        title += `</div>`;
+
+        title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-bottom:8px;"></div>`;
+
+        // Connected devices
+        title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px;">`;
+
+        const srcName = srcDevice ? srcDevice.name : 'Unknown';
+        const tgtName = tgtDevice ? tgtDevice.name : 'Unknown';
+        const srcStatus = srcDevice ? (srcDevice.status || 'unknown') : 'unknown';
+        const tgtStatus = tgtDevice ? (tgtDevice.status || 'unknown') : 'unknown';
+        const statusDotColors = { online: '#22c55e', warning: '#eab308', critical: '#ef4444', offline: '#64748b', unknown: '#94a3b8' };
+
+        title += `<span style="color:#94a3b8;">Source:</span>`;
+        title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[srcStatus] || '#94a3b8'}; margin-right:4px;"></span>${srcName}</span>`;
+
+        title += `<span style="color:#94a3b8;">Target:</span>`;
+        title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[tgtStatus] || '#94a3b8'}; margin-right:4px;"></span>${tgtName}</span>`;
+
+        // Port mapping
+        if (edge.source_port_label || edge.target_port_label) {
+            title += `<span style="color:#94a3b8;">Ports:</span>`;
+            title += `<span style="color:#22d3ee; font-family:monospace; font-weight:600;">${edge.source_port_label || '—'} ↔ ${edge.target_port_label || '—'}</span>`;
+        }
+
+        title += `</div>`;
+
+        // Port mapping visual
+        if (edge.source_port_label && edge.target_port_label) {
+            title += `<div style="margin-top:8px; padding:6px 8px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); border-radius:6px; text-align:center;">`;
+            title += `<span style="font-size:11px; color:#94a3b8;">Port Mapping</span><br>`;
+            title += `<span style="font-size:13px; font-family:monospace; color:#22d3ee; font-weight:600;">${edge.source_port_label}</span>`;
+            title += `<span style="font-size:11px; color:#64748b; margin:0 6px;">⟷</span>`;
+            title += `<span style="font-size:13px; font-family:monospace; color:#22d3ee; font-weight:600;">${edge.target_port_label}</span>`;
+            title += `</div>`;
+        }
+
+        title += `</div>`;
+        return title;
+    },
+
+    /**
      * Get Font Awesome icon class for a device based on type and subchoice
      * @param {string} deviceType - Device type key (e.g., 'router', 'server', 'wifi')
      * @param {number|string} subchoice - Icon variant index (0-based)
