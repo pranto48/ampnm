@@ -159,24 +159,38 @@ export default function NetworkMapPage() {
 
     if (devRes.data) {
       devicesCache.current = devRes.data;
-      const flowNodes: Node[] = devRes.data.map((d: Device) => ({
-        id: d.id,
-        type: "device",
-        position: { x: Number(d.x) || 100, y: Number(d.y) || 100 },
-        data: {
-          name: d.name,
-          ip_address: d.ip_address,
-          status: d.status || "unknown",
-          icon: d.type || "server",
-          subchoice: d.subchoice,
-          icon_url: d.icon_url,
-          icon_size: d.icon_size || 40,
-          name_text_size: d.name_text_size || 12,
-          last_latency: d.last_latency,
-          last_ping: d.last_ping,
-          onContextMenu: handleNodeContextMenu,
-        },
-      }));
+      const flowNodes: Node[] = devRes.data.map((d: Device) => {
+        const isBox = d.type === "box";
+        return {
+          id: d.id,
+          type: isBox ? "group" : "device",
+          position: { x: Number(d.x) || 100, y: Number(d.y) || 100 },
+          style: isBox ? {
+            width: 250,
+            height: 180,
+            background: "hsla(215, 25%, 27%, 0.4)",
+            border: "2px dashed hsl(215, 20%, 45%)",
+            borderRadius: 12,
+            padding: 16,
+            zIndex: -1,
+          } : undefined,
+          data: isBox ? {
+            label: d.name,
+          } : {
+            name: d.name,
+            ip_address: d.ip_address,
+            status: d.status || "unknown",
+            icon: d.type || "server",
+            subchoice: d.subchoice,
+            icon_url: d.icon_url,
+            icon_size: d.icon_size || 40,
+            name_text_size: d.name_text_size || 12,
+            last_latency: d.last_latency,
+            last_ping: d.last_ping,
+            onContextMenu: handleNodeContextMenu,
+          },
+        };
+      });
       setNodes(flowNodes);
     }
 
