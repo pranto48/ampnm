@@ -492,6 +492,88 @@ return [
             ['icon' => 'fa-square-full', 'label' => 'Box (Square)'],
         ]
     ],
+    // ===== NEW CATEGORIES (v3 expansion) =====
+    'display' => [
+        'label' => 'Monitor / Display',
+        'icons' => [
+            ['icon' => 'fa-desktop', 'label' => 'Monitor (Desktop)'],
+            ['icon' => 'fa-tv', 'label' => 'Monitor (TV)'],
+            ['icon' => 'fa-display', 'label' => 'Monitor (Display)'],
+            ['icon' => 'fa-screen-share', 'label' => 'Monitor (Screen Share)'],
+            ['icon' => 'fa-window-maximize', 'label' => 'Monitor (Window)'],
+        ]
+    ],
+    'satellite' => [
+        'label' => 'Satellite / Antenna',
+        'icons' => [
+            ['icon' => 'fa-satellite-dish', 'label' => 'Satellite (Dish)'],
+            ['icon' => 'fa-tower-broadcast', 'label' => 'Satellite (Tower)'],
+            ['icon' => 'fa-radio', 'label' => 'Satellite (Radio)'],
+            ['icon' => 'fa-signal', 'label' => 'Satellite (Signal)'],
+            ['icon' => 'fa-satellite', 'label' => 'Satellite (Orbit)'],
+        ]
+    ],
+    'networktap' => [
+        'label' => 'Network Tap / Probe',
+        'icons' => [
+            ['icon' => 'fa-magnifying-glass-chart', 'label' => 'Tap (Chart)'],
+            ['icon' => 'fa-stethoscope', 'label' => 'Tap (Probe)'],
+            ['icon' => 'fa-eye', 'label' => 'Tap (Eye)'],
+            ['icon' => 'fa-crosshairs', 'label' => 'Tap (Crosshair)'],
+            ['icon' => 'fa-wave-square', 'label' => 'Tap (Wave)'],
+        ]
+    ],
+    'proxy' => [
+        'label' => 'Proxy Server',
+        'icons' => [
+            ['icon' => 'fa-arrows-left-right', 'label' => 'Proxy (Arrows)'],
+            ['icon' => 'fa-shield-halved', 'label' => 'Proxy (Shield)'],
+            ['icon' => 'fa-globe', 'label' => 'Proxy (Globe)'],
+            ['icon' => 'fa-filter', 'label' => 'Proxy (Filter)'],
+            ['icon' => 'fa-layer-group', 'label' => 'Proxy (Layers)'],
+        ]
+    ],
+    'nvr' => [
+        'label' => 'NVR / Video Recorder',
+        'icons' => [
+            ['icon' => 'fa-video', 'label' => 'NVR (Video)'],
+            ['icon' => 'fa-hard-drive', 'label' => 'NVR (Drive)'],
+            ['icon' => 'fa-film', 'label' => 'NVR (Film)'],
+            ['icon' => 'fa-clapperboard', 'label' => 'NVR (Clapperboard)'],
+            ['icon' => 'fa-box-archive', 'label' => 'NVR (Archive)'],
+        ]
+    ],
+    'pos' => [
+        'label' => 'POS Terminal',
+        'icons' => [
+            ['icon' => 'fa-credit-card', 'label' => 'POS (Card)'],
+            ['icon' => 'fa-cart-shopping', 'label' => 'POS (Cart)'],
+            ['icon' => 'fa-receipt', 'label' => 'POS (Receipt)'],
+            ['icon' => 'fa-money-bill', 'label' => 'POS (Cash)'],
+            ['icon' => 'fa-qrcode', 'label' => 'POS (QR)'],
+        ]
+    ],
+    'kiosk' => [
+        'label' => 'Kiosk / Digital Signage',
+        'icons' => [
+            ['icon' => 'fa-desktop', 'label' => 'Kiosk (Screen)'],
+            ['icon' => 'fa-chalkboard', 'label' => 'Kiosk (Board)'],
+            ['icon' => 'fa-table-columns', 'label' => 'Kiosk (Dashboard)'],
+            ['icon' => 'fa-window-maximize', 'label' => 'Kiosk (Window)'],
+        ]
+    ],
+    'envsensor' => [
+        'label' => 'Environmental Sensor',
+        'icons' => [
+            ['icon' => 'fa-temperature-half', 'label' => 'Sensor (Temp)'],
+            ['icon' => 'fa-droplet', 'label' => 'Sensor (Humidity)'],
+            ['icon' => 'fa-wind', 'label' => 'Sensor (Wind)'],
+            ['icon' => 'fa-sun', 'label' => 'Sensor (Sun)'],
+            ['icon' => 'fa-water', 'label' => 'Sensor (Water)'],
+            ['icon' => 'fa-gauge-high', 'label' => 'Sensor (Gauge)'],
+        ]
+    ],
+
     'other' => [
         'label' => 'Generic / Other',
         'icons' => [
