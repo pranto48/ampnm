@@ -202,7 +202,7 @@ export default function NetworkMapPage() {
       }
 
       const flowEdges: Edge[] = edgeRes.data.map((e: DeviceEdge) => {
-        const connType = e.connection_type || "cat5";
+        const connType = e.connection_type || "cat6";
         const sourceStatus = deviceStatusMap.get(e.source_id) || "unknown";
         const targetStatus = deviceStatusMap.get(e.target_id) || "unknown";
         const isOffline = sourceStatus === "offline" || targetStatus === "offline";
