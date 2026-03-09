@@ -3,8 +3,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Pencil, Trash2, Activity, Timer, ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal } from "lucide-react";
+import { Pencil, Trash2, Activity, Timer, ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { getIconComponent } from "@/components/devices/DeviceIconPicker";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -48,6 +49,8 @@ const COLUMNS: { id: ColumnId; label: string }[] = [
 ];
 
 const STORAGE_KEY = "ampnm-device-columns";
+const PAGE_SIZE_KEY = "ampnm-device-page-size";
+const PAGE_SIZES = [10, 25, 50, 100];
 
 function loadVisibleColumns(): Set<ColumnId> {
   try {
@@ -55,6 +58,14 @@ function loadVisibleColumns(): Set<ColumnId> {
     if (stored) return new Set(JSON.parse(stored));
   } catch {}
   return new Set(COLUMNS.map(c => c.id));
+}
+
+function loadPageSize(): number {
+  try {
+    const stored = localStorage.getItem(PAGE_SIZE_KEY);
+    if (stored) { const n = parseInt(stored); if (PAGE_SIZES.includes(n)) return n; }
+  } catch {}
+  return 25;
 }
 
 interface DeviceTableProps {
@@ -75,6 +86,8 @@ export function DeviceTable({ devices, loading, search, selected, pingingIds, on
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [visibleCols, setVisibleCols] = useState<Set<ColumnId>>(loadVisibleColumns);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(loadPageSize);
 
   const toggleColumn = (col: ColumnId) => {
     setVisibleCols(prev => {
@@ -92,6 +105,7 @@ export function DeviceTable({ devices, loading, search, selected, pingingIds, on
       setSortKey(key);
       setSortDir("asc");
     }
+    setPage(0);
   };
 
   const sortedDevices = useMemo(() => {
@@ -114,8 +128,25 @@ export function DeviceTable({ devices, loading, search, selected, pingingIds, on
     });
   }, [devices, sortKey, sortDir]);
 
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(sortedDevices.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedDevices = sortedDevices.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const startRow = sortedDevices.length === 0 ? 0 : safePage * pageSize + 1;
+  const endRow = Math.min((safePage + 1) * pageSize, sortedDevices.length);
+
+  const handlePageSizeChange = (value: string) => {
+    const size = parseInt(value);
+    setPageSize(size);
+    setPage(0);
+    localStorage.setItem(PAGE_SIZE_KEY, String(size));
+  };
+
+  // Reset page when devices change (e.g. filter)
+  useMemo(() => { if (page >= totalPages) setPage(Math.max(0, totalPages - 1)); }, [devices.length, pageSize]);
+
   const show = (col: ColumnId) => visibleCols.has(col);
-  const visibleCount = 2 + visibleCols.size; // checkbox + actions always visible
+  const visibleCount = 2 + visibleCols.size;
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
@@ -174,14 +205,14 @@ export function DeviceTable({ devices, loading, search, selected, pingingIds, on
             <TableRow>
               <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">Loading devices...</TableCell>
             </TableRow>
-          ) : sortedDevices.length === 0 ? (
+          ) : pagedDevices.length === 0 ? (
             <TableRow>
               <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">
                 {search ? "No devices match your search." : 'No devices configured. Click "Add Device" to get started.'}
               </TableCell>
             </TableRow>
           ) : (
-            sortedDevices.map(device => (
+            pagedDevices.map(device => (
               <TableRow key={device.id} className={selected.has(device.id) ? "bg-muted/50" : ""}>
                 <TableCell>
                   <Checkbox checked={selected.has(device.id)} onCheckedChange={() => onToggleOne(device.id)} aria-label={`Select ${device.name}`} />
@@ -236,6 +267,44 @@ export function DeviceTable({ devices, loading, search, selected, pingingIds, on
           )}
         </TableBody>
       </Table>
+
+      {/* Pagination footer */}
+      {!loading && sortedDevices.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Rows per page</span>
+            <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+              <SelectTrigger className="h-8 w-[70px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZES.map(s => (
+                  <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {startRow}–{endRow} of {sortedDevices.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(0)} disabled={safePage === 0}>
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(totalPages - 1)} disabled={safePage >= totalPages - 1}>
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

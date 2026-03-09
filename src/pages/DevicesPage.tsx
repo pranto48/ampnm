@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Server, RefreshCw, Search, Download, Upload, Activity } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Trash2, Server, RefreshCw, Search, Download, Upload, Activity, Filter } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { DeviceTable } from "@/components/devices/DeviceTable";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,7 @@ export default function DevicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pingingIds, setPingingIds] = useState<Set<string>>(new Set());
   const [isPingingAll, setIsPingingAll] = useState(false);
@@ -26,6 +28,12 @@ export default function DevicesPage() {
   const { toast } = useToast();
 
   const filteredDevices = devices.filter(d => {
+    // Status filter
+    if (statusFilter !== "all") {
+      const ds = d.status ?? "unknown";
+      if (ds !== statusFilter) return false;
+    }
+    // Search filter
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return d.name.toLowerCase().includes(q) || (d.ip_address || "").toLowerCase().includes(q);
@@ -196,9 +204,27 @@ export default function DevicesPage() {
           </div>
         </div>
 
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search devices..." className="pl-9" />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search devices..." className="pl-9" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="online">Online</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="offline">Offline</SelectItem>
+                <SelectItem value="unknown">Unknown</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <Card>
