@@ -109,12 +109,18 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
       setWarningPacketloss(device.warning_packetloss_threshold ?? 10);
       setCriticalLatency(device.critical_latency_threshold ?? 500);
       setCriticalPacketloss(device.critical_packetloss_threshold ?? 50);
+      // Parse port_config
+      try {
+        const pc = (device as any).port_config;
+        if (pc && Array.isArray(pc)) setPortGroups(pc);
+        else setPortGroups([]);
+      } catch { setPortGroups([]); }
     } else {
       setName(""); setMapId("__none__"); setIpAddress(""); setDescription(""); setType("server");
       setSubchoice(""); setMonitorMethod("ping"); setCheckPort("");
       setPingInterval(300); setIconUrl(""); setIconSize(40); setNameTextSize(12);
       setShowLivePing(false); setWarningLatency(100); setWarningPacketloss(10);
-      setCriticalLatency(500); setCriticalPacketloss(50);
+      setCriticalLatency(500); setCriticalPacketloss(50); setPortGroups([]);
     }
   }, [device, open]);
 
