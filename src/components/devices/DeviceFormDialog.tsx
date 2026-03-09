@@ -328,6 +328,89 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
               </div>
             </TabsContent>
 
+            <TabsContent value="ports" className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">Define custom port groups for this device. Each group generates a range of ports with an optional VLAN tag.</p>
+              {portGroups.map((pg, idx) => (
+                <div key={idx} className="grid grid-cols-6 gap-2 items-end bg-muted/30 rounded-lg p-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Type</Label>
+                    <Select value={pg.type} onValueChange={(v) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, type: v };
+                      setPortGroups(updated);
+                    }}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["GE", "SFP", "Serial", "Mgmt", "Console"].map(t => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Prefix</Label>
+                    <Input className="h-8 text-xs" value={pg.prefix} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, prefix: e.target.value };
+                      setPortGroups(updated);
+                    }} placeholder="G0/" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Start</Label>
+                    <Input className="h-8 text-xs" type="number" min={0} value={pg.start} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, start: parseInt(e.target.value) || 0 };
+                      setPortGroups(updated);
+                    }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Count</Label>
+                    <Input className="h-8 text-xs" type="number" min={1} value={pg.count} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, count: parseInt(e.target.value) || 1 };
+                      setPortGroups(updated);
+                    }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">VLAN</Label>
+                    <Input className="h-8 text-xs" value={pg.vlan} onChange={(e) => {
+                      const updated = [...portGroups];
+                      updated[idx] = { ...pg, vlan: e.target.value };
+                      setPortGroups(updated);
+                    }} placeholder="e.g. 100" />
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
+                    setPortGroups(portGroups.filter((_, i) => i !== idx));
+                  }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => {
+                setPortGroups([...portGroups, { type: "GE", prefix: "G0/", start: 1, count: 4, vlan: "" }]);
+              }} className="gap-1">
+                <Plus className="h-4 w-4" />
+                Add Port Group
+              </Button>
+              {portGroups.length > 0 && (
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <Label className="text-xs text-muted-foreground mb-2 block">Preview: {portGroups.reduce((sum, g) => sum + g.count, 0)} total ports</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {portGroups.flatMap((g) =>
+                      Array.from({ length: g.count }, (_, i) => {
+                        const portName = `${g.prefix}${g.start + i}`;
+                        return (
+                          <span key={`${portName}-${i}`} className="text-[10px] font-mono bg-card border border-border rounded px-1.5 py-0.5">
+                            {portName}{g.vlan && <span className="text-primary ml-0.5">v{g.vlan}</span>}
+                          </span>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
             <TabsContent value="thresholds" className="space-y-4 mt-4">
               <p className="text-sm text-muted-foreground">Set thresholds to determine when a device status changes to warning or critical.</p>
               <div className="grid grid-cols-2 gap-4">
