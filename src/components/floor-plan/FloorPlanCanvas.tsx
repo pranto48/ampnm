@@ -31,6 +31,7 @@ interface FloorPlanCanvasProps {
   panY: number;
   onPanChange: (x: number, y: number) => void;
   onZoomChange: (z: number) => void;
+  svgRef?: React.RefObject<SVGSVGElement | null>;
 }
 
 // Resolve positions for cable endpoints
