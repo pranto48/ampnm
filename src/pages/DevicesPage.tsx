@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Server, RefreshCw, Search, Download, Upload, Activity, Filter } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, Trash2, Server, RefreshCw, Search, Download, Upload, Activity, Filter, FileText, FileJson } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { DeviceTable } from "@/components/devices/DeviceTable";
 import { StatusSummaryBar } from "@/components/devices/StatusSummaryBar";
@@ -127,13 +128,29 @@ export default function DevicesPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExportAmp = () => {
     const exportData = devices.map(({ id, created_at, updated_at, user_id, last_ping, last_ping_result, last_latency, status, ...rest }) => rest);
     const blob = new Blob([JSON.stringify({ version: "1.0", format: "ampnm", exported_at: new Date().toISOString(), devices: exportData }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `ampnm-devices-${new Date().toISOString().slice(0, 10)}.amp`; a.click();
     URL.revokeObjectURL(url);
-    toast({ title: `Exported ${devices.length} devices` });
+    toast({ title: `Exported ${devices.length} devices as .amp` });
+  };
+
+  const handleExportCsv = () => {
+    const headers = ["name", "ip_address", "type", "subchoice", "monitor_method", "check_port", "ping_interval", "status", "last_latency", "description"];
+    const rows = devices.map(d => headers.map(h => {
+      const val = (d as any)[h];
+      if (val == null) return "";
+      const str = String(val);
+      return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str.replace(/"/g, '""')}"` : str;
+    }).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `ampnm-devices-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `Exported ${devices.length} devices as CSV` });
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,9 +209,21 @@ export default function DevicesPage() {
             <Button variant="outline" size="sm" onClick={fetchDevices} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={devices.length === 0}>
-              <Download className="h-4 w-4 mr-1" /> Export
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={devices.length === 0}>
+                  <Download className="h-4 w-4 mr-1" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportAmp}>
+                  <FileJson className="h-4 w-4 mr-2" /> Export as .amp
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCsv}>
+                  <FileText className="h-4 w-4 mr-2" /> Export as CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-4 w-4 mr-1" /> Import
             </Button>
