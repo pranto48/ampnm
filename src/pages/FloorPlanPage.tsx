@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,6 +56,7 @@ export default function FloorPlanPage() {
   const [loading, setLoading] = useState(true);
 
   // Canvas state
+  const canvasSvgRef = useRef<SVGSVGElement>(null);
   const [activeTool, setActiveTool] = useState<ToolMode>("select");
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
@@ -396,6 +397,7 @@ export default function FloorPlanPage() {
               onUpload={() => setUploadDialog(true)}
               snapToGrid={snapToGrid} onToggleSnap={() => setSnapToGrid(s => !s)}
               isAdmin={isAdmin} onDeleteSelected={handleDeleteSelected} hasSelection={!!selectedItem}
+              canvasRef={canvasSvgRef} planName={selectedPlan.name}
             />
             <div className="flex-1 min-w-0">
               <FloorPlanCanvas
@@ -406,6 +408,7 @@ export default function FloorPlanPage() {
                 onCanvasClick={handleCanvasClick} onCableEndpointClick={handleCableEndpointClick}
                 zoom={zoom} panX={panX} panY={panY}
                 onPanChange={(x, y) => { setPanX(x); setPanY(y); }} onZoomChange={setZoom}
+                svgRef={canvasSvgRef}
               />
             </div>
             {selectedItem && (
