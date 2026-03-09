@@ -573,6 +573,14 @@ export const IconPicker = ({ value, onChange, open, onOpenChange }: IconPickerPr
   const [search, setSearch] = useState('');
   const [quickFilter, setQuickFilter] = useState<string>('all');
 
+  const recentIcons = useMemo(() => {
+    try {
+      const stored = localStorage.getItem("ampnm-docker-recent-icons");
+      const ids: string[] = stored ? JSON.parse(stored) : [];
+      return ids.map(id => ICON_OPTIONS.find(i => i.value === id)).filter(Boolean) as typeof ICON_OPTIONS;
+    } catch { return []; }
+  }, [open]);
+
   const filteredIcons = useMemo(() => {
     const term = search.toLowerCase();
     const selectedQuickFilter = QUICK_FILTERS.find(filter => filter.id === quickFilter);
@@ -598,6 +606,14 @@ export const IconPicker = ({ value, onChange, open, onOpenChange }: IconPickerPr
   );
 
   const handleSelect = (iconValue: string) => {
+    // Save to recently used
+    try {
+      const key = "ampnm-docker-recent-icons";
+      const stored = localStorage.getItem(key);
+      const recent: string[] = stored ? JSON.parse(stored) : [];
+      const updated = [iconValue, ...recent.filter(v => v !== iconValue)].slice(0, 10);
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch {}
     onChange(iconValue);
     onOpenChange(false);
   };
@@ -666,6 +682,32 @@ export const IconPicker = ({ value, onChange, open, onOpenChange }: IconPickerPr
         </div>
 
         <ScrollArea className="mt-2 h-80 pr-2">
+          {/* Recently Used */}
+          {recentIcons.length > 0 && category === 'all' && quickFilter === 'all' && !search && (
+            <div className="mb-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recently Used</p>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                {recentIcons.map(icon => (
+                  <Button
+                    key={`recent-${icon.value}`}
+                    variant={value === icon.value ? 'default' : 'outline'}
+                    className="h-auto justify-start p-3 text-left"
+                    onClick={() => handleSelect(icon.value)}
+                  >
+                    <div className="flex w-full items-center gap-3">
+                      <icon.Icon className="h-5 w-5" />
+                      <div className="flex-1">
+                        <div className="font-medium capitalize leading-tight">{icon.label}</div>
+                        <div className="text-xs text-muted-foreground">Recent</div>
+                      </div>
+                      {value === icon.value && <Check className="h-4 w-4" />}
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {filteredIcons.length === 0 ? (
             <p className="text-sm text-muted-foreground">No icons match your search.</p>
           ) : (
