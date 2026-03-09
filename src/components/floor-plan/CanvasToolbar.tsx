@@ -136,6 +136,19 @@ export function CanvasToolbar({
         <Grid3X3 className="h-4 w-4" />
       </Button>
 
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-9 w-9" title="Export Canvas">
+            <Download className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right">
+          <DropdownMenuItem onClick={() => handleExport('png')}>Export as PNG</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleExport('svg')}>Export as SVG</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      </Button>
+
       {isAdmin && (
         <>
           <Button variant="ghost" size="icon" className="h-9 w-9" title="Upload Floor Plan" onClick={onUpload}>
