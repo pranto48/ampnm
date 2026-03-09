@@ -217,7 +217,8 @@ export function FloorPlanCanvas({
         {racks.map(rack => (
           <CanvasRackNode
             key={rack.id}
-            {...rack}
+            id={rack.id} x={rack.x} y={rack.y} name={rack.name}
+            rackUnits={rack.rack_units} rotation={rack.rotation}
             labelVisible={rack.label_visible}
             selected={selectedItem?.kind === "rack" && selectedItem.id === rack.id}
             onMouseDown={e => startDrag("rack", rack.id, e)}
