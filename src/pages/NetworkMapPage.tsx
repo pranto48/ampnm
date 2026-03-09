@@ -575,7 +575,13 @@ export default function NetworkMapPage() {
         {/* Controls Bar */}
         {currentMap && (
           <div className="flex items-center justify-between flex-wrap gap-2 bg-card border border-border rounded-lg px-4 py-2">
-            <span className="font-semibold text-foreground">{currentMap.name}</span>
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-foreground">{currentMap.name}</span>
+              <Badge variant="outline" className="gap-1 text-xs font-medium border-border text-muted-foreground" title="Offline detection delay">
+                <Clock className="h-3 w-3 text-warning" />
+                {offlineDelay}s delay
+              </Badge>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 border-r border-border pr-2 mr-1">
                 <Label htmlFor="live-toggle" className="text-xs text-muted-foreground cursor-pointer">Live Status</Label>
