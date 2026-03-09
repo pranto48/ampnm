@@ -459,12 +459,25 @@ export default function FloorPlanPage() {
                 zoom={zoom} panX={panX} panY={panY}
                 onPanChange={(x, y) => { setPanX(x); setPanY(y); }} onZoomChange={setZoom}
                 svgRef={canvasSvgRef}
+                onContextMenu={handleContextMenu}
               />
             </div>
             {selectedItem && (
               <PropertiesPanel item={selectedItem} onUpdate={handlePropertyUpdate} onClose={() => setSelectedItem(null)} isAdmin={isAdmin} />
             )}
           </div>
+        )}
+
+        {/* Context menu */}
+        {contextMenu && (
+          <CanvasContextMenu
+            menu={contextMenu}
+            onClose={() => setContextMenu(null)}
+            onEdit={handleCtxEdit}
+            onDelete={handleCtxDelete}
+            onDuplicate={handleCtxDuplicate}
+            isAdmin={isAdmin}
+          />
         )}
 
         {/* ═══════════ LIST VIEW ═══════════ */}
