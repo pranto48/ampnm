@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload, Activity, Timer } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
+import { getIconComponent } from "@/components/devices/DeviceIconPicker";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -279,6 +280,7 @@ export default function DevicesPage() {
                   <TableHead className="w-10">
                     <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
                   </TableHead>
+                  <TableHead className="w-10">Icon</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>IP / Host</TableHead>
                   <TableHead>Type</TableHead>
@@ -292,13 +294,13 @@ export default function DevicesPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                   <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                        Loading devices...
                      </TableCell>
                   </TableRow>
                 ) : filteredDevices.length === 0 ? (
                   <TableRow>
-                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                   <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                        {search ? "No devices match your search." : 'No devices configured. Click "Add Device" to get started.'}
                     </TableCell>
                   </TableRow>
@@ -307,6 +309,16 @@ export default function DevicesPage() {
                     <TableRow key={device.id} className={selected.has(device.id) ? "bg-muted/50" : ""}>
                       <TableCell>
                         <Checkbox checked={selected.has(device.id)} onCheckedChange={() => toggleOne(device.id)} aria-label={`Select ${device.name}`} />
+                      </TableCell>
+                      <TableCell>
+                        {device.icon_url ? (
+                          <img src={device.icon_url} alt={device.name} className="h-6 w-6 object-contain rounded" />
+                        ) : (
+                          (() => {
+                            const DevIcon = getIconComponent(device.subchoice || device.type);
+                            return <DevIcon className="h-5 w-5 text-muted-foreground" />;
+                          })()
+                        )}
                       </TableCell>
                       <TableCell className="font-medium">{device.name}</TableCell>
                       <TableCell className="font-mono text-sm">{device.ip_address || "—"}</TableCell>
