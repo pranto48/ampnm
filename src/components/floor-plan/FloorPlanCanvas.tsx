@@ -48,7 +48,7 @@ export function FloorPlanCanvas({
   backgroundUrl, width, height, racks, devices, cables, annotations,
   activeTool, snapToGrid, selectedItem, onSelectItem, onMoveItem,
   onCanvasClick, onCableEndpointClick, zoom, panX, panY, onPanChange, onZoomChange,
-  svgRef: externalSvgRef,
+  svgRef: externalSvgRef, onContextMenu: onCtxMenu,
 }: FloorPlanCanvasProps) {
   const internalRef = useRef<SVGSVGElement>(null);
   const svgRef = externalSvgRef || internalRef;
