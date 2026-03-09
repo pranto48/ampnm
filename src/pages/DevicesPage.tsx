@@ -228,6 +228,8 @@ export default function DevicesPage() {
           </div>
         </div>
 
+        <StatusSummaryBar devices={filteredDevices} />
+
         <Card>
           <CardContent className="p-0">
             <DeviceTable
