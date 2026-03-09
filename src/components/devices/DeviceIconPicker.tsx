@@ -620,6 +620,8 @@ export function DeviceIconPicker({ open, onOpenChange, selectedType, selectedSub
                           isActive ? "bg-primary/10 border-primary ring-1 ring-primary/30" : "border-border bg-card"
                         )}
                         onClick={() => {
+                          saveRecentIcon(iconOpt.id);
+                          setRecentIds(getRecentIcons());
                           onSelect(cat.key, iconOpt.id);
                           onOpenChange(false);
                         }}
