@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Server, RefreshCw, Search, Download, Upload, Activity, Filter } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { DeviceTable } from "@/components/devices/DeviceTable";
+import { StatusSummaryBar } from "@/components/devices/StatusSummaryBar";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -226,6 +227,8 @@ export default function DevicesPage() {
             </Select>
           </div>
         </div>
+
+        <StatusSummaryBar devices={filteredDevices} />
 
         <Card>
           <CardContent className="p-0">
