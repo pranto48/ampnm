@@ -77,8 +77,9 @@ export default function FloorPlanPage() {
   const [labelDialog, setLabelDialog] = useState(false);
   const [pendingLabelPos, setPendingLabelPos] = useState<{ x: number; y: number } | null>(null);
 
-  // Cable drawing
+  // Cable drawing & context menu
   const [cableSource, setCableSource] = useState<{ kind: string; id: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
