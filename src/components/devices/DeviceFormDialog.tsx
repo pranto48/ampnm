@@ -38,6 +38,14 @@ const MONITOR_METHODS = [
   { value: "none", label: "None (Manual)" },
 ];
 
+interface PortGroup {
+  type: string;
+  prefix: string;
+  start: number;
+  count: number;
+  vlan: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
