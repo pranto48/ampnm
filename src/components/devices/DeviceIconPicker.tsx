@@ -409,6 +409,81 @@ export const DEVICE_ICON_CATEGORIES: IconCategory[] = [
       { id: "box-layers", label: "Layers", icon: Layers },
     ],
   },
+  // ===== NEW ICON PACKS (v3 expansion) =====
+  {
+    key: "display", label: "Monitor / Display",
+    icons: [
+      { id: "display-monitor", label: "Monitor", icon: Monitor },
+      { id: "display-tv", label: "TV", icon: Tv },
+      { id: "display-share", label: "Screen Share", icon: ScreenShare },
+      { id: "display-window", label: "App Window", icon: AppWindow },
+    ],
+  },
+  {
+    key: "satellite", label: "Satellite / Antenna",
+    icons: [
+      { id: "sat-dish", label: "Satellite Dish", icon: SatelliteDish },
+      { id: "sat-antenna", label: "Antenna", icon: Antenna },
+      { id: "sat-radio", label: "Radio", icon: Radio },
+      { id: "sat-signal", label: "Signal", icon: Signal },
+      { id: "sat-tower", label: "Tower", icon: TowerControl },
+    ],
+  },
+  {
+    key: "networktap", label: "Network Tap / Probe",
+    icons: [
+      { id: "tap-scan", label: "Scan Line", icon: ScanLine },
+      { id: "tap-activity", label: "Activity", icon: Gauge },
+      { id: "tap-search", label: "Search", icon: Search },
+      { id: "tap-eye", label: "Eye", icon: Eye },
+      { id: "tap-crosshair", label: "Crosshair", icon: Crosshair },
+    ],
+  },
+  {
+    key: "proxy", label: "Proxy Server",
+    icons: [
+      { id: "proxy-arrows", label: "Bidirectional", icon: ArrowLeftRight },
+      { id: "proxy-shield", label: "Shield", icon: Shield },
+      { id: "proxy-globe", label: "Globe", icon: Globe },
+      { id: "proxy-layers", label: "Layers", icon: Layers },
+    ],
+  },
+  {
+    key: "nvr", label: "NVR / Video Recorder",
+    icons: [
+      { id: "nvr-video", label: "Video", icon: Video },
+      { id: "nvr-drive", label: "Hard Drive", icon: HardDrive },
+      { id: "nvr-film", label: "Film", icon: Film },
+      { id: "nvr-clapper", label: "Clapperboard", icon: Clapperboard },
+      { id: "nvr-archive", label: "Archive", icon: Archive },
+    ],
+  },
+  {
+    key: "pos", label: "POS Terminal",
+    icons: [
+      { id: "pos-card", label: "Credit Card", icon: CreditCard },
+      { id: "pos-qr", label: "QR Code", icon: QrCode },
+      { id: "pos-barcode", label: "Barcode", icon: Barcode },
+    ],
+  },
+  {
+    key: "kiosk", label: "Kiosk / Digital Signage",
+    icons: [
+      { id: "kiosk-monitor", label: "Monitor", icon: Monitor },
+      { id: "kiosk-layout", label: "Dashboard", icon: LayoutGrid },
+      { id: "kiosk-window", label: "App Window", icon: AppWindow },
+    ],
+  },
+  {
+    key: "envsensor", label: "Environmental Sensor",
+    icons: [
+      { id: "env-temp", label: "Temperature", icon: Thermometer },
+      { id: "env-wind", label: "Wind", icon: Wind },
+      { id: "env-sun", label: "Sun", icon: SunMedium },
+      { id: "env-gauge", label: "Gauge", icon: Gauge },
+      { id: "env-zap", label: "Lightning", icon: Zap },
+    ],
+  },
   {
     key: "other", label: "Generic / Other",
     icons: [
