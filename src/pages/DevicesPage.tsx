@@ -20,6 +20,7 @@ export default function DevicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pingingIds, setPingingIds] = useState<Set<string>>(new Set());
   const [isPingingAll, setIsPingingAll] = useState(false);
@@ -27,6 +28,12 @@ export default function DevicesPage() {
   const { toast } = useToast();
 
   const filteredDevices = devices.filter(d => {
+    // Status filter
+    if (statusFilter !== "all") {
+      const ds = d.status ?? "unknown";
+      if (ds !== statusFilter) return false;
+    }
+    // Search filter
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return d.name.toLowerCase().includes(q) || (d.ip_address || "").toLowerCase().includes(q);
