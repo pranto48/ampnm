@@ -147,8 +147,6 @@ export function CanvasToolbar({
           <DropdownMenuItem onClick={() => handleExport('svg')}>Export as SVG</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      </Button>
-
       {isAdmin && (
         <>
           <Button variant="ghost" size="icon" className="h-9 w-9" title="Upload Floor Plan" onClick={onUpload}>
