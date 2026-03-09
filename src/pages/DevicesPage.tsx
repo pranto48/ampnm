@@ -209,9 +209,21 @@ export default function DevicesPage() {
             <Button variant="outline" size="sm" onClick={fetchDevices} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={devices.length === 0}>
-              <Download className="h-4 w-4 mr-1" /> Export
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={devices.length === 0}>
+                  <Download className="h-4 w-4 mr-1" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportAmp}>
+                  <FileJson className="h-4 w-4 mr-2" /> Export as .amp
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCsv}>
+                  <FileText className="h-4 w-4 mr-2" /> Export as CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-4 w-4 mr-1" /> Import
             </Button>
