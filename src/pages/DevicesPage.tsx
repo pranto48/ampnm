@@ -128,13 +128,29 @@ export default function DevicesPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExportAmp = () => {
     const exportData = devices.map(({ id, created_at, updated_at, user_id, last_ping, last_ping_result, last_latency, status, ...rest }) => rest);
     const blob = new Blob([JSON.stringify({ version: "1.0", format: "ampnm", exported_at: new Date().toISOString(), devices: exportData }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `ampnm-devices-${new Date().toISOString().slice(0, 10)}.amp`; a.click();
     URL.revokeObjectURL(url);
-    toast({ title: `Exported ${devices.length} devices` });
+    toast({ title: `Exported ${devices.length} devices as .amp` });
+  };
+
+  const handleExportCsv = () => {
+    const headers = ["name", "ip_address", "type", "subchoice", "monitor_method", "check_port", "ping_interval", "status", "last_latency", "description"];
+    const rows = devices.map(d => headers.map(h => {
+      const val = (d as any)[h];
+      if (val == null) return "";
+      const str = String(val);
+      return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str.replace(/"/g, '""')}"` : str;
+    }).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `ampnm-devices-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `Exported ${devices.length} devices as CSV` });
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
