@@ -47,8 +47,10 @@ export function FloorPlanCanvas({
   backgroundUrl, width, height, racks, devices, cables, annotations,
   activeTool, snapToGrid, selectedItem, onSelectItem, onMoveItem,
   onCanvasClick, onCableEndpointClick, zoom, panX, panY, onPanChange, onZoomChange,
+  svgRef: externalSvgRef,
 }: FloorPlanCanvasProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const internalRef = useRef<SVGSVGElement>(null);
+  const svgRef = externalSvgRef || internalRef;
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState<{ kind: string; id: string; offsetX: number; offsetY: number } | null>(null);
