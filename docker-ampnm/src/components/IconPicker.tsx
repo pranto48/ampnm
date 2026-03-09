@@ -573,6 +573,14 @@ export const IconPicker = ({ value, onChange, open, onOpenChange }: IconPickerPr
   const [search, setSearch] = useState('');
   const [quickFilter, setQuickFilter] = useState<string>('all');
 
+  const recentIcons = useMemo(() => {
+    try {
+      const stored = localStorage.getItem("ampnm-docker-recent-icons");
+      const ids: string[] = stored ? JSON.parse(stored) : [];
+      return ids.map(id => ICON_OPTIONS.find(i => i.value === id)).filter(Boolean) as typeof ICON_OPTIONS;
+    } catch { return []; }
+  }, [open]);
+
   const filteredIcons = useMemo(() => {
     const term = search.toLowerCase();
     const selectedQuickFilter = QUICK_FILTERS.find(filter => filter.id === quickFilter);
