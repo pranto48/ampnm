@@ -880,7 +880,7 @@ export default function NetworkMapPage() {
       <EdgeEditor
         open={!!editingEdge}
         onOpenChange={(open) => { if (!open) setEditingEdge(null); }}
-        currentType={(editingEdge?.data?.connection_type as string) || "cat5"}
+        currentType={(editingEdge?.data?.connection_type as string) || "cat6"}
         onSave={handleEdgeSave}
         onDelete={handleEdgeDelete}
       />
