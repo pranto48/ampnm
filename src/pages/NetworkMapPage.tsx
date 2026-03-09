@@ -601,6 +601,12 @@ export default function NetworkMapPage() {
                 </Button>
               )}
               {isAdmin && (
+                <Button variant="ghost" size="sm" onClick={handleAddGroupBox} title="Add a visual grouping rectangle" className="gap-1 text-xs">
+                  <Square className="h-4 w-4" />
+                  Group Box
+                </Button>
+              )}
+              {isAdmin && (
                 <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Map Settings">
                   <Settings className="h-4 w-4" />
                 </Button>
