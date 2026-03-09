@@ -390,7 +390,7 @@ export default function NetworkMapPage() {
     const exportData = {
       map: { name: currentMap.name, background_color: currentMap.background_color, background_image_url: currentMap.background_image_url },
       devices: nodes.map((n) => ({ name: n.data.name, ip_address: n.data.ip_address, type: n.data.icon, icon_url: n.data.icon_url, x: n.position.x, y: n.position.y, icon_size: n.data.icon_size, name_text_size: n.data.name_text_size })),
-      edges: edges.map((e) => ({ source_index: nodes.findIndex((n) => n.id === e.source), target_index: nodes.findIndex((n) => n.id === e.target), connection_type: e.data?.connection_type || "cat5" })),
+      edges: edges.map((e) => ({ source_index: nodes.findIndex((n) => n.id === e.source), target_index: nodes.findIndex((n) => n.id === e.target), connection_type: e.data?.connection_type || "cat6" })),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
