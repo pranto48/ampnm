@@ -1,44 +1,79 @@
 
 
-# Fix map.php Edge Error + Add Port Visualization to create-device.php
+# Plan: Expand Device Icon Selection in Both Apps
 
-## Problem 1: `updateEdgeColorsAndDashes is not a function`
+## Current State
+- **Web app** (`DeviceIconPicker.tsx`): ~30 categories, ~150 icons — already comprehensive
+- **Docker AMPNM React** (`IconPicker.tsx`): Only 6 categories, ~40 icons — severely behind the PHP version (`device_icons.php` has 35 categories, ~280 icons)
 
-**Root cause**: In `docker-ampnm/assets/js/map.js` line 85, the edge form submit handler calls `MapApp.ui.updateEdgeColorsAndDashes()`, but the actual function name in `ui.js` is `MapApp.ui.updateAndAnimateEdges()`.
+## Changes
 
-**Fix**: Change line 85 in `map.js` from `updateEdgeColorsAndDashes()` to `updateAndAnimateEdges()`.
+### 1. Docker AMPNM `IconPicker.tsx` — Major Expansion
 
-## Problem 2: Port Visualization on create-device.php
+Rebuild `ICON_CATEGORIES` to match all 35 categories from `device_icons.php`, using Lucide equivalents. Add missing categories:
 
-Add a visual port panel to the Add New Device form that shows networking port counts and a visual port grid based on the selected device type. When the user selects switch, router, firewall, or server, they see:
-- Total ports, used ports, and free ports
-- A visual grid of port indicators (like the Docker map's DevicePortGrid)
+| New Category | Icons (Lucide) |
+|---|---|
+| Server | Server, Cpu, HardDrive, MemoryStick, Warehouse, Factory |
+| Network Switch | Cable, CodeXml, Layers, GripHorizontal, Sliders, LayoutGrid |
+| Firewall / Security | Shield, ShieldCheck, Lock, Fingerprint, Key, Ban, AlertCircle |
+| Cloud Services | Cloud, CloudUpload, CloudDownload, CloudLightning, Wind |
+| Database | Database, Table, Boxes, Archive, FileArchive |
+| NAS / Storage | HardDrive, Archive, FolderOpen, FolderTree |
+| Laptop / Desktop | Laptop, LaptopMinimal, Monitor, Tv, ScreenShare |
+| Tablet | Tablet, TabletSmartphone, Smartphone |
+| Mobile Phone | Smartphone, Phone, PhoneCall |
+| Printer / Scanner | Printer, FileText, FileImage, Copy, Files |
+| Camera / CCTV | Video, Camera, Eye, Glasses, Film, Clapperboard |
+| IP Phone / VoIP | Phone, Headset, Headphones, Mic |
+| Radio Tower | TowerControl, Radio, Signal, Rss, SatelliteDish |
+| Equipment Rack | Boxes, Box, Package, Layers, Warehouse |
+| Attendance / Punch | Clock, Timer, CreditCard, UserCheck, CalendarCheck, Fingerprint |
+| UPS / Power | Plug, BatteryFull, BatteryMedium, Zap, Power, BatteryCharging |
+| Modem / Gateway | Cable, Route, Shuffle, Repeat |
+| Load Balancer | Scale, ArrowUpDown, Workflow, Network |
+| IoT Devices | Cpu, Thermometer, Lightbulb, DoorOpen, Bell, Gauge |
+| Monitor / Display | Monitor, Tv, ScreenShare, AppWindow |
+| Keyboard / Mouse | Keyboard, Mouse, Gamepad, PenSquare, Pointer |
+| Access Point | Wifi, TowerControl, Signal, CircleDot, Target, Rss |
+| VPN / Tunnel | ShieldAlert, Lock, Key, UserX, Globe, Earth |
+| DNS Server | Globe, Earth, Search, Signpost, Network |
+| Mail Server | Mail, MailOpen, AtSign, Inbox, Send, MailCheck, MessageSquare |
+| Web Server | Globe, Code, FileCode, AppWindow, Link, Terminal |
+| Virtual Machine | Copy, Monitor, AppWindow, Server, Layers |
+| Smart Home | Home, Lightbulb, Fan, Thermometer, Plug, ToggleRight, Bot |
+| Media Player | Play, Tv, Music, Headphones, Volume2, Clapperboard, Disc3 |
+| Barcode / QR Scanner | Barcode, QrCode, ScanLine, Search, Crosshair |
+| Internet Gateway | DoorOpen, LogIn, LogOut, ArrowLeftRight, Route, Signpost |
+| PDU / Power Distribution | PlugZap, Unplug, Plug, Zap, SunMedium, BatteryFull |
+| Controller / PLC | Settings, Settings2, Wrench, Hammer, GaugeCircle, Bot, Cpu |
 
-### Changes to `docker-ampnm/create-device.php`
+Also add quick filters for Server, Security, IoT, and Endpoints.
 
-Add a new fieldset section after the Device Type selector:
+### 2. Web App `DeviceIconPicker.tsx` — Add 8 New Categories
 
-- Title: "Network Ports"
-- Summary cards: Total Ports | Used Ports | Free Ports
-- Visual port grid showing all ports as small colored rectangles with port names
-- Port grid updates dynamically when device type changes
+| New Category | Icons (Lucide) |
+|---|---|
+| Monitor / Display | Monitor, Tv, ScreenShare, AppWindow, Projector |
+| Satellite / Antenna | SatelliteDish, Antenna, Radio, Radar, Signal |
+| Network Tap / Probe | ScanLine, Activity, Stethoscope, Search, Eye |
+| Proxy Server | ArrowLeftRight, Shield, Globe, Filter, Layers |
+| NVR / Video Recorder | Video, HardDrive, Film, Clapperboard, Archive |
+| POS Terminal | CreditCard, ShoppingCart, Receipt, Banknote, QrCode |
+| Kiosk / Digital Signage | Monitor, Presentation, LayoutDashboard, PanelTop |
+| Environmental Sensor | Thermometer, Droplets, Wind, Sun, Waves, Gauge |
 
-Port counts per device type:
-- **Switch**: 24x GigabitEthernet (G0/1-G0/24) + 4x SFP (SFP01-SFP04) = 28 ports
-- **Router**: 4x GigabitEthernet (G0/0-G0/3) + 2x Serial (S0/0-S0/1) + 1x SFP (SFP01) = 7 ports
-- **Firewall**: 8x GigabitEthernet (G0/0-G0/7) + 2x Management (Mgmt0/0-Mgmt0/1) = 10 ports
-- **Server**: 4x GigabitEthernet (G0/0-G0/3) = 4 ports
-- **Other device types**: 2x GigabitEthernet (G0/0-G0/1) = 2 ports
+### 3. Docker AMPNM `device_icons.php` — Add 8 Matching Categories
 
-### Implementation
+Add the same 8 new categories (Monitor, Satellite, Network Tap, Proxy, NVR, POS, Kiosk, Environmental Sensor) with Font Awesome equivalents.
 
-Add inline JavaScript (or extend `icon-picker.js`) that listens to the `#type` select change event and renders port grid HTML into a new container `#devicePortPanel`. Each port is a small rectangle with:
-- Green border = free/available
-- Port name tooltip on hover
-- Summary counts above the grid
+## Files Modified
 
-### Files to modify
+| File | Change |
+|---|---|
+| `docker-ampnm/src/components/IconPicker.tsx` | Expand from 6 to 35+ categories (~280 icons) |
+| `src/components/devices/DeviceIconPicker.tsx` | Add 8 new categories (~45 new icons) |
+| `docker-ampnm/includes/device_icons.php` | Add 8 new categories with FA icons |
 
-1. **`docker-ampnm/assets/js/map.js`** (line 85) -- Fix function name: `updateEdgeColorsAndDashes` → `updateAndAnimateEdges`
-2. **`docker-ampnm/create-device.php`** -- Add port visualization fieldset with inline JS after the device type selector
+No database changes needed -- icon selection is stored as text strings.
 
