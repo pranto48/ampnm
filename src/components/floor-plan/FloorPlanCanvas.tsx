@@ -238,7 +238,9 @@ export function FloorPlanCanvas({
         {/* Label annotations (front layer) */}
         {annotations.filter(a => a.type === "label").map(a => (
           <CanvasAnnotation
-            key={a.id} {...a}
+            key={a.id} id={a.id} x={a.x} y={a.y} text={a.text}
+            fontSize={a.font_size} color={a.color} type={a.type}
+            width={a.width} height={a.height}
             selected={selectedItem?.kind === "annotation" && selectedItem.id === a.id}
             onMouseDown={e => startDrag("annotation", a.id, e)}
           />
