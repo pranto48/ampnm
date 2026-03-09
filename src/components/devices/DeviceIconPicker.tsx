@@ -603,6 +603,40 @@ export function DeviceIconPicker({ open, onOpenChange, selectedType, selectedSub
         {/* Icon grid */}
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-4 pr-4">
+            {/* Recently Used */}
+            {recentIcons.length > 0 && !activeCategory && !search && (
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Recently Used</h3>
+                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                  {recentIcons.map((iconOpt) => {
+                    const Icon = iconOpt.icon;
+                    const isActive = currentId === iconOpt.id;
+                    return (
+                      <button
+                        key={`recent-${iconOpt.id}`}
+                        type="button"
+                        title={iconOpt.id}
+                        className={cn(
+                          "flex flex-col items-center gap-1 p-2 rounded-lg border transition-all hover:bg-accent hover:border-primary/50",
+                          isActive ? "bg-primary/10 border-primary ring-1 ring-primary/30" : "border-border bg-card"
+                        )}
+                        onClick={() => {
+                          saveRecentIcon(iconOpt.id);
+                          setRecentIds(getRecentIcons());
+                          // find category for this icon
+                          const cat = DEVICE_ICON_CATEGORIES.find((c) => c.icons.some((i) => i.id === iconOpt.id));
+                          onSelect(cat?.key ?? "other", iconOpt.id);
+                          onOpenChange(false);
+                        }}
+                      >
+                        <Icon className="h-6 w-6 text-foreground" />
+                        <span className="text-[10px] text-muted-foreground leading-tight text-center truncate w-full">{iconOpt.id}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {filtered.map((cat) => (
               <div key={cat.key}>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{cat.label}</h3>

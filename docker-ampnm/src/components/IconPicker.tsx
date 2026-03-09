@@ -598,6 +598,14 @@ export const IconPicker = ({ value, onChange, open, onOpenChange }: IconPickerPr
   );
 
   const handleSelect = (iconValue: string) => {
+    // Save to recently used
+    try {
+      const key = "ampnm-docker-recent-icons";
+      const stored = localStorage.getItem(key);
+      const recent: string[] = stored ? JSON.parse(stored) : [];
+      const updated = [iconValue, ...recent.filter(v => v !== iconValue)].slice(0, 10);
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch {}
     onChange(iconValue);
     onOpenChange(false);
   };
