@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil, Trash2, Server, RefreshCw, Search, Download, Upload, Activity, Timer } from "lucide-react";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
+import { getIconComponent } from "@/components/devices/DeviceIconPicker";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
