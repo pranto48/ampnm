@@ -56,6 +56,7 @@ export default function FloorPlanPage() {
   const [loading, setLoading] = useState(true);
 
   // Canvas state
+  const canvasSvgRef = useRef<SVGSVGElement>(null);
   const [activeTool, setActiveTool] = useState<ToolMode>("select");
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
