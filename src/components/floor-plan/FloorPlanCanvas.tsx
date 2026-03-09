@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
 import { CanvasRackNode } from "./CanvasRackNode";
 import { CanvasDeviceNode } from "./CanvasDeviceNode";
 import { CanvasCableLine } from "./CanvasCableLine";
