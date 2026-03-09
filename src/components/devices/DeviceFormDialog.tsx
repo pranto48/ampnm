@@ -148,7 +148,8 @@ export function DeviceFormDialog({ open, onOpenChange, device, onSaved }: Props)
       critical_latency_threshold: criticalLatency,
       critical_packetloss_threshold: criticalPacketloss,
       user_id: device?.user_id ?? user.id,
-    };
+      port_config: portGroups.length > 0 ? portGroups : null,
+    } as any;
 
     let error;
     if (device) {
