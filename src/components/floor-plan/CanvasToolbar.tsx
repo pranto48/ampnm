@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   MousePointer2, Server, Monitor, Cable, Type,
-  ZoomIn, ZoomOut, Maximize, Upload, Grid3X3, Trash2
+  ZoomIn, ZoomOut, Maximize, Upload, Grid3X3, Trash2, Download
 } from "lucide-react";
 
 export type ToolMode = "select" | "add-rack" | "add-device" | "draw-cable" | "add-label";
@@ -18,6 +19,8 @@ interface CanvasToolbarProps {
   isAdmin: boolean;
   onDeleteSelected: () => void;
   hasSelection: boolean;
+  canvasRef?: React.RefObject<SVGSVGElement | null>;
+  planName?: string;
 }
 
 const tools: { mode: ToolMode; icon: typeof MousePointer2; label: string }[] = [
