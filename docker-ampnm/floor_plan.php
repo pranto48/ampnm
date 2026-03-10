@@ -199,6 +199,7 @@ $is_admin = ($user_role === 'admin');
     </div>
 </div>
 
+<script src="assets/js/floor-plan-canvas.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
 <script>
 const notyf = new Notyf({ duration: 3000, position: { x: 'right', y: 'top' } });
