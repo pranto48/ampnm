@@ -258,7 +258,7 @@ async function loadPlanData() {
 function renderPlanSelector() {
     const el = document.getElementById('plan-selector');
     el.innerHTML = floorPlans.map(fp => `
-        <button onclick="selectPlan('${fp.id}')" class="px-3 py-1.5 rounded-lg text-sm font-medium ${fp.id === selectedPlanId ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}">
+        <button onclick="selectPlan('${fp.id}')" class="px-3 py-1.5 rounded-lg text-sm font-medium ${fp.id == selectedPlanId ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}">
             <i class="fas fa-map-marker-alt mr-1"></i>${fp.name}
             ${isAdmin ? `<i class="fas fa-edit ml-2 opacity-60 hover:opacity-100" onclick="event.stopPropagation();editPlan('${fp.id}')"></i><i class="fas fa-trash ml-1 opacity-60 hover:opacity-100 text-red-400" onclick="event.stopPropagation();deletePlan('${fp.id}')"></i>` : ''}
         </button>
