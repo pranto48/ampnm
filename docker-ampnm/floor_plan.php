@@ -23,15 +23,66 @@ $is_admin = ($user_role === 'admin');
     <!-- Tabs -->
     <div class="flex gap-1 mb-4 border-b border-slate-700 pb-2">
         <button onclick="switchTab('overview')" class="tab-btn active px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="overview"><i class="fas fa-th-large mr-2"></i>Overview</button>
+        <button onclick="switchTab('canvas')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="canvas"><i class="fas fa-drafting-compass mr-2"></i>Canvas</button>
         <button onclick="switchTab('racks')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="racks"><i class="fas fa-server mr-2"></i>Racks & Panels</button>
         <button onclick="switchTab('ports')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="ports"><i class="fas fa-th mr-2"></i>Switch Ports</button>
         <button onclick="switchTab('cables')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="cables"><i class="fas fa-ethernet mr-2"></i>Cable Runs</button>
     </div>
 
     <div id="tab-overview" class="tab-content"></div>
+    <div id="tab-canvas" class="tab-content hidden">
+        <!-- Canvas Toolbar -->
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+            <div class="flex gap-1 bg-slate-800 rounded-lg p-1 border border-slate-700">
+                <button onclick="FPCanvas.setTool('select')" class="canvas-tool-btn bg-cyan-600 text-white px-3 py-1.5 rounded text-sm" data-tool="select" title="Select & Move"><i class="fas fa-mouse-pointer"></i></button>
+                <?php if ($is_admin): ?>
+                <button onclick="FPCanvas.setTool('add-rack')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="add-rack" title="Place Rack"><i class="fas fa-server"></i></button>
+                <button onclick="FPCanvas.setTool('add-device')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="add-device" title="Place Device"><i class="fas fa-desktop"></i></button>
+                <button onclick="FPCanvas.setTool('add-label')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="add-label" title="Add Label"><i class="fas fa-font"></i></button>
+                <button onclick="FPCanvas.setTool('draw-cable')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="draw-cable" title="Draw Cable"><i class="fas fa-ethernet"></i></button>
+                <?php endif; ?>
+            </div>
+            <div class="flex gap-1">
+                <label class="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 cursor-pointer">
+                    <input type="checkbox" checked onchange="FPCanvas.snapToGrid=this.checked;FPCanvas.render()" class="accent-cyan-500"> Grid
+                </label>
+                <button onclick="FPCanvas.fitToView()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Fit to View"><i class="fas fa-expand"></i></button>
+            </div>
+            <?php if ($is_admin): ?>
+            <div class="flex gap-1 ml-auto">
+                <button onclick="FPCanvas.deleteSelected()" class="px-3 py-1.5 bg-red-900/50 text-red-300 rounded-lg text-sm hover:bg-red-900/70 border border-red-800/50" title="Delete Selected"><i class="fas fa-trash mr-1"></i>Delete</button>
+            </div>
+            <?php endif; ?>
+            <div class="flex gap-1 border-l border-slate-700 pl-2">
+                <button onclick="FPCanvas.exportPNG()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Export PNG"><i class="fas fa-image mr-1"></i>PNG</button>
+                <button onclick="FPCanvas.exportSVG()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Export SVG"><i class="fas fa-file-code mr-1"></i>SVG</button>
+                <button onclick="FPCanvas.exportPDF()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Export PDF"><i class="fas fa-file-pdf mr-1"></i>PDF</button>
+            </div>
+        </div>
+        <!-- Canvas Container -->
+        <div id="fp-canvas-container" class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden" style="height:600px;"></div>
+        <!-- Properties panel -->
+        <div id="canvas-properties" class="mt-3 bg-slate-800/50 border border-slate-700 rounded-xl p-4 hidden">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-bold text-white" id="canvas-prop-title">Properties</span>
+            </div>
+            <div id="canvas-prop-content" class="text-sm text-slate-400"></div>
+        </div>
+    </div>
     <div id="tab-racks" class="tab-content hidden"></div>
     <div id="tab-ports" class="tab-content hidden"></div>
     <div id="tab-cables" class="tab-content hidden"></div>
+</div>
+
+<!-- Device Picker Dialog for Canvas -->
+<div id="canvas-device-picker-dialog" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-white">Place Device on Canvas</h3>
+            <button onclick="document.getElementById('canvas-device-picker-dialog').classList.add('hidden');FPCanvas.activeTool='select';FPCanvas.updateToolButtons()" class="text-slate-400 hover:text-white text-xl">&times;</button>
+        </div>
+        <div id="canvas-device-picker"></div>
+    </div>
 </div>
 
 <!-- Dialogs -->
