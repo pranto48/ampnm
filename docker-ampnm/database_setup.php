@@ -522,6 +522,57 @@ try {
     $pdo->exec("UPDATE `device_edges` SET `connection_type` = 'cat6' WHERE `connection_type` = 'cat5'");
     message("Migrated 'device_edges': renamed 'cat5' connections to 'cat6'.");
 
+    // MIGRATION: Add canvas-related columns to rack_locations
+    if (!columnExists($pdo, $dbname, 'rack_locations', 'rotation')) {
+        $pdo->exec("ALTER TABLE `rack_locations` ADD COLUMN `rotation` INT DEFAULT 0 AFTER `rack_units`;");
+        message("Upgraded 'rack_locations' table: added 'rotation' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'rack_locations', 'label_visible')) {
+        $pdo->exec("ALTER TABLE `rack_locations` ADD COLUMN `label_visible` TINYINT(1) DEFAULT 1 AFTER `rotation`;");
+        message("Upgraded 'rack_locations' table: added 'label_visible' column.");
+    }
+
+    // MIGRATION: Add floor_plan_devices table for placing devices on canvas
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `floor_plan_devices` (
+        `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `floor_plan_id` INT(6) UNSIGNED NOT NULL,
+        `device_id` INT(6) UNSIGNED NOT NULL,
+        `x` DECIMAL(10,2) DEFAULT 0,
+        `y` DECIMAL(10,2) DEFAULT 0,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (`floor_plan_id`) REFERENCES `floor_plans`(`id`) ON DELETE CASCADE,
+        FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
+        UNIQUE KEY `unique_plan_device` (`floor_plan_id`, `device_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'floor_plan_devices' checked/created successfully.");
+
+    // MIGRATION: Add floor_plan_annotations table for labels and zones on canvas
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `floor_plan_annotations` (
+        `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `floor_plan_id` INT(6) UNSIGNED NOT NULL,
+        `x` DECIMAL(10,2) DEFAULT 0,
+        `y` DECIMAL(10,2) DEFAULT 0,
+        `text` VARCHAR(500) DEFAULT 'Label',
+        `font_size` INT DEFAULT 14,
+        `color` VARCHAR(50) DEFAULT '#94a3b8',
+        `type` VARCHAR(20) DEFAULT 'label',
+        `width` INT NULL,
+        `height` INT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (`floor_plan_id`) REFERENCES `floor_plans`(`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'floor_plan_annotations' checked/created successfully.");
+
+    // MIGRATION: Add width/height to floor_plans for canvas dimensions
+    if (!columnExists($pdo, $dbname, 'floor_plans', 'width')) {
+        $pdo->exec("ALTER TABLE `floor_plans` ADD COLUMN `width` INT DEFAULT 2000 AFTER `image_url`;");
+        message("Upgraded 'floor_plans' table: added 'width' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'floor_plans', 'height')) {
+        $pdo->exec("ALTER TABLE `floor_plans` ADD COLUMN `height` INT DEFAULT 1500 AFTER `width`;");
+        message("Upgraded 'floor_plans' table: added 'height' column.");
+    }
+
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
     $stmt->execute([$admin_id]);

@@ -79,8 +79,11 @@ MapApp.ui = {
             window.notyf.error('You do not have permission to edit connections.');
             return;
         }
-        const edge = MapApp.state.edges.get(Number(edgeId));
-        console.log('openEdgeModal called with edge ID:', edgeId);
+        // Try both string and number ID lookups for vis.js compatibility
+        let edge = MapApp.state.edges.get(edgeId);
+        if (!edge && !isNaN(edgeId)) edge = MapApp.state.edges.get(Number(edgeId));
+        if (!edge && typeof edgeId === 'number') edge = MapApp.state.edges.get(String(edgeId));
+        console.log('openEdgeModal called with edge ID:', edgeId, 'type:', typeof edgeId);
         console.log('Retrieved edge object:', edge);
         if (!edge) {
             console.error('Error: Edge object not found for ID:', edgeId);
@@ -90,8 +93,10 @@ MapApp.ui = {
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || '';
 
-        const sourceNode = MapApp.state.nodes.get(edge.from);
-        const targetNode = MapApp.state.nodes.get(edge.to);
+        // Use loose comparison for node lookup (MySQL IDs can be string or number)
+        const allNodes = MapApp.state.nodes.get();
+        const sourceNode = allNodes.find(n => n.id == edge.from);
+        const targetNode = allNodes.find(n => n.id == edge.to);
 
         const srcNameEl = document.getElementById('edgeSourceDeviceName');
         const tgtNameEl = document.getElementById('edgeTargetDeviceName');
