@@ -280,9 +280,36 @@ function renderCurrentTab() {
 
 function renderTab(tab) {
     if (tab === 'overview') renderOverview();
+    else if (tab === 'canvas') renderCanvas();
     else if (tab === 'racks') renderRacks();
     else if (tab === 'ports') renderPorts();
     else if (tab === 'cables') renderCables();
+}
+
+function renderCanvas() {
+    const plan = floorPlans.find(f => f.id == selectedPlanId);
+    FPCanvas.racks = racks.map(r => ({ ...r, x: parseFloat(r.x) || 100, y: parseFloat(r.y) || 100 }));
+    FPCanvas.planDevices = planDevices.map(d => ({ ...d, x: parseFloat(d.x) || 200, y: parseFloat(d.y) || 200 }));
+    FPCanvas.cables = cables;
+    FPCanvas.annotations = annotations.map(a => ({ ...a, x: parseFloat(a.x) || 0, y: parseFloat(a.y) || 0 }));
+    FPCanvas.init('fp-canvas-container', { plan });
+
+    // Properties panel callback
+    window.onCanvasSelect = (item, kind) => {
+        const panel = document.getElementById('canvas-properties');
+        const title = document.getElementById('canvas-prop-title');
+        const content = document.getElementById('canvas-prop-content');
+        if (!item || !kind) { panel.classList.add('hidden'); return; }
+        panel.classList.remove('hidden');
+        title.textContent = kind.charAt(0).toUpperCase() + kind.slice(1) + ' Properties';
+        let html = '';
+        if (kind === 'rack') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Units:</strong> ${item.rack_units || 42}U</div><div><strong>Position:</strong> ${Math.round(item.x)}, ${Math.round(item.y)}</div>`;
+        else if (kind === 'device') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Type:</strong> ${item.type || 'device'}</div>${item.ip ? `<div><strong>IP:</strong> ${item.ip}</div>` : ''}<div><strong>Status:</strong> ${item.status || 'unknown'}</div>`;
+        else if (kind === 'cable') html = `<div><strong>Type:</strong> ${item.cable_type}</div><div><strong>Color:</strong> ${item.cable_color}</div>${item.label ? `<div><strong>Label:</strong> ${item.label}</div>` : ''}`;
+        else if (kind === 'annotation') html = `<div><strong>Text:</strong> ${item.text}</div><div><strong>Type:</strong> ${item.type}</div>`;
+        content.innerHTML = html;
+    };
+    setTimeout(() => FPCanvas.fitToView(), 100);
 }
 
 function renderOverview() {
