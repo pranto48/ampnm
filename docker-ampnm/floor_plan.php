@@ -204,7 +204,7 @@ $is_admin = ($user_role === 'admin');
 <script>
 const notyf = new Notyf({ duration: 3000, position: { x: 'right', y: 'top' } });
 const isAdmin = <?= $is_admin ? 'true' : 'false' ?>;
-let floorPlans = [], selectedPlanId = null, racks = [], panels = [], switchPorts = [], cables = [], devices = [];
+let floorPlans = [], selectedPlanId = null, racks = [], panels = [], switchPorts = [], cables = [], devices = [], planDevices = [], annotations = [];
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
 
