@@ -235,14 +235,18 @@ function selectPlan(id) {
 
 async function loadPlanData() {
     if (!selectedPlanId) return;
-    const [r, c, sp] = await Promise.all([
+    const [r, c, sp, pd, ann] = await Promise.all([
         fpApi('get_racks', { floor_plan_id: selectedPlanId }),
         fpApi('get_cables', { floor_plan_id: selectedPlanId }),
-        fpApi('get_switch_ports')
+        fpApi('get_switch_ports'),
+        fpApi('get_floor_plan_devices', { floor_plan_id: selectedPlanId }),
+        fpApi('get_annotations', { floor_plan_id: selectedPlanId })
     ]);
     racks = r.data || [];
     cables = c.data || [];
     switchPorts = sp.data || [];
+    planDevices = pd.data || [];
+    annotations = ann.data || [];
     // Load panels for racks
     if (racks.length) {
         const p = await fpApi('get_panels', { rack_ids: racks.map(r => r.id) });
