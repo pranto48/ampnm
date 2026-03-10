@@ -114,6 +114,7 @@ try {
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',
         // Floor plan viewing
         'get_floor_plans', 'get_racks', 'get_panels', 'get_switch_ports', 'get_cables', 'get_devices',
+        'get_floor_plan_devices', 'get_annotations',
         // Port usage
         'get_device_used_ports',
     ];
