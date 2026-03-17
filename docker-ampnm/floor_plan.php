@@ -50,6 +50,7 @@ $is_admin = ($user_role === 'admin');
             </div>
             <?php if ($is_admin): ?>
             <div class="flex gap-1 ml-auto">
+                <button onclick="syncFloorPlanFromMap()" class="px-3 py-1.5 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm hover:bg-cyan-900/70 border border-cyan-800/50" title="Sync coordinates from main map"><i class="fas fa-sync-alt mr-1"></i>Sync Map</button>
                 <button onclick="FPCanvas.deleteSelected()" class="px-3 py-1.5 bg-red-900/50 text-red-300 rounded-lg text-sm hover:bg-red-900/70 border border-red-800/50" title="Delete Selected"><i class="fas fa-trash mr-1"></i>Delete</button>
             </div>
             <?php endif; ?>
@@ -205,6 +206,7 @@ $is_admin = ($user_role === 'admin');
 const notyf = new Notyf({ duration: 3000, position: { x: 'right', y: 'top' } });
 const isAdmin = <?= $is_admin ? 'true' : 'false' ?>;
 let floorPlans = [], selectedPlanId = null, racks = [], panels = [], switchPorts = [], cables = [], devices = [], planDevices = [], annotations = [];
+const bootstrappedPlans = new Set();
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
 
@@ -253,6 +255,18 @@ async function loadPlanData() {
     switchPorts = sp.data || [];
     planDevices = pd.data || [];
     annotations = ann.data || [];
+
+    // Auto-bootstrap placements once per floor plan when no explicit floor-plan devices exist yet
+    if (!planDevices.length && !bootstrappedPlans.has(String(selectedPlanId))) {
+        bootstrappedPlans.add(String(selectedPlanId));
+        const seeded = await fpApi('bootstrap_floor_plan_devices', { floor_plan_id: selectedPlanId });
+        if (seeded?.success && (seeded.inserted || 0) > 0) {
+            const refreshed = await fpApi('get_floor_plan_devices', { floor_plan_id: selectedPlanId });
+            planDevices = refreshed.data || [];
+            notyf.success(`Loaded ${seeded.inserted} existing map-positioned device(s) to this floor plan.`);
+        }
+    }
+
     // Load panels for racks
     if (racks.length) {
         const p = await fpApi('get_panels', { rack_ids: racks.map(r => r.id) });
@@ -457,6 +471,23 @@ function openPortDialog() { closeAllDialogs(); document.getElementById('port-edi
 function editPort(id) { closeAllDialogs(); const p = switchPorts.find(x => x.id === id); if (!p) return; document.getElementById('port-edit-id').value = p.id; document.getElementById('port-number').value = p.port_number; document.getElementById('port-label').value = p.port_label || ''; document.getElementById('port-status').value = p.status; document.getElementById('port-speed').value = p.speed; document.getElementById('port-vlan').value = p.vlan || ''; document.getElementById('port-connected').value = p.connected_device || ''; document.getElementById('port-notes').value = p.notes || ''; document.getElementById('port-device-row').style.display = 'none'; document.getElementById('port-dialog-title').textContent = 'Edit Switch Port'; document.getElementById('port-dialog').classList.remove('hidden'); }
 async function savePort() { const id = document.getElementById('port-edit-id').value; const deviceId = document.getElementById('port-device').value; const data = { id, device_id: deviceId, port_number: +document.getElementById('port-number').value, port_label: document.getElementById('port-label').value || null, status: document.getElementById('port-status').value, speed: document.getElementById('port-speed').value, vlan: document.getElementById('port-vlan').value || null, connected_device: document.getElementById('port-connected').value || null, notes: document.getElementById('port-notes').value || null }; await fpApi(id ? 'update_port' : 'create_port', data); closeDialog('port-dialog'); await loadPlanData(); notyf.success('Port saved.'); }
 async function deletePort(id) { await fpApi('delete_port', { id }); await loadPlanData(); notyf.success('Port deleted.'); }
+
+
+async function syncFloorPlanFromMap() {
+    if (!selectedPlanId) {
+        notyf.error('Select a floor plan first.');
+        return;
+    }
+    if (!confirm('Sync floor-plan device coordinates from main map positions? This updates existing placed devices and adds missing ones.')) return;
+
+    const res = await fpApi('sync_floor_plan_devices_from_map', { floor_plan_id: selectedPlanId });
+    if (!res.success) {
+        notyf.error(res.error || 'Sync failed.');
+        return;
+    }
+    await loadPlanData();
+    notyf.success(`Sync complete: ${res.inserted || 0} added, ${res.updated || 0} updated.`);
+}
 
 function populateEndpoints(typeSelectId, idSelectId) {
     const type = document.getElementById(typeSelectId).value;

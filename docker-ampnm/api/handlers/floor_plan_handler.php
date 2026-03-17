@@ -127,6 +127,49 @@ function handleFloorPlanAction($action, $data, $pdo) {
         // ==========================================
         // CANVAS: Floor Plan Devices (placed on canvas)
         // ==========================================
+        case 'sync_floor_plan_devices_from_map':
+            if (empty($data['floor_plan_id'])) return ['success' => false, 'error' => 'floor_plan_id is required'];
+
+            // Upsert all devices with map coordinates into this floor plan
+            $rows = $pdo->query("SELECT id, x, y FROM devices WHERE x IS NOT NULL AND y IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($rows)) return ['success' => true, 'inserted' => 0, 'updated' => 0];
+
+            $insertStmt = $pdo->prepare("INSERT INTO floor_plan_devices (floor_plan_id, device_id, x, y) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE x = VALUES(x), y = VALUES(y)");
+            $existsStmt = $pdo->prepare("SELECT id FROM floor_plan_devices WHERE floor_plan_id = ? AND device_id = ?");
+
+            $inserted = 0;
+            $updated = 0;
+            foreach ($rows as $r) {
+                $existsStmt->execute([$data['floor_plan_id'], $r['id']]);
+                $exists = $existsStmt->fetch(PDO::FETCH_ASSOC);
+                $insertStmt->execute([$data['floor_plan_id'], $r['id'], $r['x'], $r['y']]);
+                if ($exists) $updated++; else $inserted++;
+            }
+            return ['success' => true, 'inserted' => $inserted, 'updated' => $updated];
+
+        case 'bootstrap_floor_plan_devices':
+            if (empty($data['floor_plan_id'])) return ['success' => false, 'error' => 'floor_plan_id is required'];
+
+            // Do not duplicate existing placements for this floor plan
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM floor_plan_devices WHERE floor_plan_id = ?");
+            $stmt->execute([$data['floor_plan_id']]);
+            $existing = (int)$stmt->fetchColumn();
+            if ($existing > 0) {
+                return ['success' => true, 'inserted' => 0, 'message' => 'Floor plan already has placed devices'];
+            }
+
+            // Seed from legacy map coordinates
+            $rows = $pdo->query("SELECT id, x, y FROM devices WHERE x IS NOT NULL AND y IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($rows)) return ['success' => true, 'inserted' => 0];
+
+            $stmt = $pdo->prepare("INSERT INTO floor_plan_devices (floor_plan_id, device_id, x, y) VALUES (?, ?, ?, ?)");
+            $inserted = 0;
+            foreach ($rows as $r) {
+                $stmt->execute([$data['floor_plan_id'], $r['id'], $r['x'], $r['y']]);
+                $inserted++;
+            }
+            return ['success' => true, 'inserted' => $inserted];
+
         case 'get_floor_plan_devices':
             $stmt = $pdo->prepare("
                 SELECT fpd.id, fpd.floor_plan_id, fpd.device_id, fpd.x, fpd.y, d.name, d.type, d.ip, d.status
