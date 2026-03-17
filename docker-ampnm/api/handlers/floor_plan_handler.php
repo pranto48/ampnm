@@ -28,7 +28,8 @@ function handleFloorPlanAction($action, $data, $pdo) {
 
         // Devices (for dropdowns)
         case 'get_devices':
-            $stmt = $pdo->query("SELECT id, name, type, ip, port_config, subchoice FROM devices ORDER BY name ASC");
+            // Include map coordinates and status so floor plan canvas can fallback to existing mapped positions
+            $stmt = $pdo->query("SELECT id, name, type, ip, status, x, y, map_id, port_config, subchoice FROM devices ORDER BY name ASC");
             return ['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
 
         // Racks
