@@ -29,11 +29,16 @@ const FPCanvas = {
         orange: '#f97316', white: '#e2e8f0', gray: '#64748b', purple: '#a855f7', black: '#1e293b'
     },
 
+    toNumber(value, fallback) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    },
+
     init(containerId, data) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        this.canvasWidth = data.plan?.width || 2000;
-        this.canvasHeight = data.plan?.height || 1500;
+        this.canvasWidth = this.toNumber(data.plan?.width, 2000);
+        this.canvasHeight = this.toNumber(data.plan?.height, 1500);
         this.backgroundUrl = data.plan?.image_url || null;
 
         container.innerHTML = `<svg id="fp-canvas-svg" class="w-full" style="height:600px; background:#0f172a; border-radius:8px; border:1px solid #334155; cursor:default;"></svg>`;
@@ -303,36 +308,44 @@ const FPCanvas = {
             g.appendChild(img);
         }
 
+        if (!this.backgroundUrl && !this.racks.length && !this.planDevices.length && !this.cables.length && !this.annotations.length) {
+            const hint = this.createSVG('text', { x: this.canvasWidth / 2, y: this.canvasHeight / 2, 'text-anchor': 'middle', fill: '#64748b', 'font-size': 18, 'font-weight': 600 });
+            hint.textContent = 'Canvas is ready. Add rack/device or upload a floor plan image.';
+            g.appendChild(hint);
+        }
+
         // Zone annotations (back layer)
-        this.annotations.filter(a => a.type === 'zone').forEach(a => this.renderAnnotation(a));
+        this.annotations.filter(a => a.type === 'zone').forEach(a => { try { this.renderAnnotation(a); } catch (e) { console.warn('Skipping bad zone annotation', a, e); } });
 
         // Cables
-        this.cables.forEach(cable => this.renderCable(cable));
+        this.cables.forEach(cable => { try { this.renderCable(cable); } catch (e) { console.warn('Skipping bad cable', cable, e); } });
 
         // Racks
-        this.racks.forEach(rack => this.renderRack(rack));
+        this.racks.forEach(rack => { try { this.renderRack(rack); } catch (e) { console.warn('Skipping bad rack', rack, e); } });
 
         // Devices
-        this.planDevices.forEach(dev => this.renderDevice(dev));
+        this.planDevices.forEach(dev => { try { this.renderDevice(dev); } catch (e) { console.warn('Skipping bad device', dev, e); } });
 
         // Label annotations (front)
-        this.annotations.filter(a => a.type === 'label').forEach(a => this.renderAnnotation(a));
+        this.annotations.filter(a => a.type === 'label').forEach(a => { try { this.renderAnnotation(a); } catch (e) { console.warn('Skipping bad label annotation', a, e); } });
 
         this.updateTransform();
     },
 
     renderRack(rack) {
         const sel = this.selectedItem?.kind === 'rack' && this.selectedItem?.id == rack.id;
-        const w = 60, h = Math.max(40, (rack.rack_units || 42) * 1.2);
-        const rg = this.createSVG('g', { transform: `translate(${rack.x}, ${rack.y})`, 'data-kind': 'rack', 'data-id': rack.id, style: 'cursor:pointer' });
+        const w = 60;
+        const rackUnits = Math.max(1, this.toNumber(rack.rack_units, 42));
+        const h = Math.max(40, rackUnits * 1.2);
+        const rg = this.createSVG('g', { transform: `translate(${this.toNumber(rack.x, 100)}, ${this.toNumber(rack.y, 100)})`, 'data-kind': 'rack', 'data-id': rack.id, style: 'cursor:pointer' });
         rg.innerHTML = `
             <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="3" fill="#1e293b" stroke="${sel ? '#06b6d4' : '#475569'}" stroke-width="${sel ? 2.5 : 1.5}"/>
-            ${Array.from({ length: Math.min(rack.rack_units || 42, 30) }, (_, i) => {
-                const uy = -h / 2 + 4 + i * ((h - 8) / Math.min(rack.rack_units || 42, 30));
+            ${Array.from({ length: Math.min(rackUnits, 30) }, (_, i) => {
+                const uy = -h / 2 + 4 + i * ((h - 8) / Math.min(rackUnits, 30));
                 return `<line x1="${-w / 2 + 4}" y1="${uy}" x2="${w / 2 - 4}" y2="${uy}" stroke="#334155" stroke-width="0.5"/>`;
             }).join('')}
             ${rack.label_visible !== false && rack.label_visible != 0 ? `<text x="0" y="${h / 2 + 14}" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="500">${this.esc(rack.name)}</text>` : ''}
-            <text x="0" y="4" text-anchor="middle" fill="#94a3b8" font-size="8">${rack.rack_units || 42}U</text>
+            <text x="0" y="4" text-anchor="middle" fill="#94a3b8" font-size="8">${rackUnits}U</text>
             ${sel ? `<rect x="${-w / 2 - 3}" y="${-h / 2 - 3}" width="${w + 6}" height="${h + 6}" rx="5" fill="none" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2"/>` : ''}
         `;
         this.g.appendChild(rg);
@@ -344,7 +357,9 @@ const FPCanvas = {
         const icon = icons[dev.type] || '📦';
         const statusColor = { online: '#22c55e', warning: '#f59e0b', critical: '#ef4444', offline: '#64748b' };
         const color = statusColor[dev.status] || '#94a3b8';
-        const dg = this.createSVG('g', { transform: `translate(${dev.x}, ${dev.y})`, 'data-kind': 'device', 'data-id': dev.id, style: 'cursor:pointer' });
+        const dx = this.toNumber(dev.x, 200);
+        const dy = this.toNumber(dev.y, 200);
+        const dg = this.createSVG('g', { transform: `translate(${dx}, ${dy})`, 'data-kind': 'device', 'data-id': dev.id, style: 'cursor:pointer' });
         dg.innerHTML = `
             <circle r="20" fill="#1e293b" stroke="${color}" stroke-width="${sel ? 2.5 : 1.5}"/>
             <text x="0" y="5" text-anchor="middle" font-size="16">${icon}</text>
@@ -382,7 +397,9 @@ const FPCanvas = {
 
     renderAnnotation(a) {
         const sel = this.selectedItem?.kind === 'annotation' && this.selectedItem?.id == a.id;
-        const ag = this.createSVG('g', { transform: `translate(${a.x}, ${a.y})`, 'data-kind': 'annotation', 'data-id': a.id, style: 'cursor:pointer' });
+        const ax = this.toNumber(a.x, 0);
+        const ay = this.toNumber(a.y, 0);
+        const ag = this.createSVG('g', { transform: `translate(${ax}, ${ay})`, 'data-kind': 'annotation', 'data-id': a.id, style: 'cursor:pointer' });
         if (a.type === 'zone') {
             const w = a.width || 200, h = a.height || 150;
             ag.innerHTML = `
