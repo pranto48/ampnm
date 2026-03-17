@@ -294,8 +294,24 @@ function renderTab(tab) {
 
 function renderCanvas() {
     const plan = floorPlans.find(f => f.id == selectedPlanId);
+    const floorPlanDevices = planDevices.map(d => ({ ...d, x: parseFloat(d.x) || 200, y: parseFloat(d.y) || 200, movable: true }));
+    const fallbackMapDevices = devices
+        .filter(d => d.x !== null && d.y !== null && d.x !== undefined && d.y !== undefined)
+        .map(d => ({
+            id: d.id,
+            device_id: d.id,
+            name: d.name,
+            type: d.type,
+            ip: d.ip,
+            status: d.status,
+            x: parseFloat(d.x) || 200,
+            y: parseFloat(d.y) || 200,
+            movable: false,
+            legacy_map_position: true
+        }));
+
     FPCanvas.racks = racks.map(r => ({ ...r, x: parseFloat(r.x) || 100, y: parseFloat(r.y) || 100 }));
-    FPCanvas.planDevices = planDevices.map(d => ({ ...d, x: parseFloat(d.x) || 200, y: parseFloat(d.y) || 200 }));
+    FPCanvas.planDevices = floorPlanDevices.length ? floorPlanDevices : fallbackMapDevices;
     FPCanvas.cables = cables;
     FPCanvas.annotations = annotations.map(a => ({ ...a, x: parseFloat(a.x) || 0, y: parseFloat(a.y) || 0 }));
     FPCanvas.init('fp-canvas-container', { plan });
@@ -310,7 +326,7 @@ function renderCanvas() {
         title.textContent = kind.charAt(0).toUpperCase() + kind.slice(1) + ' Properties';
         let html = '';
         if (kind === 'rack') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Units:</strong> ${item.rack_units || 42}U</div><div><strong>Position:</strong> ${Math.round(item.x)}, ${Math.round(item.y)}</div>`;
-        else if (kind === 'device') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Type:</strong> ${item.type || 'device'}</div>${item.ip ? `<div><strong>IP:</strong> ${item.ip}</div>` : ''}<div><strong>Status:</strong> ${item.status || 'unknown'}</div>`;
+        else if (kind === 'device') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Type:</strong> ${item.type || 'device'}</div>${item.ip ? `<div><strong>IP:</strong> ${item.ip}</div>` : ''}<div><strong>Status:</strong> ${item.status || 'unknown'}</div>${item.legacy_map_position ? `<div><strong>Source:</strong> Existing map coordinates</div><div class='text-xs text-slate-500'>Use "Place Device" for persistent floor-plan positioning.</div>` : ''}`;
         else if (kind === 'cable') html = `<div><strong>Type:</strong> ${item.cable_type}</div><div><strong>Color:</strong> ${item.cable_color}</div>${item.cable_length ? `<div><strong>Length:</strong> ${item.cable_length}</div>` : ''}<div><strong>Ports:</strong> ${item.source_port || 1} → ${item.dest_port || 1}</div>${item.label ? `<div><strong>Label:</strong> ${item.label}</div>` : ''}`;
         else if (kind === 'annotation') html = `<div><strong>Text:</strong> ${item.text}</div><div><strong>Type:</strong> ${item.type}</div>`;
         content.innerHTML = html;

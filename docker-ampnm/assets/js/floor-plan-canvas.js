@@ -102,7 +102,7 @@ const FPCanvas = {
                 if (kind === 'rack' || kind === 'device' || kind === 'annotation') {
                     const pt = this.svgPoint(e.clientX, e.clientY);
                     const item = this.findItem(kind, id);
-                    if (item) {
+                    if (item && item.movable !== false) {
                         this.dragging = { kind, id, offsetX: pt.x - item.x, offsetY: pt.y - item.y };
                     }
                 }
@@ -176,6 +176,8 @@ const FPCanvas = {
         if (kind === 'rack') {
             await fpApi('update_rack', { id, x, y });
         } else if (kind === 'device') {
+            const item = this.findItem(kind, id);
+            if (item && item.movable === false) return;
             await fpApi('move_plan_device', { id, x, y });
         } else if (kind === 'annotation') {
             await fpApi('update_annotation', { id, x, y });
@@ -367,6 +369,7 @@ const FPCanvas = {
             ${dev.ip ? `<text x="0" y="44" text-anchor="middle" fill="#64748b" font-size="8">${this.esc(dev.ip)}</text>` : ''}
             ${sel ? `<circle r="24" fill="none" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2"/>` : ''}
             <circle r="5" cx="16" cy="-14" fill="${color}" opacity="0.9"/>
+            ${dev.legacy_map_position ? `<text x="0" y="56" text-anchor="middle" fill="#38bdf8" font-size="8">legacy map pos</text>` : ''}
         `;
         this.g.appendChild(dg);
     },
