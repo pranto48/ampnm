@@ -50,6 +50,7 @@ $is_admin = ($user_role === 'admin');
             </div>
             <?php if ($is_admin): ?>
             <div class="flex gap-1 ml-auto">
+                <button onclick="syncFloorPlanFromMap()" class="px-3 py-1.5 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm hover:bg-cyan-900/70 border border-cyan-800/50" title="Sync coordinates from main map"><i class="fas fa-sync-alt mr-1"></i>Sync Map</button>
                 <button onclick="FPCanvas.deleteSelected()" class="px-3 py-1.5 bg-red-900/50 text-red-300 rounded-lg text-sm hover:bg-red-900/70 border border-red-800/50" title="Delete Selected"><i class="fas fa-trash mr-1"></i>Delete</button>
             </div>
             <?php endif; ?>
@@ -205,8 +206,15 @@ $is_admin = ($user_role === 'admin');
 const notyf = new Notyf({ duration: 3000, position: { x: 'right', y: 'top' } });
 const isAdmin = <?= $is_admin ? 'true' : 'false' ?>;
 let floorPlans = [], selectedPlanId = null, racks = [], panels = [], switchPorts = [], cables = [], devices = [], planDevices = [], annotations = [];
+const bootstrappedPlans = new Set();
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
+
+function buildCableMark(sourceType, sourcePort, destType, destPort) {
+    const sType = (sourceType || 's').charAt(0).toUpperCase();
+    const dType = (destType || 'd').charAt(0).toUpperCase();
+    return `${sType}${sourcePort || 1}-${dType}${destPort || 1}`;
+}
 
 async function api(action, data = {}) {
     const res = await fetch('api.php?action=' + action + '&handler=metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
@@ -247,6 +255,18 @@ async function loadPlanData() {
     switchPorts = sp.data || [];
     planDevices = pd.data || [];
     annotations = ann.data || [];
+
+    // Auto-bootstrap placements once per floor plan when no explicit floor-plan devices exist yet
+    if (!planDevices.length && !bootstrappedPlans.has(String(selectedPlanId))) {
+        bootstrappedPlans.add(String(selectedPlanId));
+        const seeded = await fpApi('bootstrap_floor_plan_devices', { floor_plan_id: selectedPlanId });
+        if (seeded?.success && (seeded.inserted || 0) > 0) {
+            const refreshed = await fpApi('get_floor_plan_devices', { floor_plan_id: selectedPlanId });
+            planDevices = refreshed.data || [];
+            notyf.success(`Loaded ${seeded.inserted} existing map-positioned device(s) to this floor plan.`);
+        }
+    }
+
     // Load panels for racks
     if (racks.length) {
         const p = await fpApi('get_panels', { rack_ids: racks.map(r => r.id) });
@@ -288,8 +308,24 @@ function renderTab(tab) {
 
 function renderCanvas() {
     const plan = floorPlans.find(f => f.id == selectedPlanId);
+    const floorPlanDevices = planDevices.map(d => ({ ...d, x: parseFloat(d.x) || 200, y: parseFloat(d.y) || 200, movable: true }));
+    const fallbackMapDevices = devices
+        .filter(d => d.x !== null && d.y !== null && d.x !== undefined && d.y !== undefined)
+        .map(d => ({
+            id: d.id,
+            device_id: d.id,
+            name: d.name,
+            type: d.type,
+            ip: d.ip,
+            status: d.status,
+            x: parseFloat(d.x) || 200,
+            y: parseFloat(d.y) || 200,
+            movable: false,
+            legacy_map_position: true
+        }));
+
     FPCanvas.racks = racks.map(r => ({ ...r, x: parseFloat(r.x) || 100, y: parseFloat(r.y) || 100 }));
-    FPCanvas.planDevices = planDevices.map(d => ({ ...d, x: parseFloat(d.x) || 200, y: parseFloat(d.y) || 200 }));
+    FPCanvas.planDevices = floorPlanDevices.length ? floorPlanDevices : fallbackMapDevices;
     FPCanvas.cables = cables;
     FPCanvas.annotations = annotations.map(a => ({ ...a, x: parseFloat(a.x) || 0, y: parseFloat(a.y) || 0 }));
     FPCanvas.init('fp-canvas-container', { plan });
@@ -304,8 +340,8 @@ function renderCanvas() {
         title.textContent = kind.charAt(0).toUpperCase() + kind.slice(1) + ' Properties';
         let html = '';
         if (kind === 'rack') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Units:</strong> ${item.rack_units || 42}U</div><div><strong>Position:</strong> ${Math.round(item.x)}, ${Math.round(item.y)}</div>`;
-        else if (kind === 'device') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Type:</strong> ${item.type || 'device'}</div>${item.ip ? `<div><strong>IP:</strong> ${item.ip}</div>` : ''}<div><strong>Status:</strong> ${item.status || 'unknown'}</div>`;
-        else if (kind === 'cable') html = `<div><strong>Type:</strong> ${item.cable_type}</div><div><strong>Color:</strong> ${item.cable_color}</div>${item.label ? `<div><strong>Label:</strong> ${item.label}</div>` : ''}`;
+        else if (kind === 'device') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Type:</strong> ${item.type || 'device'}</div>${item.ip ? `<div><strong>IP:</strong> ${item.ip}</div>` : ''}<div><strong>Status:</strong> ${item.status || 'unknown'}</div>${item.legacy_map_position ? `<div><strong>Source:</strong> Existing map coordinates</div><div class='text-xs text-slate-500'>Use "Place Device" for persistent floor-plan positioning.</div>` : ''}`;
+        else if (kind === 'cable') html = `<div><strong>Type:</strong> ${item.cable_type}</div><div><strong>Color:</strong> ${item.cable_color}</div>${item.cable_length ? `<div><strong>Length:</strong> ${item.cable_length}</div>` : ''}<div><strong>Ports:</strong> ${item.source_port || 1} → ${item.dest_port || 1}</div>${item.label ? `<div><strong>Label:</strong> ${item.label}</div>` : ''}`;
         else if (kind === 'annotation') html = `<div><strong>Text:</strong> ${item.text}</div><div><strong>Type:</strong> ${item.type}</div>`;
         content.innerHTML = html;
     };
@@ -366,9 +402,11 @@ function renderPorts() {
     deviceIds.forEach(did => {
         const dev = devices.find(d => d.id == did);
         const ports = switchPorts.filter(p => p.device_id == did).sort((a,b) => a.port_number - b.port_number);
+        const usedPorts = ports.filter(p => p.status === 'active' || !!p.connected_device).length;
+        const freePorts = Math.max(ports.length - usedPorts, 0);
         const statusColor = s => s === 'active' ? 'text-emerald-400' : s === 'error' ? 'text-red-400' : s === 'reserved' ? 'text-amber-400' : 'text-slate-500';
         html += `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4">
-            <div class="flex items-center gap-2 mb-3"><i class="fas fa-th text-cyan-400"></i><span class="font-bold text-white">${dev ? dev.name : 'Unknown Device'}</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${ports.length} ports</span></div>
+            <div class="flex items-center gap-2 mb-3 flex-wrap"><i class="fas fa-th text-cyan-400"></i><span class="font-bold text-white">${dev ? dev.name : 'Unknown Device'}</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${ports.length} total</span><span class="text-xs bg-emerald-900/50 px-2 py-0.5 rounded text-emerald-300">${usedPorts} used</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${freePorts} free</span></div>
             <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2">
                 ${ports.map(p => `<div class="flex flex-col items-center p-2 rounded-lg border border-slate-700 cursor-pointer hover:border-cyan-500 transition-colors group relative" ${isAdmin ? `onclick="editPort('${p.id}')"` : ''}>
                     <i class="fas fa-circle ${statusColor(p.status)} text-sm"></i>
@@ -381,6 +419,7 @@ function renderPorts() {
                         <div class="text-slate-400">Speed: ${p.speed}</div>
                         ${p.vlan ? `<div class="text-slate-400">VLAN: ${p.vlan}</div>` : ''}
                         ${p.connected_device ? `<div class="text-slate-400">→ ${p.connected_device}</div>` : ''}
+                        <div class="text-slate-400">Cable mark: P${p.port_number}-${(p.port_label || `PORT${p.port_number}`).toUpperCase()}</div>
                         ${p.notes ? `<div class="text-slate-400 mt-1 italic">${p.notes}</div>` : ''}
                     </div>
                 </div>`).join('')}
@@ -400,7 +439,7 @@ function renderCables() {
                 <div class="flex items-center gap-2 flex-wrap"><span class="font-medium text-white">${c.label || 'Cable #' + c.id.substring(0,6)}</span>
                 <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${c.cable_type.toUpperCase()}</span>
                 ${c.cable_length ? `<span class="text-xs bg-cyan-900/50 px-2 py-0.5 rounded text-cyan-300">${c.cable_length}</span>` : ''}</div>
-                <div class="text-xs text-slate-500 mt-1">${c.source_type} port ${c.source_port} → ${c.dest_type} port ${c.dest_port}</div>
+                <div class="text-xs text-slate-500 mt-1">${c.source_type} port ${c.source_port} → ${c.dest_type} port ${c.dest_port}</div><div class="text-[11px] text-cyan-300 mt-1 font-mono">MARK ${buildCableMark(c.source_type, c.source_port, c.dest_type, c.dest_port)}</div>
             </div>
             ${isAdmin ? `<div class="flex gap-1"><button onclick="editCable('${c.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300"><i class="fas fa-edit"></i></button><button onclick="deleteCable('${c.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-red-400"><i class="fas fa-trash"></i></button></div>` : ''}
         </div>`;
@@ -432,6 +471,23 @@ function openPortDialog() { closeAllDialogs(); document.getElementById('port-edi
 function editPort(id) { closeAllDialogs(); const p = switchPorts.find(x => x.id === id); if (!p) return; document.getElementById('port-edit-id').value = p.id; document.getElementById('port-number').value = p.port_number; document.getElementById('port-label').value = p.port_label || ''; document.getElementById('port-status').value = p.status; document.getElementById('port-speed').value = p.speed; document.getElementById('port-vlan').value = p.vlan || ''; document.getElementById('port-connected').value = p.connected_device || ''; document.getElementById('port-notes').value = p.notes || ''; document.getElementById('port-device-row').style.display = 'none'; document.getElementById('port-dialog-title').textContent = 'Edit Switch Port'; document.getElementById('port-dialog').classList.remove('hidden'); }
 async function savePort() { const id = document.getElementById('port-edit-id').value; const deviceId = document.getElementById('port-device').value; const data = { id, device_id: deviceId, port_number: +document.getElementById('port-number').value, port_label: document.getElementById('port-label').value || null, status: document.getElementById('port-status').value, speed: document.getElementById('port-speed').value, vlan: document.getElementById('port-vlan').value || null, connected_device: document.getElementById('port-connected').value || null, notes: document.getElementById('port-notes').value || null }; await fpApi(id ? 'update_port' : 'create_port', data); closeDialog('port-dialog'); await loadPlanData(); notyf.success('Port saved.'); }
 async function deletePort(id) { await fpApi('delete_port', { id }); await loadPlanData(); notyf.success('Port deleted.'); }
+
+
+async function syncFloorPlanFromMap() {
+    if (!selectedPlanId) {
+        notyf.error('Select a floor plan first.');
+        return;
+    }
+    if (!confirm('Sync floor-plan device coordinates from main map positions? This updates existing placed devices and adds missing ones.')) return;
+
+    const res = await fpApi('sync_floor_plan_devices_from_map', { floor_plan_id: selectedPlanId });
+    if (!res.success) {
+        notyf.error(res.error || 'Sync failed.');
+        return;
+    }
+    await loadPlanData();
+    notyf.success(`Sync complete: ${res.inserted || 0} added, ${res.updated || 0} updated.`);
+}
 
 function populateEndpoints(typeSelectId, idSelectId) {
     const type = document.getElementById(typeSelectId).value;
