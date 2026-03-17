@@ -166,30 +166,25 @@ function initMap() {
 
     // Only admin can export/import map
     if (window.userRole === 'admin') {
-        els.exportBtn.addEventListener('click', () => {
+        els.exportBtn.addEventListener('click', async () => {
             if (!state.currentMapId) {
                 window.notyf.error('No map selected to export.');
                 return;
             }
-            const mapName = els.mapSelector.options[els.mapSelector.selectedIndex].text;
-            const devices = state.nodes.get({ fields: ['id', 'deviceData'] }).map(node => ({
-                id: node.id,
-                ...node.deviceData
-            }));
-            const edges = state.edges.get({ fields: ['from', 'to', 'connection_type'] }).map(edge => ({
-                source_id: edge.from, // Map 'from' to 'source_id'
-                target_id: edge.to,   // Map 'to' to 'target_id'
-                connection_type: edge.connection_type
-            }));
-            const exportData = { devices, edges };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", `${mapName.replace(/\s+/g, '_')}_export.json`);
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
-            window.notyf.success('Map exported successfully.');
+            const mapName = els.mapSelector.options[els.mapSelector.selectedIndex]?.text || 'map';
+            try {
+                const exportData = await api.get('export_map', { map_id: state.currentMapId });
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `${mapName.replace(/\s+/g, '_')}_export.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                window.notyf.success('Map exported successfully (devices, links, ports, cables).');
+            } catch (error) {
+                window.notyf.error(error.message || 'Failed to export map.');
+            }
         });
 
         els.importBtn.addEventListener('click', () => els.importFile.click());
@@ -201,9 +196,18 @@ function initMap() {
                 reader.onload = async (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        await api.post('import_map', { map_id: state.currentMapId, ...data });
+                        if (!Array.isArray(data.devices) || !Array.isArray(data.edges)) {
+                            throw new Error('Invalid import file: missing devices/edges arrays.');
+                        }
+                        await api.post('import_map', {
+                            map_id: state.currentMapId,
+                            devices: data.devices,
+                            edges: data.edges,
+                            switch_ports: Array.isArray(data.switch_ports) ? data.switch_ports : [],
+                            cables: Array.isArray(data.cables) ? data.cables : []
+                        });
                         await mapManager.switchMap(state.currentMapId);
-                        window.notyf.success('Map imported successfully.');
+                        window.notyf.success('Map imported successfully with links, ports, and cables.');
                     } catch (err) {
                         window.notyf.error('Failed to import map: ' + err.message);
                     }
