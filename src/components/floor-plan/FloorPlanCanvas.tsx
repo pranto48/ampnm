@@ -8,7 +8,7 @@ import type { SelectedItem } from "./PropertiesPanel";
 
 interface RackData { id: string; name: string; x: number; y: number; rack_units: number; rotation: number; label_visible: boolean; }
 interface DeviceData { id: string; name: string; type: string | null; x: number; y: number; }
-interface CableData { id: string; cable_color: string; cable_type: string; label: string | null; source_id: string; dest_id: string; source_port: number; dest_port: number; }
+interface CableData { id: string; cable_color: string; cable_type: string; cable_length: string | null; label: string | null; source_id: string; dest_id: string; source_port: number; dest_port: number; }
 interface AnnotationData { id: string; x: number; y: number; text: string; font_size: number; color: string; type: string; width: number | null; height: number | null; }
 
 interface FloorPlanCanvasProps {
@@ -218,6 +218,9 @@ export function FloorPlanCanvas({
                 x2={dstPos.x} y2={dstPos.y}
                 cableColor={cable.cable_color}
                 cableType={cable.cable_type}
+                cableLength={cable.cable_length}
+                sourcePort={cable.source_port}
+                destPort={cable.dest_port}
                 label={cable.label}
                 selected={selectedItem?.kind === "cable" && selectedItem.id === cable.id}
                 onMouseDown={e => startDrag("cable", cable.id, e)}

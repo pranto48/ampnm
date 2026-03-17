@@ -564,13 +564,17 @@ export default function FloorPlanPage() {
               {devices.filter(d => d.type === "switch" || d.type === "router" || switchPorts.some(sp => sp.device_id === d.id)).map(dev => {
                 const ports = switchPorts.filter(sp => sp.device_id === dev.id).sort((a, b) => a.port_number - b.port_number);
                 if (ports.length === 0) return null;
+                const usedPorts = ports.filter(p => p.status === "active" || !!p.connected_device).length;
+                const freePorts = Math.max(ports.length - usedPorts, 0);
                 return (
                   <Card key={dev.id}>
                     <CardHeader className="pb-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Grid3X3 className="h-5 w-5 text-primary" />
                         <CardTitle className="text-base">{dev.name}</CardTitle>
-                        <Badge variant="secondary">{ports.length} ports</Badge>
+                        <Badge variant="secondary">{ports.length} total</Badge>
+                        <Badge variant="outline" className="text-emerald-400 border-emerald-500/40">{usedPorts} used</Badge>
+                        <Badge variant="outline">{freePorts} free</Badge>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -590,6 +594,7 @@ export default function FloorPlanPage() {
                               <div className="text-muted-foreground">Speed: {port.speed}</div>
                               {port.vlan && <div className="text-muted-foreground">VLAN: {port.vlan}</div>}
                               {port.connected_device && <div className="text-muted-foreground">→ {port.connected_device}</div>}
+                              <div className="text-muted-foreground">Cable mark: P{port.port_number}-{(port.port_label || `PORT${port.port_number}`).toUpperCase()}</div>
                               {port.notes && <div className="text-muted-foreground mt-1 italic">{port.notes}</div>}
                               {isAdmin && <div className="mt-1 text-primary cursor-pointer" onClick={() => deletePort(port.id)}>Delete</div>}
                             </div>
@@ -615,6 +620,7 @@ export default function FloorPlanPage() {
                         <span className="font-medium text-foreground">{cable.label || `Cable #${cable.id.slice(0, 6)}`}</span>
                         <Badge variant="outline">{cable.cable_type.toUpperCase()}</Badge>
                         {cable.cable_length && <Badge variant="secondary">{cable.cable_length}</Badge>}
+                        <Badge variant="outline" className="font-mono">MARK {`${cable.source_type[0]?.toUpperCase() ?? "S"}${cable.source_port}-${cable.dest_type[0]?.toUpperCase() ?? "D"}${cable.dest_port}`}</Badge>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">{cable.source_type} port {cable.source_port} → {cable.dest_type} port {cable.dest_port}</div>
                     </div>
