@@ -362,13 +362,17 @@ const FPCanvas = {
         const dstPos = this.findEndpointPos(cable.dest_type, cable.dest_id);
         if (!srcPos || !dstPos) return;
         const color = this.CABLE_COLOR_MAP[cable.cable_color] || '#64748b';
+        const mark = `P${cable.source_port || 1}→P${cable.dest_port || 1}${cable.cable_length ? ` • ${cable.cable_length}` : ''}`;
         const cg = this.createSVG('g', { 'data-kind': 'cable', 'data-id': cable.id, style: 'cursor:pointer' });
         // Invisible wider hit area
         cg.innerHTML = `
             <line x1="${srcPos.x}" y1="${srcPos.y}" x2="${dstPos.x}" y2="${dstPos.y}" stroke="transparent" stroke-width="12"/>
             <line x1="${srcPos.x}" y1="${srcPos.y}" x2="${dstPos.x}" y2="${dstPos.y}" stroke="${color}" stroke-width="${sel ? 3 : 2}" ${cable.cable_type?.includes('fiber') ? 'stroke-dasharray="8 4"' : ''} opacity="${sel ? 1 : 0.7}"/>
-            ${cable.label ? `<text x="${(srcPos.x + dstPos.x) / 2}" y="${(srcPos.y + dstPos.y) / 2 - 6}" text-anchor="middle" fill="${color}" font-size="9">${this.esc(cable.label)}</text>` : ''}
-            ${sel ? `<circle cx="${srcPos.x}" cy="${srcPos.y}" r="4" fill="${color}"/><circle cx="${dstPos.x}" cy="${dstPos.y}" r="4" fill="${color}"/>` : ''}
+            <circle cx="${srcPos.x}" cy="${srcPos.y}" r="3" fill="${color}"/>
+            <circle cx="${dstPos.x}" cy="${dstPos.y}" r="3" fill="${color}"/>
+            ${cable.label ? `<text x="${(srcPos.x + dstPos.x) / 2}" y="${(srcPos.y + dstPos.y) / 2 - 10}" text-anchor="middle" fill="${color}" font-size="9">${this.esc(cable.label)}</text>` : ''}
+            <text x="${(srcPos.x + dstPos.x) / 2}" y="${(srcPos.y + dstPos.y) / 2 + 2}" text-anchor="middle" fill="#94a3b8" font-size="8">${this.esc(mark)}</text>
+            ${sel ? `<circle cx="${srcPos.x}" cy="${srcPos.y}" r="6" fill="none" stroke="#06b6d4" stroke-width="1.5"/><circle cx="${dstPos.x}" cy="${dstPos.y}" r="6" fill="none" stroke="#06b6d4" stroke-width="1.5"/>` : ''}
         `;
         this.g.appendChild(cg);
     },
