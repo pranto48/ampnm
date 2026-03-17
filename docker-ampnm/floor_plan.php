@@ -208,6 +208,12 @@ let floorPlans = [], selectedPlanId = null, racks = [], panels = [], switchPorts
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
 
+function buildCableMark(sourceType, sourcePort, destType, destPort) {
+    const sType = (sourceType || 's').charAt(0).toUpperCase();
+    const dType = (destType || 'd').charAt(0).toUpperCase();
+    return `${sType}${sourcePort || 1}-${dType}${destPort || 1}`;
+}
+
 async function api(action, data = {}) {
     const res = await fetch('api.php?action=' + action + '&handler=metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     return res.json();
@@ -382,7 +388,7 @@ function renderPorts() {
                         <div class="text-slate-400">Status: <span class="${statusColor(p.status)}">${p.status}</span></div>
                         <div class="text-slate-400">Speed: ${p.speed}</div>
                         ${p.vlan ? `<div class="text-slate-400">VLAN: ${p.vlan}</div>` : ''}
-                        ${p.connected_device ? `<div class=\"text-slate-400\">→ ${p.connected_device}</div>` : ''}
+                        ${p.connected_device ? `<div class="text-slate-400">→ ${p.connected_device}</div>` : ''}
                         <div class="text-slate-400">Cable mark: P${p.port_number}-${(p.port_label || `PORT${p.port_number}`).toUpperCase()}</div>
                         ${p.notes ? `<div class="text-slate-400 mt-1 italic">${p.notes}</div>` : ''}
                     </div>
@@ -403,7 +409,7 @@ function renderCables() {
                 <div class="flex items-center gap-2 flex-wrap"><span class="font-medium text-white">${c.label || 'Cable #' + c.id.substring(0,6)}</span>
                 <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${c.cable_type.toUpperCase()}</span>
                 ${c.cable_length ? `<span class="text-xs bg-cyan-900/50 px-2 py-0.5 rounded text-cyan-300">${c.cable_length}</span>` : ''}</div>
-                <div class="text-xs text-slate-500 mt-1">${c.source_type} port ${c.source_port} → ${c.dest_type} port ${c.dest_port}</div><div class="text-[11px] text-cyan-300 mt-1 font-mono">MARK ${`${(c.source_type || 's')[0].toUpperCase()}${c.source_port}-${(c.dest_type || 'd')[0].toUpperCase()}${c.dest_port}`}</div>
+                <div class="text-xs text-slate-500 mt-1">${c.source_type} port ${c.source_port} → ${c.dest_type} port ${c.dest_port}</div><div class="text-[11px] text-cyan-300 mt-1 font-mono">MARK ${buildCableMark(c.source_type, c.source_port, c.dest_type, c.dest_port)}</div>
             </div>
             ${isAdmin ? `<div class="flex gap-1"><button onclick="editCable('${c.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300"><i class="fas fa-edit"></i></button><button onclick="deleteCable('${c.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-red-400"><i class="fas fa-trash"></i></button></div>` : ''}
         </div>`;

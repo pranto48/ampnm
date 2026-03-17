@@ -360,9 +360,12 @@ const FPCanvas = {
         const sel = this.selectedItem?.kind === 'cable' && this.selectedItem?.id == cable.id;
         const srcPos = this.findEndpointPos(cable.source_type, cable.source_id);
         const dstPos = this.findEndpointPos(cable.dest_type, cable.dest_id);
-        if (!srcPos || !dstPos) return;
+        if (!srcPos || !dstPos || !isFinite(srcPos.x) || !isFinite(srcPos.y) || !isFinite(dstPos.x) || !isFinite(dstPos.y)) return;
         const color = this.CABLE_COLOR_MAP[cable.cable_color] || '#64748b';
-        const mark = `P${cable.source_port || 1}→P${cable.dest_port || 1}${cable.cable_length ? ` • ${cable.cable_length}` : ''}`;
+        const sourcePort = cable.source_port || 1;
+        const destPort = cable.dest_port || 1;
+        const lengthText = cable.cable_length ? ` • ${cable.cable_length}` : '';
+        const mark = `P${sourcePort}→P${destPort}${lengthText}`;
         const cg = this.createSVG('g', { 'data-kind': 'cable', 'data-id': cable.id, style: 'cursor:pointer' });
         // Invisible wider hit area
         cg.innerHTML = `
