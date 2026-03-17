@@ -305,7 +305,7 @@ function renderCanvas() {
         let html = '';
         if (kind === 'rack') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Units:</strong> ${item.rack_units || 42}U</div><div><strong>Position:</strong> ${Math.round(item.x)}, ${Math.round(item.y)}</div>`;
         else if (kind === 'device') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Type:</strong> ${item.type || 'device'}</div>${item.ip ? `<div><strong>IP:</strong> ${item.ip}</div>` : ''}<div><strong>Status:</strong> ${item.status || 'unknown'}</div>`;
-        else if (kind === 'cable') html = `<div><strong>Type:</strong> ${item.cable_type}</div><div><strong>Color:</strong> ${item.cable_color}</div>${item.label ? `<div><strong>Label:</strong> ${item.label}</div>` : ''}`;
+        else if (kind === 'cable') html = `<div><strong>Type:</strong> ${item.cable_type}</div><div><strong>Color:</strong> ${item.cable_color}</div>${item.cable_length ? `<div><strong>Length:</strong> ${item.cable_length}</div>` : ''}<div><strong>Ports:</strong> ${item.source_port || 1} → ${item.dest_port || 1}</div>${item.label ? `<div><strong>Label:</strong> ${item.label}</div>` : ''}`;
         else if (kind === 'annotation') html = `<div><strong>Text:</strong> ${item.text}</div><div><strong>Type:</strong> ${item.type}</div>`;
         content.innerHTML = html;
     };
@@ -366,9 +366,11 @@ function renderPorts() {
     deviceIds.forEach(did => {
         const dev = devices.find(d => d.id == did);
         const ports = switchPorts.filter(p => p.device_id == did).sort((a,b) => a.port_number - b.port_number);
+        const usedPorts = ports.filter(p => p.status === 'active' || !!p.connected_device).length;
+        const freePorts = Math.max(ports.length - usedPorts, 0);
         const statusColor = s => s === 'active' ? 'text-emerald-400' : s === 'error' ? 'text-red-400' : s === 'reserved' ? 'text-amber-400' : 'text-slate-500';
         html += `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4">
-            <div class="flex items-center gap-2 mb-3"><i class="fas fa-th text-cyan-400"></i><span class="font-bold text-white">${dev ? dev.name : 'Unknown Device'}</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${ports.length} ports</span></div>
+            <div class="flex items-center gap-2 mb-3 flex-wrap"><i class="fas fa-th text-cyan-400"></i><span class="font-bold text-white">${dev ? dev.name : 'Unknown Device'}</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${ports.length} total</span><span class="text-xs bg-emerald-900/50 px-2 py-0.5 rounded text-emerald-300">${usedPorts} used</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${freePorts} free</span></div>
             <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2">
                 ${ports.map(p => `<div class="flex flex-col items-center p-2 rounded-lg border border-slate-700 cursor-pointer hover:border-cyan-500 transition-colors group relative" ${isAdmin ? `onclick="editPort('${p.id}')"` : ''}>
                     <i class="fas fa-circle ${statusColor(p.status)} text-sm"></i>
@@ -380,7 +382,8 @@ function renderPorts() {
                         <div class="text-slate-400">Status: <span class="${statusColor(p.status)}">${p.status}</span></div>
                         <div class="text-slate-400">Speed: ${p.speed}</div>
                         ${p.vlan ? `<div class="text-slate-400">VLAN: ${p.vlan}</div>` : ''}
-                        ${p.connected_device ? `<div class="text-slate-400">→ ${p.connected_device}</div>` : ''}
+                        ${p.connected_device ? `<div class=\"text-slate-400\">→ ${p.connected_device}</div>` : ''}
+                        <div class="text-slate-400">Cable mark: P${p.port_number}-${(p.port_label || `PORT${p.port_number}`).toUpperCase()}</div>
                         ${p.notes ? `<div class="text-slate-400 mt-1 italic">${p.notes}</div>` : ''}
                     </div>
                 </div>`).join('')}
@@ -400,7 +403,7 @@ function renderCables() {
                 <div class="flex items-center gap-2 flex-wrap"><span class="font-medium text-white">${c.label || 'Cable #' + c.id.substring(0,6)}</span>
                 <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">${c.cable_type.toUpperCase()}</span>
                 ${c.cable_length ? `<span class="text-xs bg-cyan-900/50 px-2 py-0.5 rounded text-cyan-300">${c.cable_length}</span>` : ''}</div>
-                <div class="text-xs text-slate-500 mt-1">${c.source_type} port ${c.source_port} → ${c.dest_type} port ${c.dest_port}</div>
+                <div class="text-xs text-slate-500 mt-1">${c.source_type} port ${c.source_port} → ${c.dest_type} port ${c.dest_port}</div><div class="text-[11px] text-cyan-300 mt-1 font-mono">MARK ${`${(c.source_type || 's')[0].toUpperCase()}${c.source_port}-${(c.dest_type || 'd')[0].toUpperCase()}${c.dest_port}`}</div>
             </div>
             ${isAdmin ? `<div class="flex gap-1"><button onclick="editCable('${c.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300"><i class="fas fa-edit"></i></button><button onclick="deleteCable('${c.id}')" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-red-400"><i class="fas fa-trash"></i></button></div>` : ''}
         </div>`;
