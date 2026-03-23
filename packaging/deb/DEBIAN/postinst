@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+systemctl daemon-reload
+if [ ! -f /etc/ampnm-agent/config.env ] && [ -f /usr/share/ampnm-agent/config.env.example ]; then
+  install -d -m 0755 /etc/ampnm-agent
+  cp /usr/share/ampnm-agent/config.env.example /etc/ampnm-agent/config.env
+  chmod 0600 /etc/ampnm-agent/config.env
+fi
+systemctl enable --now ampnm-agent.service || true
