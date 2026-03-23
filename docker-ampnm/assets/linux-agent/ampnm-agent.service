@@ -9,9 +9,10 @@ EnvironmentFile=/etc/ampnm-agent/config.env
 ExecStart=/opt/ampnm-agent/ampnm-agent.sh
 Restart=always
 RestartSec=15
-User=root
-Group=root
+User=ampnm-agent
+Group=ampnm-agent
 NoNewPrivileges=true
+WorkingDirectory=/opt/ampnm-agent
 
 [Install]
 WantedBy=multi-user.target
