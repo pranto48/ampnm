@@ -23,6 +23,8 @@ const FPCanvas = {
     planDevices: [],
     cables: [],
     annotations: [],
+    container: null,
+    resizeHandler: null,
 
     CABLE_COLOR_MAP: {
         blue: '#3b82f6', red: '#ef4444', green: '#22c55e', yellow: '#eab308',
@@ -37,12 +39,21 @@ const FPCanvas = {
     init(containerId, data) {
         const container = document.getElementById(containerId);
         if (!container) return;
+        this.container = container;
         this.canvasWidth = this.toNumber(data.plan?.width, 2000);
         this.canvasHeight = this.toNumber(data.plan?.height, 1500);
         this.backgroundUrl = data.plan?.image_url || null;
+        this.zoom = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.isPanning = false;
+        this.dragging = null;
+        this.cableStart = null;
 
-        container.innerHTML = `<svg id="fp-canvas-svg" class="w-full" style="height:600px; background:#0f172a; border-radius:8px; border:1px solid #334155; cursor:default;"></svg>`;
+        container.innerHTML = `<svg id="fp-canvas-svg" class="w-full h-full block" style="height:600px; background:#0f172a; border-radius:8px; border:1px solid #334155; cursor:default; touch-action:none;"></svg>`;
         this.svg = document.getElementById('fp-canvas-svg');
+        this.svg.setAttribute('viewBox', `0 0 ${this.canvasWidth} ${this.canvasHeight}`);
+        this.svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
         this.g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         this.svg.appendChild(this.g);
 
@@ -64,7 +75,14 @@ const FPCanvas = {
         this.svg.addEventListener('mouseleave', () => this.onMouseUp());
         this.svg.addEventListener('contextmenu', e => e.preventDefault());
 
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
+        }
+        this.resizeHandler = () => this.fitToView();
+        window.addEventListener('resize', this.resizeHandler);
+
         this.render();
+        requestAnimationFrame(() => this.fitToView());
     },
 
     snap(v) { return this.snapToGrid ? Math.round(v / this.gridSize) * this.gridSize : v; },
@@ -300,8 +318,12 @@ const FPCanvas = {
         }
 
         // Background rect
-        const bg = this.createSVG('rect', { x: 0, y: 0, width: this.canvasWidth, height: this.canvasHeight, fill: this.snapToGrid ? 'url(#fpgrid)' : 'rgba(30,41,59,0.2)', rx: 4, class: 'canvas-bg' });
-        g.appendChild(bg);
+        const bgBase = this.createSVG('rect', { x: 0, y: 0, width: this.canvasWidth, height: this.canvasHeight, fill: '#0f172a', rx: 4, class: 'canvas-bg' });
+        g.appendChild(bgBase);
+        if (this.snapToGrid) {
+            const bgGrid = this.createSVG('rect', { x: 0, y: 0, width: this.canvasWidth, height: this.canvasHeight, fill: 'url(#fpgrid)', rx: 4, opacity: 0.45, class: 'canvas-bg' });
+            g.appendChild(bgGrid);
+        }
 
         // Background image
         if (this.backgroundUrl) {
@@ -506,11 +528,14 @@ const FPCanvas = {
     },
 
     fitToView() {
+        if (!this.svg) return;
         const rect = this.svg.getBoundingClientRect();
+        if (!rect.width || !rect.height || !this.canvasWidth || !this.canvasHeight) return;
         this.zoom = Math.min(rect.width / this.canvasWidth, rect.height / this.canvasHeight) * 0.9;
         this.panX = (rect.width - this.canvasWidth * this.zoom) / 2;
         this.panY = (rect.height - this.canvasHeight * this.zoom) / 2;
-        document.getElementById('fp-zoom-label').textContent = Math.round(this.zoom * 100) + '%';
+        const zoomLabel = document.getElementById('fp-zoom-label');
+        if (zoomLabel) zoomLabel.textContent = Math.round(this.zoom * 100) + '%';
         this.updateTransform();
     }
 };
