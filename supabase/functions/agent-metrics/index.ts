@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const MAX_SNAPSHOT_ROWS = 50;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -31,13 +33,16 @@ Deno.serve(async (req) => {
 
     // POST / - submit metrics (agent token auth)
     if (req.method === "POST" && (path === "" || path === "/")) {
-      const agentToken = req.headers.get("x-agent-token") || 
+      const agentToken = req.headers.get("x-agent-token") ||
         req.headers.get("authorization")?.replace("Bearer ", "");
 
       if (!agentToken) {
         return new Response(
           JSON.stringify({ error: "Missing agent token" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
         );
       }
 
@@ -50,7 +55,10 @@ Deno.serve(async (req) => {
       if (tokenErr || !tokenRow || !tokenRow.enabled) {
         return new Response(
           JSON.stringify({ error: "Invalid or disabled token" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
         );
       }
 
@@ -59,40 +67,50 @@ Deno.serve(async (req) => {
       if (!hostname) {
         return new Response(
           JSON.stringify({ error: "hostname is required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
         );
       }
 
-      // Upsert host metrics (including uptime fields)
+      const metricsPayload = {
+        hostname,
+        ip_address: body.ip_address || null,
+        cpu_usage: body.cpu ?? body.cpu_usage ?? null,
+        memory_usage: body.memory_usage ?? null,
+        memory_total: body.memory_total ?? null,
+        disk_usage: body.disk_usage ?? null,
+        disk_total: body.disk_total ?? null,
+        network_in: body.network_in ?? null,
+        network_out: body.network_out ?? null,
+        gpu_usage: body.gpu_usage ?? null,
+        uptime_seconds: body.uptime_seconds ?? null,
+        boot_time: body.boot_time ?? null,
+        os_version: body.os_version ?? null,
+        load_1: body.load_1 ?? null,
+        load_5: body.load_5 ?? null,
+        load_15: body.load_15 ?? null,
+        temperature_c: body.temperature_c ?? null,
+        sensor_summary: body.sensor_summary ?? null,
+        agent_token_id: tokenRow.id,
+        status: "online",
+        last_seen: new Date().toISOString(),
+      };
+
+      // Upsert host metrics (including uptime/load/temperature fields)
       const { error: upsertErr } = await supabaseAdmin
         .from("host_metrics")
-        .upsert(
-          {
-            hostname,
-            ip_address: body.ip_address || null,
-            cpu_usage: body.cpu ?? body.cpu_usage ?? null,
-            memory_usage: body.memory_usage ?? null,
-            memory_total: body.memory_total ?? null,
-            disk_usage: body.disk_usage ?? null,
-            disk_total: body.disk_total ?? null,
-            network_in: body.network_in ?? null,
-            network_out: body.network_out ?? null,
-            gpu_usage: body.gpu_usage ?? null,
-            uptime_seconds: body.uptime_seconds ?? null,
-            boot_time: body.boot_time ?? null,
-            os_version: body.os_version ?? null,
-            agent_token_id: tokenRow.id,
-            status: "online",
-            last_seen: new Date().toISOString(),
-          },
-          { onConflict: "hostname" }
-        );
+        .upsert(metricsPayload, { onConflict: "hostname" });
 
       if (upsertErr) {
         console.error("Upsert error:", upsertErr);
         return new Response(
           JSON.stringify({ error: "Failed to store metrics" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
         );
       }
 
@@ -109,13 +127,17 @@ Deno.serve(async (req) => {
           network_in: body.network_in ?? null,
           network_out: body.network_out ?? null,
           gpu_usage: body.gpu_usage ?? null,
+          load_1: body.load_1 ?? null,
+          load_5: body.load_5 ?? null,
+          load_15: body.load_15 ?? null,
+          temperature_c: body.temperature_c ?? null,
         });
 
       if (historyErr) {
         console.error("History insert error:", historyErr);
       }
 
-      // Store processes/services if provided
+      // Store processes if provided
       if (Array.isArray(body.processes) && body.processes.length > 0) {
         // Delete old process snapshot for this host
         await supabaseAdmin
@@ -123,16 +145,18 @@ Deno.serve(async (req) => {
           .delete()
           .eq("hostname", hostname);
 
-        // Insert new process list (limit to top 50)
-        const processRows = body.processes.slice(0, 50).map((p: any) => ({
-          hostname,
-          process_name: p.name || p.process_name || "unknown",
-          pid: p.pid ?? null,
-          cpu_percent: p.cpu ?? p.cpu_percent ?? null,
-          memory_mb: p.memory_mb ?? p.mem ?? null,
-          status: p.status ?? "running",
-          process_type: p.type ?? p.process_type ?? "process",
-        }));
+        // Insert new process list (limit to top N)
+        const processRows = body.processes
+          .slice(0, MAX_SNAPSHOT_ROWS)
+          .map((p: any) => ({
+            hostname,
+            process_name: p.name || p.process_name || "unknown",
+            pid: p.pid ?? null,
+            cpu_percent: p.cpu ?? p.cpu_percent ?? null,
+            memory_mb: p.memory_mb ?? p.mem ?? null,
+            status: p.status ?? "running",
+            process_type: p.type ?? p.process_type ?? "process",
+          }));
 
         const { error: procErr } = await supabaseAdmin
           .from("host_processes")
@@ -140,6 +164,38 @@ Deno.serve(async (req) => {
 
         if (procErr) {
           console.error("Process insert error:", procErr);
+        }
+      }
+
+      // Store services if provided
+      if (Array.isArray(body.services)) {
+        await supabaseAdmin
+          .from("host_services")
+          .delete()
+          .eq("hostname", hostname);
+
+        if (body.services.length > 0) {
+          const serviceRows = body.services
+            .slice(0, MAX_SNAPSHOT_ROWS)
+            .map((service: any) => ({
+              hostname,
+              service_name: service.name || service.service_name || "unknown",
+              display_name:
+                service.display_name ?? service.displayName ?? null,
+              state: service.state ?? null,
+              sub_state:
+                service.sub_state ?? service.subState ?? null,
+              enabled: service.enabled ?? null,
+              recorded_at: service.recorded_at ?? null,
+            }));
+
+          const { error: serviceErr } = await supabaseAdmin
+            .from("host_services")
+            .insert(serviceRows);
+
+          if (serviceErr) {
+            console.error("Service insert error:", serviceErr);
+          }
         }
       }
 
@@ -170,12 +226,18 @@ Deno.serve(async (req) => {
     }
 
     // GET /processes?hostname=XXX
-    if (req.method === "GET" && (path === "processes" || path === "processes/")) {
+    if (
+      req.method === "GET" &&
+      (path === "processes" || path === "processes/")
+    ) {
       const hostname = url.searchParams.get("hostname");
       if (!hostname) {
         return new Response(
           JSON.stringify({ error: "hostname query param required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
         );
       }
 
@@ -184,7 +246,7 @@ Deno.serve(async (req) => {
         .select("*")
         .eq("hostname", hostname)
         .order("cpu_percent", { ascending: false })
-        .limit(50);
+        .limit(MAX_SNAPSHOT_ROWS);
 
       if (error) throw error;
 
@@ -196,13 +258,19 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ error: "Not found" }),
-      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   } catch (e) {
     console.error("Agent metrics error:", e);
     return new Response(
       JSON.stringify({ error: "Internal error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 });
