@@ -14,7 +14,7 @@ const sections = [
   },
   {
     icon: Activity, title: "Monitoring",
-    content: "Host Metrics shows latency and packet loss charts for each device over time. The Windows Agent page provides a monitoring script you can install on Windows hosts to collect CPU, memory, disk, and network metrics.",
+    content: "Host Metrics shows collected host telemetry over time, including CPU, memory, disk, and Linux-specific metrics when reported. The Agent Onboarding page provides Windows and Linux installation workflows, shared token management, and endpoint details for registering hosts.",
   },
   {
     icon: Mail, title: "Email Notifications",

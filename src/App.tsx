@@ -14,7 +14,7 @@ import HistoryPage from "./pages/HistoryPage";
 import StatusLogsPage from "./pages/StatusLogsPage";
 import NetworkGraphsPage from "./pages/NetworkGraphsPage";
 import HostMetricsPage from "./pages/HostMetricsPage";
-import WindowsAgentPage from "./pages/WindowsAgentPage";
+import AgentOnboardingPage from "./pages/AgentOnboardingPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import UsersPage from "./pages/UsersPage";
 import LicensePage from "./pages/LicensePage";
@@ -41,7 +41,8 @@ const App = () => (
               <Route path="/network-graphs" element={<ProtectedRoute><NetworkGraphsPage /></ProtectedRoute>} />
               <Route path="/floor-plan" element={<ProtectedRoute><FloorPlanPage /></ProtectedRoute>} />
               <Route path="/host-metrics" element={<ProtectedRoute><HostMetricsPage /></ProtectedRoute>} />
-              <Route path="/windows-agent" element={<ProtectedRoute><WindowsAgentPage /></ProtectedRoute>} />
+              <Route path="/agent-onboarding" element={<ProtectedRoute><AgentOnboardingPage /></ProtectedRoute>} />
+              <Route path="/windows-agent" element={<ProtectedRoute><AgentOnboardingPage /></ProtectedRoute>} />
               <Route path="/devices" element={<ProtectedRoute adminOnly><DevicesPage /></ProtectedRoute>} />
               <Route path="/history" element={<ProtectedRoute adminOnly><HistoryPage /></ProtectedRoute>} />
               <Route path="/status-logs" element={<ProtectedRoute adminOnly><StatusLogsPage /></ProtectedRoute>} />
