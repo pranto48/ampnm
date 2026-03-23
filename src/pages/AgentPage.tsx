@@ -6,6 +6,7 @@ import {
   Download,
   Key,
   Laptop,
+  Monitor,
   Plus,
   RefreshCw,
   Server,
@@ -18,7 +19,7 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,8 +51,8 @@ interface HostRow {
   memory_total: number | null;
   disk_usage: number | null;
   disk_total: number | null;
+  platform: string | null;
   agent_platform?: string | null;
-  platform?: string | null;
   load_average?: number | null;
   temperature_celsius?: number | null;
 }
@@ -62,6 +63,17 @@ const normalizePlatform = (platform?: string | null): AgentPlatform => {
   return "unknown";
 };
 
+const platformBadgeVariant = (platform: AgentPlatform) => {
+  if (platform === "windows") return "default" as const;
+  if (platform === "linux") return "secondary" as const;
+  return "outline" as const;
+};
+
+const platformLabel = (platform: AgentPlatform) => {
+  if (platform === "unknown") return "Unknown";
+  return platform.charAt(0).toUpperCase() + platform.slice(1);
+};
+
 function CopyButton({ onClick, label = "Copy" }: { onClick: () => void; label?: string }) {
   return (
     <Button variant="ghost" size="sm" onClick={onClick} aria-label={label}>
@@ -70,7 +82,34 @@ function CopyButton({ onClick, label = "Copy" }: { onClick: () => void; label?: 
   );
 }
 
-export default function AgentOnboardingPage() {
+function CommandCard({
+  title,
+  description,
+  command,
+  copyLabel,
+  onCopy,
+}: {
+  title: string;
+  description: string;
+  command: string;
+  copyLabel: string;
+  onCopy: (command: string, label: string) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-medium text-sm">{title}</h3>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <CopyButton onClick={() => onCopy(command, copyLabel)} label={copyLabel} />
+      </div>
+      <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all">{command}</pre>
+    </div>
+  );
+}
+
+export default function AgentPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [tokens, setTokens] = useState<AgentTokenRow[]>([]);
@@ -84,48 +123,14 @@ export default function AgentOnboardingPage() {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "";
   const agentEndpoint = `https://${projectId}.supabase.co/functions/v1/agent-metrics`;
   const linuxDownloadBase = `${agentEndpoint.replace(/\/agent-metrics$/, "")}/agent-downloads`;
-  const linuxShellInstaller = `curl -fsSL ${linuxDownloadBase}/install.sh | sudo bash -s -- --server-url ${agentEndpoint} --agent-token ${selectedToken || "<paste-token-here>"}`;
-  const linuxShellInstallerWget = `wget -qO- ${linuxDownloadBase}/install.sh | sudo bash -s -- --server-url ${agentEndpoint} --agent-token ${selectedToken || "<paste-token-here>"}`;
-  const linuxDebInstall = `curl -fsSLo /tmp/ampnm-agent.deb ${linuxDownloadBase}/ampnm-agent_latest_amd64.deb && sudo dpkg -i /tmp/ampnm-agent.deb && sudo AMPNM_SERVER_URL=${agentEndpoint} AMPNM_AGENT_TOKEN=${selectedToken || "<paste-token-here>"} /usr/bin/ampnm-agent register`;
-  const linuxRpmInstall = `curl -fsSLo /tmp/ampnm-agent.rpm ${linuxDownloadBase}/ampnm-agent-latest.x86_64.rpm && sudo rpm -Uvh /tmp/ampnm-agent.rpm && sudo AMPNM_SERVER_URL=${agentEndpoint} AMPNM_AGENT_TOKEN=${selectedToken || "<paste-token-here>"} /usr/bin/ampnm-agent register`;
-  const linuxManualInstall = `mkdir -p /opt/ampnm-agent
-curl -fsSLo /opt/ampnm-agent/ampnm-agent ${linuxDownloadBase}/ampnm-agent-linux-amd64
-chmod +x /opt/ampnm-agent/ampnm-agent
-cat <<'CFG' | sudo tee /etc/ampnm-agent.env
-AMPNM_SERVER_URL=${agentEndpoint}
-AMPNM_AGENT_TOKEN=${selectedToken || "<paste-token-here>"}
-CFG
-sudo /opt/ampnm-agent/ampnm-agent install-service
-sudo systemctl enable --now ampnm-agent`;
+  const selectedTokenValue = selectedToken || "<paste-token-here>";
 
-  const windowsInstallCommand = `$p = "$env:TEMP\\AMPNM-Agent-Installer.ps1"
-Invoke-WebRequest -Uri "${agentEndpoint}" -OutFile $p
-Unblock-File -Path $p
-& $p -ServerUrl "${agentEndpoint}" -AgentToken "${selectedToken || "<paste-token-here>"}"`;
-
-  const windowsBatScript = `@echo off
-REM AMPNM Windows Monitor Agent - Simple Version
-set SERVER_URL=${agentEndpoint}
-set AGENT_TOKEN=${selectedToken || "your-agent-token-here"}
-set INTERVAL=60
-
-:loop
-echo Collecting metrics...
-for /f "skip=1" %%%%p in ('wmic cpu get loadpercentage') do (set CPU=%%%%p& goto :gotcpu)
-:gotcpu
-for /f "skip=1 tokens=1" %%%%m in ('wmic OS get FreePhysicalMemory') do (set FREE_MEM=%%%%m& goto :gotmem)
-:gotmem
-for /f "tokens=2 delims==" %%%%h in ('wmic computersystem get name /value') do (set HOSTNAME=%%%%h& goto :gothost)
-:gothost
-
-echo CPU: %CPU%% | Memory Free: %FREE_MEM%KB | Host: %HOSTNAME%
-curl -s -X POST "%SERVER_URL%" ^
-  -H "Content-Type: application/json" ^
-  -H "x-agent-token: %AGENT_TOKEN%" ^
-  -d "{\\"hostname\\": \\"%HOSTNAME%\\", \\"cpu_usage\\": %CPU%, \\"free_memory_kb\\": %FREE_MEM%}"
-
-timeout /t %INTERVAL% /nobreak >nul
-goto loop`;
+  const linuxShellInstaller = `curl -fsSL ${linuxDownloadBase}/install.sh | sudo bash -s -- --server-url ${agentEndpoint} --agent-token ${selectedTokenValue}`;
+  const linuxDebInstall = `curl -fsSLo /tmp/ampnm-agent.deb ${linuxDownloadBase}/ampnm-agent_latest_amd64.deb && sudo dpkg -i /tmp/ampnm-agent.deb && sudo AMPNM_SERVER_URL=${agentEndpoint} AMPNM_AGENT_TOKEN=${selectedTokenValue} /usr/bin/ampnm-agent register`;
+  const linuxRpmInstall = `curl -fsSLo /tmp/ampnm-agent.rpm ${linuxDownloadBase}/ampnm-agent-latest.x86_64.rpm && sudo rpm -Uvh /tmp/ampnm-agent.rpm && sudo AMPNM_SERVER_URL=${agentEndpoint} AMPNM_AGENT_TOKEN=${selectedTokenValue} /usr/bin/ampnm-agent register`;
+  const linuxServiceCommands = `sudo systemctl status ampnm-agent\nsudo systemctl restart ampnm-agent`;
+  const windowsInstallCommand = `$p = "$env:TEMP\\AMPNM-Agent-Installer.ps1"\nInvoke-WebRequest -Uri "${agentEndpoint}" -OutFile $p\nUnblock-File -Path $p\n& $p -ServerUrl "${agentEndpoint}" -AgentToken "${selectedTokenValue}"`;
+  const windowsVerifyCommands = `Get-Service -Name ampnm-agent\nGet-Service -Name ampnm-agent | Select-Object Status, Name, DisplayName\nGet-Content "C:\\ProgramData\\ampnm-agent\\agent.log" -Tail 50`;
 
   const fetchData = async () => {
     setLoading(true);
@@ -208,7 +213,7 @@ goto loop`;
             <Server className="h-7 w-7 text-primary" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Agent Onboarding</h1>
-              <p className="text-sm text-muted-foreground">Install and register Windows or Linux hosts with a shared token and endpoint workflow.</p>
+              <p className="text-sm text-muted-foreground">Install and register Windows or Linux agents with a shared token workflow and platform-aware instructions.</p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
@@ -216,17 +221,15 @@ goto loop`;
           </Button>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Key className="h-4 w-4 text-amber-400" /> Step 1 — Create an Agent Token
+                <Key className="h-4 w-4 text-amber-400" /> Step 1 — Shared Agent Tokens
               </CardTitle>
+              <CardDescription>Create one token and reuse it across Windows and Linux hosts.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Tokens authenticate Windows and Linux hosts posting metrics. Create one token and reuse it on as many hosts as you need.
-              </p>
               <Button size="sm" onClick={() => setShowCreateToken(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Create Token
               </Button>
@@ -248,7 +251,7 @@ goto loop`;
                         <TableCell>
                           <button
                             onClick={() => {
-                              copyText(token.token);
+                              copyText(token.token, "Token copied");
                               setSelectedToken(token.token);
                             }}
                             className="text-xs font-mono text-primary hover:underline cursor-pointer"
@@ -280,8 +283,9 @@ goto loop`;
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Download className="h-4 w-4 text-purple-400" /> Step 2 — Install the Agent
+                <Download className="h-4 w-4 text-purple-400" /> Step 2 — Platform Installers
               </CardTitle>
+              <CardDescription>Choose the host platform, then copy the matching install or service commands.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
@@ -294,79 +298,91 @@ goto loop`;
 
               <Tabs defaultValue="windows" className="space-y-4">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="windows">Windows</TabsTrigger>
-                  <TabsTrigger value="linux">Linux</TabsTrigger>
+                  <TabsTrigger value="windows" className="gap-2"><Monitor className="h-4 w-4" /> Windows</TabsTrigger>
+                  <TabsTrigger value="linux" className="gap-2"><Laptop className="h-4 w-4" /> Linux</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="windows" className="space-y-4 mt-0">
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-sm">PowerShell One-Liner</h3>
-                    <p className="text-xs text-muted-foreground">Run in PowerShell as Administrator on the Windows host.</p>
-                    <div className="bg-muted rounded-md border p-3 relative">
-                      <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all pr-8">{windowsInstallCommand}</pre>
-                      <CopyButton onClick={() => copyText(windowsInstallCommand)} label="Copy Windows one-liner" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-sm">Simple Batch Script</h3>
-                    <p className="text-xs text-muted-foreground">Lightweight script for quick monitoring setup.</p>
-                    <Button variant="outline" size="sm" onClick={() => copyText(windowsBatScript)}>
-                      <Copy className="h-4 w-4 mr-1" /> Copy BAT Script
-                    </Button>
+                <TabsContent value="windows" className="mt-0 space-y-4">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Windows Installer</CardTitle>
+                        <CardDescription>Run the PowerShell installer from an elevated session.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <CommandCard
+                          title="PowerShell installer"
+                          description="Downloads the installer script, unblocks it, and registers the service."
+                          command={windowsInstallCommand}
+                          copyLabel="Copy Windows installer"
+                          onCopy={copyText}
+                        />
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Windows Verification</CardTitle>
+                        <CardDescription>Verify the service is installed and the agent log is updating.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <CommandCard
+                          title="Service verification commands"
+                          description="Checks the Windows service and tails the local agent log."
+                          command={windowsVerifyCommands}
+                          copyLabel="Copy Windows verification commands"
+                          onCopy={copyText}
+                        />
+                      </CardContent>
+                    </Card>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="linux" className="space-y-4 mt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Laptop className="h-4 w-4 text-emerald-400" />
-                      <h3 className="font-medium text-sm">Shell Installer One-Liner</h3>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Use curl or wget to bootstrap the Linux agent and register it to this endpoint.</p>
-                    <div className="bg-muted rounded-md border p-3 space-y-3">
-                      <div className="relative">
-                        <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all pr-8">{linuxShellInstaller}</pre>
-                        <CopyButton onClick={() => copyText(linuxShellInstaller, "Shell installer copied")} label="Copy shell installer" />
-                      </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">wget alternative</p>
-                        <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all">{linuxShellInstallerWget}</pre>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-sm">Manual Install</h3>
-                    <div className="bg-muted rounded-md border p-3">
-                      <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all">{linuxManualInstall}</pre>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <h3 className="font-medium text-sm">Package Install — .deb</h3>
-                      <div className="bg-muted rounded-md border p-3 relative">
-                        <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all pr-8">{linuxDebInstall}</pre>
-                        <CopyButton onClick={() => copyText(linuxDebInstall, ".deb install command copied")} label="Copy .deb install command" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="font-medium text-sm">Package Install — .rpm</h3>
-                      <div className="bg-muted rounded-md border p-3 relative">
-                        <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all pr-8">{linuxRpmInstall}</pre>
-                        <CopyButton onClick={() => copyText(linuxRpmInstall, ".rpm install command copied")} label="Copy .rpm install command" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-sm">Service Management</h3>
-                    <div className="bg-muted rounded-md border p-3">
-                      <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all">sudo systemctl status ampnm-agent
-sudo systemctl restart ampnm-agent
-sudo journalctl -u ampnm-agent -n 100 -f</pre>
-                    </div>
+                <TabsContent value="linux" className="mt-0 space-y-4">
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Linux Installer</CardTitle>
+                        <CardDescription>Bootstrap and register the Linux agent with the selected token.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <CommandCard
+                          title="Shell installer one-liner"
+                          description="Fetches the install script and registers the host in one command."
+                          command={linuxShellInstaller}
+                          copyLabel="Copy Linux shell installer"
+                          onCopy={copyText}
+                        />
+                        <CommandCard
+                          title=".deb install command"
+                          description="Installs the Debian package and registers the agent on Ubuntu or Debian."
+                          command={linuxDebInstall}
+                          copyLabel="Copy .deb install command"
+                          onCopy={copyText}
+                        />
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Linux Operations</CardTitle>
+                        <CardDescription>Package and service controls for Red Hat, Rocky, Alma, or Fedora style systems.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <CommandCard
+                          title=".rpm install command"
+                          description="Installs the RPM package and registers the host after installation."
+                          command={linuxRpmInstall}
+                          copyLabel="Copy .rpm install command"
+                          onCopy={copyText}
+                        />
+                        <CommandCard
+                          title="systemd status/restart commands"
+                          description="Checks service health and restarts the agent when configuration changes."
+                          command={linuxServiceCommands}
+                          copyLabel="Copy systemd commands"
+                          onCopy={copyText}
+                        />
+                      </CardContent>
+                    </Card>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -376,9 +392,9 @@ sudo journalctl -u ampnm-agent -n 100 -f</pre>
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <CardTitle className="text-base flex items-center gap-2">
-                <Zap className="h-4 w-4 text-yellow-400" /> Registered Agent Hosts
+                <Zap className="h-4 w-4 text-yellow-400" /> Registered Hosts
                 <Badge variant="secondary">{hosts.length}</Badge>
               </CardTitle>
               <div className="flex items-center gap-4 text-sm">
@@ -386,6 +402,7 @@ sudo journalctl -u ampnm-agent -n 100 -f</pre>
                 <span className="text-muted-foreground">● Offline: {hostCounts.offline}</span>
               </div>
             </div>
+            <CardDescription>Shared host inventory for every enrolled Windows and Linux agent.</CardDescription>
           </CardHeader>
           <CardContent>
             {hosts.length === 0 ? (
@@ -408,7 +425,8 @@ sudo journalctl -u ampnm-agent -n 100 -f</pre>
                 <TableBody>
                   {hosts.map((host) => {
                     const memoryPct = host.memory_total ? Math.round((Number(host.memory_usage) / Number(host.memory_total)) * 100) : null;
-                    const platform = normalizePlatform(host.agent_platform ?? host.platform);
+                    const platform = normalizePlatform(host.platform ?? host.agent_platform);
+
                     return (
                       <TableRow key={host.id}>
                         <TableCell>
@@ -418,7 +436,7 @@ sudo journalctl -u ampnm-agent -n 100 -f</pre>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={platform === "unknown" ? "outline" : "secondary"}>{platform}</Badge>
+                          <Badge variant={platformBadgeVariant(platform)}>{platformLabel(platform)}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge className={isRecentlySeen(host.last_seen) ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground"}>
@@ -449,9 +467,9 @@ sudo journalctl -u ampnm-agent -n 100 -f</pre>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>Select a token above before copying install commands so they are pre-filled with the correct credential.</p>
             <ul className="list-disc ml-5 space-y-1">
-              <li>Confirm the host appears in the registered host table with the correct platform badge.</li>
+              <li>Confirm the host appears in the registered host table with the correct platform badge from <code>host_metrics.platform</code>.</li>
               <li>Use <strong>Host Metrics</strong> to verify CPU, memory, disk, and Linux-only metrics such as load average or temperature.</li>
-              <li>Use the raw endpoint copy action when configuring custom agents, scripts, or packages.</li>
+              <li>Use the endpoint copy action when configuring custom agents, packages, or automation workflows.</li>
             </ul>
           </CardContent>
         </Card>
