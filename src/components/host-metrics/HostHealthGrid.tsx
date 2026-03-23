@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Activity, Cpu, MemoryStick, HardDrive, Server } from "lucide-react";
+import { Activity, Cpu, MemoryStick, HardDrive, Laptop, Server } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface HostSummary {
@@ -21,6 +21,10 @@ interface HostSummary {
   first_seen: string;
   uptime_seconds?: number | null;
   os_version?: string | null;
+  platform?: string | null;
+  agent_platform?: string | null;
+  load_average?: number | null;
+  temperature_celsius?: number | null;
 }
 
 interface HostWithAvailability extends HostSummary {
@@ -166,8 +170,16 @@ export function HostHealthGrid({ hosts, onSelectHost, selectedHost }: Props) {
                   </span>
                 </div>
 
-                {h.ip_address && (
-                  <p className="text-[10px] text-muted-foreground">{h.ip_address}</p>
+                {(h.ip_address || h.agent_platform || h.platform) && (
+                  <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                    <p className="truncate">{h.ip_address || "No IP reported"}</p>
+                    {(h.agent_platform || h.platform) && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5 uppercase tracking-wide">
+                        <Laptop className="h-2.5 w-2.5" />
+                        {h.agent_platform || h.platform}
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 <div className="space-y-1.5">
@@ -180,6 +192,13 @@ export function HostHealthGrid({ hosts, onSelectHost, selectedHost }: Props) {
                   <span>{h.status}</span>
                   <span>{formatDistanceToNow(new Date(h.last_seen), { addSuffix: true })}</span>
                 </div>
+
+                {(h.load_average != null || h.temperature_celsius != null) && (
+                  <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                    <span>Load: {h.load_average != null ? h.load_average.toFixed(2) : "—"}</span>
+                    <span>Temp: {h.temperature_celsius != null ? `${h.temperature_celsius.toFixed(1)}°C` : "—"}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

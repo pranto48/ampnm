@@ -16,6 +16,10 @@ interface HostMetric {
   ip_address: string | null;
   status: string;
   last_seen: string;
+  platform?: string | null;
+  agent_platform?: string | null;
+  load_average?: number | null;
+  temperature_celsius?: number | null;
 }
 
 interface Props {
@@ -43,12 +47,15 @@ export function HostSnapshotCards({ host }: Props) {
     { label: "Memory", value: memPct != null ? `${memPct}%` : "—", color: getColor(memPct) },
     { label: "Disk", value: diskPct != null ? `${diskPct}%` : "—", color: getColor(diskPct) },
     { label: "GPU", value: host.gpu_usage != null ? `${host.gpu_usage.toFixed(1)}%` : "—", color: getColor(host.gpu_usage) },
+    { label: "Platform", value: host.agent_platform || host.platform || "—" },
+    { label: "Load Avg", value: host.load_average != null ? host.load_average.toFixed(2) : "—" },
+    { label: "Temp", value: host.temperature_celsius != null ? `${host.temperature_celsius.toFixed(1)}°C` : "—" },
     { label: "IP", value: host.ip_address || "—" },
     { label: "Last Seen", value: format(new Date(host.last_seen), "HH:mm:ss") },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9 gap-3">
       {cards.map((c) => (
         <Card key={c.label} className="bg-card/50 border-border/50">
           <CardContent className="pt-4 pb-3 text-center">
