@@ -13,13 +13,12 @@ $pdo = getDbConnection();
  */
 function validateAgentToken($pdo, $token) {
     if (empty($token)) return false;
-    
+
     $stmt = $pdo->prepare("SELECT id, name FROM agent_tokens WHERE token = ? AND enabled = TRUE");
     $stmt->execute([$token]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if ($result) {
-        // Update last used timestamp
         $updateStmt = $pdo->prepare("UPDATE agent_tokens SET last_used_at = NOW() WHERE id = ?");
         $updateStmt->execute([$result['id']]);
         return $result;
@@ -28,12 +27,77 @@ function validateAgentToken($pdo, $token) {
 }
 
 /**
- * Find device by IP address
+ * Find device by IP address or hostname
  */
-function findDeviceByIp($pdo, $ip) {
-    $stmt = $pdo->prepare("SELECT id, name FROM devices WHERE ip = ? LIMIT 1");
-    $stmt->execute([$ip]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+function findDeviceMatch($pdo, $hostname, $ip) {
+    if (!empty($ip)) {
+        $stmt = $pdo->prepare("SELECT id, name FROM devices WHERE ip = ? LIMIT 1");
+        $stmt->execute([$ip]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) return $device;
+    }
+
+    if (!empty($hostname)) {
+        $stmt = $pdo->prepare("SELECT id, name FROM devices WHERE name = ? LIMIT 1");
+        $stmt->execute([$hostname]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($device) return $device;
+    }
+
+    return false;
+}
+
+function normalizePlatform($payload) {
+    $platform = strtolower(trim((string)($payload['platform'] ?? $payload['agent_platform'] ?? '')));
+    if ($platform === '') {
+        $runtimeCollector = strtolower((string)($payload['agent_runtime']['collector'] ?? ''));
+        $osVersion = strtolower((string)($payload['os_version'] ?? ''));
+        if (str_contains($runtimeCollector, 'linux') || str_contains($osVersion, 'ubuntu') || str_contains($osVersion, 'debian') || str_contains($osVersion, 'rhel') || str_contains($osVersion, 'rocky') || str_contains($osVersion, 'alma') || str_contains($osVersion, 'fedora')) {
+            return 'linux';
+        }
+        if (str_contains($osVersion, 'windows')) {
+            return 'windows';
+        }
+    }
+    return in_array($platform, ['windows', 'linux'], true) ? $platform : 'unknown';
+}
+
+function normalizeMetricsPayload($payload) {
+    $hostname = trim((string)($payload['hostname'] ?? $payload['host_name'] ?? 'Unknown Host'));
+    $ipAddress = trim((string)($payload['ip_address'] ?? $payload['host_ip'] ?? ''));
+    $cpuUsage = $payload['cpu_usage'] ?? $payload['cpu_percent'] ?? $payload['cpu'] ?? null;
+    $memoryUsage = $payload['memory_usage'] ?? $payload['memory_percent'] ?? null;
+    $memoryTotal = $payload['memory_total'] ?? $payload['memory_total_gb'] ?? null;
+    $diskUsage = $payload['disk_usage'] ?? $payload['disk_percent'] ?? null;
+    $diskTotal = $payload['disk_total'] ?? $payload['disk_total_gb'] ?? null;
+    $networkIn = $payload['network_in'] ?? null;
+    $networkOut = $payload['network_out'] ?? null;
+    $gpuUsage = $payload['gpu_usage'] ?? $payload['gpu_percent'] ?? null;
+    $temperature = $payload['temperature_celsius'] ?? $payload['temperature_c'] ?? null;
+    $loadAverage = $payload['load_average'] ?? $payload['load_1'] ?? null;
+    $platform = normalizePlatform($payload);
+
+    return [
+        'hostname' => $hostname !== '' ? $hostname : 'Unknown Host',
+        'ip_address' => $ipAddress !== '' ? $ipAddress : null,
+        'os_version' => $payload['os_version'] ?? null,
+        'cpu_usage' => is_numeric($cpuUsage) ? round((float)$cpuUsage, 2) : null,
+        'memory_usage' => is_numeric($memoryUsage) ? round((float)$memoryUsage, 2) : null,
+        'memory_total' => is_numeric($memoryTotal) ? round((float)$memoryTotal, 2) : null,
+        'disk_usage' => is_numeric($diskUsage) ? round((float)$diskUsage, 2) : null,
+        'disk_total' => is_numeric($diskTotal) ? round((float)$diskTotal, 2) : null,
+        'gpu_usage' => is_numeric($gpuUsage) ? round((float)$gpuUsage, 2) : null,
+        'network_in' => is_numeric($networkIn) ? (int)round((float)$networkIn) : null,
+        'network_out' => is_numeric($networkOut) ? (int)round((float)$networkOut) : null,
+        'uptime_seconds' => isset($payload['uptime_seconds']) && is_numeric($payload['uptime_seconds']) ? (int)$payload['uptime_seconds'] : null,
+        'boot_time' => !empty($payload['boot_time']) ? date('Y-m-d H:i:s', strtotime((string)$payload['boot_time'])) : null,
+        'status' => 'online',
+        'platform' => $platform,
+        'load_average' => is_numeric($loadAverage) ? round((float)$loadAverage, 2) : null,
+        'temperature_celsius' => is_numeric($temperature) ? round((float)$temperature, 2) : null,
+        'top_processes' => is_array($payload['top_processes'] ?? null) ? $payload['top_processes'] : (is_array($payload['processes'] ?? null) ? $payload['processes'] : []),
+        'services' => is_array($payload['services'] ?? null) ? $payload['services'] : [],
+    ];
 }
 
 function getTableColumns(PDO $pdo, string $table): array {
@@ -119,7 +183,7 @@ function normalizeMetricsPayload(array $data): array {
 }
 
 /**
- * Save host metrics to database
+ * Save current host snapshot and matching history row
  */
 function saveHostMetrics($pdo, $data, $deviceId = null) {
     $data = normalizeMetricsPayload($data);
@@ -273,6 +337,41 @@ function saveHostMetrics($pdo, $data, $deviceId = null) {
     return $metricsId;
 }
 
+function saveHostProcesses($pdo, $hostname, $processes, $services) {
+    if (empty($hostname)) return;
+
+    $deleteStmt = $pdo->prepare("DELETE FROM host_processes WHERE hostname = ?");
+    $deleteStmt->execute([$hostname]);
+
+    $insertStmt = $pdo->prepare("INSERT INTO host_processes (hostname, process_name, process_type, pid, cpu_percent, memory_mb, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+
+    foreach ($processes as $process) {
+        if (!is_array($process)) continue;
+        $insertStmt->execute([
+            $hostname,
+            $process['name'] ?? $process['process_name'] ?? 'process',
+            'process',
+            isset($process['pid']) && is_numeric($process['pid']) ? (int)$process['pid'] : null,
+            isset($process['cpu_percent']) && is_numeric($process['cpu_percent']) ? round((float)$process['cpu_percent'], 2) : null,
+            isset($process['memory_mb']) && is_numeric($process['memory_mb']) ? round((float)$process['memory_mb'], 2) : null,
+            $process['status'] ?? null,
+        ]);
+    }
+
+    foreach ($services as $service) {
+        if (!is_array($service)) continue;
+        $insertStmt->execute([
+            $hostname,
+            $service['name'] ?? $service['service_name'] ?? 'service',
+            'service',
+            null,
+            null,
+            null,
+            $service['status'] ?? $service['state'] ?? $service['sub_state'] ?? null,
+        ]);
+    }
+}
+
 /**
  * Clean up old metrics (keep last 7 days)
  */
@@ -288,7 +387,7 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 // Handle different actions
 switch ($action) {
     case 'submit_metrics':
-        // Accept metrics from Windows agent
+        // Accept metrics from Windows and Linux agents
         $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
         
         // Validate token
@@ -303,7 +402,7 @@ switch ($action) {
         $normalizedInput = normalizeMetricsPayload($input);
         if (empty($normalizedInput['host_ip'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'host_ip is required']);
+            echo json_encode(['error' => 'hostname is required']);
             exit;
         }
         
@@ -335,7 +434,10 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'metrics_id' => $metricsId,
-            'device_matched' => $device ? $device['name'] : null
+            'device_matched' => $device ? $device['name'] : null,
+            'platform' => $normalized['platform'],
+            'hostname' => $normalized['hostname'],
+            'ip_address' => $normalized['ip_address']
         ]);
         break;
         

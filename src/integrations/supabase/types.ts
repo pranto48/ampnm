@@ -702,6 +702,7 @@ export type Database = {
       }
       host_metrics: {
         Row: {
+          agent_platform: string | null
           agent_token_id: string | null
           boot_time: string | null
           cpu_usage: number | null
@@ -714,15 +715,19 @@ export type Database = {
           id: string
           ip_address: string | null
           last_seen: string
+          load_average: number | null
           memory_total: number | null
           memory_usage: number | null
           network_in: number | null
           network_out: number | null
           os_version: string | null
+          platform: string | null
           status: string
+          temperature_celsius: number | null
           uptime_seconds: number | null
         }
         Insert: {
+          agent_platform?: string | null
           agent_token_id?: string | null
           boot_time?: string | null
           cpu_usage?: number | null
@@ -735,15 +740,19 @@ export type Database = {
           id?: string
           ip_address?: string | null
           last_seen?: string
+          load_average?: number | null
           memory_total?: number | null
           memory_usage?: number | null
           network_in?: number | null
           network_out?: number | null
           os_version?: string | null
+          platform?: string | null
           status?: string
+          temperature_celsius?: number | null
           uptime_seconds?: number | null
         }
         Update: {
+          agent_platform?: string | null
           agent_token_id?: string | null
           boot_time?: string | null
           cpu_usage?: number | null
@@ -756,12 +765,15 @@ export type Database = {
           id?: string
           ip_address?: string | null
           last_seen?: string
+          load_average?: number | null
           memory_total?: number | null
           memory_usage?: number | null
           network_in?: number | null
           network_out?: number | null
           os_version?: string | null
+          platform?: string | null
           status?: string
+          temperature_celsius?: number | null
           uptime_seconds?: number | null
         }
         Relationships: [

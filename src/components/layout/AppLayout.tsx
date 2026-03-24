@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
     label: "Monitoring", icon: Activity,
     children: [
       { label: "Host Metrics", to: "/host-metrics", icon: Monitor },
-      { label: "Windows Agent", to: "/windows-agent", icon: Server },
+      { label: "Agent Onboarding", to: "/agent-onboarding", icon: Server },
     ],
   },
   {
