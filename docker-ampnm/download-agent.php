@@ -7,7 +7,10 @@
 $file = $_GET['file'] ?? 'AMPNM-Agent-Installer.ps1';
 $allowedFiles = [
     'AMPNM-Agent-Installer.ps1',
-    'AMPNM-Agent-Simple.bat'
+    'AMPNM-Agent-Simple.bat',
+    'install.sh',
+    'ampnm-agent.sh',
+    'ampnm-agent.service'
 ];
 
 // Validate file name
@@ -17,7 +20,11 @@ if (!in_array($file, $allowedFiles)) {
     exit;
 }
 
-$filePath = __DIR__ . '/assets/windows-agent/' . $file;
+$baseDir = in_array($file, ['install.sh', 'ampnm-agent.sh', 'ampnm-agent.service'], true)
+    ? __DIR__ . '/assets/linux-agent/'
+    : __DIR__ . '/assets/windows-agent/';
+
+$filePath = $baseDir . $file;
 
 if (!file_exists($filePath)) {
     http_response_code(404);
@@ -66,7 +73,9 @@ if ($file === 'AMPNM-Agent-Installer.ps1' && ($serverUrl !== '' || $agentToken !
 $ext = pathinfo($file, PATHINFO_EXTENSION);
 $mimeTypes = [
     'ps1' => 'application/octet-stream',
-    'bat' => 'application/octet-stream'
+    'bat' => 'application/octet-stream',
+    'sh' => 'text/x-shellscript',
+    'service' => 'text/plain'
 ];
 
 $contentType = $mimeTypes[$ext] ?? 'application/octet-stream';

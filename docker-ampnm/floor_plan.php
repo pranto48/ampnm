@@ -7,72 +7,82 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
 $is_admin = ($user_role === 'admin');
 ?>
 <div class="container mx-auto px-4 py-6">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div class="flex items-center gap-3">
             <i class="fas fa-building text-2xl text-cyan-400"></i>
             <h1 class="text-2xl font-bold text-white">Floor Plan & Cable Management</h1>
         </div>
-        <?php if ($is_admin): ?>
-        <button onclick="openPlanDialog()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-plus mr-2"></i>New Floor Plan</button>
-        <?php endif; ?>
-    </div>
-
-    <!-- Floor Plan Selector -->
-    <div id="plan-selector" class="flex gap-2 flex-wrap mb-6"></div>
-
-    <!-- Tabs -->
-    <div class="flex gap-1 mb-4 border-b border-slate-700 pb-2">
-        <button onclick="switchTab('overview')" class="tab-btn active px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="overview"><i class="fas fa-th-large mr-2"></i>Overview</button>
-        <button onclick="switchTab('canvas')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="canvas"><i class="fas fa-drafting-compass mr-2"></i>Canvas</button>
-        <button onclick="switchTab('racks')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="racks"><i class="fas fa-server mr-2"></i>Racks & Panels</button>
-        <button onclick="switchTab('ports')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="ports"><i class="fas fa-th mr-2"></i>Switch Ports</button>
-        <button onclick="switchTab('cables')" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium" data-tab="cables"><i class="fas fa-ethernet mr-2"></i>Cable Runs</button>
-    </div>
-
-    <div id="tab-overview" class="tab-content"></div>
-    <div id="tab-canvas" class="tab-content hidden">
-        <!-- Canvas Toolbar -->
-        <div class="flex items-center gap-2 mb-3 flex-wrap">
-            <div class="flex gap-1 bg-slate-800 rounded-lg p-1 border border-slate-700">
-                <button onclick="FPCanvas.setTool('select')" class="canvas-tool-btn bg-cyan-600 text-white px-3 py-1.5 rounded text-sm" data-tool="select" title="Select & Move"><i class="fas fa-mouse-pointer"></i></button>
-                <?php if ($is_admin): ?>
-                <button onclick="FPCanvas.setTool('add-rack')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="add-rack" title="Place Rack"><i class="fas fa-server"></i></button>
-                <button onclick="FPCanvas.setTool('add-device')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="add-device" title="Place Device"><i class="fas fa-desktop"></i></button>
-                <button onclick="FPCanvas.setTool('add-label')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="add-label" title="Add Label"><i class="fas fa-font"></i></button>
-                <button onclick="FPCanvas.setTool('draw-cable')" class="canvas-tool-btn bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-sm" data-tool="draw-cable" title="Draw Cable"><i class="fas fa-ethernet"></i></button>
-                <?php endif; ?>
-            </div>
-            <div class="flex gap-1">
-                <label class="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 cursor-pointer">
-                    <input type="checkbox" checked onchange="FPCanvas.snapToGrid=this.checked;FPCanvas.render()" class="accent-cyan-500"> Grid
-                </label>
-                <button onclick="FPCanvas.fitToView()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Fit to View"><i class="fas fa-expand"></i></button>
+        <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700">
+                <button onclick="switchView('canvas')" id="view-btn-canvas" class="view-btn px-4 py-2 rounded-lg text-sm font-medium bg-cyan-600 text-white"><i class="fas fa-pen-ruler mr-2"></i>Canvas</button>
+                <button onclick="switchView('list')" id="view-btn-list" class="view-btn px-4 py-2 rounded-lg text-sm font-medium text-slate-300"><i class="fas fa-list mr-2"></i>List</button>
             </div>
             <?php if ($is_admin): ?>
-            <div class="flex gap-1 ml-auto">
-                <button onclick="syncFloorPlanFromMap()" class="px-3 py-1.5 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm hover:bg-cyan-900/70 border border-cyan-800/50" title="Sync coordinates from main map"><i class="fas fa-sync-alt mr-1"></i>Sync Map</button>
-                <button onclick="FPCanvas.deleteSelected()" class="px-3 py-1.5 bg-red-900/50 text-red-300 rounded-lg text-sm hover:bg-red-900/70 border border-red-800/50" title="Delete Selected"><i class="fas fa-trash mr-1"></i>Delete</button>
-            </div>
+            <button onclick="openPlanDialog()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-plus mr-2"></i>New Floor Plan</button>
             <?php endif; ?>
-            <div class="flex gap-1 border-l border-slate-700 pl-2">
-                <button onclick="FPCanvas.exportPNG()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Export PNG"><i class="fas fa-image mr-1"></i>PNG</button>
-                <button onclick="FPCanvas.exportSVG()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Export SVG"><i class="fas fa-file-code mr-1"></i>SVG</button>
-                <button onclick="FPCanvas.exportPDF()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600" title="Export PDF"><i class="fas fa-file-pdf mr-1"></i>PDF</button>
-            </div>
-        </div>
-        <!-- Canvas Container -->
-        <div id="fp-canvas-container" class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden" style="height:600px;"></div>
-        <!-- Properties panel -->
-        <div id="canvas-properties" class="mt-3 bg-slate-800/50 border border-slate-700 rounded-xl p-4 hidden">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-bold text-white" id="canvas-prop-title">Properties</span>
-            </div>
-            <div id="canvas-prop-content" class="text-sm text-slate-400"></div>
         </div>
     </div>
-    <div id="tab-racks" class="tab-content hidden"></div>
-    <div id="tab-ports" class="tab-content hidden"></div>
-    <div id="tab-cables" class="tab-content hidden"></div>
+
+    <div class="flex flex-col gap-3 mb-4">
+        <div id="plan-selector" class="flex gap-2 flex-wrap"></div>
+        <div id="plan-stats" class="flex gap-2 flex-wrap items-center"></div>
+    </div>
+
+    <div id="view-canvas" class="view-panel">
+        <div class="flex gap-3" style="height: calc(100vh - 240px); min-height: 620px;">
+            <div class="w-16 flex-shrink-0 bg-slate-900/80 border border-slate-700 rounded-xl p-2 flex flex-col items-center gap-2">
+                <button onclick="FPCanvas.setTool('select')" class="canvas-tool-btn bg-cyan-600 text-white w-10 h-10 rounded-lg text-sm" data-tool="select" title="Select & Move"><i class="fas fa-mouse-pointer"></i></button>
+                <?php if ($is_admin): ?>
+                <button onclick="FPCanvas.setTool('add-rack')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="add-rack" title="Place Rack"><i class="fas fa-server"></i></button>
+                <button onclick="FPCanvas.setTool('add-device')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="add-device" title="Place Device"><i class="fas fa-desktop"></i></button>
+                <button onclick="FPCanvas.setTool('draw-cable')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="draw-cable" title="Draw Cable"><i class="fas fa-ethernet"></i></button>
+                <button onclick="FPCanvas.setTool('add-label')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="add-label" title="Add Label"><i class="fas fa-font"></i></button>
+                <?php endif; ?>
+                <div class="w-full border-t border-slate-700 my-1"></div>
+                <button onclick="FPCanvas.fitToView()" class="w-10 h-10 rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700" title="Fit to View"><i class="fas fa-expand"></i></button>
+                <label class="w-10 h-10 rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700 flex items-center justify-center cursor-pointer" title="Toggle Grid">
+                    <input type="checkbox" checked onchange="FPCanvas.snapToGrid=this.checked;FPCanvas.render()" class="hidden" id="canvas-grid-toggle">
+                    <i class="fas fa-border-all"></i>
+                </label>
+                <button onclick="FPCanvas.exportPNG()" class="w-10 h-10 rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700" title="Export PNG"><i class="fas fa-image"></i></button>
+                <button onclick="FPCanvas.exportSVG()" class="w-10 h-10 rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700" title="Export SVG"><i class="fas fa-file-code"></i></button>
+                <button onclick="FPCanvas.exportPDF()" class="w-10 h-10 rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700" title="Export PDF"><i class="fas fa-file-pdf"></i></button>
+            </div>
+
+            <div class="flex-1 min-w-0 flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div class="text-xs text-slate-400">Use the canvas toolbar to place racks, devices, labels, and cables just like the web floor-plan editor.</div>
+                    <div class="flex gap-2 flex-wrap">
+                        <?php if ($is_admin): ?>
+                        <button onclick="syncFloorPlanFromMap()" class="px-3 py-1.5 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm hover:bg-cyan-900/70 border border-cyan-800/50" title="Sync coordinates from main map"><i class="fas fa-sync-alt mr-1"></i>Sync Map</button>
+                        <button onclick="FPCanvas.deleteSelected()" class="px-3 py-1.5 bg-red-900/50 text-red-300 rounded-lg text-sm hover:bg-red-900/70 border border-red-800/50" title="Delete Selected"><i class="fas fa-trash mr-1"></i>Delete</button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div id="fp-canvas-container" class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden flex-1 min-h-0"></div>
+            </div>
+
+            <div id="canvas-properties" class="w-72 flex-shrink-0 bg-slate-800/50 border border-slate-700 rounded-xl p-4 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-bold text-white" id="canvas-prop-title">Properties</span>
+                </div>
+                <div id="canvas-prop-content" class="text-sm text-slate-400"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-list" class="view-panel hidden">
+        <div class="flex gap-1 mb-4 border-b border-slate-700 pb-2 flex-wrap">
+            <button onclick="switchListTab('overview')" class="list-tab-btn active px-4 py-2 rounded-t-lg text-sm font-medium bg-slate-700 text-white" data-tab="overview"><i class="fas fa-th-large mr-2"></i>Overview</button>
+            <button onclick="switchListTab('racks')" class="list-tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-slate-300" data-tab="racks"><i class="fas fa-server mr-2"></i>Racks & Panels</button>
+            <button onclick="switchListTab('ports')" class="list-tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-slate-300" data-tab="ports"><i class="fas fa-th mr-2"></i>Switch Ports</button>
+            <button onclick="switchListTab('cables')" class="list-tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-slate-300" data-tab="cables"><i class="fas fa-ethernet mr-2"></i>Cable Runs</button>
+        </div>
+        <div id="tab-overview" class="tab-content"></div>
+        <div id="tab-racks" class="tab-content hidden"></div>
+        <div id="tab-ports" class="tab-content hidden"></div>
+        <div id="tab-cables" class="tab-content hidden"></div>
+    </div>
 </div>
 
 <!-- Device Picker Dialog for Canvas -->
@@ -206,6 +216,8 @@ $is_admin = ($user_role === 'admin');
 const notyf = new Notyf({ duration: 3000, position: { x: 'right', y: 'top' } });
 const isAdmin = <?= $is_admin ? 'true' : 'false' ?>;
 let floorPlans = [], selectedPlanId = null, racks = [], panels = [], switchPorts = [], cables = [], devices = [], planDevices = [], annotations = [];
+let currentView = 'canvas';
+let currentListTab = 'overview';
 const bootstrappedPlans = new Set();
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
@@ -232,12 +244,15 @@ async function loadAll() {
     floorPlans = fp.data || [];
     devices = dev.data || [];
     renderPlanSelector();
+    renderPlanStats();
     if (floorPlans.length && !selectedPlanId) selectPlan(floorPlans[0].id);
+    if (!floorPlans.length) renderEmptyState();
 }
 
 function selectPlan(id) {
     selectedPlanId = id;
     renderPlanSelector();
+    renderPlanStats();
     loadPlanData();
 }
 
@@ -273,34 +288,69 @@ async function loadPlanData() {
         panels = p.data || [];
     } else { panels = []; }
     renderCurrentTab();
+    renderPlanStats();
+}
+
+function renderPlanStats() {
+    const el = document.getElementById('plan-stats');
+    if (!el) return;
+    if (!selectedPlanId) {
+        el.innerHTML = '';
+        return;
+    }
+    el.innerHTML = `
+        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-xs border border-cyan-500/30"><i class="fas fa-server"></i>${racks.length} Racks</span>
+        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs border border-slate-700"><i class="fas fa-ethernet"></i>${cables.length} Cables</span>
+    `;
+}
+
+function renderEmptyState() {
+    document.getElementById('fp-canvas-container').innerHTML = '<div class="h-full min-h-[600px] flex items-center justify-center text-slate-500 border border-dashed border-slate-700 rounded-xl">No floor plans yet. Create one to get started.</div>';
+    document.getElementById('tab-overview').innerHTML = '<div class="flex items-center justify-center h-64 text-slate-500 border border-dashed border-slate-700 rounded-xl">No floor plans yet. Create one to get started.</div>';
+    ['tab-racks','tab-ports','tab-cables'].forEach(id => { const node = document.getElementById(id); if (node) node.innerHTML = ''; });
 }
 
 function renderPlanSelector() {
     const el = document.getElementById('plan-selector');
     el.innerHTML = floorPlans.map(fp => `
-        <button onclick="selectPlan('${fp.id}')" class="px-3 py-1.5 rounded-lg text-sm font-medium ${fp.id == selectedPlanId ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}">
-            <i class="fas fa-map-marker-alt mr-1"></i>${fp.name}
-            ${isAdmin ? `<i class="fas fa-edit ml-2 opacity-60 hover:opacity-100" onclick="event.stopPropagation();editPlan('${fp.id}')"></i><i class="fas fa-trash ml-1 opacity-60 hover:opacity-100 text-red-400" onclick="event.stopPropagation();deletePlan('${fp.id}')"></i>` : ''}
+        <button onclick="selectPlan('${fp.id}')" class="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-2 ${fp.id == selectedPlanId ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'}">
+            <i class="fas fa-map-marker-alt"></i>${fp.name}
+            ${isAdmin ? `<i class="fas fa-edit ml-1 opacity-60 hover:opacity-100" onclick="event.stopPropagation();editPlan('${fp.id}')"></i><i class="fas fa-trash opacity-60 hover:opacity-100 text-red-400" onclick="event.stopPropagation();deletePlan('${fp.id}')"></i>` : ''}
         </button>
     `).join('');
 }
 
-function switchTab(tab) {
+function switchView(view) {
+    currentView = view;
+    document.getElementById('view-canvas').classList.toggle('hidden', view !== 'canvas');
+    document.getElementById('view-list').classList.toggle('hidden', view !== 'list');
+    document.getElementById('view-btn-canvas').classList.toggle('bg-cyan-600', view === 'canvas');
+    document.getElementById('view-btn-canvas').classList.toggle('text-white', view === 'canvas');
+    document.getElementById('view-btn-list').classList.toggle('bg-cyan-600', view === 'list');
+    document.getElementById('view-btn-list').classList.toggle('text-white', view === 'list');
+    renderCurrentTab();
+}
+
+function switchListTab(tab) {
+    currentListTab = tab;
     document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
-    document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active', 'bg-slate-700', 'text-white'));
+    document.querySelectorAll('.list-tab-btn').forEach(e => e.classList.remove('active', 'bg-slate-700', 'text-white'));
     document.getElementById('tab-' + tab).classList.remove('hidden');
-    document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active', 'bg-slate-700', 'text-white');
+    document.querySelector(`.list-tab-btn[data-tab="${tab}"]`).classList.add('active', 'bg-slate-700', 'text-white');
     renderTab(tab);
 }
 
 function renderCurrentTab() {
-    const active = document.querySelector('.tab-btn.active');
-    renderTab(active ? active.dataset.tab : 'overview');
+    if (!selectedPlanId) {
+        renderEmptyState();
+        return;
+    }
+    if (currentView === 'canvas') renderCanvas();
+    else renderTab(currentListTab);
 }
 
 function renderTab(tab) {
     if (tab === 'overview') renderOverview();
-    else if (tab === 'canvas') renderCanvas();
     else if (tab === 'racks') renderRacks();
     else if (tab === 'ports') renderPorts();
     else if (tab === 'cables') renderCables();
@@ -504,7 +554,8 @@ document.getElementById('cable-src-type').addEventListener('change', () => popul
 document.getElementById('cable-dst-type').addEventListener('change', () => populateEndpoints('cable-dst-type','cable-dst-id'));
 
 // Init
-switchTab('overview');
+switchView('canvas');
+switchListTab('overview');
 loadAll();
 </script>
 <?php include 'footer.php'; ?>

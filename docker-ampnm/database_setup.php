@@ -573,6 +573,19 @@ try {
         message("Upgraded 'floor_plans' table: added 'height' column.");
     }
 
+    if (!columnExists($pdo, $dbname, 'host_metrics', 'platform')) {
+        $pdo->exec("ALTER TABLE `host_metrics` ADD COLUMN `platform` VARCHAR(20) NULL AFTER `agent_token_id`;");
+        message("Upgraded 'host_metrics' table: added 'platform' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'host_metrics', 'load_average')) {
+        $pdo->exec("ALTER TABLE `host_metrics` ADD COLUMN `load_average` DECIMAL(10,2) NULL AFTER `platform`;");
+        message("Upgraded 'host_metrics' table: added 'load_average' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'host_metrics', 'temperature_celsius')) {
+        $pdo->exec("ALTER TABLE `host_metrics` ADD COLUMN `temperature_celsius` DECIMAL(6,2) NULL AFTER `load_average`;");
+        message("Upgraded 'host_metrics' table: added 'temperature_celsius' column.");
+    }
+
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
     $stmt->execute([$admin_id]);
