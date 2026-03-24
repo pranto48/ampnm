@@ -323,6 +323,21 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         </div>
                     </div>
                 </div>
+                <div class="border-t border-slate-700 pt-4 mt-4 space-y-3">
+                    <h3 class="text-lg font-semibold text-white">Mouse Over Device Information</h3>
+                    <p class="text-xs text-slate-500">Choose which fields are visible when hovering a device on this map.</p>
+                    <div id="tooltipFieldSettings" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="ip" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>IP Address</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="type" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Device Type</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="monitor" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Monitor Method</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="latency" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Latency</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="ttl" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>TTL</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="interval" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Ping Interval</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="last_seen" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Last Seen</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="description" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Description</label>
+                        <label class="flex items-center text-slate-300 sm:col-span-2"><input type="checkbox" data-tooltip-field="ports" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Ports Summary</label>
+                    </div>
+                </div>
                 <div class="flex justify-between items-center mt-6">
                     <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Reset to Default</button>
                     <div>

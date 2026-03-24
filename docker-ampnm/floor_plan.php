@@ -210,6 +210,11 @@ $is_admin = ($user_role === 'admin');
     </div>
 </div>
 
+<script type="module">
+import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs';
+window.pdfjsLib = pdfjsLib;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="assets/js/floor-plan-canvas.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
 <script>
@@ -221,6 +226,24 @@ let currentListTab = 'overview';
 const bootstrappedPlans = new Set();
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
+
+function isPdfUrl(url) {
+    if (!url) return false;
+    const clean = String(url).split('?')[0].split('#')[0].toLowerCase();
+    return clean.endsWith('.pdf') || String(url).toLowerCase().startsWith('data:application/pdf');
+}
+
+function renderPlanPreview(plan) {
+    if (!plan || !plan.image_url) return '';
+    if (isPdfUrl(plan.image_url)) {
+        return `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+            <iframe src="${plan.image_url}" title="${plan.name} PDF Preview" class="w-full rounded-lg h-[500px] bg-slate-900"></iframe>
+        </div>`;
+    }
+    return `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+        <img src="${plan.image_url}" alt="${plan.name}" class="w-full rounded-lg max-h-[500px] object-contain">
+    </div>`;
+}
 
 function buildCableMark(sourceType, sourcePort, destType, destPort) {
     const sType = (sourceType || 's').charAt(0).toUpperCase();
@@ -406,7 +429,7 @@ function renderOverview() {
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4"><div class="text-sm text-slate-400">Patch Panels</div><div class="text-3xl font-bold text-white">${panels.length}</div></div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4"><div class="text-sm text-slate-400">Cable Runs</div><div class="text-3xl font-bold text-white">${cables.length}</div></div>
         </div>
-        ${plan && plan.image_url ? `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-2"><img src="${plan.image_url}" alt="${plan.name}" class="w-full rounded-lg max-h-[500px] object-contain"></div>` : ''}
+        ${renderPlanPreview(plan)}
     `;
 }
 
