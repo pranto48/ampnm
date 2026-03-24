@@ -779,7 +779,7 @@ function createHostCard(host) {
                             title="Custom alert thresholds">
                         <i class="fas fa-sliders text-xs"></i>
                     </button>
-                    <span class="px-2 py-1 text-xs rounded ${isRecent ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${statusText}</span>
+                    <span class="px-2 py-1 text-xs rounded ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${statusText}</span>
                 </div>
             </div>
 

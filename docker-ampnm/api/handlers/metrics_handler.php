@@ -100,75 +100,241 @@ function normalizeMetricsPayload($payload) {
     ];
 }
 
+function getTableColumns(PDO $pdo, string $table): array {
+    static $cache = [];
+    if (isset($cache[$table])) {
+        return $cache[$table];
+    }
+
+    $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}`");
+    $columns = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $columns[] = $row['Field'];
+    }
+
+    return $cache[$table] = $columns;
+}
+
+function hasColumn(array $columns, string $column): bool {
+    return in_array($column, $columns, true);
+}
+
+function firstAvailableColumn(array $columns, array $preferred): ?string {
+    foreach ($preferred as $column) {
+        if (hasColumn($columns, $column)) {
+            return $column;
+        }
+    }
+    return null;
+}
+
+function columnExpr(array $columns, array $preferred, ?string $fallback = 'NULL'): string {
+    foreach ($preferred as $column) {
+        if (hasColumn($columns, $column)) {
+            return "hm.`{$column}`";
+        }
+    }
+    return $fallback ?? 'NULL';
+}
+
+function normalizeMetricsPayload(array $data): array {
+    $hostName = trim((string)($data['host_name'] ?? $data['hostname'] ?? ''));
+    $hostIp = trim((string)($data['host_ip'] ?? $data['ip_address'] ?? ''));
+
+    $memoryTotal = $data['memory_total_gb'] ?? $data['memory_total'] ?? null;
+    $memoryFree = $data['memory_free_gb'] ?? $data['memory_available_gb'] ?? null;
+    $diskTotal = $data['disk_total_gb'] ?? $data['disk_total'] ?? null;
+    $diskFree = $data['disk_free_gb'] ?? null;
+    $networkInMbps = $data['network_in_mbps'] ?? null;
+    $networkOutMbps = $data['network_out_mbps'] ?? null;
+
+    if ($networkInMbps === null && isset($data['network_in']) && is_numeric($data['network_in'])) {
+        $networkInMbps = round((((float)$data['network_in']) * 8) / 1000000, 2);
+    }
+    if ($networkOutMbps === null && isset($data['network_out']) && is_numeric($data['network_out'])) {
+        $networkOutMbps = round((((float)$data['network_out']) * 8) / 1000000, 2);
+    }
+
+    $diskPercent = $data['disk_percent'] ?? $data['disk_usage'] ?? null;
+    if ($diskPercent === null && is_numeric($diskTotal) && is_numeric($diskFree) && (float)$diskTotal > 0) {
+        $diskPercent = round((((float)$diskTotal - (float)$diskFree) / (float)$diskTotal) * 100, 2);
+    }
+
+    return [
+        'host_name' => $hostName !== '' ? $hostName : ($hostIp !== '' ? $hostIp : 'Unknown'),
+        'host_ip' => $hostIp !== '' ? $hostIp : null,
+        'cpu_percent' => $data['cpu_percent'] ?? $data['cpu_usage'] ?? $data['cpu'] ?? null,
+        'memory_percent' => $data['memory_percent'] ?? $data['memory_usage'] ?? null,
+        'memory_total_gb' => $memoryTotal,
+        'memory_free_gb' => $memoryFree,
+        'disk_percent' => $diskPercent,
+        'disk_total_gb' => $diskTotal,
+        'disk_free_gb' => $diskFree,
+        'network_in_mbps' => $networkInMbps,
+        'network_out_mbps' => $networkOutMbps,
+        'gpu_percent' => $data['gpu_percent'] ?? $data['gpu_usage'] ?? null,
+        'uptime_seconds' => $data['uptime_seconds'] ?? null,
+        'boot_time' => $data['boot_time'] ?? null,
+        'os_version' => $data['os_version'] ?? null,
+        'services' => $data['services'] ?? null,
+        'top_processes' => $data['top_processes'] ?? $data['processes'] ?? null,
+        'raw_payload' => $data,
+    ];
+}
+
 /**
  * Save current host snapshot and matching history row
  */
-function saveHostMetrics($pdo, $payload, $tokenInfo, $deviceId = null) {
-    $sql = "INSERT INTO host_metrics (
-        device_id, hostname, ip_address, os_version, cpu_usage, memory_usage,
-        memory_total, disk_usage, disk_total, gpu_usage, network_in, network_out,
-        uptime_seconds, boot_time, status, agent_token_id, platform, load_average, temperature_celsius
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-        device_id = VALUES(device_id),
-        ip_address = VALUES(ip_address),
-        os_version = VALUES(os_version),
-        cpu_usage = VALUES(cpu_usage),
-        memory_usage = VALUES(memory_usage),
-        memory_total = VALUES(memory_total),
-        disk_usage = VALUES(disk_usage),
-        disk_total = VALUES(disk_total),
-        gpu_usage = VALUES(gpu_usage),
-        network_in = VALUES(network_in),
-        network_out = VALUES(network_out),
-        uptime_seconds = VALUES(uptime_seconds),
-        boot_time = VALUES(boot_time),
-        status = VALUES(status),
-        agent_token_id = VALUES(agent_token_id),
-        platform = VALUES(platform),
-        load_average = VALUES(load_average),
-        temperature_celsius = VALUES(temperature_celsius),
-        last_seen = CURRENT_TIMESTAMP";
+function saveHostMetrics($pdo, $data, $deviceId = null) {
+    $data = normalizeMetricsPayload($data);
+    $columns = getTableColumns($pdo, 'host_metrics');
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
-        $deviceId,
-        $payload['hostname'],
-        $payload['ip_address'],
-        $payload['os_version'],
-        $payload['cpu_usage'],
-        $payload['memory_usage'],
-        $payload['memory_total'],
-        $payload['disk_usage'],
-        $payload['disk_total'],
-        $payload['gpu_usage'],
-        $payload['network_in'],
-        $payload['network_out'],
-        $payload['uptime_seconds'],
-        $payload['boot_time'],
-        $payload['status'],
-        $tokenInfo['id'],
-        $payload['platform'],
-        $payload['load_average'],
-        $payload['temperature_celsius'],
-    ]);
+    $current = [
+        'device_id' => $deviceId,
+        'host_name' => $data['host_name'],
+        'hostname' => $data['host_name'],
+        'host_ip' => $data['host_ip'],
+        'ip_address' => $data['host_ip'],
+        'cpu_percent' => $data['cpu_percent'],
+        'cpu_usage' => $data['cpu_percent'],
+        'memory_percent' => $data['memory_percent'],
+        'memory_usage' => $data['memory_percent'],
+        'memory_total_gb' => $data['memory_total_gb'],
+        'memory_total' => $data['memory_total_gb'],
+        'memory_free_gb' => $data['memory_free_gb'],
+        'disk_percent' => $data['disk_percent'],
+        'disk_usage' => $data['disk_percent'],
+        'disk_total_gb' => $data['disk_total_gb'],
+        'disk_total' => $data['disk_total_gb'],
+        'disk_free_gb' => $data['disk_free_gb'],
+        'network_in_mbps' => $data['network_in_mbps'],
+        'network_out_mbps' => $data['network_out_mbps'],
+        'network_in' => $data['network_in_mbps'],
+        'network_out' => $data['network_out_mbps'],
+        'gpu_percent' => $data['gpu_percent'],
+        'gpu_usage' => $data['gpu_percent'],
+        'uptime_seconds' => $data['uptime_seconds'],
+        'boot_time' => $data['boot_time'],
+        'os_version' => $data['os_version'],
+        'status' => 'online',
+        'created_at' => date('Y-m-d H:i:s'),
+        'last_seen' => date('Y-m-d H:i:s'),
+    ];
 
-    $historyStmt = $pdo->prepare("INSERT INTO host_metrics_history (
-        hostname, cpu_usage, memory_usage, memory_total, disk_usage, disk_total, gpu_usage, network_in, network_out
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $historyStmt->execute([
-        $payload['hostname'],
-        $payload['cpu_usage'],
-        $payload['memory_usage'],
-        $payload['memory_total'],
-        $payload['disk_usage'],
-        $payload['disk_total'],
-        $payload['gpu_usage'],
-        $payload['network_in'],
-        $payload['network_out'],
-    ]);
+    $identifierColumn = firstAvailableColumn($columns, ['host_ip', 'ip_address', 'host_name', 'hostname']);
+    $identifierValue = $identifierColumn && array_key_exists($identifierColumn, $current) ? $current[$identifierColumn] : null;
+    $existingId = null;
 
-    return $pdo->lastInsertId();
+    if ($identifierColumn && !empty($identifierValue)) {
+        $stmt = $pdo->prepare("SELECT id FROM host_metrics WHERE `{$identifierColumn}` = ? LIMIT 1");
+        $stmt->execute([$identifierValue]);
+        $existingId = $stmt->fetchColumn() ?: null;
+    }
+
+    $persistColumns = [];
+    $persistValues = [];
+    foreach ($current as $column => $value) {
+        if (hasColumn($columns, $column)) {
+            $persistColumns[] = $column;
+            $persistValues[] = $value;
+        }
+    }
+
+    if ($existingId) {
+        $set = implode(', ', array_map(fn($column) => "`{$column}` = ?", $persistColumns));
+        $stmt = $pdo->prepare("UPDATE host_metrics SET {$set} WHERE id = ?");
+        $stmt->execute(array_merge($persistValues, [$existingId]));
+        $metricsId = (int)$existingId;
+    } else {
+        $columnList = implode(', ', array_map(fn($column) => "`{$column}`", $persistColumns));
+        $placeholders = implode(', ', array_fill(0, count($persistColumns), '?'));
+        $stmt = $pdo->prepare("INSERT INTO host_metrics ({$columnList}) VALUES ({$placeholders})");
+        $stmt->execute($persistValues);
+        $metricsId = (int)$pdo->lastInsertId();
+    }
+
+    $historyColumns = getTableColumns($pdo, 'host_metrics_history');
+    $history = [
+        'hostname' => $data['host_name'],
+        'host_name' => $data['host_name'],
+        'host_ip' => $data['host_ip'],
+        'ip_address' => $data['host_ip'],
+        'cpu_percent' => $data['cpu_percent'],
+        'cpu_usage' => $data['cpu_percent'],
+        'memory_percent' => $data['memory_percent'],
+        'memory_usage' => $data['memory_percent'],
+        'memory_total_gb' => $data['memory_total_gb'],
+        'memory_total' => $data['memory_total_gb'],
+        'memory_free_gb' => $data['memory_free_gb'],
+        'disk_percent' => $data['disk_percent'],
+        'disk_usage' => $data['disk_percent'],
+        'disk_total_gb' => $data['disk_total_gb'],
+        'disk_total' => $data['disk_total_gb'],
+        'disk_free_gb' => $data['disk_free_gb'],
+        'network_in_mbps' => $data['network_in_mbps'],
+        'network_out_mbps' => $data['network_out_mbps'],
+        'network_in' => $data['network_in_mbps'],
+        'network_out' => $data['network_out_mbps'],
+        'gpu_percent' => $data['gpu_percent'],
+        'gpu_usage' => $data['gpu_percent'],
+        'recorded_at' => date('Y-m-d H:i:s'),
+    ];
+
+    $historyPersistColumns = [];
+    $historyPersistValues = [];
+    foreach ($history as $column => $value) {
+        if (hasColumn($historyColumns, $column)) {
+            $historyPersistColumns[] = $column;
+            $historyPersistValues[] = $value;
+        }
+    }
+    if (!empty($historyPersistColumns)) {
+        $columnList = implode(', ', array_map(fn($column) => "`{$column}`", $historyPersistColumns));
+        $placeholders = implode(', ', array_fill(0, count($historyPersistColumns), '?'));
+        $stmt = $pdo->prepare("INSERT INTO host_metrics_history ({$columnList}) VALUES ({$placeholders})");
+        $stmt->execute($historyPersistValues);
+    }
+
+    $processColumns = getTableColumns($pdo, 'host_processes');
+    if (!empty($data['top_processes']) && hasColumn($processColumns, 'hostname')) {
+        $deleteStmt = $pdo->prepare("DELETE FROM host_processes WHERE hostname = ?");
+        $deleteStmt->execute([$data['host_name']]);
+
+        $insertableColumns = array_values(array_filter([
+            hasColumn($processColumns, 'hostname') ? 'hostname' : null,
+            hasColumn($processColumns, 'process_name') ? 'process_name' : null,
+            hasColumn($processColumns, 'process_type') ? 'process_type' : null,
+            hasColumn($processColumns, 'pid') ? 'pid' : null,
+            hasColumn($processColumns, 'cpu_percent') ? 'cpu_percent' : null,
+            hasColumn($processColumns, 'memory_mb') ? 'memory_mb' : null,
+            hasColumn($processColumns, 'status') ? 'status' : null,
+        ]));
+
+        if (!empty($insertableColumns)) {
+            $columnList = implode(', ', array_map(fn($column) => "`{$column}`", $insertableColumns));
+            $placeholders = implode(', ', array_fill(0, count($insertableColumns), '?'));
+            $insertStmt = $pdo->prepare("INSERT INTO host_processes ({$columnList}) VALUES ({$placeholders})");
+
+            foreach (array_slice($data['top_processes'], 0, 50) as $process) {
+                $row = [
+                    'hostname' => $data['host_name'],
+                    'process_name' => $process['name'] ?? $process['process_name'] ?? 'unknown',
+                    'process_type' => 'process',
+                    'pid' => $process['pid'] ?? null,
+                    'cpu_percent' => $process['cpu_percent'] ?? null,
+                    'memory_mb' => $process['memory_mb'] ?? null,
+                    'status' => $process['state'] ?? $process['status'] ?? null,
+                ];
+                $values = [];
+                foreach ($insertableColumns as $column) {
+                    $values[] = $row[$column] ?? null;
+                }
+                $insertStmt->execute($values);
+            }
+        }
+    }
+
+    return $metricsId;
 }
 
 function saveHostProcesses($pdo, $hostname, $processes, $services) {
@@ -232,27 +398,29 @@ switch ($action) {
             exit;
         }
         
-        $normalized = normalizeMetricsPayload($input);
-        if (empty($normalized['hostname'])) {
+        // Validate required fields
+        $normalizedInput = normalizeMetricsPayload($input);
+        if (empty($normalizedInput['host_ip'])) {
             http_response_code(400);
             echo json_encode(['error' => 'hostname is required']);
             exit;
         }
-
-        $device = findDeviceMatch($pdo, $normalized['hostname'], $normalized['ip_address']);
+        
+        // Try to find matching device
+        $device = findDeviceByIp($pdo, $normalizedInput['host_ip']);
         $deviceId = $device ? $device['id'] : null;
-
-        $metricsId = saveHostMetrics($pdo, $normalized, $tokenInfo, $deviceId);
-        saveHostProcesses($pdo, $normalized['hostname'], $normalized['top_processes'], $normalized['services']);
+        
+        // Save metrics
+        $metricsId = saveHostMetrics($pdo, $normalizedInput, $deviceId);
         
         // Check thresholds and send alerts if needed
         try {
             require_once __DIR__ . '/../../includes/host_alerts.php';
             $alertSystem = new HostAlertSystem($pdo);
             $alertSystem->checkAndAlert(
-                $normalized['ip_address'] ?? $normalized['hostname'],
-                $normalized['hostname'],
-                $normalized
+                $normalizedInput['host_ip'],
+                $normalizedInput['host_name'] ?? $normalizedInput['host_ip'],
+                $normalizedInput
             );
         } catch (Exception $e) {
             error_log("Host Alert Error: " . $e->getMessage());
@@ -277,6 +445,16 @@ switch ($action) {
         // Get latest metrics for a specific device
         $deviceId = $_GET['device_id'] ?? null;
         $hostIp = $_GET['host_ip'] ?? null;
+        $hostColumns = getTableColumns($pdo, 'host_metrics');
+        $hostIpExpr = columnExpr($hostColumns, ['host_ip', 'ip_address']);
+        $hostNameExpr = columnExpr($hostColumns, ['host_name', 'hostname']);
+        $cpuExpr = columnExpr($hostColumns, ['cpu_percent', 'cpu_usage']);
+        $memoryExpr = columnExpr($hostColumns, ['memory_percent', 'memory_usage']);
+        $diskExpr = columnExpr($hostColumns, ['disk_percent', 'disk_usage']);
+        $netInExpr = columnExpr($hostColumns, ['network_in_mbps', 'network_in']);
+        $netOutExpr = columnExpr($hostColumns, ['network_out_mbps', 'network_out']);
+        $gpuExpr = columnExpr($hostColumns, ['gpu_percent', 'gpu_usage']);
+        $createdExpr = columnExpr($hostColumns, ['last_seen', 'created_at']);
         
         if (!$deviceId && !$hostIp) {
             http_response_code(400);
@@ -284,11 +462,30 @@ switch ($action) {
             exit;
         }
         
-        if ($deviceId) {
-            $stmt = $pdo->prepare("SELECT * FROM host_metrics WHERE device_id = ? ORDER BY created_at DESC LIMIT 1");
+        if ($deviceId && hasColumn($hostColumns, 'device_id')) {
+            $stmt = $pdo->prepare("
+                SELECT hm.*, {$hostNameExpr} AS host_name, {$hostIpExpr} AS host_ip,
+                       {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
+                       {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent,
+                       {$createdExpr} AS created_at
+                FROM host_metrics hm
+                WHERE hm.device_id = ?
+                ORDER BY hm.id DESC
+                LIMIT 1
+            ");
             $stmt->execute([$deviceId]);
         } else {
-            $stmt = $pdo->prepare("SELECT hm.*, hm.hostname AS host_name, hm.ip_address AS host_ip, hm.cpu_usage AS cpu_percent, hm.memory_usage AS memory_percent, hm.disk_usage AS disk_percent, hm.gpu_usage AS gpu_percent, hm.created_at FROM host_metrics hm WHERE hm.ip_address = ? ORDER BY hm.created_at DESC LIMIT 1");
+            $hostIpColumn = firstAvailableColumn($hostColumns, ['host_ip', 'ip_address']);
+            $stmt = $pdo->prepare("
+                SELECT hm.*, {$hostNameExpr} AS host_name, {$hostIpExpr} AS host_ip,
+                       {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
+                       {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent,
+                       {$createdExpr} AS created_at
+                FROM host_metrics hm
+                WHERE hm.`{$hostIpColumn}` = ?
+                ORDER BY hm.id DESC
+                LIMIT 1
+            ");
             $stmt->execute([$hostIp]);
         }
         
@@ -308,22 +505,44 @@ switch ($action) {
             exit;
         }
         
+        $historyColumns = getTableColumns($pdo, 'host_metrics_history');
+        $hostNameExpr = hasColumn($historyColumns, 'host_name') ? '`host_name`' : '`hostname`';
+        $hostIpExpr = hasColumn($historyColumns, 'host_ip') ? '`host_ip`' : '`ip_address`';
+        $recordedExpr = hasColumn($historyColumns, 'recorded_at') ? '`recorded_at`' : '`created_at`';
+        $cpuExpr = hasColumn($historyColumns, 'cpu_percent') ? '`cpu_percent`' : '`cpu_usage`';
+        $memoryExpr = hasColumn($historyColumns, 'memory_percent') ? '`memory_percent`' : '`memory_usage`';
+        $diskExpr = hasColumn($historyColumns, 'disk_percent') ? '`disk_percent`' : '`disk_usage`';
+        $netInExpr = hasColumn($historyColumns, 'network_in_mbps') ? '`network_in_mbps`' : '`network_in`';
+        $netOutExpr = hasColumn($historyColumns, 'network_out_mbps') ? '`network_out_mbps`' : '`network_out`';
+        $gpuExpr = hasColumn($historyColumns, 'gpu_percent') ? '`gpu_percent`' : '`gpu_usage`';
+
         if ($deviceId) {
-            $stmt = $pdo->prepare("
-                SELECT id, cpu_usage AS cpu_percent, memory_usage AS memory_percent, disk_usage AS disk_percent,
-                       (network_in * 8 / 1000000) AS network_in_mbps, (network_out * 8 / 1000000) AS network_out_mbps, gpu_usage AS gpu_percent, recorded_at AS created_at
-                FROM host_metrics_history
-                WHERE hostname = (SELECT hostname FROM host_metrics WHERE device_id = ? LIMIT 1) AND recorded_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
-                ORDER BY recorded_at ASC
-            ");
-            $stmt->execute([$deviceId, $hours]);
+            $currentColumns = getTableColumns($pdo, 'host_metrics');
+            $hostNameColumn = firstAvailableColumn($currentColumns, ['host_name', 'hostname']);
+            if (hasColumn($currentColumns, 'device_id') && $hostNameColumn) {
+                $stmt = $pdo->prepare("SELECT `{$hostNameColumn}` FROM host_metrics WHERE device_id = ? LIMIT 1");
+                $stmt->execute([$deviceId]);
+                $hostIdentifier = $stmt->fetchColumn();
+                $stmt = $pdo->prepare("
+                    SELECT id, {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
+                           {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent, {$recordedExpr} AS created_at
+                    FROM host_metrics_history
+                    WHERE {$hostNameExpr} = ? AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                    ORDER BY {$recordedExpr} ASC
+                ");
+                $stmt->execute([$hostIdentifier, $hours]);
+            } else {
+                http_response_code(400);
+                echo json_encode(['error' => 'device_id lookup not supported by current schema; use host_ip']);
+                exit;
+            }
         } else {
             $stmt = $pdo->prepare("
-                SELECT id, cpu_usage AS cpu_percent, memory_usage AS memory_percent, disk_usage AS disk_percent,
-                       (network_in * 8 / 1000000) AS network_in_mbps, (network_out * 8 / 1000000) AS network_out_mbps, gpu_usage AS gpu_percent, recorded_at AS created_at
+                SELECT id, {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
+                       {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent, {$recordedExpr} AS created_at
                 FROM host_metrics_history
-                WHERE hostname = (SELECT hostname FROM host_metrics WHERE ip_address = ? LIMIT 1) AND recorded_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
-                ORDER BY recorded_at ASC
+                WHERE {$hostIpExpr} = ? AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                ORDER BY {$recordedExpr} ASC
             ");
             $stmt->execute([$hostIp, $hours]);
         }
@@ -334,17 +553,55 @@ switch ($action) {
         
     case 'get_all_hosts':
         // Get list of all monitored hosts with latest metrics, first registration time, and any per-host overrides
+        $hostColumns = getTableColumns($pdo, 'host_metrics');
+        $hostIdentityExpr = firstAvailableColumn($hostColumns, ['host_ip', 'ip_address', 'host_name', 'hostname']);
+        $hostIpExpr = columnExpr($hostColumns, ['host_ip', 'ip_address']);
+        $hostNameExpr = columnExpr($hostColumns, ['host_name', 'hostname']);
+        $cpuExpr = columnExpr($hostColumns, ['cpu_percent', 'cpu_usage']);
+        $memoryExpr = columnExpr($hostColumns, ['memory_percent', 'memory_usage']);
+        $memoryTotalExpr = columnExpr($hostColumns, ['memory_total_gb', 'memory_total']);
+        $memoryFreeExpr = columnExpr($hostColumns, ['memory_free_gb']);
+        $diskExpr = columnExpr($hostColumns, ['disk_percent', 'disk_usage']);
+        $diskTotalExpr = columnExpr($hostColumns, ['disk_total_gb', 'disk_total']);
+        $diskFreeExpr = columnExpr($hostColumns, ['disk_free_gb']);
+        $netInExpr = columnExpr($hostColumns, ['network_in_mbps', 'network_in']);
+        $netOutExpr = columnExpr($hostColumns, ['network_out_mbps', 'network_out']);
+        $gpuExpr = columnExpr($hostColumns, ['gpu_percent', 'gpu_usage']);
+        $createdExpr = columnExpr($hostColumns, ['last_seen', 'created_at']);
+        $firstSeenExpr = columnExpr($hostColumns, ['first_seen', 'created_at']);
+        $deviceJoin = hasColumn($hostColumns, 'device_id')
+            ? 'LEFT JOIN devices d ON hm.device_id = d.id'
+            : "LEFT JOIN devices d ON d.ip = COALESCE({$hostIpExpr}, {$hostNameExpr})";
+
         $stmt = $pdo->query("
-            SELECT hm.*, hm.hostname as host_name, hm.ip_address as host_ip,
-                   hm.cpu_usage as cpu_percent, hm.memory_usage as memory_percent, hm.disk_usage as disk_percent, hm.gpu_usage as gpu_percent,
-                   d.name as device_name, d.id as linked_device_id,
+            SELECT hm.id,
+                   {$hostNameExpr} AS host_name,
+                   {$hostIpExpr} AS host_ip,
+                   {$cpuExpr} AS cpu_percent,
+                   {$memoryExpr} AS memory_percent,
+                   {$memoryTotalExpr} AS memory_total_gb,
+                   {$memoryFreeExpr} AS memory_free_gb,
+                   {$diskExpr} AS disk_percent,
+                   {$diskTotalExpr} AS disk_total_gb,
+                   {$diskFreeExpr} AS disk_free_gb,
+                   {$netInExpr} AS network_in_mbps,
+                   {$netOutExpr} AS network_out_mbps,
+                   {$gpuExpr} AS gpu_percent,
+                   {$createdExpr} AS created_at,
+                   {$firstSeenExpr} AS first_seen_at,
+                   d.name as device_name,
+                   d.id as linked_device_id,
                    CASE WHEN hao.id IS NOT NULL AND hao.enabled = 1 THEN 1 ELSE 0 END as has_override,
-                   hao.status_delay_seconds,
-                   hm.first_seen as first_seen_at
+                   hao.status_delay_seconds
             FROM host_metrics hm
-            LEFT JOIN devices d ON hm.device_id = d.id
-            LEFT JOIN host_alert_overrides hao ON hm.ip_address = hao.host_ip
-            ORDER BY hm.hostname
+            {$deviceJoin}
+            LEFT JOIN host_alert_overrides hao ON hao.host_ip = {$hostIpExpr}
+            INNER JOIN (
+                SELECT MAX(id) AS max_id
+                FROM host_metrics
+                GROUP BY `{$hostIdentityExpr}`
+            ) latest ON latest.max_id = hm.id
+            ORDER BY host_name
         ");
         $hosts = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($hosts);
