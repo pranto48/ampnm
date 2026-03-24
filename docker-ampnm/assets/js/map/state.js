@@ -14,5 +14,7 @@ MapApp.state = {
     deviceFirstFailTime: {},
     // Agent registration tracking
     knownHostnames: new Set(),
-    agentPollIntervalId: null
+    agentPollIntervalId: null,
+    // Per-map mouse-over field visibility settings
+    tooltipFieldSettingsByMap: {}
 };
