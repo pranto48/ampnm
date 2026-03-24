@@ -13,6 +13,7 @@ $pdo = getDbConnection();
  */
 function validateAgentToken($pdo, $token) {
     if (empty($token)) return false;
+    ensureAgentTokenTable($pdo);
 
     $stmt = $pdo->prepare("SELECT id, name FROM agent_tokens WHERE token = ? AND enabled = TRUE");
     $stmt->execute([$token]);
@@ -24,6 +25,42 @@ function validateAgentToken($pdo, $token) {
         return $result;
     }
     return false;
+}
+
+/**
+ * Ensure agent_tokens table exists for legacy installs that skipped setup migrations.
+ */
+function ensureAgentTokenTable($pdo) {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `agent_tokens` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `token` VARCHAR(255) NOT NULL UNIQUE,
+            `name` VARCHAR(100) NOT NULL,
+            `enabled` BOOLEAN DEFAULT TRUE,
+            `last_used_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_token` (`token`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+}
+
+/**
+ * Generate secure token with compatibility fallback for restricted PHP environments.
+ */
+function generateAgentToken() {
+    try {
+        return bin2hex(random_bytes(32));
+    } catch (Throwable $e) {
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $strong = false;
+            $bytes = openssl_random_pseudo_bytes(32, $strong);
+            if ($bytes !== false) {
+                return bin2hex($bytes);
+            }
+        }
+        return hash('sha256', uniqid((string)mt_rand(), true) . microtime(true));
+    }
 }
 
 /**
@@ -60,44 +97,6 @@ function normalizePlatform($payload) {
         }
     }
     return in_array($platform, ['windows', 'linux'], true) ? $platform : 'unknown';
-}
-
-function normalizeMetricsPayload($payload) {
-    $hostname = trim((string)($payload['hostname'] ?? $payload['host_name'] ?? 'Unknown Host'));
-    $ipAddress = trim((string)($payload['ip_address'] ?? $payload['host_ip'] ?? ''));
-    $cpuUsage = $payload['cpu_usage'] ?? $payload['cpu_percent'] ?? $payload['cpu'] ?? null;
-    $memoryUsage = $payload['memory_usage'] ?? $payload['memory_percent'] ?? null;
-    $memoryTotal = $payload['memory_total'] ?? $payload['memory_total_gb'] ?? null;
-    $diskUsage = $payload['disk_usage'] ?? $payload['disk_percent'] ?? null;
-    $diskTotal = $payload['disk_total'] ?? $payload['disk_total_gb'] ?? null;
-    $networkIn = $payload['network_in'] ?? null;
-    $networkOut = $payload['network_out'] ?? null;
-    $gpuUsage = $payload['gpu_usage'] ?? $payload['gpu_percent'] ?? null;
-    $temperature = $payload['temperature_celsius'] ?? $payload['temperature_c'] ?? null;
-    $loadAverage = $payload['load_average'] ?? $payload['load_1'] ?? null;
-    $platform = normalizePlatform($payload);
-
-    return [
-        'hostname' => $hostname !== '' ? $hostname : 'Unknown Host',
-        'ip_address' => $ipAddress !== '' ? $ipAddress : null,
-        'os_version' => $payload['os_version'] ?? null,
-        'cpu_usage' => is_numeric($cpuUsage) ? round((float)$cpuUsage, 2) : null,
-        'memory_usage' => is_numeric($memoryUsage) ? round((float)$memoryUsage, 2) : null,
-        'memory_total' => is_numeric($memoryTotal) ? round((float)$memoryTotal, 2) : null,
-        'disk_usage' => is_numeric($diskUsage) ? round((float)$diskUsage, 2) : null,
-        'disk_total' => is_numeric($diskTotal) ? round((float)$diskTotal, 2) : null,
-        'gpu_usage' => is_numeric($gpuUsage) ? round((float)$gpuUsage, 2) : null,
-        'network_in' => is_numeric($networkIn) ? (int)round((float)$networkIn) : null,
-        'network_out' => is_numeric($networkOut) ? (int)round((float)$networkOut) : null,
-        'uptime_seconds' => isset($payload['uptime_seconds']) && is_numeric($payload['uptime_seconds']) ? (int)$payload['uptime_seconds'] : null,
-        'boot_time' => !empty($payload['boot_time']) ? date('Y-m-d H:i:s', strtotime((string)$payload['boot_time'])) : null,
-        'status' => 'online',
-        'platform' => $platform,
-        'load_average' => is_numeric($loadAverage) ? round((float)$loadAverage, 2) : null,
-        'temperature_celsius' => is_numeric($temperature) ? round((float)$temperature, 2) : null,
-        'top_processes' => is_array($payload['top_processes'] ?? null) ? $payload['top_processes'] : (is_array($payload['processes'] ?? null) ? $payload['processes'] : []),
-        'services' => is_array($payload['services'] ?? null) ? $payload['services'] : [],
-    ];
 }
 
 function getTableColumns(PDO $pdo, string $table): array {
@@ -140,6 +139,7 @@ function columnExpr(array $columns, array $preferred, ?string $fallback = 'NULL'
 function normalizeMetricsPayload(array $data): array {
     $hostName = trim((string)($data['host_name'] ?? $data['hostname'] ?? ''));
     $hostIp = trim((string)($data['host_ip'] ?? $data['ip_address'] ?? ''));
+    $platform = normalizePlatform($data);
 
     $memoryTotal = $data['memory_total_gb'] ?? $data['memory_total'] ?? null;
     $memoryFree = $data['memory_free_gb'] ?? $data['memory_available_gb'] ?? null;
@@ -163,6 +163,8 @@ function normalizeMetricsPayload(array $data): array {
     return [
         'host_name' => $hostName !== '' ? $hostName : ($hostIp !== '' ? $hostIp : 'Unknown'),
         'host_ip' => $hostIp !== '' ? $hostIp : null,
+        'hostname' => $hostName !== '' ? $hostName : ($hostIp !== '' ? $hostIp : 'Unknown'),
+        'ip_address' => $hostIp !== '' ? $hostIp : null,
         'cpu_percent' => $data['cpu_percent'] ?? $data['cpu_usage'] ?? $data['cpu'] ?? null,
         'memory_percent' => $data['memory_percent'] ?? $data['memory_usage'] ?? null,
         'memory_total_gb' => $memoryTotal,
@@ -176,6 +178,7 @@ function normalizeMetricsPayload(array $data): array {
         'uptime_seconds' => $data['uptime_seconds'] ?? null,
         'boot_time' => $data['boot_time'] ?? null,
         'os_version' => $data['os_version'] ?? null,
+        'platform' => $platform,
         'services' => $data['services'] ?? null,
         'top_processes' => $data['top_processes'] ?? $data['processes'] ?? null,
         'raw_payload' => $data,
@@ -435,9 +438,9 @@ switch ($action) {
             'success' => true,
             'metrics_id' => $metricsId,
             'device_matched' => $device ? $device['name'] : null,
-            'platform' => $normalized['platform'],
-            'hostname' => $normalized['hostname'],
-            'ip_address' => $normalized['ip_address']
+            'platform' => $normalizedInput['platform'] ?? 'unknown',
+            'hostname' => $normalizedInput['host_name'] ?? null,
+            'ip_address' => $normalizedInput['host_ip'] ?? null
         ]);
         break;
         
@@ -609,6 +612,7 @@ switch ($action) {
         
     case 'get_agent_tokens':
         // List all agent tokens (admin only)
+        ensureAgentTokenTable($pdo);
         $stmt = $pdo->query("SELECT id, name, token, enabled, last_used_at, created_at FROM agent_tokens ORDER BY created_at DESC");
         $tokens = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($tokens);
@@ -616,8 +620,14 @@ switch ($action) {
         
     case 'create_agent_token':
         // Create a new agent token
+        ensureAgentTokenTable($pdo);
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can create agent tokens']);
+            exit;
+        }
         $name = $input['name'] ?? 'Windows Agent ' . date('Y-m-d H:i');
-        $token = bin2hex(random_bytes(32)); // 64 character hex token
+        $token = generateAgentToken();
         
         $userId = $_SESSION['user_id'] ?? null;
         if (!$userId) { http_response_code(401); echo json_encode(['error' => 'Not authenticated']); exit; }
@@ -633,6 +643,12 @@ switch ($action) {
         break;
         
     case 'delete_agent_token':
+        ensureAgentTokenTable($pdo);
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can delete agent tokens']);
+            exit;
+        }
         $tokenId = $input['id'] ?? null;
         if (!$tokenId) {
             http_response_code(400);
@@ -647,6 +663,12 @@ switch ($action) {
         break;
         
     case 'toggle_agent_token':
+        ensureAgentTokenTable($pdo);
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can manage agent tokens']);
+            exit;
+        }
         $tokenId = $input['id'] ?? null;
         $enabled = isset($input['enabled']) ? (bool)$input['enabled'] : true;
         
