@@ -1,6 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 body { font-family: 'Inter', sans-serif; } /* Changed from * to body */
 
+/* Full-width, responsive app shell */
+html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.container {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.page-content {
+    width: 100%;
+    padding: 0.5rem 0.75rem 1rem;
+}
+
+@media (min-width: 768px) {
+    .page-content {
+        padding: 0.75rem 1rem 1.25rem;
+    }
+}
+
 /* --- Modern UI Enhancements --- */
 
 /* 1. Color Palette & Transitions */
@@ -131,9 +154,16 @@ button:hover, a.hoverable:hover {
 
 /* Map specific styles */
 #network-map-wrapper { position: relative; }
-#network-map { height: 75vh; background-color: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; }
+#network-map { height: clamp(420px, 72dvh, 920px); background-color: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; }
 #network-map-wrapper:fullscreen #network-map { height: 100vh; border-radius: 0; border: 0; }
 #network-map-wrapper:fullscreen #map-controls { display: none; }
+
+@media (max-width: 767px) {
+    #network-map {
+        height: calc(100dvh - 260px);
+        min-height: 360px;
+    }
+}
 
 .vis-tooltip {
     position: absolute; visibility: hidden; padding: 5px; white-space: nowrap;
