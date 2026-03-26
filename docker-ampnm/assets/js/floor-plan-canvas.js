@@ -25,6 +25,8 @@ const FPCanvas = {
     annotations: [],
     container: null,
     resizeHandler: null,
+    backgroundRenderUrl: null,
+    backgroundIsPdf: false,
 
     CABLE_COLOR_MAP: {
         blue: '#3b82f6', red: '#ef4444', green: '#22c55e', yellow: '#eab308',
@@ -43,6 +45,8 @@ const FPCanvas = {
         this.canvasWidth = this.toNumber(data.plan?.width, 2000);
         this.canvasHeight = this.toNumber(data.plan?.height, 1500);
         this.backgroundUrl = data.plan?.image_url || null;
+        this.backgroundRenderUrl = this.backgroundUrl;
+        this.backgroundIsPdf = this.isPdfUrl(this.backgroundUrl);
         this.zoom = 1;
         this.panX = 0;
         this.panY = 0;
@@ -82,7 +86,50 @@ const FPCanvas = {
         window.addEventListener('resize', this.resizeHandler);
 
         this.render();
-        requestAnimationFrame(() => this.fitToView());
+        this.prepareBackgroundRender().finally(() => {
+            this.render();
+            requestAnimationFrame(() => this.fitToView());
+        });
+    },
+
+    isPdfUrl(url) {
+        if (!url) return false;
+        const clean = String(url).split('?')[0].split('#')[0].toLowerCase();
+        return clean.endsWith('.pdf') || String(url).toLowerCase().startsWith('data:application/pdf');
+    },
+
+    async prepareBackgroundRender() {
+        if (!this.backgroundUrl || !this.backgroundIsPdf) {
+            this.backgroundRenderUrl = this.backgroundUrl;
+            return;
+        }
+        try {
+            if (!window.pdfjsLib) throw new Error('pdfjsLib not available');
+            if (window.pdfjsLib.GlobalWorkerOptions) {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
+            }
+            const pdf = await window.pdfjsLib.getDocument(this.backgroundUrl).promise;
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 1 });
+            const renderCanvas = document.createElement('canvas');
+            renderCanvas.width = this.canvasWidth;
+            renderCanvas.height = this.canvasHeight;
+            const ctx = renderCanvas.getContext('2d', { alpha: false });
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+            const pageScale = Math.min(this.canvasWidth / viewport.width, this.canvasHeight / viewport.height);
+            const scaledViewport = page.getViewport({ scale: pageScale });
+            const offsetX = (this.canvasWidth - scaledViewport.width) / 2;
+            const offsetY = (this.canvasHeight - scaledViewport.height) / 2;
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+            ctx.restore();
+            this.backgroundRenderUrl = renderCanvas.toDataURL('image/png');
+        } catch (error) {
+            console.warn('Failed to render PDF background, fallback to URL.', error);
+            this.backgroundRenderUrl = this.backgroundUrl;
+        }
     },
 
     snap(v) { return this.snapToGrid ? Math.round(v / this.gridSize) * this.gridSize : v; },
@@ -326,13 +373,13 @@ const FPCanvas = {
         }
 
         // Background image
-        if (this.backgroundUrl) {
-            const img = this.createSVG('image', { href: this.backgroundUrl, x: 0, y: 0, width: this.canvasWidth, height: this.canvasHeight, preserveAspectRatio: 'xMidYMid meet', opacity: 0.6 });
+        if (this.backgroundRenderUrl) {
+            const img = this.createSVG('image', { href: this.backgroundRenderUrl, x: 0, y: 0, width: this.canvasWidth, height: this.canvasHeight, preserveAspectRatio: 'xMidYMid meet', opacity: 0.75 });
             img.style.pointerEvents = 'none';
             g.appendChild(img);
         }
 
-        if (!this.backgroundUrl && !this.racks.length && !this.planDevices.length && !this.cables.length && !this.annotations.length) {
+        if (!this.backgroundRenderUrl && !this.racks.length && !this.planDevices.length && !this.cables.length && !this.annotations.length) {
             const hint = this.createSVG('text', { x: this.canvasWidth / 2, y: this.canvasHeight / 2, 'text-anchor': 'middle', fill: '#64748b', 'font-size': 18, 'font-weight': 600 });
             hint.textContent = 'Canvas is ready. Add rack/device or upload a floor plan image.';
             g.appendChild(hint);
@@ -478,44 +525,57 @@ const FPCanvas = {
     },
 
     exportPNG() {
-        const clone = this.svg.cloneNode(true);
-        clone.querySelector('g').setAttribute('transform', 'scale(1)');
-        clone.setAttribute('width', this.canvasWidth);
-        clone.setAttribute('height', this.canvasHeight);
-        clone.setAttribute('viewBox', `0 0 ${this.canvasWidth} ${this.canvasHeight}`);
-        const zl = clone.querySelector('#fp-zoom-label');
-        if (zl) zl.remove();
-        const svgData = new XMLSerializer().serializeToString(clone);
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = this.canvasWidth * 2;
-            canvas.height = this.canvasHeight * 2;
-            const ctx = canvas.getContext('2d');
-            ctx.scale(2, 2);
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
-            ctx.drawImage(img, 0, 0, this.canvasWidth, this.canvasHeight);
-            canvas.toBlob(blob => this.downloadBlob(blob, 'floor-plan.png'), 'image/png');
-        };
-        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgData);
+        this.renderToCanvas(2)
+            .then((canvas) => canvas.toBlob(blob => this.downloadBlob(blob, 'floor-plan.png'), 'image/png'))
+            .catch((error) => {
+                console.error('PNG export failed:', error);
+                if (typeof notyf !== 'undefined') notyf.error('PNG export failed.');
+            });
     },
 
     exportPDF() {
-        // Use print-based PDF export
-        const clone = this.svg.cloneNode(true);
-        clone.querySelector('g').setAttribute('transform', 'scale(1)');
-        clone.setAttribute('width', '100%');
-        clone.setAttribute('height', '100%');
-        clone.setAttribute('viewBox', `0 0 ${this.canvasWidth} ${this.canvasHeight}`);
-        const zl = clone.querySelector('#fp-zoom-label');
-        if (zl) zl.remove();
+        this.renderToCanvas(2)
+            .then((canvas) => {
+                if (!window.jspdf?.jsPDF) throw new Error('jsPDF not loaded');
+                const { jsPDF } = window.jspdf;
+                const orientation = this.canvasWidth >= this.canvasHeight ? 'landscape' : 'portrait';
+                const pdf = new jsPDF({ orientation, unit: 'pt', format: [this.canvasWidth, this.canvasHeight] });
+                const imgData = canvas.toDataURL('image/png');
+                pdf.addImage(imgData, 'PNG', 0, 0, this.canvasWidth, this.canvasHeight, undefined, 'FAST');
+                pdf.save('floor-plan.pdf');
+            })
+            .catch((error) => {
+                console.error('PDF export failed:', error);
+                if (typeof notyf !== 'undefined') notyf.error('PDF export failed.');
+            });
+    },
 
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(`<!DOCTYPE html><html><head><title>Floor Plan Export</title>
-            <style>@page{size:landscape;margin:10mm}body{margin:0;background:#0f172a}svg{width:100%;height:auto}</style>
-        </head><body>${clone.outerHTML}<script>setTimeout(()=>{window.print();window.close()},500)<\/script></body></html>`);
-        printWindow.document.close();
+    renderToCanvas(scale = 2) {
+        return new Promise((resolve, reject) => {
+            const clone = this.svg.cloneNode(true);
+            clone.querySelector('g').setAttribute('transform', 'scale(1)');
+            clone.setAttribute('width', this.canvasWidth);
+            clone.setAttribute('height', this.canvasHeight);
+            clone.setAttribute('viewBox', `0 0 ${this.canvasWidth} ${this.canvasHeight}`);
+            const zl = clone.querySelector('#fp-zoom-label');
+            if (zl) zl.remove();
+            const svgData = new XMLSerializer().serializeToString(clone);
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = this.canvasWidth * scale;
+                canvas.height = this.canvasHeight * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.scale(scale, scale);
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                ctx.drawImage(img, 0, 0, this.canvasWidth, this.canvasHeight);
+                resolve(canvas);
+            };
+            img.onerror = reject;
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgData);
+        });
     },
 
     downloadBlob(blob, filename) {

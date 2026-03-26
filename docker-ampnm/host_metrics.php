@@ -1300,18 +1300,21 @@ async function createToken() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name })
         });
-        const result = await response.json();
+        const rawBody = await response.text();
+        let result = {};
+        try { result = rawBody ? JSON.parse(rawBody) : {}; }
+        catch (parseError) { throw new Error(rawBody || 'Unexpected response from server'); }
         
-        if (result.success) {
+        if (response.ok && result?.success) {
             notyf.success('Token created!');
             alert(`Token created successfully!\n\nFull Token (copy now, it won't be shown again in full):\n\n${result.token}`);
             loadTokens();
         } else {
-            notyf.error(result.error || 'Failed to create token');
+            notyf.error(result?.error || `Failed to create token (HTTP ${response.status})`);
         }
     } catch (error) {
         console.error('Failed to create token:', error);
-        notyf.error('Failed to create token');
+        notyf.error(error.message || 'Failed to create token');
     }
 }
 
