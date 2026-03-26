@@ -552,13 +552,33 @@ const FPCanvas = {
     esc(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
 
     // ==================== EXPORT ====================
+    getExportBounds() {
+        try {
+            const bbox = this.g?.getBBox?.();
+            if (!bbox || !isFinite(bbox.width) || !isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {
+                return { minX: 0, minY: 0, width: this.canvasWidth, height: this.canvasHeight };
+            }
+            const padding = 20;
+            const minX = Math.min(0, bbox.x) - padding;
+            const minY = Math.min(0, bbox.y) - padding;
+            const maxX = Math.max(this.canvasWidth, bbox.x + bbox.width) + padding;
+            const maxY = Math.max(this.canvasHeight, bbox.y + bbox.height) + padding;
+            return { minX, minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+        } catch (error) {
+            return { minX: 0, minY: 0, width: this.canvasWidth, height: this.canvasHeight };
+        }
+    },
+
     exportSVG() {
+        const bounds = this.getExportBounds();
         const clone = this.svg.cloneNode(true);
         // Reset transform for export
-        clone.querySelector('g').setAttribute('transform', 'scale(1)');
-        clone.setAttribute('width', this.canvasWidth);
-        clone.setAttribute('height', this.canvasHeight);
-        clone.setAttribute('viewBox', `0 0 ${this.canvasWidth} ${this.canvasHeight}`);
+        clone.querySelector('g').setAttribute('transform', `translate(${-bounds.minX}, ${-bounds.minY}) scale(1)`);
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+        clone.setAttribute('width', bounds.width);
+        clone.setAttribute('height', bounds.height);
+        clone.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
         // Remove zoom label
         const zl = clone.querySelector('#fp-zoom-label');
         if (zl) zl.remove();
@@ -581,10 +601,12 @@ const FPCanvas = {
             .then((canvas) => {
                 if (!window.jspdf?.jsPDF) throw new Error('jsPDF not loaded');
                 const { jsPDF } = window.jspdf;
-                const orientation = this.canvasWidth >= this.canvasHeight ? 'landscape' : 'portrait';
-                const pdf = new jsPDF({ orientation, unit: 'pt', format: [this.canvasWidth, this.canvasHeight] });
+                const exportWidth = canvas.width / 2;
+                const exportHeight = canvas.height / 2;
+                const orientation = exportWidth >= exportHeight ? 'landscape' : 'portrait';
+                const pdf = new jsPDF({ orientation, unit: 'pt', format: [exportWidth, exportHeight] });
                 const imgData = canvas.toDataURL('image/png');
-                pdf.addImage(imgData, 'PNG', 0, 0, this.canvasWidth, this.canvasHeight, undefined, 'FAST');
+                pdf.addImage(imgData, 'PNG', 0, 0, exportWidth, exportHeight, undefined, 'FAST');
                 pdf.save('floor-plan.pdf');
             })
             .catch((error) => {
@@ -595,11 +617,14 @@ const FPCanvas = {
 
     renderToCanvas(scale = 2) {
         return new Promise((resolve, reject) => {
+            const bounds = this.getExportBounds();
             const clone = this.svg.cloneNode(true);
-            clone.querySelector('g').setAttribute('transform', 'scale(1)');
-            clone.setAttribute('width', this.canvasWidth);
-            clone.setAttribute('height', this.canvasHeight);
-            clone.setAttribute('viewBox', `0 0 ${this.canvasWidth} ${this.canvasHeight}`);
+            clone.querySelector('g').setAttribute('transform', `translate(${-bounds.minX}, ${-bounds.minY}) scale(1)`);
+            clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+            clone.setAttribute('width', bounds.width);
+            clone.setAttribute('height', bounds.height);
+            clone.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
             const zl = clone.querySelector('#fp-zoom-label');
             if (zl) zl.remove();
             const svgData = new XMLSerializer().serializeToString(clone);
@@ -607,13 +632,13 @@ const FPCanvas = {
             img.crossOrigin = 'anonymous';
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                canvas.width = this.canvasWidth * scale;
-                canvas.height = this.canvasHeight * scale;
+                canvas.width = Math.ceil(bounds.width * scale);
+                canvas.height = Math.ceil(bounds.height * scale);
                 const ctx = canvas.getContext('2d');
                 ctx.scale(scale, scale);
                 ctx.fillStyle = '#0f172a';
-                ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
-                ctx.drawImage(img, 0, 0, this.canvasWidth, this.canvasHeight);
+                ctx.fillRect(0, 0, bounds.width, bounds.height);
+                ctx.drawImage(img, 0, 0, bounds.width, bounds.height);
                 resolve(canvas);
             };
             img.onerror = reject;
