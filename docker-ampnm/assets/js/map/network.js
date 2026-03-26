@@ -4,6 +4,46 @@ MapApp.network = {
     initializeMap: () => {
         const container = document.getElementById('network-map');
         const contextMenu = document.getElementById('context-menu');
+        const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+        const getViewStorageKey = () => `ampnm_map_view:${userStorageId}:${MapApp.state.currentMapId}`;
+        const getNodePosStorageKey = () => `ampnm_map_node_positions:${userStorageId}:${MapApp.state.currentMapId}`;
+
+        const saveCurrentView = () => {
+            if (!MapApp.state.network || !MapApp.state.currentMapId) return;
+            const scale = MapApp.state.network.getScale();
+            const position = MapApp.state.network.getViewPosition();
+            localStorage.setItem(getViewStorageKey(), JSON.stringify({ scale, position }));
+        };
+
+        const saveNodePositionForUser = (nodeId, position) => {
+            if (!MapApp.state.currentMapId || !nodeId || !position) return;
+            let snapshot = {};
+            try {
+                snapshot = JSON.parse(localStorage.getItem(getNodePosStorageKey()) || '{}') || {};
+            } catch (error) {
+                snapshot = {};
+            }
+            snapshot[String(nodeId)] = { x: position.x, y: position.y };
+            localStorage.setItem(getNodePosStorageKey(), JSON.stringify(snapshot));
+        };
+
+        const restoreSavedView = () => {
+            if (!MapApp.state.network || !MapApp.state.currentMapId) return;
+            try {
+                const raw = localStorage.getItem(getViewStorageKey());
+                if (!raw) return;
+                const saved = JSON.parse(raw);
+                if (!saved?.position || !saved?.scale) return;
+                MapApp.state.network.moveTo({
+                    position: saved.position,
+                    scale: saved.scale,
+                    animation: false
+                });
+            } catch (error) {
+                // Ignore malformed user preference data
+            }
+        };
+
         MapApp.ui.populateLegend();
         const data = { nodes: MapApp.state.nodes, edges: MapApp.state.edges };
         const options = { 
@@ -25,16 +65,22 @@ MapApp.network = {
             } 
         };
         MapApp.state.network = new vis.Network(container, data, options);
+        restoreSavedView();
         
         // Event Handlers
         MapApp.state.network.on("dragEnd", async (params) => { 
-            if (window.userRole !== 'admin') return; // Only admin can drag
             if (params.nodes.length > 0) { 
                 const nodeId = params.nodes[0]; 
                 const position = MapApp.state.network.getPositions([nodeId])[nodeId]; 
-                await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                saveNodePositionForUser(nodeId, position);
+                if (window.userRole === 'admin') {
+                    await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                }
             } 
+            saveCurrentView();
         });
+        MapApp.state.network.on("dragging", saveCurrentView);
+        MapApp.state.network.on("zoom", saveCurrentView);
         MapApp.state.network.on("doubleClick", (params) => { 
             if (window.userRole === 'admin' && params.nodes.length > 0) MapApp.ui.openDeviceModal(params.nodes[0]); 
         });
