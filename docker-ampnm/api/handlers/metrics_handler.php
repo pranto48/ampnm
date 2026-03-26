@@ -15,7 +15,7 @@ function validateAgentToken($pdo, $token) {
     if (empty($token)) return false;
     ensureAgentTokenTable($pdo);
 
-    $stmt = $pdo->prepare("SELECT id, name FROM agent_tokens WHERE token = ? AND enabled = TRUE");
+    $stmt = $pdo->prepare("SELECT id, name, user_id FROM agent_tokens WHERE token = ? AND enabled = TRUE");
     $stmt->execute([$token]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -82,6 +82,35 @@ function findDeviceMatch($pdo, $hostname, $ip) {
     }
 
     return false;
+}
+
+function createDeviceForHost(PDO $pdo, int $userId, string $hostName, ?string $hostIp, string $platform = 'unknown'): ?array {
+    $safeName = trim($hostName) !== '' ? trim($hostName) : ($hostIp ?: 'Host ' . date('YmdHis'));
+    $deviceType = in_array($platform, ['windows', 'linux'], true) ? 'server' : 'server';
+
+    // Re-check to avoid duplicates by IP or name for this user
+    if (!empty($hostIp)) {
+        $stmt = $pdo->prepare("SELECT id, name, ip FROM devices WHERE user_id = ? AND ip = ? LIMIT 1");
+        $stmt->execute([$userId, $hostIp]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($existing) return $existing;
+    }
+
+    $stmt = $pdo->prepare("SELECT id, name, ip FROM devices WHERE user_id = ? AND name = ? LIMIT 1");
+    $stmt->execute([$userId, $safeName]);
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($existing) return $existing;
+
+    $insert = $pdo->prepare("
+        INSERT INTO devices (user_id, name, ip, monitor_method, type, status, ping_interval, show_live_ping)
+        VALUES (?, ?, ?, 'ping', ?, 'online', 60, 1)
+    ");
+    $insert->execute([$userId, $safeName, $hostIp, $deviceType]);
+    $newId = (int)$pdo->lastInsertId();
+
+    $fetch = $pdo->prepare("SELECT id, name, ip FROM devices WHERE id = ? LIMIT 1");
+    $fetch->execute([$newId]);
+    return $fetch->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
 function normalizePlatform($payload) {
@@ -409,8 +438,22 @@ switch ($action) {
             exit;
         }
         
-        // Try to find matching device
-        $device = findDeviceByIp($pdo, $normalizedInput['host_ip']);
+        // Try to find matching device (IP first, then hostname)
+        $device = findDeviceMatch($pdo, $normalizedInput['host_name'] ?? '', $normalizedInput['host_ip'] ?? '');
+        $autoCreatedDevice = false;
+        if (!$device && !empty($tokenInfo['user_id'])) {
+            $created = createDeviceForHost(
+                $pdo,
+                (int)$tokenInfo['user_id'],
+                (string)($normalizedInput['host_name'] ?? ''),
+                $normalizedInput['host_ip'] ?? null,
+                (string)($normalizedInput['platform'] ?? 'unknown')
+            );
+            if ($created) {
+                $device = $created;
+                $autoCreatedDevice = true;
+            }
+        }
         $deviceId = $device ? $device['id'] : null;
         
         // Save metrics
@@ -438,6 +481,7 @@ switch ($action) {
             'success' => true,
             'metrics_id' => $metricsId,
             'device_matched' => $device ? $device['name'] : null,
+            'auto_device_created' => $autoCreatedDevice,
             'platform' => $normalizedInput['platform'] ?? 'unknown',
             'hostname' => $normalizedInput['host_name'] ?? null,
             'ip_address' => $normalizedInput['host_ip'] ?? null
@@ -640,6 +684,30 @@ switch ($action) {
             'token' => $token,
             'name' => $name
         ]);
+        break;
+
+    case 'create_device_from_host':
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can add host devices']);
+            exit;
+        }
+        $userId = $_SESSION['user_id'] ?? null;
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Not authenticated']);
+            exit;
+        }
+        $hostIp = trim((string)($input['host_ip'] ?? ''));
+        $hostName = trim((string)($input['host_name'] ?? ''));
+        $platform = trim((string)($input['platform'] ?? 'unknown'));
+        if ($hostIp === '' && $hostName === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'host_ip or host_name is required']);
+            exit;
+        }
+        $device = createDeviceForHost($pdo, (int)$userId, $hostName, $hostIp ?: null, $platform);
+        echo json_encode(['success' => true, 'device' => $device]);
         break;
         
     case 'delete_agent_token':
