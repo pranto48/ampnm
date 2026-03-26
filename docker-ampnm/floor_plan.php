@@ -237,6 +237,7 @@ const isAdmin = <?= $is_admin ? 'true' : 'false' ?>;
 let floorPlans = [], selectedPlanId = null, racks = [], panels = [], switchPorts = [], cables = [], devices = [], planDevices = [], annotations = [];
 let currentView = 'canvas';
 let currentListTab = 'overview';
+let loadPlanDataSeq = 0;
 const bootstrappedPlans = new Set();
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
@@ -295,6 +296,7 @@ function selectPlan(id) {
 
 async function loadPlanData() {
     if (!selectedPlanId) return;
+    const requestSeq = ++loadPlanDataSeq;
     const [r, c, sp, pd, ann] = await Promise.all([
         fpApi('get_racks', { floor_plan_id: selectedPlanId }),
         fpApi('get_cables', { floor_plan_id: selectedPlanId }),
@@ -302,6 +304,8 @@ async function loadPlanData() {
         fpApi('get_floor_plan_devices', { floor_plan_id: selectedPlanId }),
         fpApi('get_annotations', { floor_plan_id: selectedPlanId })
     ]);
+    // Ignore stale async responses when a newer load has already started.
+    if (requestSeq !== loadPlanDataSeq) return;
     racks = r.data || [];
     cables = c.data || [];
     switchPorts = sp.data || [];

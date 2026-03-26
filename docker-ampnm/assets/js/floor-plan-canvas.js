@@ -315,7 +315,26 @@ const FPCanvas = {
     async placeDevice(deviceId, x, y) {
         document.getElementById('canvas-device-picker-dialog').classList.add('hidden');
         const res = await fpApi('place_device_on_plan', { floor_plan_id: selectedPlanId, device_id: deviceId, x, y });
-        if (res.success) { await loadPlanData(); notyf.success('Device placed.'); }
+        if (res.success) {
+            const baseDevice = (window.devices || []).find(d => String(d.id) === String(deviceId)) || {};
+            const existingIdx = this.planDevices.findIndex(pd => String(pd.device_id) === String(deviceId));
+            const optimisticEntry = {
+                id: res.id || `tmp-${Date.now()}`,
+                floor_plan_id: selectedPlanId,
+                device_id: deviceId,
+                x,
+                y,
+                name: baseDevice.name || `Device ${deviceId}`,
+                type: baseDevice.type || 'device',
+                ip: baseDevice.ip || null,
+                status: baseDevice.status || 'unknown'
+            };
+            if (existingIdx >= 0) this.planDevices[existingIdx] = { ...this.planDevices[existingIdx], ...optimisticEntry };
+            else this.planDevices.push(optimisticEntry);
+            this.render();
+            await loadPlanData();
+            notyf.success('Device placed.');
+        }
         this.activeTool = 'select';
         this.updateToolButtons();
     },
@@ -347,7 +366,23 @@ const FPCanvas = {
             source_type: src.kind, source_id: src.id, source_port: 1,
             dest_type: dst.kind, dest_id: dst.id, dest_port: 1
         });
-        if (res.success) { await loadPlanData(); notyf.success('Cable drawn.'); }
+        if (res.success) {
+            this.cables.push({
+                id: res.id || `tmp-cable-${Date.now()}`,
+                floor_plan_id: selectedPlanId,
+                cable_type: 'cat6',
+                cable_color: 'blue',
+                source_type: src.kind,
+                source_id: src.id,
+                source_port: 1,
+                dest_type: dst.kind,
+                dest_id: dst.id,
+                dest_port: 1
+            });
+            this.render();
+            await loadPlanData();
+            notyf.success('Cable drawn.');
+        }
         this.activeTool = 'select';
         this.updateToolButtons();
     },
@@ -455,7 +490,15 @@ const FPCanvas = {
 
     renderDevice(dev) {
         const sel = this.selectedItem?.kind === 'device' && this.selectedItem?.id == dev.id;
-        const icons = { server: '🖥', switch: '🔀', router: '🌐', firewall: '🛡', printer: '🖨', camera: '📷', phone: '📞', ap: '📡', workstation: '💻' };
+        const icons = {
+            server: '🖥', switch: '🔀', router: '🌐', firewall: '🛡',
+            printer: '🖨', camera: '📷', phone: '📞', ipphone: '☎️',
+            ap: '📡', 'wifi-router': '📶', workstation: '💻', laptop: '💻',
+            desktop: '🖥️', mobile: '📱', tablet: '📱', cloud: '☁️',
+            internet: '🌍', database: '🗄️', nas: '💾', storage: '🗃️',
+            loadbalancer: '⚖️', gateway: '🚪', modem: '📟', iot: '🔌',
+            ups: '🔋', sensor: '📟', voip: '🎙️', tv: '📺'
+        };
         const icon = icons[dev.type] || '📦';
         const statusColor = { online: '#22c55e', warning: '#f59e0b', critical: '#ef4444', offline: '#64748b' };
         const color = statusColor[dev.status] || '#94a3b8';
