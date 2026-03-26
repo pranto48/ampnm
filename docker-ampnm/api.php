@@ -161,6 +161,7 @@ try {
     $metricsActions = [
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',
         'get_agent_tokens', 'create_agent_token', 'delete_agent_token', 'toggle_agent_token',
+        'create_device_from_host',
         'get_all_host_overrides', 'save_host_override', 'delete_host_override',
         'export_host_overrides', 'import_host_overrides',
     ];

@@ -35,6 +35,7 @@ $is_admin = ($user_role === 'admin');
                 <?php if ($is_admin): ?>
                 <button onclick="FPCanvas.setTool('add-rack')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="add-rack" title="Place Rack"><i class="fas fa-server"></i></button>
                 <button onclick="FPCanvas.setTool('add-device')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="add-device" title="Place Device"><i class="fas fa-desktop"></i></button>
+                <button onclick="FPCanvas.setTool('add-symbol')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="add-symbol" title="Place Diagram Symbol"><i class="fas fa-shapes"></i></button>
                 <button onclick="FPCanvas.setTool('draw-cable')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="draw-cable" title="Draw Cable"><i class="fas fa-ethernet"></i></button>
                 <button onclick="FPCanvas.setTool('add-label')" class="canvas-tool-btn bg-slate-700 text-slate-300 w-10 h-10 rounded-lg text-sm" data-tool="add-label" title="Add Label"><i class="fas fa-font"></i></button>
                 <?php endif; ?>
@@ -52,6 +53,19 @@ $is_admin = ($user_role === 'admin');
             <div class="flex-1 min-w-0 flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-3 flex-wrap">
                     <div class="text-xs text-slate-400">Use the canvas toolbar to place racks, devices, labels, and cables just like the web floor-plan editor.</div>
+                    <?php if ($is_admin): ?>
+                    <div class="flex items-center gap-2 bg-slate-800/70 border border-slate-700 rounded-lg px-2 py-1">
+                        <span class="text-xs text-slate-400">Symbol</span>
+                        <select id="fp-symbol-type" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200">
+                            <option value="server">Server</option>
+                            <option value="router">Router</option>
+                            <option value="switch">Switch</option>
+                            <option value="internet">Internet</option>
+                            <option value="firewall">Firewall</option>
+                            <option value="cloud">Cloud</option>
+                        </select>
+                    </div>
+                    <?php endif; ?>
                     <div class="flex gap-2 flex-wrap">
                         <?php if ($is_admin): ?>
                         <button onclick="syncFloorPlanFromMap()" class="px-3 py-1.5 bg-cyan-900/50 text-cyan-300 rounded-lg text-sm hover:bg-cyan-900/70 border border-cyan-800/50" title="Sync coordinates from main map"><i class="fas fa-sync-alt mr-1"></i>Sync Map</button>
@@ -210,6 +224,11 @@ $is_admin = ($user_role === 'admin');
     </div>
 </div>
 
+<script type="module">
+import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs';
+window.pdfjsLib = pdfjsLib;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="assets/js/floor-plan-canvas.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
 <script>
@@ -221,6 +240,24 @@ let currentListTab = 'overview';
 const bootstrappedPlans = new Set();
 
 const CABLE_COLOR_MAP = { blue:'#3b82f6', red:'#ef4444', green:'#22c55e', yellow:'#eab308', orange:'#f97316', white:'#e2e8f0', gray:'#64748b', purple:'#a855f7', black:'#1e293b' };
+
+function isPdfUrl(url) {
+    if (!url) return false;
+    const clean = String(url).split('?')[0].split('#')[0].toLowerCase();
+    return clean.endsWith('.pdf') || String(url).toLowerCase().startsWith('data:application/pdf');
+}
+
+function renderPlanPreview(plan) {
+    if (!plan || !plan.image_url) return '';
+    if (isPdfUrl(plan.image_url)) {
+        return `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+            <iframe src="${plan.image_url}" title="${plan.name} PDF Preview" class="w-full rounded-lg h-[500px] bg-slate-900"></iframe>
+        </div>`;
+    }
+    return `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+        <img src="${plan.image_url}" alt="${plan.name}" class="w-full rounded-lg max-h-[500px] object-contain">
+    </div>`;
+}
 
 function buildCableMark(sourceType, sourcePort, destType, destPort) {
     const sType = (sourceType || 's').charAt(0).toUpperCase();
@@ -391,11 +428,73 @@ function renderCanvas() {
         let html = '';
         if (kind === 'rack') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Units:</strong> ${item.rack_units || 42}U</div><div><strong>Position:</strong> ${Math.round(item.x)}, ${Math.round(item.y)}</div>`;
         else if (kind === 'device') html = `<div><strong>Name:</strong> ${item.name}</div><div><strong>Type:</strong> ${item.type || 'device'}</div>${item.ip ? `<div><strong>IP:</strong> ${item.ip}</div>` : ''}<div><strong>Status:</strong> ${item.status || 'unknown'}</div>${item.legacy_map_position ? `<div><strong>Source:</strong> Existing map coordinates</div><div class='text-xs text-slate-500'>Use "Place Device" for persistent floor-plan positioning.</div>` : ''}`;
-        else if (kind === 'cable') html = `<div><strong>Type:</strong> ${item.cable_type}</div><div><strong>Color:</strong> ${item.cable_color}</div>${item.cable_length ? `<div><strong>Length:</strong> ${item.cable_length}</div>` : ''}<div><strong>Ports:</strong> ${item.source_port || 1} → ${item.dest_port || 1}</div>${item.label ? `<div><strong>Label:</strong> ${item.label}</div>` : ''}`;
-        else if (kind === 'annotation') html = `<div><strong>Text:</strong> ${item.text}</div><div><strong>Type:</strong> ${item.type}</div>`;
+        else if (kind === 'cable') html = `
+            <div class="space-y-2">
+                <div><strong>Type:</strong> ${item.cable_type}</div>
+                <div><strong>Length:</strong> ${item.cable_length || 'N/A'}</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-xs text-slate-500">Connector Label</label><input id="prop-cable-label" value="${item.label || ''}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs"></div>
+                    <div><label class="text-xs text-slate-500">Cable Color</label><select id="prop-cable-color" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs">
+                        ${Object.keys(CABLE_COLOR_MAP).map(c => `<option value="${c}" ${item.cable_color === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-xs text-slate-500">Source Port</label><input id="prop-cable-src-port" type="number" value="${item.source_port || 1}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs"></div>
+                    <div><label class="text-xs text-slate-500">Destination Port</label><input id="prop-cable-dst-port" type="number" value="${item.dest_port || 1}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs"></div>
+                </div>
+                ${isAdmin ? `<button onclick="updateSelectedCable(${item.id})" class="w-full mt-1 px-2 py-1 bg-cyan-700 hover:bg-cyan-600 rounded text-xs text-white">Save Connector/Port Settings</button>` : ''}
+            </div>
+        `;
+        else if (kind === 'annotation') html = `
+            <div class="space-y-2">
+                <div><label class="text-xs text-slate-500">Text / Symbol Type</label><input id="prop-ann-text" value="${item.text || ''}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs"></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-xs text-slate-500">Type</label><select id="prop-ann-type" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs">
+                        <option value="label" ${item.type === 'label' ? 'selected' : ''}>Label</option>
+                        <option value="zone" ${item.type === 'zone' ? 'selected' : ''}>Zone</option>
+                        <option value="symbol" ${item.type === 'symbol' ? 'selected' : ''}>Symbol</option>
+                    </select></div>
+                    <div><label class="text-xs text-slate-500">Color</label><input id="prop-ann-color" type="color" value="${item.color || '#94a3b8'}" class="w-full bg-slate-900 border border-slate-600 rounded px-1 py-1 text-xs"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div><label class="text-xs text-slate-500">Font</label><input id="prop-ann-font" type="number" value="${item.font_size || 14}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs"></div>
+                    <div><label class="text-xs text-slate-500">Width</label><input id="prop-ann-width" type="number" value="${item.width || 120}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs"></div>
+                    <div><label class="text-xs text-slate-500">Height</label><input id="prop-ann-height" type="number" value="${item.height || 80}" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs"></div>
+                </div>
+                ${isAdmin ? `<button onclick="updateSelectedAnnotation(${item.id})" class="w-full mt-1 px-2 py-1 bg-cyan-700 hover:bg-cyan-600 rounded text-xs text-white">Save Format Settings</button>` : ''}
+            </div>
+        `;
         content.innerHTML = html;
     };
     setTimeout(() => FPCanvas.fitToView(), 100);
+}
+
+async function updateSelectedCable(id) {
+    if (!isAdmin) return;
+    await fpApi('update_cable', {
+        id,
+        label: document.getElementById('prop-cable-label').value || null,
+        cable_color: document.getElementById('prop-cable-color').value,
+        source_port: +document.getElementById('prop-cable-src-port').value || 1,
+        dest_port: +document.getElementById('prop-cable-dst-port').value || 1
+    });
+    await loadPlanData();
+    notyf.success('Connector label and ports updated.');
+}
+
+async function updateSelectedAnnotation(id) {
+    if (!isAdmin) return;
+    await fpApi('update_annotation', {
+        id,
+        text: document.getElementById('prop-ann-text').value || '',
+        type: document.getElementById('prop-ann-type').value,
+        color: document.getElementById('prop-ann-color').value,
+        font_size: +document.getElementById('prop-ann-font').value || 14,
+        width: +document.getElementById('prop-ann-width').value || 120,
+        height: +document.getElementById('prop-ann-height').value || 80
+    });
+    await loadPlanData();
+    notyf.success('Format settings updated.');
 }
 
 function renderOverview() {
@@ -406,7 +505,7 @@ function renderOverview() {
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4"><div class="text-sm text-slate-400">Patch Panels</div><div class="text-3xl font-bold text-white">${panels.length}</div></div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4"><div class="text-sm text-slate-400">Cable Runs</div><div class="text-3xl font-bold text-white">${cables.length}</div></div>
         </div>
-        ${plan && plan.image_url ? `<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-2"><img src="${plan.image_url}" alt="${plan.name}" class="w-full rounded-lg max-h-[500px] object-contain"></div>` : ''}
+        ${renderPlanPreview(plan)}
     `;
 }
 
