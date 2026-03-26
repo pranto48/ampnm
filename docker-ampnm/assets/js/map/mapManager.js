@@ -367,6 +367,7 @@ MapApp.mapManager = {
         
         MapApp.deviceManager.setupAutoPing(deviceData);
         if (!MapApp.state.network) MapApp.network.initializeMap();
+        else MapApp.network.restoreSavedView();
         if (!MapApp.state.animationFrameId) MapApp.ui.updateAndAnimateEdges();
     },
 
