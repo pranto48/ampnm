@@ -11,7 +11,7 @@ const FPCanvas = {
     isPanning: false,
     panStart: { x: 0, y: 0 },
     dragging: null,
-    activeTool: 'select', // select, add-rack, add-device, add-label, draw-cable
+    activeTool: 'select', // select, add-rack, add-device, add-symbol, add-label, draw-cable
     snapToGrid: true,
     gridSize: 20,
     selectedItem: null,
@@ -31,6 +31,14 @@ const FPCanvas = {
     CABLE_COLOR_MAP: {
         blue: '#3b82f6', red: '#ef4444', green: '#22c55e', yellow: '#eab308',
         orange: '#f97316', white: '#e2e8f0', gray: '#64748b', purple: '#a855f7', black: '#1e293b'
+    },
+    SYMBOL_TEMPLATES: {
+        server: { icon: '🖥', color: '#38bdf8', width: 120, height: 70, label: 'Server' },
+        router: { icon: '🌐', color: '#22d3ee', width: 110, height: 70, label: 'Router' },
+        switch: { icon: '🔀', color: '#a78bfa', width: 120, height: 70, label: 'Switch' },
+        internet: { icon: '☁️', color: '#60a5fa', width: 130, height: 80, label: 'Internet' },
+        firewall: { icon: '🛡️', color: '#f97316', width: 120, height: 70, label: 'Firewall' },
+        cloud: { icon: '☁️', color: '#93c5fd', width: 130, height: 80, label: 'Cloud' }
     },
 
     toNumber(value, fallback) {
@@ -181,7 +189,7 @@ const FPCanvas = {
             // Start panning
             this.isPanning = true;
             this.panStart = { x: e.clientX - this.panX, y: e.clientY - this.panY };
-        } else if (['add-rack', 'add-device', 'add-label'].includes(this.activeTool)) {
+        } else if (['add-rack', 'add-device', 'add-symbol', 'add-label'].includes(this.activeTool)) {
             const pt = this.svgPoint(e.clientX, e.clientY);
             this.handleCanvasClick(this.snap(pt.x), this.snap(pt.y));
         }
@@ -254,9 +262,32 @@ const FPCanvas = {
             this.promptAddRack(x, y);
         } else if (this.activeTool === 'add-device') {
             this.promptAddDevice(x, y);
+        } else if (this.activeTool === 'add-symbol') {
+            this.promptAddSymbol(x, y);
         } else if (this.activeTool === 'add-label') {
             this.promptAddLabel(x, y);
         }
+    },
+
+    async promptAddSymbol(x, y) {
+        const selectedType = document.getElementById('fp-symbol-type')?.value || 'server';
+        const t = this.SYMBOL_TEMPLATES[selectedType] || this.SYMBOL_TEMPLATES.server;
+        const res = await fpApi('create_annotation', {
+            floor_plan_id: selectedPlanId,
+            x, y,
+            text: selectedType,
+            type: 'symbol',
+            color: t.color,
+            width: t.width,
+            height: t.height,
+            font_size: 12
+        });
+        if (res.success) {
+            await loadPlanData();
+            notyf.success(`${t.label} symbol placed.`);
+        }
+        this.activeTool = 'select';
+        this.updateToolButtons();
     },
 
     async promptAddRack(x, y) {
@@ -478,6 +509,18 @@ const FPCanvas = {
                 <rect x="0" y="0" width="${w}" height="${h}" rx="6" fill="${a.color || '#94a3b8'}22" stroke="${a.color || '#94a3b8'}" stroke-width="${sel ? 2 : 1}" stroke-dasharray="6 3"/>
                 <text x="8" y="${(a.font_size || 14) + 4}" fill="${a.color || '#94a3b8'}" font-size="${a.font_size || 14}" font-weight="600">${this.esc(a.text)}</text>
                 ${sel ? `<rect x="-2" y="-2" width="${w + 4}" height="${h + 4}" rx="8" fill="none" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2"/>` : ''}
+            `;
+        } else if (a.type === 'symbol') {
+            const key = (a.text || 'server').toLowerCase();
+            const t = this.SYMBOL_TEMPLATES[key] || this.SYMBOL_TEMPLATES.server;
+            const w = a.width || t.width;
+            const h = a.height || t.height;
+            const color = a.color || t.color;
+            ag.innerHTML = `
+                <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="10" fill="${color}22" stroke="${color}" stroke-width="${sel ? 2 : 1.2}"/>
+                <text x="0" y="-6" text-anchor="middle" font-size="24">${t.icon}</text>
+                <text x="0" y="14" text-anchor="middle" fill="#e2e8f0" font-size="${a.font_size || 12}" font-weight="600">${this.esc(t.label)}</text>
+                ${sel ? `<rect x="${-w / 2 - 3}" y="${-h / 2 - 3}" width="${w + 6}" height="${h + 6}" rx="12" fill="none" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 2"/>` : ''}
             `;
         } else {
             ag.innerHTML = `
