@@ -288,6 +288,14 @@ MapApp.mapManager = {
             MapApp.api.get('get_edges', { map_id: mapId })
         ]);
         const deviceData = deviceResponse.devices || []; // Extract the array here
+        const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+        const nodePosStorageKey = `ampnm_map_node_positions:${userStorageId}:${mapId}`;
+        let nodePositionOverrides = {};
+        try {
+            nodePositionOverrides = JSON.parse(localStorage.getItem(nodePosStorageKey) || '{}') || {};
+        } catch (error) {
+            nodePositionOverrides = {};
+        }
         
         const visNodes = deviceData.map(d => {
             let label = d.name;
@@ -295,9 +303,11 @@ MapApp.mapManager = {
                 label += `\n${d.last_avg_time}ms | TTL:${d.last_ttl || 'N/A'}`;
             }
 
+            const overridePos = nodePositionOverrides[d.id] || nodePositionOverrides[String(d.id)] || null;
+
             const baseNode = {
                 id: d.id, label: label, title: MapApp.utils.buildNodeTitle(d),
-                x: d.x, y: d.y,
+                x: overridePos?.x ?? d.x, y: overridePos?.y ?? d.y,
                 font: { color: 'white', size: parseInt(d.name_text_size) || 14, multi: true },
                 deviceData: d
             };
