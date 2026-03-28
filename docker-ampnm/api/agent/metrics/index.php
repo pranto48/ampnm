@@ -1,9 +1,9 @@
 <?php
-// REST-style endpoint for Windows monitoring agent
-// - POST   /api/agent/windows-metrics
-// - GET    /api/agent/windows-metrics/health
-// - GET    /api/agent/windows-metrics/recent?limit=50
-// - GET    /api/agent/windows-metrics/<HOSTNAME>/latest
+// REST-style endpoint for Windows/Linux monitoring agents
+// - POST   /api/agent/metrics
+// - GET    /api/agent/metrics/health
+// - GET    /api/agent/metrics/recent?limit=50
+// - GET    /api/agent/metrics/<HOSTNAME>/latest
 
 require_once __DIR__ . '/../../../includes/functions.php';
 
@@ -11,18 +11,14 @@ header('Content-Type: application/json');
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
-
-// Base path of this endpoint (works under /docker-ampnm/ as well)
 $endpointBase = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
 $suffix = '';
 if ($endpointBase !== '' && str_starts_with($requestPath, $endpointBase)) {
     $suffix = trim(substr($requestPath, strlen($endpointBase)), '/');
 }
 
-// Route
 try {
     if ($method === 'POST' && $suffix === '') {
-        // Reuse the existing handler logic
         $_GET['action'] = 'submit_metrics';
         require __DIR__ . '/../../handlers/metrics_handler.php';
         exit;
@@ -31,14 +27,9 @@ try {
     $pdo = getDbConnection();
 
     if ($method === 'GET' && $suffix === 'health') {
-        // Lightweight check: confirm DB connectivity.
         $stmt = $pdo->query('SELECT 1');
         $stmt->fetch();
-
-        echo json_encode([
-            'status' => 'ok',
-            'timestamp' => date('c'),
-        ]);
+        echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
         exit;
     }
 
@@ -47,30 +38,16 @@ try {
         if ($limit < 1) $limit = 1;
         if ($limit > 200) $limit = 200;
 
-        $stmt = $pdo->prepare('SELECT * FROM host_metrics ORDER BY created_at DESC LIMIT ?');
+        $stmt = $pdo->prepare('SELECT hm.*, hm.hostname AS host_name, hm.ip_address AS host_ip, hm.cpu_usage AS cpu_percent, hm.memory_usage AS memory_percent, hm.disk_usage AS disk_percent, hm.gpu_usage AS gpu_percent FROM host_metrics hm ORDER BY hm.created_at DESC LIMIT ?');
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
         echo json_encode(['items' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
 
-    // <HOSTNAME>/latest
     if ($method === 'GET' && preg_match('#^([^/]+)/latest$#', $suffix, $m)) {
         $hostName = urldecode($m[1]);
-        $columns = [];
-        $colStmt = $pdo->query("SHOW COLUMNS FROM `host_metrics`");
-        while ($col = $colStmt->fetch(PDO::FETCH_ASSOC)) {
-            $columns[] = $col['Field'];
-        }
-        $hostNameColumn = in_array('host_name', $columns, true) ? 'host_name' : 'hostname';
-        $sortColumn = in_array('last_seen', $columns, true) ? 'last_seen' : 'created_at';
-        $stmt = $pdo->prepare('
-            SELECT *
-            FROM host_metrics
-            WHERE `' . $hostNameColumn . '` = ?
-            ORDER BY `' . $sortColumn . '` DESC, id DESC
-            LIMIT 1
-        ');
+        $stmt = $pdo->prepare('SELECT hm.*, hm.hostname AS host_name, hm.ip_address AS host_ip, hm.cpu_usage AS cpu_percent, hm.memory_usage AS memory_percent, hm.disk_usage AS disk_percent, hm.gpu_usage AS gpu_percent FROM host_metrics hm WHERE hm.hostname = ? ORDER BY hm.created_at DESC LIMIT 1');
         $stmt->execute([$hostName]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         echo json_encode($row ?: ['error' => 'No metrics found']);
@@ -80,7 +57,7 @@ try {
     http_response_code(404);
     echo json_encode(['error' => 'Not found']);
 } catch (Exception $e) {
-    error_log('windows-metrics endpoint error: ' . $e->getMessage());
+    error_log('agent metrics endpoint error: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Internal error']);
 }

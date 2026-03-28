@@ -1,9 +1,50 @@
 window.MapApp = window.MapApp || {};
 
 MapApp.network = {
+    getUserStorageId: () => (window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest'),
+    getViewStorageKey: () => `ampnm_map_view:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
+    getNodePosStorageKey: () => `ampnm_map_node_positions:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
+
+    saveCurrentView: () => {
+        if (!MapApp.state.network || !MapApp.state.currentMapId) return;
+        const scale = MapApp.state.network.getScale();
+        const position = MapApp.state.network.getViewPosition();
+        localStorage.setItem(MapApp.network.getViewStorageKey(), JSON.stringify({ scale, position }));
+    },
+
+    saveNodePositionForUser: (nodeId, position) => {
+        if (!MapApp.state.currentMapId || !nodeId || !position) return;
+        let snapshot = {};
+        try {
+            snapshot = JSON.parse(localStorage.getItem(MapApp.network.getNodePosStorageKey()) || '{}') || {};
+        } catch (error) {
+            snapshot = {};
+        }
+        snapshot[String(nodeId)] = { x: position.x, y: position.y };
+        localStorage.setItem(MapApp.network.getNodePosStorageKey(), JSON.stringify(snapshot));
+    },
+
+    restoreSavedView: () => {
+        if (!MapApp.state.network || !MapApp.state.currentMapId) return;
+        try {
+            const raw = localStorage.getItem(MapApp.network.getViewStorageKey());
+            if (!raw) return;
+            const saved = JSON.parse(raw);
+            if (!saved?.position || !saved?.scale) return;
+            MapApp.state.network.moveTo({
+                position: saved.position,
+                scale: saved.scale,
+                animation: false
+            });
+        } catch (error) {
+            // Ignore malformed preference data
+        }
+    },
+
     initializeMap: () => {
         const container = document.getElementById('network-map');
         const contextMenu = document.getElementById('context-menu');
+
         MapApp.ui.populateLegend();
         const data = { nodes: MapApp.state.nodes, edges: MapApp.state.edges };
         const options = { 
@@ -25,16 +66,22 @@ MapApp.network = {
             } 
         };
         MapApp.state.network = new vis.Network(container, data, options);
+        MapApp.network.restoreSavedView();
         
         // Event Handlers
         MapApp.state.network.on("dragEnd", async (params) => { 
-            if (window.userRole !== 'admin') return; // Only admin can drag
             if (params.nodes.length > 0) { 
                 const nodeId = params.nodes[0]; 
                 const position = MapApp.state.network.getPositions([nodeId])[nodeId]; 
-                await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                MapApp.network.saveNodePositionForUser(nodeId, position);
+                if (window.userRole === 'admin') {
+                    await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                }
             } 
+            MapApp.network.saveCurrentView();
         });
+        MapApp.state.network.on("dragging", MapApp.network.saveCurrentView);
+        MapApp.state.network.on("zoom", MapApp.network.saveCurrentView);
         MapApp.state.network.on("doubleClick", (params) => { 
             if (window.userRole === 'admin' && params.nodes.length > 0) MapApp.ui.openDeviceModal(params.nodes[0]); 
         });

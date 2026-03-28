@@ -32,6 +32,10 @@ interface HostMetric {
   uptime_seconds?: number | null;
   boot_time?: string | null;
   os_version?: string | null;
+  platform?: string | null;
+  agent_platform?: string | null;
+  load_average?: number | null;
+  temperature_celsius?: number | null;
 }
 
 interface HistoryPoint {
