@@ -774,6 +774,13 @@ function createHostCard(host) {
                     ${host.device_name ? `<p class="text-cyan-400 text-xs mt-1"><i class="fas fa-link mr-1"></i>${host.device_name}</p>` : ''}
                 </div>
                 <div class="flex items-center gap-2">
+                    ${IS_ADMIN && !host.device_name ? `
+                        <button onclick="event.stopPropagation(); manualAddHostDevice('${host.host_ip}', '${host.host_name || host.host_ip}', '${host.platform || 'unknown'}')" 
+                                class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/20 rounded transition-colors" 
+                                title="Add host as device">
+                            <i class="fas fa-plus-circle text-xs"></i>
+                        </button>
+                    ` : ''}
                     <button onclick="event.stopPropagation(); openHostOverrideModal('${host.host_ip}', '${host.host_name || host.host_ip}')" 
                             class="p-1.5 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded transition-colors" 
                             title="Custom alert thresholds">
@@ -858,6 +865,31 @@ function createHostCard(host) {
             </div>
         </div>
     `;
+}
+
+async function manualAddHostDevice(hostIp, hostName, platform = 'unknown') {
+    if (!IS_ADMIN) return;
+    try {
+        const response = await fetch('api.php?action=create_device_from_host', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                host_ip: hostIp || '',
+                host_name: hostName || '',
+                platform
+            })
+        });
+        const result = await response.json();
+        if (response.ok && result?.success) {
+            notyf.success(`Host linked as device: ${result.device?.name || hostName || hostIp}`);
+            loadHosts();
+        } else {
+            notyf.error(result?.error || 'Failed to add host device');
+        }
+    } catch (error) {
+        console.error('Failed to add host device:', error);
+        notyf.error('Failed to add host device');
+    }
 }
 
 async function quickSaveStatusDelay(hostIp, hostName, inputEl) {
@@ -1300,18 +1332,21 @@ async function createToken() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name })
         });
-        const result = await response.json();
+        const rawBody = await response.text();
+        let result = {};
+        try { result = rawBody ? JSON.parse(rawBody) : {}; }
+        catch (parseError) { throw new Error(rawBody || 'Unexpected response from server'); }
         
-        if (result.success) {
+        if (response.ok && result?.success) {
             notyf.success('Token created!');
             alert(`Token created successfully!\n\nFull Token (copy now, it won't be shown again in full):\n\n${result.token}`);
             loadTokens();
         } else {
-            notyf.error(result.error || 'Failed to create token');
+            notyf.error(result?.error || `Failed to create token (HTTP ${response.status})`);
         }
     } catch (error) {
         console.error('Failed to create token:', error);
-        notyf.error('Failed to create token');
+        notyf.error(error.message || 'Failed to create token');
     }
 }
 
