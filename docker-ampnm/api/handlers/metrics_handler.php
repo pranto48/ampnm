@@ -165,6 +165,16 @@ function columnExpr(array $columns, array $preferred, ?string $fallback = 'NULL'
     return $fallback ?? 'NULL';
 }
 
+function ensureHostOverrideSchema(PDO $pdo): void {
+    $columns = getTableColumns($pdo, 'host_alert_overrides');
+    if (!in_array('host_name', $columns, true)) {
+        $pdo->exec("ALTER TABLE `host_alert_overrides` ADD COLUMN `host_name` VARCHAR(255) NULL AFTER `host_ip`");
+        if (in_array('hostname', $columns, true)) {
+            $pdo->exec("UPDATE `host_alert_overrides` SET `host_name` = `hostname` WHERE (`host_name` IS NULL OR `host_name` = '') AND `hostname` IS NOT NULL");
+        }
+    }
+}
+
 function normalizeMetricsPayload(array $data): array {
     $hostName = trim((string)($data['host_name'] ?? $data['hostname'] ?? ''));
     $hostIp = trim((string)($data['host_ip'] ?? $data['ip_address'] ?? ''));
@@ -709,6 +719,41 @@ switch ($action) {
         $device = createDeviceForHost($pdo, (int)$userId, $hostName, $hostIp ?: null, $platform);
         echo json_encode(['success' => true, 'device' => $device]);
         break;
+
+    case 'register_host_ip':
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can register hosts']);
+            exit;
+        }
+        $hostIp = trim((string)($input['host_ip'] ?? ''));
+        $hostName = trim((string)($input['host_name'] ?? ''));
+        $autoCreateDevice = !isset($input['create_device']) || !empty($input['create_device']);
+        if ($hostIp === '' || !filter_var($hostIp, FILTER_VALIDATE_IP)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Valid host_ip is required']);
+            exit;
+        }
+        $userId = $_SESSION['user_id'] ?? null;
+        $payload = normalizeMetricsPayload([
+            'host_ip' => $hostIp,
+            'host_name' => $hostName !== '' ? $hostName : $hostIp,
+            'cpu_percent' => null,
+            'memory_percent' => null,
+            'disk_percent' => null,
+            'network_in_mbps' => null,
+            'network_out_mbps' => null,
+            'gpu_percent' => null,
+            'platform' => 'unknown'
+        ]);
+        $deviceId = null;
+        if ($autoCreateDevice && $userId) {
+            $device = createDeviceForHost($pdo, (int)$userId, $payload['host_name'], $payload['host_ip'], 'unknown');
+            $deviceId = $device['id'] ?? null;
+        }
+        $metricsId = saveHostMetrics($pdo, $payload, $deviceId);
+        echo json_encode(['success' => true, 'metrics_id' => $metricsId, 'host_ip' => $hostIp, 'host_name' => $payload['host_name']]);
+        break;
         
     case 'delete_agent_token':
         ensureAgentTokenTable($pdo);
@@ -795,6 +840,7 @@ switch ($action) {
         break;
     
     case 'get_host_override':
+        ensureHostOverrideSchema($pdo);
         $hostIp = $_GET['host_ip'] ?? null;
         if (!$hostIp) {
             echo json_encode(['error' => 'host_ip required']);
@@ -808,6 +854,7 @@ switch ($action) {
         break;
         
     case 'save_host_override':
+        ensureHostOverrideSchema($pdo);
         $hostIp = $input['host_ip'] ?? null;
         if (!$hostIp) {
             echo json_encode(['error' => 'host_ip required']);
@@ -858,6 +905,7 @@ switch ($action) {
         break;
         
     case 'delete_host_override':
+        ensureHostOverrideSchema($pdo);
         $hostIp = $input['host_ip'] ?? null;
         if (!$hostIp) {
             echo json_encode(['error' => 'host_ip required']);
@@ -870,12 +918,14 @@ switch ($action) {
         break;
         
     case 'get_all_host_overrides':
+        ensureHostOverrideSchema($pdo);
         $stmt = $pdo->query("SELECT * FROM host_alert_overrides ORDER BY host_ip");
         $overrides = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($overrides);
         break;
 
     case 'export_host_overrides':
+        ensureHostOverrideSchema($pdo);
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="host_alert_overrides.csv"');
 
@@ -897,6 +947,7 @@ switch ($action) {
         exit;
 
     case 'import_host_overrides':
+        ensureHostOverrideSchema($pdo);
         if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
             echo json_encode(['error' => 'CSV file upload failed']);
             break;

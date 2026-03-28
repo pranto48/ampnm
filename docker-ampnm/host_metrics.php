@@ -31,6 +31,9 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'] . ($basePath === '/' ? '' : $base
             <button onclick="openInstallGuideModal()" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg">
                 <i class="fas fa-book-open mr-2"></i>Installation Guide
             </button>
+            <button onclick="registerHostByIpPrompt()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors">
+                <i class="fas fa-network-wired mr-2"></i>Add Host by IP
+            </button>
             <button onclick="openAlertSettingsModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors">
                 <i class="fas fa-bell mr-2"></i>Alert Thresholds
             </button>
@@ -889,6 +892,36 @@ async function manualAddHostDevice(hostIp, hostName, platform = 'unknown') {
     } catch (error) {
         console.error('Failed to add host device:', error);
         notyf.error('Failed to add host device');
+    }
+}
+
+async function registerHostByIpPrompt() {
+    if (!IS_ADMIN) return;
+    const hostIp = (prompt('Enter host IP address to register/poll:', '') || '').trim();
+    if (!hostIp) return;
+    const hostName = (prompt('Optional host name label:', hostIp) || '').trim();
+    const createDevice = confirm('Also auto-create/link this host as a device?');
+
+    try {
+        const response = await fetch('api.php?action=register_host_ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                host_ip: hostIp,
+                host_name: hostName,
+                create_device: createDevice ? 1 : 0
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false) {
+            notyf.error(result.error || `Failed to register host (${response.status})`);
+            return;
+        }
+        notyf.success(`Host registered: ${result.host_name || hostName || hostIp}`);
+        loadHosts();
+    } catch (error) {
+        console.error('Failed to register host by IP:', error);
+        notyf.error('Failed to register host by IP');
     }
 }
 
