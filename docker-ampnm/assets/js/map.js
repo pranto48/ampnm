@@ -357,22 +357,19 @@ function initMap() {
                     type: 'box',
                     map_id: state.currentMapId,
                     x: canvasPosition.x,
-                    y: canvasPosition.y
+                    y: canvasPosition.y,
+                    port_config: MapApp.utils.withUpdatedBoxStyle({}, MapApp.utils.getDefaultBoxStyle())
                 });
-                const visNode = {
+                const baseNode = {
                     id: newDevice.id,
                     label: newDevice.name,
                     title: newDevice.name,
                     x: newDevice.x,
                     y: newDevice.y,
-                    shape: 'box',
-                    color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
                     font: { color: 'white', size: 16, multi: true },
-                    margin: 20,
-                    widthConstraint: { minimum: 150 },
-                    heightConstraint: { minimum: 80 },
                     deviceData: newDevice
                 };
+                const visNode = MapApp.utils.buildVisBoxNode(baseNode, newDevice);
                 state.nodes.add(visNode);
                 window.notyf.success(`Group box "${name.trim()}" added.`);
             } catch (error) {

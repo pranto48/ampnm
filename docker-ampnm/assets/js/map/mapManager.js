@@ -360,7 +360,7 @@ MapApp.mapManager = {
             
             // Box type
             if (d.type === 'box') {
-                return { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
+                return MapApp.utils.buildVisBoxNode(baseNode, d);
             }
 
             // Use dynamic icon mapping based on type and subchoice
@@ -450,7 +450,7 @@ MapApp.mapManager = {
             if (createdDevice.icon_url) {
                 visNode = { ...baseNode, shape: 'image', image: createdDevice.icon_url, size: (parseInt(createdDevice.icon_size) || 50) / 2, color: { border: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' }, borderWidth: 3 };
             } else if (createdDevice.type === 'box') {
-                visNode = { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
+                visNode = MapApp.utils.buildVisBoxNode(baseNode, createdDevice);
             } else {
                 const iconCode = MapApp.mapManager.getDeviceIconUnicode(createdDevice);
                 visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: iconCode, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown } };

@@ -69,18 +69,82 @@ MapApp.network = {
         MapApp.network.restoreSavedView();
         
         // Event Handlers
+        let boxResizeState = null;
+        MapApp.state.network.on("dragStart", (params) => {
+            if (!params.nodes || params.nodes.length !== 1) return;
+            const nodeId = params.nodes[0];
+            const node = MapApp.state.nodes.get(nodeId);
+            if (!node?.deviceData || node.deviceData.type !== 'box') return;
+            const srcEvent = params?.event?.srcEvent;
+            if (!srcEvent || !srcEvent.altKey) return;
+            const pointer = params?.pointer?.DOM || { x: 0, y: 0 };
+            boxResizeState = {
+                id: nodeId,
+                startCanvas: MapApp.state.network.canvas.DOMtoCanvas(pointer),
+                originalStyle: MapApp.utils.getBoxStyleFromDevice(node.deviceData),
+                originalPos: MapApp.state.network.getPositions([nodeId])[nodeId] || { x: node.x || 0, y: node.y || 0 }
+            };
+            window.notyf.info('ALT + drag to resize group box');
+        });
+
+        MapApp.state.network.on("dragging", (params) => {
+            MapApp.network.saveCurrentView();
+            if (!boxResizeState || !params.nodes || !params.nodes.includes(boxResizeState.id)) return;
+            const node = MapApp.state.nodes.get(boxResizeState.id);
+            if (!node?.deviceData) return;
+            const pointer = params?.pointer?.DOM || { x: 0, y: 0 };
+            const currentCanvas = MapApp.state.network.canvas.DOMtoCanvas(pointer);
+            const dx = currentCanvas.x - boxResizeState.startCanvas.x;
+            const dy = currentCanvas.y - boxResizeState.startCanvas.y;
+            const resizedStyle = {
+                ...boxResizeState.originalStyle,
+                width: Math.max(120, Math.round(boxResizeState.originalStyle.width + dx)),
+                height: Math.max(70, Math.round(boxResizeState.originalStyle.height + dy))
+            };
+            const updatedDeviceData = {
+                ...node.deviceData,
+                port_config: MapApp.utils.withUpdatedBoxStyle(node.deviceData, resizedStyle)
+            };
+            const visNode = MapApp.utils.buildVisBoxNode({
+                id: node.id,
+                label: updatedDeviceData.name || node.label,
+                title: MapApp.utils.buildNodeTitle(updatedDeviceData),
+                x: boxResizeState.originalPos.x,
+                y: boxResizeState.originalPos.y,
+                font: { color: 'white', size: parseInt(updatedDeviceData.name_text_size, 10) || 14, multi: true },
+                deviceData: updatedDeviceData
+            }, updatedDeviceData);
+            MapApp.state.nodes.update(visNode);
+        });
+
         MapApp.state.network.on("dragEnd", async (params) => { 
             if (params.nodes.length > 0) { 
                 const nodeId = params.nodes[0]; 
-                const position = MapApp.state.network.getPositions([nodeId])[nodeId]; 
-                MapApp.network.saveNodePositionForUser(nodeId, position);
-                if (window.userRole === 'admin') {
-                    await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                const node = MapApp.state.nodes.get(nodeId);
+                const position = MapApp.state.network.getPositions([nodeId])[nodeId];
+
+                if (boxResizeState && nodeId == boxResizeState.id) {
+                    try {
+                        const updated = await MapApp.api.post('update_device', {
+                            id: nodeId,
+                            updates: { port_config: node?.deviceData?.port_config || null }
+                        });
+                        MapApp.state.nodes.update({ id: nodeId, deviceData: updated, title: MapApp.utils.buildNodeTitle(updated), x: boxResizeState.originalPos.x, y: boxResizeState.originalPos.y });
+                        window.notyf.success('Group box size updated.');
+                    } catch (error) {
+                        window.notyf.error(error.message || 'Failed to save group box size.');
+                    } finally {
+                        boxResizeState = null;
+                    }
+                } else {
+                    MapApp.network.saveNodePositionForUser(nodeId, position);
+                    if (window.userRole === 'admin') {
+                        await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                    }
                 }
             } 
             MapApp.network.saveCurrentView();
         });
-        MapApp.state.network.on("dragging", MapApp.network.saveCurrentView);
         MapApp.state.network.on("zoom", MapApp.network.saveCurrentView);
         MapApp.state.network.on("doubleClick", (params) => { 
             if (window.userRole === 'admin' && params.nodes.length > 0) MapApp.ui.openDeviceModal(params.nodes[0]); 
@@ -98,6 +162,7 @@ MapApp.network = {
                 if (window.userRole === 'admin') {
                     menuItems += `
                         <div class="context-menu-item" data-action="edit" data-id="${nodeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit</div>
+                        ${node.deviceData.type === 'box' ? `<div class="context-menu-item" data-action="box-settings" data-id="${nodeId}"><i class="fas fa-vector-square fa-fw mr-2"></i>Box Settings</div>` : ''}
                         <div class="context-menu-item" data-action="change-icon" data-id="${nodeId}"><i class="fas fa-icons fa-fw mr-2"></i>Change Icon</div>
                         <div class="context-menu-item" data-action="copy" data-id="${nodeId}"><i class="fas fa-copy fa-fw mr-2"></i>Copy</div>
                         ${node.deviceData.ip ? `<div class="context-menu-item" data-action="ping" data-id="${nodeId}"><i class="fas fa-sync fa-fw mr-2"></i>Check Status</div>` : ''}
@@ -293,13 +358,17 @@ MapApp.network = {
                                         size: (parseInt(updated.icon_size, 10) || 50) / 2,
                                     });
                                 } else if (updated.type === 'box') {
-                                    MapApp.state.nodes.update({
+                                    const pos = MapApp.state.network.getPositions([updated.id])[updated.id] || { x: node.x || 0, y: node.y || 0 };
+                                    const baseNode = {
                                         id: updated.id,
                                         label: updated.name,
                                         title: MapApp.utils.buildNodeTitle(updated),
-                                        deviceData: updated,
-                                        shape: 'box',
-                                    });
+                                        x: pos.x,
+                                        y: pos.y,
+                                        font: { color: 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true },
+                                        deviceData: updated
+                                    };
+                                    MapApp.state.nodes.update(MapApp.utils.buildVisBoxNode(baseNode, updated));
                                 } else {
                                     MapApp.state.nodes.update({
                                         id: updated.id,
@@ -325,6 +394,57 @@ MapApp.network = {
                                 saveBtn.textContent = 'Save';
                             }
                         });
+                    } else if (action === 'box-settings') {
+                        const node = MapApp.state.nodes.get(id);
+                        if (!node?.deviceData || node.deviceData.type !== 'box') {
+                            window.notyf.error('Group box not found.');
+                            return;
+                        }
+                        const style = MapApp.utils.getBoxStyleFromDevice(node.deviceData);
+                        const label = prompt('Group box label text:', node.deviceData.name || node.label || 'Group');
+                        if (label === null) return;
+                        const width = parseInt(prompt('Box width (px):', String(style.width)), 10);
+                        const height = parseInt(prompt('Box height (px):', String(style.height)), 10);
+                        const borderWidth = parseInt(prompt('Border width (1-12):', String(style.borderWidth)), 10);
+                        const borderColor = prompt('Border color (#hex or CSS):', style.borderColor);
+                        const fillColor = prompt('Fill color (rgba/hex):', style.fillColor);
+                        const labelAlign = prompt('Label horizontal position (left/center/right):', style.labelAlign || 'center');
+                        const labelVAdjust = parseInt(prompt('Label vertical offset (-120..120):', String(style.labelVAdjust || 0)), 10);
+
+                        const nextStyle = {
+                            width: Math.max(120, isNaN(width) ? style.width : width),
+                            height: Math.max(70, isNaN(height) ? style.height : height),
+                            borderWidth: Math.max(1, Math.min(12, isNaN(borderWidth) ? style.borderWidth : borderWidth)),
+                            borderColor: borderColor || style.borderColor,
+                            fillColor: fillColor || style.fillColor,
+                            labelAlign: ['left', 'center', 'right'].includes((labelAlign || '').toLowerCase()) ? (labelAlign || '').toLowerCase() : 'center',
+                            labelVAdjust: Math.max(-120, Math.min(120, isNaN(labelVAdjust) ? (style.labelVAdjust || 0) : labelVAdjust))
+                        };
+
+                        try {
+                            const updated = await MapApp.api.post('update_device', {
+                                id,
+                                updates: {
+                                    name: (label || '').trim() || node.deviceData.name || 'Group',
+                                    port_config: MapApp.utils.withUpdatedBoxStyle(node.deviceData, nextStyle),
+                                    type: 'box'
+                                }
+                            });
+                            const pos = MapApp.state.network.getPositions([id])[id] || { x: node.x || 0, y: node.y || 0 };
+                            const baseNode = {
+                                id: updated.id,
+                                label: updated.name,
+                                title: MapApp.utils.buildNodeTitle(updated),
+                                x: pos.x,
+                                y: pos.y,
+                                font: { color: 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true },
+                                deviceData: updated
+                            };
+                            MapApp.state.nodes.update(MapApp.utils.buildVisBoxNode(baseNode, updated));
+                            window.notyf.success('Group box updated.');
+                        } catch (error) {
+                            window.notyf.error(error.message || 'Failed to update group box.');
+                        }
                     } else if (action === 'ping') {
                         const icon = document.createElement('i');
                         icon.className = 'fas fa-spinner fa-spin';

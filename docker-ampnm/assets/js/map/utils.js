@@ -1,6 +1,73 @@
 window.MapApp = window.MapApp || {};
 
 MapApp.utils = {
+    getDefaultBoxStyle: () => ({
+        width: 220,
+        height: 120,
+        borderWidth: 2,
+        borderColor: '#475569',
+        fillColor: 'rgba(49, 65, 85, 0.50)',
+        labelAlign: 'center',
+        labelVAdjust: 0
+    }),
+
+    getBoxStyleFromDevice: (deviceData) => {
+        const defaults = MapApp.utils.getDefaultBoxStyle();
+        if (!deviceData || !deviceData.port_config) return defaults;
+        try {
+            const parsed = typeof deviceData.port_config === 'string'
+                ? JSON.parse(deviceData.port_config)
+                : deviceData.port_config;
+            const style = parsed?.box_style || {};
+            return {
+                ...defaults,
+                ...style,
+                width: Math.max(120, parseInt(style.width, 10) || defaults.width),
+                height: Math.max(70, parseInt(style.height, 10) || defaults.height),
+                borderWidth: Math.max(1, Math.min(12, parseInt(style.borderWidth, 10) || defaults.borderWidth)),
+                labelVAdjust: Math.max(-120, Math.min(120, parseInt(style.labelVAdjust, 10) || 0))
+            };
+        } catch (e) {
+            return defaults;
+        }
+    },
+
+    withUpdatedBoxStyle: (deviceData, nextStyle) => {
+        const current = (deviceData && deviceData.port_config)
+            ? (typeof deviceData.port_config === 'string' ? (() => {
+                try { return JSON.parse(deviceData.port_config); } catch (e) { return {}; }
+            })() : { ...(deviceData.port_config || {}) })
+            : {};
+        current.box_style = {
+            ...MapApp.utils.getDefaultBoxStyle(),
+            ...current.box_style,
+            ...(nextStyle || {})
+        };
+        return JSON.stringify(current);
+    },
+
+    buildVisBoxNode: (baseNode, deviceData) => {
+        const style = MapApp.utils.getBoxStyleFromDevice(deviceData);
+        return {
+            ...baseNode,
+            shape: 'box',
+            color: {
+                background: style.fillColor,
+                border: style.borderColor
+            },
+            borderWidth: style.borderWidth,
+            margin: 16,
+            level: -1,
+            widthConstraint: { minimum: style.width, maximum: style.width },
+            heightConstraint: { minimum: style.height, maximum: style.height },
+            font: {
+                ...(baseNode.font || {}),
+                align: style.labelAlign || 'center',
+                vadjust: style.labelVAdjust || 0
+            }
+        };
+    },
+
     getDefaultTooltipFields: () => ({
         ip: true,
         type: true,
