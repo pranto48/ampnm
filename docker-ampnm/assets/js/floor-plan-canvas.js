@@ -16,6 +16,7 @@ const FPCanvas = {
     gridSize: 20,
     selectedItem: null,
     cableStart: null,
+    cablePreviewPoint: null,
     canvasWidth: 2000,
     canvasHeight: 1500,
     // Data
@@ -61,6 +62,7 @@ const FPCanvas = {
         this.isPanning = false;
         this.dragging = null;
         this.cableStart = null;
+        this.cablePreviewPoint = null;
 
         container.innerHTML = `<svg id="fp-canvas-svg" class="w-full h-full block" style="height:600px; background:#0f172a; border-radius:8px; border:1px solid #334155; cursor:default; touch-action:none;"></svg>`;
         this.svg = document.getElementById('fp-canvas-svg');
@@ -200,6 +202,11 @@ const FPCanvas = {
             this.panX = e.clientX - this.panStart.x;
             this.panY = e.clientY - this.panStart.y;
             this.updateTransform();
+        }
+        if (this.activeTool === 'draw-cable' && this.cableStart) {
+            const pt = this.svgPoint(e.clientX, e.clientY);
+            this.cablePreviewPoint = { x: this.snap(pt.x), y: this.snap(pt.y) };
+            this.render();
         }
         if (this.dragging) {
             const pt = this.svgPoint(e.clientX, e.clientY);
@@ -351,11 +358,14 @@ const FPCanvas = {
     handleCableClick(kind, id) {
         if (!this.cableStart) {
             this.cableStart = { kind, id };
+            this.cablePreviewPoint = null;
             notyf.open({ type: 'info', message: 'Click a destination rack or device to draw cable.', duration: 3000 });
         } else {
-            if (this.cableStart.id == id) { this.cableStart = null; return; }
+            if (this.cableStart.id == id) { this.cableStart = null; this.cablePreviewPoint = null; this.render(); return; }
             this.drawCableBetween(this.cableStart, { kind, id });
             this.cableStart = null;
+            this.cablePreviewPoint = null;
+            this.render();
         }
     },
 
@@ -390,6 +400,7 @@ const FPCanvas = {
     setTool(tool) {
         this.activeTool = tool;
         this.cableStart = null;
+        this.cablePreviewPoint = null;
         this.svg.style.cursor = tool === 'select' ? 'default' : tool === 'draw-cable' ? 'crosshair' : 'cell';
         this.updateToolButtons();
     },
@@ -456,6 +467,7 @@ const FPCanvas = {
 
         // Cables
         this.cables.forEach(cable => { try { this.renderCable(cable); } catch (e) { console.warn('Skipping bad cable', cable, e); } });
+        this.renderCablePreview();
 
         // Racks
         this.racks.forEach(rack => { try { this.renderRack(rack); } catch (e) { console.warn('Skipping bad rack', rack, e); } });
@@ -537,6 +549,20 @@ const FPCanvas = {
             ${cable.label ? `<text x="${(srcPos.x + dstPos.x) / 2}" y="${(srcPos.y + dstPos.y) / 2 - 10}" text-anchor="middle" fill="${color}" font-size="9">${this.esc(cable.label)}</text>` : ''}
             <text x="${(srcPos.x + dstPos.x) / 2}" y="${(srcPos.y + dstPos.y) / 2 + 2}" text-anchor="middle" fill="#94a3b8" font-size="8">${this.esc(mark)}</text>
             ${sel ? `<circle cx="${srcPos.x}" cy="${srcPos.y}" r="6" fill="none" stroke="#06b6d4" stroke-width="1.5"/><circle cx="${dstPos.x}" cy="${dstPos.y}" r="6" fill="none" stroke="#06b6d4" stroke-width="1.5"/>` : ''}
+        `;
+        this.g.appendChild(cg);
+    },
+
+    renderCablePreview() {
+        if (!this.cableStart || !this.cablePreviewPoint) return;
+        const srcPos = this.findEndpointPos(this.cableStart.kind, this.cableStart.id);
+        if (!srcPos || !isFinite(srcPos.x) || !isFinite(srcPos.y)) return;
+        const dstPos = this.cablePreviewPoint;
+        const cg = this.createSVG('g', { 'data-kind': 'cable-preview', style: 'pointer-events:none' });
+        cg.innerHTML = `
+            <line x1="${srcPos.x}" y1="${srcPos.y}" x2="${dstPos.x}" y2="${dstPos.y}" stroke="#22d3ee" stroke-width="2" stroke-dasharray="6 4" opacity="0.95"/>
+            <circle cx="${srcPos.x}" cy="${srcPos.y}" r="4" fill="#22d3ee" opacity="0.85"/>
+            <circle cx="${dstPos.x}" cy="${dstPos.y}" r="4" fill="#22d3ee" opacity="0.85"/>
         `;
         this.g.appendChild(cg);
     },
