@@ -1,6 +1,34 @@
 window.MapApp = window.MapApp || {};
 
 MapApp.utils = {
+    getDefaultTooltipFields: () => ({
+        ip: true,
+        type: true,
+        monitor: true,
+        latency: true,
+        ttl: true,
+        interval: true,
+        last_seen: true,
+        description: true,
+        ports: true
+    }),
+
+    getCurrentTooltipFields: () => {
+        const defaults = MapApp.utils.getDefaultTooltipFields();
+        const currentMapId = MapApp.state?.currentMapId;
+        if (!currentMapId) return defaults;
+        let mapSettings = MapApp.state?.tooltipFieldSettingsByMap?.[currentMapId] || {};
+        if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
+            try {
+                const raw = localStorage.getItem(`mapTooltipFields:${currentMapId}`);
+                mapSettings = raw ? JSON.parse(raw) : {};
+            } catch (error) {
+                mapSettings = {};
+            }
+        }
+        return { ...defaults, ...mapSettings };
+    },
+
     buildNodeTitle: (deviceData) => {
         const statusColors = {
             online: '#22c55e', warning: '#eab308', critical: '#ef4444',
@@ -9,6 +37,7 @@ MapApp.utils = {
         const status = deviceData.status || 'unknown';
         const statusColor = statusColors[status] || statusColors.unknown;
         const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+        const tooltipFields = MapApp.utils.getCurrentTooltipFields();
 
         let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 220px; max-width: 320px; padding: 2px;">`;
 
@@ -25,22 +54,26 @@ MapApp.utils = {
         title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px;">`;
 
         // IP
-        title += `<span style="color:#94a3b8;">IP Address:</span>`;
-        title += `<span style="color:#e2e8f0; font-family:monospace;">${deviceData.ip || 'N/A'}</span>`;
+        if (tooltipFields.ip) {
+            title += `<span style="color:#94a3b8;">IP Address:</span>`;
+            title += `<span style="color:#e2e8f0; font-family:monospace;">${deviceData.ip || 'N/A'}</span>`;
+        }
 
         // Type
-        const typeLabel = (deviceData.type || 'server').charAt(0).toUpperCase() + (deviceData.type || 'server').slice(1);
-        title += `<span style="color:#94a3b8;">Type:</span>`;
-        title += `<span style="color:#e2e8f0;">${typeLabel}${deviceData.subchoice ? ' (#' + deviceData.subchoice + ')' : ''}</span>`;
+        if (tooltipFields.type) {
+            const typeLabel = (deviceData.type || 'server').charAt(0).toUpperCase() + (deviceData.type || 'server').slice(1);
+            title += `<span style="color:#94a3b8;">Type:</span>`;
+            title += `<span style="color:#e2e8f0;">${typeLabel}${deviceData.subchoice ? ' (#' + deviceData.subchoice + ')' : ''}</span>`;
+        }
 
         // Monitor method
-        if (deviceData.monitor_method) {
+        if (tooltipFields.monitor && deviceData.monitor_method) {
             title += `<span style="color:#94a3b8;">Monitor:</span>`;
             title += `<span style="color:#e2e8f0;">${deviceData.monitor_method}${deviceData.check_port ? ':' + deviceData.check_port : ''}</span>`;
         }
 
         // Latency
-        if (deviceData.last_avg_time !== null && deviceData.last_avg_time !== undefined) {
+        if (tooltipFields.latency && deviceData.last_avg_time !== null && deviceData.last_avg_time !== undefined) {
             const latency = parseFloat(deviceData.last_avg_time);
             const latColor = latency < 50 ? '#22c55e' : latency < 150 ? '#eab308' : '#ef4444';
             title += `<span style="color:#94a3b8;">Latency:</span>`;
@@ -48,19 +81,19 @@ MapApp.utils = {
         }
 
         // TTL
-        if (deviceData.last_ttl) {
+        if (tooltipFields.ttl && deviceData.last_ttl) {
             title += `<span style="color:#94a3b8;">TTL:</span>`;
             title += `<span style="color:#e2e8f0;">${deviceData.last_ttl}</span>`;
         }
 
         // Ping interval
-        if (deviceData.ping_interval) {
+        if (tooltipFields.interval && deviceData.ping_interval) {
             title += `<span style="color:#94a3b8;">Interval:</span>`;
             title += `<span style="color:#e2e8f0;">${deviceData.ping_interval}s</span>`;
         }
 
         // Last seen
-        if (deviceData.last_seen) {
+        if (tooltipFields.last_seen && deviceData.last_seen) {
             title += `<span style="color:#94a3b8;">Last Seen:</span>`;
             title += `<span style="color:#e2e8f0;">${deviceData.last_seen}</span>`;
         }
@@ -83,14 +116,14 @@ MapApp.utils = {
         }
 
         // Description
-        if (deviceData.description) {
+        if (tooltipFields.description && deviceData.description) {
             const desc = deviceData.description.replace(/</g, "&lt;").replace(/>/g, "&gt;");
             title += `<div style="margin-top:6px; font-size:11px; color:#94a3b8; font-style:italic;">${desc}</div>`;
         }
 
         // Ports summary
         const ports = MapApp.utils.getPortsFromDevice(deviceData);
-        if (ports.length > 0) {
+        if (tooltipFields.ports && ports.length > 0) {
             title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-top:8px; padding-top:6px;">`;
             title += `<div style="font-size:11px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">Ports (${ports.length})</div>`;
             const portGroups = {};
