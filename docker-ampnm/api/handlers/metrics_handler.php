@@ -66,22 +66,57 @@ function generateAgentToken() {
 /**
  * Find device by IP address or hostname
  */
-function findDeviceMatch($pdo, $hostname, $ip) {
+function findDeviceMatch($pdo, $hostname, $ip, ?int $userId = null) {
+    $userClause = $userId ? ' AND user_id = ?' : '';
+    $userParams = $userId ? [$userId] : [];
+
     if (!empty($ip)) {
-        $stmt = $pdo->prepare("SELECT id, name FROM devices WHERE ip = ? LIMIT 1");
-        $stmt->execute([$ip]);
+        $stmt = $pdo->prepare("SELECT id, name, ip, ping_interval FROM devices WHERE ip = ?{$userClause} LIMIT 1");
+        $stmt->execute(array_merge([$ip], $userParams));
         $device = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($device) return $device;
     }
 
     if (!empty($hostname)) {
-        $stmt = $pdo->prepare("SELECT id, name FROM devices WHERE name = ? LIMIT 1");
-        $stmt->execute([$hostname]);
+        $stmt = $pdo->prepare("SELECT id, name, ip, ping_interval FROM devices WHERE name = ?{$userClause} LIMIT 1");
+        $stmt->execute(array_merge([$hostname], $userParams));
         $device = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($device) return $device;
     }
 
     return false;
+}
+
+function touchDeviceFromMetrics(PDO $pdo, int $deviceId, string $hostIp = '', string $status = 'online'): void {
+    $columns = getTableColumns($pdo, 'devices');
+    $updates = [];
+    $values = [];
+    $now = date('Y-m-d H:i:s');
+
+    if (hasColumn($columns, 'status')) {
+        $updates[] = '`status` = ?';
+        $values[] = $status;
+    }
+    if (hasColumn($columns, 'last_seen')) {
+        $updates[] = '`last_seen` = ?';
+        $values[] = $now;
+    }
+    if (hasColumn($columns, 'last_check')) {
+        $updates[] = '`last_check` = ?';
+        $values[] = $now;
+    }
+    if ($hostIp !== '' && hasColumn($columns, 'ip')) {
+        $updates[] = '`ip` = COALESCE(NULLIF(`ip`, \'\'), ?)';
+        $values[] = $hostIp;
+    }
+
+    if (empty($updates)) {
+        return;
+    }
+
+    $values[] = $deviceId;
+    $stmt = $pdo->prepare('UPDATE devices SET ' . implode(', ', $updates) . ' WHERE id = ?');
+    $stmt->execute($values);
 }
 
 function createDeviceForHost(PDO $pdo, int $userId, string $hostName, ?string $hostIp, string $platform = 'unknown'): ?array {
@@ -449,12 +484,13 @@ switch ($action) {
         }
         
         // Try to find matching device (IP first, then hostname)
-        $device = findDeviceMatch($pdo, $normalizedInput['host_name'] ?? '', $normalizedInput['host_ip'] ?? '');
+        $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
+        $device = findDeviceMatch($pdo, $normalizedInput['host_name'] ?? '', $normalizedInput['host_ip'] ?? '', $tokenUserId);
         $autoCreatedDevice = false;
-        if (!$device && !empty($tokenInfo['user_id'])) {
+        if (!$device && $tokenUserId) {
             $created = createDeviceForHost(
                 $pdo,
-                (int)$tokenInfo['user_id'],
+                $tokenUserId,
                 (string)($normalizedInput['host_name'] ?? ''),
                 $normalizedInput['host_ip'] ?? null,
                 (string)($normalizedInput['platform'] ?? 'unknown')
@@ -465,6 +501,9 @@ switch ($action) {
             }
         }
         $deviceId = $device ? $device['id'] : null;
+        if ($deviceId) {
+            touchDeviceFromMetrics($pdo, (int)$deviceId, (string)($normalizedInput['host_ip'] ?? ''), 'online');
+        }
         
         // Save metrics
         $metricsId = saveHostMetrics($pdo, $normalizedInput, $deviceId);
@@ -491,10 +530,55 @@ switch ($action) {
             'success' => true,
             'metrics_id' => $metricsId,
             'device_matched' => $device ? $device['name'] : null,
+            'device_id' => $deviceId ? (int)$deviceId : null,
             'auto_device_created' => $autoCreatedDevice,
+            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
             'platform' => $normalizedInput['platform'] ?? 'unknown',
             'hostname' => $normalizedInput['host_name'] ?? null,
             'ip_address' => $normalizedInput['host_ip'] ?? null
+        ]);
+        break;
+
+    case 'pull_device_by_ip':
+        $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
+        $tokenInfo = validateAgentToken($pdo, $token);
+        if (!$tokenInfo) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid or missing agent token']);
+            exit;
+        }
+
+        $requestedIp = trim((string)($_GET['host_ip'] ?? $input['host_ip'] ?? ''));
+        $requestedHostName = trim((string)($_GET['host_name'] ?? $input['host_name'] ?? ''));
+        if ($requestedIp === '' && $requestedHostName === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'host_ip or host_name is required']);
+            exit;
+        }
+
+        $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
+        $device = findDeviceMatch($pdo, $requestedHostName, $requestedIp, $tokenUserId);
+        $autoCreated = false;
+        if (!$device && $tokenUserId) {
+            $created = createDeviceForHost($pdo, $tokenUserId, $requestedHostName, $requestedIp ?: null, 'windows');
+            if ($created) {
+                $device = $created;
+                $autoCreated = true;
+            }
+        }
+
+        if ($device && !empty($device['id'])) {
+            touchDeviceFromMetrics($pdo, (int)$device['id'], $requestedIp, 'online');
+        }
+
+        echo json_encode([
+            'success' => true,
+            'host_ip' => $requestedIp ?: null,
+            'host_name' => $requestedHostName ?: null,
+            'device' => $device ?: null,
+            'device_found' => (bool)$device,
+            'auto_device_created' => $autoCreated,
+            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
         ]);
         break;
         
