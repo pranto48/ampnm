@@ -17,6 +17,52 @@ function initMap() {
     const {
         deviceManager
     } = MapApp;
+    const TOOLTIP_FIELDS_STORAGE_PREFIX = 'mapTooltipFields:';
+
+    const loadTooltipFieldsForMap = (mapId) => {
+        const defaults = MapApp.utils.getDefaultTooltipFields();
+        if (!mapId) return defaults;
+        try {
+            const raw = localStorage.getItem(`${TOOLTIP_FIELDS_STORAGE_PREFIX}${mapId}`);
+            if (!raw) return defaults;
+            const parsed = JSON.parse(raw);
+            return { ...defaults, ...(parsed || {}) };
+        } catch (error) {
+            console.warn('Failed to load tooltip field settings. Using defaults.', error);
+            return defaults;
+        }
+    };
+
+    const saveTooltipFieldsForMap = (mapId, settings) => {
+        if (!mapId) return;
+        localStorage.setItem(`${TOOLTIP_FIELDS_STORAGE_PREFIX}${mapId}`, JSON.stringify(settings));
+        state.tooltipFieldSettingsByMap[mapId] = settings;
+    };
+
+    const applyTooltipFieldCheckboxes = (settings) => {
+        const merged = { ...MapApp.utils.getDefaultTooltipFields(), ...(settings || {}) };
+        document.querySelectorAll('[data-tooltip-field]').forEach((checkbox) => {
+            checkbox.checked = merged[checkbox.dataset.tooltipField] !== false;
+        });
+    };
+
+    const readTooltipFieldCheckboxes = () => {
+        const settings = MapApp.utils.getDefaultTooltipFields();
+        document.querySelectorAll('[data-tooltip-field]').forEach((checkbox) => {
+            settings[checkbox.dataset.tooltipField] = !!checkbox.checked;
+        });
+        return settings;
+    };
+
+    const refreshNodeTooltips = () => {
+        const updates = [];
+        state.nodes.forEach((node) => {
+            if (node?.deviceData) {
+                updates.push({ id: node.id, title: MapApp.utils.buildNodeTitle(node.deviceData) });
+            }
+        });
+        if (updates.length > 0) state.nodes.update(updates);
+    };
 
     // Cleanup function for SPA navigation
     window.cleanup = () => {
@@ -283,7 +329,10 @@ function initMap() {
         }
     }
 
-    els.mapSelector.addEventListener('change', (e) => mapManager.switchMap(e.target.value));
+    els.mapSelector.addEventListener('change', (e) => {
+        state.tooltipFieldSettingsByMap[e.target.value] = loadTooltipFieldsForMap(e.target.value);
+        mapManager.switchMap(e.target.value);
+    });
     
     // Only admin can add edges
     if (window.userRole === 'admin') {
@@ -308,22 +357,19 @@ function initMap() {
                     type: 'box',
                     map_id: state.currentMapId,
                     x: canvasPosition.x,
-                    y: canvasPosition.y
+                    y: canvasPosition.y,
+                    port_config: MapApp.utils.withUpdatedBoxStyle({}, MapApp.utils.getDefaultBoxStyle())
                 });
-                const visNode = {
+                const baseNode = {
                     id: newDevice.id,
                     label: newDevice.name,
                     title: newDevice.name,
                     x: newDevice.x,
                     y: newDevice.y,
-                    shape: 'box',
-                    color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
                     font: { color: 'white', size: 16, multi: true },
-                    margin: 20,
-                    widthConstraint: { minimum: 150 },
-                    heightConstraint: { minimum: 80 },
                     deviceData: newDevice
                 };
+                const visNode = MapApp.utils.buildVisBoxNode(baseNode, newDevice);
                 state.nodes.add(visNode);
                 window.notyf.success(`Group box "${name.trim()}" added.`);
             } catch (error) {
@@ -430,6 +476,7 @@ function initMap() {
                 document.getElementById('offlineDelaySeconds').value = currentMap.offline_delay_seconds ?? 5;
                 els.publicViewToggle.checked = currentMap.public_view_enabled;
                 MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
+                applyTooltipFieldCheckboxes(loadTooltipFieldsForMap(currentMap.id));
                 openModal('mapSettingsModal');
             }
         });
@@ -477,9 +524,11 @@ function initMap() {
                 offline_delay_seconds: (offlineDelay >= 1 && offlineDelay <= 300) ? offlineDelay : 5
             };
             try {
+                saveTooltipFieldsForMap(state.currentMapId, readTooltipFieldCheckboxes());
                 await api.post('update_map', { id: state.currentMapId, updates });
                 await mapManager.loadMaps(); // Reload maps to get fresh data
                 await mapManager.switchMap(state.currentMapId); // Re-apply settings
+                refreshNodeTooltips();
                 closeModal('mapSettingsModal');
                 window.notyf.success('Map settings saved.');
             } catch (error) {
@@ -490,9 +539,11 @@ function initMap() {
         els.resetMapBgBtn.addEventListener('click', async () => {
             try {
                 const updates = { background_color: null, background_image_url: null, public_view_enabled: false };
+                saveTooltipFieldsForMap(state.currentMapId, MapApp.utils.getDefaultTooltipFields());
                 await api.post('update_map', { id: state.currentMapId, updates });
                 await mapManager.loadMaps();
                 await mapManager.switchMap(state.currentMapId);
+                refreshNodeTooltips();
                 closeModal('mapSettingsModal');
                 window.notyf.success('Map background and public view reset to default.');
             } catch (error) {
@@ -641,6 +692,7 @@ function initMap() {
         
         if (initialMapId) {
             els.mapSelector.value = initialMapId;
+            state.tooltipFieldSettingsByMap[initialMapId] = loadTooltipFieldsForMap(initialMapId);
             await mapManager.switchMap(initialMapId);
             const deviceToEdit = urlParams.get('edit_device_id');
             if (deviceToEdit && state.nodes.get(deviceToEdit)) {

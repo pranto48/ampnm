@@ -46,9 +46,15 @@ include 'header.php';
                     </div>
                 </div>
                 <div class="flex justify-end">
-                    <button type="submit" id="saveSmtpBtn" class="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
+                    <div class="w-full md:w-auto flex flex-col md:flex-row gap-2">
+                        <input type="email" id="testRecipientEmail" placeholder="test@domain.com" class="w-full md:w-72 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" aria-label="Test recipient email">
+                        <button type="button" id="sendTestEmailBtn" class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+                            <i class="fas fa-paper-plane mr-2"></i>Send Test Email
+                        </button>
+                        <button type="submit" id="saveSmtpBtn" class="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
                         <i class="fas fa-save mr-2"></i>Save Settings
-                    </button>
+                        </button>
+                    </div>
                 </div>
             </form>
             <div id="smtpLoader" class="text-center py-4 hidden"><div class="loader mx-auto"></div></div>
