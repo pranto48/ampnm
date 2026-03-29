@@ -51,7 +51,13 @@ switch ($action) {
                     $fields[] = "$key = ?";
                     // Handle boolean conversion for public_view_enabled
                     if ($key === 'public_view_enabled') {
-                        $params[] = (bool)$value;
+                        $params[] = !empty($value) ? 1 : 0;
+                    } elseif ($key === 'offline_delay_seconds') {
+                        $delay = (int)$value;
+                        if ($delay < 1 || $delay > 300) {
+                            $delay = 5;
+                        }
+                        $params[] = $delay;
                     } else {
                         $params[] = ($value === '') ? null : $value;
                     }
