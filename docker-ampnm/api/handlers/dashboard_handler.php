@@ -54,13 +54,13 @@ if ($action === 'get_dashboard_data') {
 
     // Get devices (this part is not directly used by dashboard.js for display, but kept for consistency)
     // For viewers, do not filter by user_id here, show all devices on the map
-    $sql_devices = "SELECT name, ip, status FROM devices WHERE map_id = ?";
+    $sql_devices = "SELECT id, name, ip, status, type, monitor_method, ping_interval, last_seen, description FROM devices WHERE map_id = ?";
     $params_devices = [$map_id];
     if ($user_role !== 'viewer') {
         $sql_devices .= " AND user_id = ?";
         $params_devices[] = $current_user_id;
     }
-    $sql_devices .= " ORDER BY name ASC LIMIT 10";
+    $sql_devices .= " ORDER BY name ASC LIMIT 100";
     $stmt = $pdo->prepare($sql_devices);
     $stmt->execute($params_devices);
     $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);

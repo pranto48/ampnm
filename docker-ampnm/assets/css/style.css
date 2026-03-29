@@ -210,6 +210,21 @@ button:hover, a.hoverable:hover {
 /* Notyf custom icon support */
 .notyf__icon i { font-size: 1.3em; margin: 0 auto; }
 
+.dashboard-device-enter {
+    animation: dashboard-device-in 320ms ease-out both;
+}
+
+@keyframes dashboard-device-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 /* NEW: Animated Background for Login Page */
 .animated-gradient-background {
     background: linear-gradient(135deg, #1a202c, #2d3748, #3b82f6, #06b6d4, #1a202c);
