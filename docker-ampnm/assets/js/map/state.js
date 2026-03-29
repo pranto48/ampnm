@@ -16,5 +16,7 @@ MapApp.state = {
     knownHostnames: new Set(),
     agentPollIntervalId: null,
     // Per-map mouse-over field visibility settings
-    tooltipFieldSettingsByMap: {}
+    tooltipFieldSettingsByMap: {},
+    // Per-map mouse-over tooltip display preferences
+    tooltipDisplaySettingsByMap: {}
 };

@@ -18,6 +18,7 @@ function initMap() {
         deviceManager
     } = MapApp;
     const TOOLTIP_FIELDS_STORAGE_PREFIX = 'mapTooltipFields:';
+    const TOOLTIP_DISPLAY_STORAGE_PREFIX = 'mapTooltipDisplay:';
 
     const loadTooltipFieldsForMap = (mapId) => {
         const defaults = MapApp.utils.getDefaultTooltipFields();
@@ -39,6 +40,26 @@ function initMap() {
         state.tooltipFieldSettingsByMap[mapId] = settings;
     };
 
+    const loadTooltipDisplayForMap = (mapId) => {
+        const defaults = MapApp.utils.getDefaultTooltipDisplaySettings();
+        if (!mapId) return defaults;
+        try {
+            const raw = localStorage.getItem(`${TOOLTIP_DISPLAY_STORAGE_PREFIX}${mapId}`);
+            if (!raw) return defaults;
+            const parsed = JSON.parse(raw);
+            return { ...defaults, ...(parsed || {}) };
+        } catch (error) {
+            console.warn('Failed to load tooltip display settings. Using defaults.', error);
+            return defaults;
+        }
+    };
+
+    const saveTooltipDisplayForMap = (mapId, settings) => {
+        if (!mapId) return;
+        localStorage.setItem(`${TOOLTIP_DISPLAY_STORAGE_PREFIX}${mapId}`, JSON.stringify(settings));
+        state.tooltipDisplaySettingsByMap[mapId] = settings;
+    };
+
     const applyTooltipFieldCheckboxes = (settings) => {
         const merged = { ...MapApp.utils.getDefaultTooltipFields(), ...(settings || {}) };
         document.querySelectorAll('[data-tooltip-field]').forEach((checkbox) => {
@@ -54,6 +75,30 @@ function initMap() {
         return settings;
     };
 
+    const applyTooltipDisplayControls = (settings) => {
+        const merged = { ...MapApp.utils.getDefaultTooltipDisplaySettings(), ...(settings || {}) };
+        const density = document.getElementById('tooltipDensity');
+        const fontScale = document.getElementById('tooltipFontScale');
+        const fontScaleValue = document.getElementById('tooltipFontScaleValue');
+        const maxWidth = document.getElementById('tooltipMaxWidth');
+        if (density) density.value = merged.density || 'comfortable';
+        if (fontScale) fontScale.value = String(merged.font_scale ?? 100);
+        if (fontScaleValue) fontScaleValue.textContent = `${merged.font_scale ?? 100}%`;
+        if (maxWidth) maxWidth.value = String(merged.max_width ?? 320);
+    };
+
+    const readTooltipDisplayControls = () => {
+        const defaults = MapApp.utils.getDefaultTooltipDisplaySettings();
+        const density = document.getElementById('tooltipDensity')?.value || defaults.density;
+        const fontScale = Number(document.getElementById('tooltipFontScale')?.value ?? defaults.font_scale);
+        const maxWidth = Number(document.getElementById('tooltipMaxWidth')?.value ?? defaults.max_width);
+        return {
+            density: density === 'compact' ? 'compact' : 'comfortable',
+            font_scale: Math.min(130, Math.max(85, fontScale)),
+            max_width: Math.min(480, Math.max(260, maxWidth))
+        };
+    };
+
     const refreshNodeTooltips = () => {
         const updates = [];
         state.nodes.forEach((node) => {
@@ -63,6 +108,16 @@ function initMap() {
         });
         if (updates.length > 0) state.nodes.update(updates);
     };
+
+    const tooltipFontScaleInput = document.getElementById('tooltipFontScale');
+    if (tooltipFontScaleInput) {
+        tooltipFontScaleInput.addEventListener('input', () => {
+            const tooltipFontScaleValue = document.getElementById('tooltipFontScaleValue');
+            if (tooltipFontScaleValue) {
+                tooltipFontScaleValue.textContent = `${tooltipFontScaleInput.value || 100}%`;
+            }
+        });
+    }
 
     // Cleanup function for SPA navigation
     window.cleanup = () => {
@@ -331,6 +386,7 @@ function initMap() {
 
     els.mapSelector.addEventListener('change', (e) => {
         state.tooltipFieldSettingsByMap[e.target.value] = loadTooltipFieldsForMap(e.target.value);
+        state.tooltipDisplaySettingsByMap[e.target.value] = loadTooltipDisplayForMap(e.target.value);
         mapManager.switchMap(e.target.value);
     });
     
@@ -477,6 +533,7 @@ function initMap() {
                 els.publicViewToggle.checked = currentMap.public_view_enabled;
                 MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
                 applyTooltipFieldCheckboxes(loadTooltipFieldsForMap(currentMap.id));
+                applyTooltipDisplayControls(loadTooltipDisplayForMap(currentMap.id));
                 openModal('mapSettingsModal');
             }
         });
@@ -525,6 +582,7 @@ function initMap() {
             };
             try {
                 saveTooltipFieldsForMap(state.currentMapId, readTooltipFieldCheckboxes());
+                saveTooltipDisplayForMap(state.currentMapId, readTooltipDisplayControls());
                 await api.post('update_map', { id: state.currentMapId, updates });
                 await mapManager.loadMaps(); // Reload maps to get fresh data
                 await mapManager.switchMap(state.currentMapId); // Re-apply settings
@@ -540,6 +598,7 @@ function initMap() {
             try {
                 const updates = { background_color: null, background_image_url: null, public_view_enabled: false };
                 saveTooltipFieldsForMap(state.currentMapId, MapApp.utils.getDefaultTooltipFields());
+                saveTooltipDisplayForMap(state.currentMapId, MapApp.utils.getDefaultTooltipDisplaySettings());
                 await api.post('update_map', { id: state.currentMapId, updates });
                 await mapManager.loadMaps();
                 await mapManager.switchMap(state.currentMapId);
@@ -693,6 +752,8 @@ function initMap() {
         if (initialMapId) {
             els.mapSelector.value = initialMapId;
             state.tooltipFieldSettingsByMap[initialMapId] = loadTooltipFieldsForMap(initialMapId);
+            state.tooltipDisplaySettingsByMap[initialMapId] = loadTooltipDisplayForMap(initialMapId);
+            applyTooltipDisplayControls(state.tooltipDisplaySettingsByMap[initialMapId]);
             await mapManager.switchMap(initialMapId);
             const deviceToEdit = urlParams.get('edit_device_id');
             if (deviceToEdit && state.nodes.get(deviceToEdit)) {
