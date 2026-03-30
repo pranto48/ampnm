@@ -1,11 +1,14 @@
 <?php
 require_once __DIR__ . '/../../../includes/functions.php';
 require_once __DIR__ . '/../../../includes/proxy_service.php';
+require_once __DIR__ . '/../../../includes/telemetry.php';
 
 header('Content-Type: application/json');
 
 $pdo = getDbConnection();
 ensureProxySchema($pdo);
+ensureTelemetrySchema($pdo);
+$correlationId = telemetryCorrelationId();
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
@@ -40,14 +43,17 @@ try {
         $capabilities = $input['capabilities'] ?? [];
         $version = trim((string)($input['version'] ?? ''));
 
-        $stmt = $pdo->prepare("UPDATE proxies SET name=?, site=?, capabilities=?, version=?, status='online', last_seen=NOW() WHERE id=?");
-        $stmt->execute([
+        telemetryTimedExec($pdo, 'proxy', 'proxy.register_update', function () use ($pdo, $name, $site, $capabilities, $version, $proxy) {
+            $stmt = $pdo->prepare("UPDATE proxies SET name=?, site=?, capabilities=?, version=?, status='online', last_seen=NOW() WHERE id=?");
+            $stmt->execute([
             $name,
             $site !== '' ? $site : null,
             json_encode($capabilities),
             $version !== '' ? $version : null,
             $proxy['id']
-        ]);
+            ]);
+            return true;
+        }, $correlationId);
 
         echo json_encode(['success' => true, 'proxy_id' => (int)$proxy['id']]);
         exit;
@@ -142,10 +148,12 @@ try {
             $stmt->execute([$lagMs, $proxy['id']]);
         }
 
+        telemetryLog('proxy.results.accepted', ['correlation_id' => $correlationId, 'proxy_id' => (int)$proxy['id'], 'accepted' => $accepted, 'duplicates' => $duplicates]);
         echo json_encode([
             'success' => true,
             'accepted' => $accepted,
             'duplicates' => $duplicates,
+            'correlation_id' => $correlationId,
             'offline_buffering' => [
                 'mode' => 'store-and-forward',
                 'idempotency' => 'required',

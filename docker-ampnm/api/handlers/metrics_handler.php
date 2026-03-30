@@ -11,8 +11,11 @@ $pdo = getDbConnection();
 require_once __DIR__ . '/../../includes/metrics_ingest_service.php';
 require_once __DIR__ . '/../../includes/storage_policy.php';
 require_once __DIR__ . '/../../includes/security_hardening.php';
+require_once __DIR__ . '/../../includes/telemetry.php';
 ensureStoragePolicySchema($pdo);
 securityEnsureSchema($pdo);
+ensureTelemetrySchema($pdo);
+$correlationId = telemetryCorrelationId();
 
 /**
  * Validate agent token
@@ -602,6 +605,7 @@ switch ($action) {
         $message = [
             'message_type' => 'metrics_submit',
             'idempotency_key' => $idempotencyKey,
+            'correlation_id' => $correlationId,
             'payload' => array_merge($normalizedInput, [
                 'token_user_id' => $tokenUserId,
                 'token_id' => $tokenInfo['id'] ?? null,
@@ -609,7 +613,8 @@ switch ($action) {
             'enqueued_at' => gmdate('c'),
         ];
 
-        $enqueue = MetricsIngestQueue::enqueue($pdo, $message);
+        telemetryLog('agent.metrics.accepted', ['correlation_id' => $correlationId, 'idempotency_key' => $idempotencyKey, 'host_ip' => $normalizedInput['host_ip'] ?? null]);
+        $enqueue = telemetryTimedExec($pdo, 'api', 'metrics.enqueue', fn() => MetricsIngestQueue::enqueue($pdo, $message), $correlationId);
         $processedInline = false;
         if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
             try {
@@ -628,6 +633,7 @@ switch ($action) {
             'queue_transport' => $enqueue['transport'],
             'queue_message_id' => $enqueue['message_id'],
             'idempotency_key' => $idempotencyKey,
+            'correlation_id' => $correlationId,
             'hostname' => $normalizedInput['host_name'] ?? null,
             'ip_address' => $normalizedInput['host_ip'] ?? null,
         ]);
@@ -676,9 +682,10 @@ switch ($action) {
             'sequence' => 'pull-device-by-ip',
         ], $tokenUserId);
 
-        $enqueue = MetricsIngestQueue::enqueue($pdo, [
+        $enqueuePayload = [
             'message_type' => 'pull_device_by_ip',
             'idempotency_key' => $idempotencyKey,
+            'correlation_id' => $correlationId,
             'payload' => [
                 'host_ip' => $requestedIp ?: null,
                 'host_name' => $requestedHostName ?: null,
@@ -686,13 +693,16 @@ switch ($action) {
                 'token_id' => $tokenInfo['id'] ?? null,
             ],
             'enqueued_at' => gmdate('c'),
-        ]);
+        ];
+        telemetryLog('agent.pull_device.accepted', ['correlation_id' => $correlationId, 'idempotency_key' => $idempotencyKey, 'host_ip' => $requestedIp ?: null]);
+        $enqueue = telemetryTimedExec($pdo, 'api', 'metrics.pull_device_enqueue', fn() => MetricsIngestQueue::enqueue($pdo, $enqueuePayload), $correlationId);
         $processedInline = false;
         if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
             try {
                 MetricsIngestService::processMessage($pdo, [
                     'message_type' => 'pull_device_by_ip',
                     'idempotency_key' => $idempotencyKey,
+                    'correlation_id' => $correlationId,
                     'payload' => [
                         'host_ip' => $requestedIp ?: null,
                         'host_name' => $requestedHostName ?: null,
@@ -715,6 +725,7 @@ switch ($action) {
             'queue_transport' => $enqueue['transport'],
             'queue_message_id' => $enqueue['message_id'],
             'idempotency_key' => $idempotencyKey,
+            'correlation_id' => $correlationId,
             'host_ip' => $requestedIp ?: null,
             'host_name' => $requestedHostName ?: null,
         ]);

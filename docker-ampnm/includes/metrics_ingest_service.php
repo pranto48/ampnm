@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/metrics_ingest_queue.php';
+require_once __DIR__ . '/telemetry.php';
 
 class MetricsIngestService
 {
@@ -78,10 +79,12 @@ class MetricsIngestService
     public static function processMessage(PDO $pdo, array $message): array
     {
         MetricsIngestQueue::ensureQueueTables($pdo);
+        ensureTelemetrySchema($pdo);
 
         $payload = $message['payload'] ?? [];
         $type = (string)($message['message_type'] ?? 'metrics_submit');
         $idempotencyKey = (string)($message['idempotency_key'] ?? '');
+        $correlationId = (string)($message['correlation_id'] ?? telemetryCorrelationId());
 
         if ($idempotencyKey === '') {
             throw new RuntimeException('Missing idempotency key');
@@ -99,9 +102,11 @@ class MetricsIngestService
             }
 
             self::markDedup($pdo, $idempotencyKey, 'done', null);
+            telemetryLog('ingest.message.processed', ['correlation_id' => $correlationId, 'idempotency_key' => $idempotencyKey, 'message_type' => $type]);
             return array_merge(['status' => 'processed', 'idempotency_key' => $idempotencyKey], $result);
         } catch (Throwable $e) {
             self::markDedup($pdo, $idempotencyKey, 'failed', $e->getMessage());
+            telemetryLog('ingest.message.failed', ['correlation_id' => $correlationId, 'idempotency_key' => $idempotencyKey, 'error' => $e->getMessage()]);
             throw $e;
         }
     }
