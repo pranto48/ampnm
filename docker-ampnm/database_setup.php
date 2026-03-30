@@ -32,6 +32,7 @@ function generateUuid() {
 </head>
 <body>
 <?php
+require_once __DIR__ . '/includes/storage_policy.php';
 try {
     // Connect to MySQL server (without selecting a database)
     $pdo = new PDO("mysql:host=$servername", $username, $password);
@@ -467,6 +468,9 @@ try {
         message("Table '$tableName' checked/created successfully.");
     }
 
+    ensureStoragePolicySchema($pdo);
+    message("Storage policy rollup tables checked/created successfully.");
+
     // Step 4: Schema migration section to handle upgrades
     // columnExists function is defined above
     
@@ -710,7 +714,11 @@ try {
     // Initialize app_settings for license management
     $settings_to_init = [
         'installation_id' => generateUuid(),
-        'app_license_key' => '' // Initially empty, user will fill this
+        'app_license_key' => '', // Initially empty, user will fill this
+        'metrics_hires_days' => '30',
+        'metrics_hourly_days' => '365',
+        'status_hires_days' => '30',
+        'status_hourly_days' => '365'
     ];
 
     foreach ($settings_to_init as $key => $value) {

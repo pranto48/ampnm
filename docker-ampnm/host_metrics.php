@@ -115,6 +115,8 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'] . ($basePath === '/' ? '' : $base
                     <option value="24" selected>Last 24 Hours</option>
                     <option value="72">Last 3 Days</option>
                     <option value="168">Last 7 Days</option>
+                    <option value="720">Last 30 Days</option>
+                    <option value="2160">Last 90 Days</option>
                 </select>
                 <button onclick="closeHostDetail()" class="text-slate-400 hover:text-white">
                     <i class="fas fa-times text-xl"></i>
@@ -1175,6 +1177,8 @@ async function loadCharts() {
 
 function updateChart(canvasId, labels, data, label, color) {
     const ctx = document.getElementById(canvasId).getContext('2d');
+    const rangeHours = Number(document.getElementById('chart-range').value || 24);
+    const unit = rangeHours > 24 * 45 ? 'day' : (rangeHours > 24 ? 'hour' : 'hour');
     
     if (charts[canvasId]) {
         charts[canvasId].data.labels = labels;
@@ -1205,7 +1209,7 @@ function updateChart(canvasId, labels, data, label, color) {
             scales: {
                 x: {
                     type: 'time',
-                    time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+                    time: { unit, displayFormats: { hour: 'HH:mm', day: 'MMM d' } },
                     grid: { color: '#334155' },
                     ticks: { color: '#94a3b8' }
                 },
@@ -1222,6 +1226,8 @@ function updateChart(canvasId, labels, data, label, color) {
 
 function updateNetworkChart(canvasId, labels, inData, outData) {
     const ctx = document.getElementById(canvasId).getContext('2d');
+    const rangeHours = Number(document.getElementById('chart-range').value || 24);
+    const unit = rangeHours > 24 * 45 ? 'day' : (rangeHours > 24 ? 'hour' : 'hour');
     
     if (charts[canvasId]) {
         charts[canvasId].data.labels = labels;
@@ -1271,7 +1277,7 @@ function updateNetworkChart(canvasId, labels, inData, outData) {
             scales: {
                 x: {
                     type: 'time',
-                    time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+                    time: { unit, displayFormats: { hour: 'HH:mm', day: 'MMM d' } },
                     grid: { color: '#334155' },
                     ticks: { color: '#94a3b8' }
                 },
