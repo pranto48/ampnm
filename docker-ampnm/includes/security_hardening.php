@@ -28,16 +28,8 @@ function securityEnsureSchema(PDO $pdo): void {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // Add optional MFA-related columns safely for existing installs.
-    if (!securityColumnExists($pdo, 'users', 'mfa_secret')) {
-        $pdo->exec("ALTER TABLE `users` ADD COLUMN `mfa_secret` VARCHAR(128) NULL");
-    }
-    if (!securityColumnExists($pdo, 'users', 'mfa_enabled')) {
-        $pdo->exec("ALTER TABLE `users` ADD COLUMN `mfa_enabled` TINYINT(1) NOT NULL DEFAULT 0");
-    }
-    if (!securityColumnExists($pdo, 'users', 'mfa_backup_codes')) {
-        $pdo->exec("ALTER TABLE `users` ADD COLUMN `mfa_backup_codes` TEXT NULL");
-    }
+    // Intentionally no MFA schema mutations here.
+    // Local-LAN deployments may not want or need 2FA/MFA columns.
 }
 
 function getClientIpAddress(): string {
@@ -46,30 +38,46 @@ function getClientIpAddress(): string {
 }
 
 function isLoginThrottled(PDO $pdo, string $username, int $windowMinutes = 15, int $maxAttempts = 8): bool {
-    securityEnsureSchema($pdo);
+    try {
+        securityEnsureSchema($pdo);
+    } catch (Throwable $e) {
+        error_log('Security schema setup failed in isLoginThrottled: ' . $e->getMessage());
+        return false; // fail open to avoid login hard-crash
+    }
+    $windowMinutes = max(1, (int)$windowMinutes);
 
     $ip = getClientIpAddress();
+    $cutoff = date('Y-m-d H:i:s', time() - ($windowMinutes * 60));
     $stmt = $pdo->prepare("
         SELECT COUNT(*) 
         FROM `login_attempts`
         WHERE (`username` = ? OR `ip_address` = ?)
-          AND `attempted_at` >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+          AND `attempted_at` >= ?
     ");
-    $stmt->execute([$username, $ip, $windowMinutes]);
+    $stmt->execute([$username, $ip, $cutoff]);
     return (int)$stmt->fetchColumn() >= $maxAttempts;
 }
 
 function recordFailedLoginAttempt(PDO $pdo, string $username): void {
-    securityEnsureSchema($pdo);
+    try {
+        securityEnsureSchema($pdo);
+    } catch (Throwable $e) {
+        error_log('Security schema setup failed in recordFailedLoginAttempt: ' . $e->getMessage());
+        return;
+    }
     $ip = getClientIpAddress();
     $stmt = $pdo->prepare("INSERT INTO `login_attempts` (`username`, `ip_address`) VALUES (?, ?)");
     $stmt->execute([$username, $ip]);
 }
 
 function clearFailedLoginAttempts(PDO $pdo, string $username): void {
-    securityEnsureSchema($pdo);
+    try {
+        securityEnsureSchema($pdo);
+    } catch (Throwable $e) {
+        error_log('Security schema setup failed in clearFailedLoginAttempts: ' . $e->getMessage());
+        return;
+    }
     $ip = getClientIpAddress();
     $stmt = $pdo->prepare("DELETE FROM `login_attempts` WHERE `username` = ? OR `ip_address` = ?");
     $stmt->execute([$username, $ip]);
 }
-
