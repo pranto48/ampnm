@@ -495,11 +495,21 @@ switch ($action) {
         ];
 
         $enqueue = MetricsIngestQueue::enqueue($pdo, $message);
+        $processedInline = false;
+        if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
+            try {
+                MetricsIngestService::processMessage($pdo, $message);
+                $processedInline = true;
+            } catch (Throwable $e) {
+                error_log('Metrics inline fallback failed: ' . $e->getMessage());
+            }
+        }
 
         echo json_encode([
             'success' => true,
             'status' => 'accepted',
             'queued' => true,
+            'processed_inline' => $processedInline,
             'queue_transport' => $enqueue['transport'],
             'queue_message_id' => $enqueue['message_id'],
             'idempotency_key' => $idempotencyKey,
@@ -543,11 +553,31 @@ switch ($action) {
             ],
             'enqueued_at' => gmdate('c'),
         ]);
+        $processedInline = false;
+        if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
+            try {
+                MetricsIngestService::processMessage($pdo, [
+                    'message_type' => 'pull_device_by_ip',
+                    'idempotency_key' => $idempotencyKey,
+                    'payload' => [
+                        'host_ip' => $requestedIp ?: null,
+                        'host_name' => $requestedHostName ?: null,
+                        'token_user_id' => $tokenUserId,
+                        'token_id' => $tokenInfo['id'] ?? null,
+                    ],
+                    'enqueued_at' => gmdate('c'),
+                ]);
+                $processedInline = true;
+            } catch (Throwable $e) {
+                error_log('Pull-device inline fallback failed: ' . $e->getMessage());
+            }
+        }
 
         echo json_encode([
             'success' => true,
             'status' => 'accepted',
             'queued' => true,
+            'processed_inline' => $processedInline,
             'queue_transport' => $enqueue['transport'],
             'queue_message_id' => $enqueue['message_id'],
             'idempotency_key' => $idempotencyKey,
