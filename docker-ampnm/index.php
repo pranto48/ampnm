@@ -75,6 +75,35 @@ include 'header.php';
                         </div>
                     </div>
                 </div>
+
+                <div class="mt-8 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                        <div>
+                            <h2 class="text-xl font-semibold text-white">Device Information Explorer</h2>
+                            <p class="text-sm text-slate-400">Switch between animated card and compact list view with quick status filters.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select id="deviceInfoStatusFilter" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                                <option value="all">All Statuses</option>
+                                <option value="online">Online</option>
+                                <option value="warning">Warning</option>
+                                <option value="critical">Critical</option>
+                                <option value="offline">Offline</option>
+                            </select>
+                            <button id="deviceInfoGridBtn" class="px-3 py-2 bg-cyan-600 text-white rounded-lg text-sm"><i class="fas fa-th-large mr-1"></i>Cards</button>
+                            <button id="deviceInfoListBtn" class="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg text-sm"><i class="fas fa-list mr-1"></i>List</button>
+                            <label class="flex items-center text-xs text-slate-300 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2">
+                                <input type="checkbox" id="deviceInfoAnimateToggle" class="mr-2 h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500" checked>
+                                Animation
+                            </label>
+                        </div>
+                    </div>
+                    <div id="deviceInfoContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                    <div id="noDeviceInfoMessage" class="text-center py-6 text-slate-500 hidden">
+                        <i class="fas fa-server text-3xl mb-2"></i>
+                        <p>No matching device information for this filter.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

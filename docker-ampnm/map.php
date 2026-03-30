@@ -323,6 +323,43 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         </div>
                     </div>
                 </div>
+                <div class="border-t border-slate-700 pt-4 mt-4 space-y-3">
+                    <h3 class="text-lg font-semibold text-white">Mouse Over Device Information</h3>
+                    <p class="text-xs text-slate-500">Choose which fields are visible when hovering a device on this map.</p>
+                    <div id="tooltipFieldSettings" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="ip" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>IP Address</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="type" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Device Type</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="monitor" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Monitor Method</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="latency" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Latency</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="ttl" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>TTL</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="interval" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Ping Interval</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="last_seen" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Last Seen</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="description" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Description</label>
+                        <label class="flex items-center text-slate-300 sm:col-span-2"><input type="checkbox" data-tooltip-field="ports" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Ports Summary</label>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-700/80">
+                        <div>
+                            <label for="tooltipDensity" class="block text-xs font-medium text-slate-400 mb-1">Tooltip Layout</label>
+                            <select id="tooltipDensity" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                                <option value="comfortable">Comfortable</option>
+                                <option value="compact">Compact</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="tooltipMaxWidth" class="block text-xs font-medium text-slate-400 mb-1">Tooltip Width</label>
+                            <select id="tooltipMaxWidth" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                                <option value="300">Narrow</option>
+                                <option value="320" selected>Standard</option>
+                                <option value="360">Wide</option>
+                                <option value="420">Extra Wide</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="tooltipFontScale" class="block text-xs font-medium text-slate-400 mb-1">Font Size <span id="tooltipFontScaleValue" class="text-cyan-400">100%</span></label>
+                            <input id="tooltipFontScale" type="range" min="85" max="130" step="5" value="100" class="w-full accent-cyan-500">
+                        </div>
+                    </div>
+                </div>
                 <div class="flex justify-between items-center mt-6">
                     <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Reset to Default</button>
                     <div>
