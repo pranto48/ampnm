@@ -71,6 +71,7 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
                                 <a href="host_metrics.php" class="nav-link nav-sublink"><i class="fas fa-microchip fa-fw mr-2"></i>Host Metrics</a>
                                 <a href="alert_settings.php" class="nav-link nav-sublink"><i class="fas fa-bell fa-fw mr-2"></i>Alert Settings</a>
                                 <a href="windows_agent.php" class="nav-link nav-sublink"><i class="fas fa-person-chalkboard fa-fw mr-2"></i>Agent Onboarding</a>
+                                <a href="system_health.php" class="nav-link nav-sublink"><i class="fas fa-heart-pulse fa-fw mr-2"></i>System Health</a>
                                 <a href="download-agent.php" class="nav-link nav-sublink"><i class="fas fa-download fa-fw mr-2"></i>Download Agents</a>
                                 <a href="documentation.php#windows-agent" class="nav-link nav-sublink"><i class="fas fa-book-open fa-fw mr-2"></i>Windows Agent Guide</a>
                                 <a href="api/agent/windows-metrics/health" class="nav-link nav-sublink" target="_blank" rel="noreferrer"><i class="fas fa-plug-circle-check fa-fw mr-2"></i>Agent API Health</a>
@@ -85,6 +86,7 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
                                 </button>
                                 <div class="nav-group-items">
                                     <a href="devices.php" class="nav-link nav-sublink"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
+                                    <a href="templates.php" class="nav-link nav-sublink"><i class="fas fa-layer-group fa-fw mr-2"></i>Templates</a>
                                     <a href="history.php" class="nav-link nav-sublink"><i class="fas fa-history fa-fw mr-2"></i>History</a>
                                     <a href="status_logs.php" class="nav-link nav-sublink"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
                                     <a href="email_notifications.php" class="nav-link nav-sublink"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>

@@ -164,6 +164,58 @@ For technical support:
 | `/index.php` | Main dashboard |
 | `/documentation.php` | User manual |
 | `/license_expired.php` | License error page |
+| `/health/live.php` | Liveness probe endpoint |
+| `/health/ready.php` | Readiness probe endpoint |
+
+## Production HA Deployment Profile
+
+Use `docker-compose.ha.yml` for a high-availability layout with separated runtime roles:
+
+- **web**: API/web replicas (scale horizontally).
+- **queue**: Redis 7 service used for streams, cache, sessions, and locks.
+- **workers**: Background metrics ingest consumers.
+- **scheduler**: Single maintenance scheduler loop.
+
+Start with:
+
+```bash
+docker compose -f docker-compose.ha.yml up -d --build
+```
+
+Scale role services:
+
+```bash
+docker compose -f docker-compose.ha.yml up -d --scale web=3 --scale workers=3
+```
+
+### External HA Database Requirement
+
+The HA profile expects an **external MySQL-compatible HA endpoint** (managed service or primary/replica routing endpoint). Configure via env:
+
+- `DB_HOST` (required)
+- `DB_PORT` (default `3306`)
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+
+Do **not** run a single local DB container in production HA.
+
+### Health Probes
+
+- Web/API liveness: `GET /health/live.php`
+- Web/API readiness: `GET /health/ready.php`
+- Queue health: Redis `PING`
+- Worker health: `php /var/www/html/api/workers/healthcheck.php worker`
+- Scheduler health: `php /var/www/html/api/workers/healthcheck.php scheduler` (heartbeat-based)
+
+### Stateless API Guidance
+
+API replicas are stateless in HA mode:
+
+- No bind-mounted local mutable application state.
+- Sessions are centralized in Redis (`SESSION_DRIVER=redis`).
+- Cache and distributed lock primitives use Redis.
+- Only ephemeral temp paths (`/tmp`, `/var/tmp`) are writable.
 
 ---
 

@@ -2,27 +2,33 @@
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
+require_once __DIR__ . '/../../includes/smtp_mailer.php';
+require_once __DIR__ . '/../../includes/proxy_service.php';
+require_once __DIR__ . '/../../includes/template_config.php';
+ensureProxySchema($pdo);
 
-// Placeholder for email notification function
 function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) {
-    // In a real application, this would fetch SMTP settings and subscriptions,
-    // then use a mailer library (e.g., PHPMailer) to send emails.
-    // For now, we'll just log that a notification *would* be sent.
-    error_log("DEBUG: Notification triggered for device '{$device['name']}' (ID: {$device['id']}). Status changed from {$oldStatus} to {$newStatus}. Details: {$details}");
-
-    // Fetch SMTP settings for the current user
-    $stmtSmtp = $pdo->prepare("SELECT * FROM smtp_settings WHERE user_id = ?");
-    $stmtSmtp->execute([$_SESSION['user_id']]);
-    $smtpSettings = $stmtSmtp->fetch(PDO::FETCH_ASSOC);
-
-    if (!$smtpSettings) {
-        error_log("DEBUG: No SMTP settings found for user {$_SESSION['user_id']}. Cannot send email notification.");
+    if (!in_array($newStatus, ['online', 'offline', 'warning', 'critical'], true)) {
         return;
     }
 
-    // Fetch subscriptions for this device and status change
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+    if ($userId <= 0) {
+        error_log('Email notification skipped: invalid session user');
+        return;
+    }
+
+    $stmtSmtp = $pdo->prepare("SELECT * FROM smtp_settings WHERE user_id = ?");
+    $stmtSmtp->execute([$userId]);
+    $smtpSettings = $stmtSmtp->fetch(PDO::FETCH_ASSOC);
+
+    if (!$smtpSettings) {
+        error_log("Email notification skipped: no SMTP settings for user {$userId}.");
+        return;
+    }
+
     $sqlSubscriptions = "SELECT recipient_email FROM device_email_subscriptions WHERE user_id = ? AND device_id = ?";
-    $paramsSubscriptions = [$_SESSION['user_id'], $device['id']];
+    $paramsSubscriptions = [$userId, $device['id']];
 
     if ($newStatus === 'online') {
         $sqlSubscriptions .= " AND notify_on_online = TRUE";
@@ -32,9 +38,6 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
         $sqlSubscriptions .= " AND notify_on_warning = TRUE";
     } elseif ($newStatus === 'critical') {
         $sqlSubscriptions .= " AND notify_on_critical = TRUE";
-    } else {
-        // No specific notification for 'unknown' status changes
-        return;
     }
 
     $stmtSubscriptions = $pdo->prepare($sqlSubscriptions);
@@ -42,18 +45,24 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
     $recipients = $stmtSubscriptions->fetchAll(PDO::FETCH_COLUMN);
 
     if (empty($recipients)) {
-        error_log("DEBUG: No active subscriptions for device '{$device['name']}' on status '{$newStatus}'.");
+        error_log("Email notification skipped: no active subscriptions for device '{$device['name']}' status '{$newStatus}'.");
         return;
     }
 
-    // Simulate sending email
+    $subject = sprintf('AMPNM Alert: %s is %s', $device['name'], strtoupper($newStatus));
+    $body = "Device: {$device['name']}\n"
+        . "IP: " . ($device['ip'] ?? 'N/A') . "\n"
+        . "Previous Status: {$oldStatus}\n"
+        . "Current Status: {$newStatus}\n"
+        . "Details: {$details}\n"
+        . "Time (UTC): " . gmdate('Y-m-d H:i:s') . "\n";
+
     foreach ($recipients as $recipient) {
-        error_log("DEBUG: Simulating email to {$recipient} for device '{$device['name']}' status change to '{$newStatus}'.");
-        // In a real scenario, you'd use a mailer library here:
-        // $mailer = new PHPMailer(true);
-        // Configure $mailer with $smtpSettings
-        // Set recipient, subject, body
-        // $mailer->send();
+        $smtpError = null;
+        $sent = smtp_send_mail($smtpSettings, $recipient, $subject, $body, $smtpError);
+        if (!$sent) {
+            error_log("Email send failed for {$recipient} (device {$device['name']}, status {$newStatus}): " . ($smtpError ?? 'Unknown SMTP error'));
+        }
     }
 }
 
@@ -90,6 +99,18 @@ function logStatusChange($pdo, $deviceId, $oldStatus, $newStatus, $details) {
     }
 }
 
+
+function upsertDeviceThresholdOverride(PDO $pdo, int $deviceId, array $input): void {
+    $stmt = $pdo->prepare("INSERT INTO device_template_overrides (device_id, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE warning_latency_threshold = VALUES(warning_latency_threshold), warning_packetloss_threshold = VALUES(warning_packetloss_threshold), critical_latency_threshold = VALUES(critical_latency_threshold), critical_packetloss_threshold = VALUES(critical_packetloss_threshold), updated_at = CURRENT_TIMESTAMP");
+    $stmt->execute([
+        $deviceId,
+        $input['warning_latency_threshold'] ?? null,
+        $input['warning_packetloss_threshold'] ?? null,
+        $input['critical_latency_threshold'] ?? null,
+        $input['critical_packetloss_threshold'] ?? null,
+    ]);
+}
+
 function evaluateDeviceCheck($pdo, $device, &$details, &$last_avg_time, &$last_ttl, &$check_output = '') {
     $monitorMethod = $device['monitor_method'] ?? 'ping';
     $hasPort = !empty($device['check_port']) && is_numeric($device['check_port']);
@@ -116,7 +137,8 @@ function evaluateDeviceCheck($pdo, $device, &$details, &$last_avg_time, &$last_t
     $pingResult = executePing($device['ip'], 1);
     savePingResult($pdo, $device['ip'], $pingResult);
     $parsedResult = parsePingOutput($pingResult['output']);
-    $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details);
+    $effectiveDevice = applyEffectiveThresholds($pdo, $device);
+    $status = getStatusFromPingResult($effectiveDevice, $pingResult, $parsedResult, $details);
     $last_avg_time = $parsedResult['avg_time'] ?? null;
     $last_ttl = $parsedResult['ttl'] ?? null;
     $check_output = $pingResult['output'];
@@ -415,6 +437,7 @@ switch ($action) {
             $stmt->execute([$device['ip']]);
             $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
+        $device = applyEffectiveThresholds($pdo, $device);
         echo json_encode(['device' => $device, 'history' => $history]);
         break;
 
@@ -424,19 +447,21 @@ switch ($action) {
 
         $sql = "
             SELECT 
-                d.id, d.name, d.ip, d.check_port, d.monitor_method, d.type, d.subchoice, d.description, d.enabled, d.x, d.y, d.map_id,
+                d.id, d.name, d.ip, d.check_port, d.monitor_method, d.type, d.subchoice, d.description, d.enabled, d.x, d.y, d.map_id, d.proxy_id,
                 d.ping_interval, d.icon_size, d.name_text_size, d.icon_url,
                 d.router_api_username, d.router_api_password, d.router_api_port,
                 d.warning_latency_threshold, d.warning_packetloss_threshold,
                 d.critical_latency_threshold, d.critical_packetloss_threshold,
                 d.last_avg_time, d.last_ttl, d.show_live_ping, d.status, d.last_seen,
                 d.port_config,
-                m.name as map_name,
+                m.name as map_name, prx.name as proxy_name,
                 p.output as last_ping_output
             FROM 
                 devices d
             LEFT JOIN 
                 maps m ON d.map_id = m.id
+            LEFT JOIN
+                proxies prx ON d.proxy_id = prx.id
             LEFT JOIN 
                 ping_results p ON p.id = (
                     SELECT id 
@@ -471,6 +496,8 @@ switch ($action) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($devices as &$d) { $d = applyEffectiveThresholds($pdo, $d); }
+        unset($d);
         echo json_encode(['devices' => $devices]); // Wrap in 'devices' key
         break;
 
@@ -487,7 +514,7 @@ switch ($action) {
                 exit;
             }
 
-            $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config, proxy_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $portConfigValue = isset($input['port_config']) ? (is_string($input['port_config']) ? $input['port_config'] : json_encode($input['port_config'])) : null;
             $stmt->execute([
@@ -498,9 +525,11 @@ switch ($action) {
                 $input['warning_latency_threshold'] ?? null, $input['warning_packetloss_threshold'] ?? null,
                 $input['critical_latency_threshold'] ?? null, $input['critical_packetloss_threshold'] ?? null,
                 ($input['show_live_ping'] ?? false) ? 1 : 0,
-                $portConfigValue
+                $portConfigValue,
+                $input['proxy_id'] ?? null
             ]);
             $lastId = $pdo->lastInsertId();
+            upsertDeviceThresholdOverride($pdo, (int)$lastId, $input);
             $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?");
             $stmt->execute([$lastId, $current_user_id]);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -536,7 +565,7 @@ switch ($action) {
                 exit;
             }
 
-            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'ping_interval', 'icon_size', 'name_text_size', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config']; // Added status, last_seen, port_config
+            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'ping_interval', 'icon_size', 'name_text_size', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config', 'proxy_id']; // Added status, last_seen, port_config
             if (!$hasSubchoice) {
                 $allowed_fields = array_values(array_diff($allowed_fields, ['subchoice']));
             }
@@ -567,6 +596,17 @@ switch ($action) {
             }
             $stmt = $pdo->prepare($updateSql); 
             $stmt->execute($updateParams);
+
+            $thresholdFields = ['warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold'];
+            $overridePayload = [];
+            foreach ($thresholdFields as $tf) {
+                if (array_key_exists($tf, $updates)) {
+                    $overridePayload[$tf] = ($updates[$tf] === '' || $updates[$tf] === null) ? null : $updates[$tf];
+                }
+            }
+            if (!empty($overridePayload)) {
+                upsertDeviceThresholdOverride($pdo, (int)$id, $overridePayload);
+            }
 
             // Re-fetch the device to return the updated data
             $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ?";
@@ -685,7 +725,7 @@ switch ($action) {
                 $suffix++;
             }
 
-            $insertSql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, port_config, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $insertSql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, port_config, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, proxy_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $insertStmt = $pdo->prepare($insertSql);
             $insertStmt->execute([
                 $current_user_id,
@@ -711,10 +751,17 @@ switch ($action) {
                 $device['warning_packetloss_threshold'],
                 $device['critical_latency_threshold'],
                 $device['critical_packetloss_threshold'],
-                ($device['show_live_ping'] ?? false) ? 1 : 0
+                ($device['show_live_ping'] ?? false) ? 1 : 0,
+                $device['proxy_id'] ?? null
             ]);
 
             $newId = $pdo->lastInsertId();
+            upsertDeviceThresholdOverride($pdo, (int)$newId, [
+                'warning_latency_threshold' => $device['warning_latency_threshold'],
+                'warning_packetloss_threshold' => $device['warning_packetloss_threshold'],
+                'critical_latency_threshold' => $device['critical_latency_threshold'],
+                'critical_packetloss_threshold' => $device['critical_packetloss_threshold'],
+            ]);
             $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id = ?";
             $fetchStmt = $pdo->prepare($fetchSql);
             $fetchStmt->execute([$newId, $current_user_id]);
