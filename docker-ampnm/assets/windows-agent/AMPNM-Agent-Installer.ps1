@@ -122,6 +122,7 @@ $config = Get-Content $ConfigPath | ConvertFrom-Json
 $ServerUrl = $config.ServerUrl
 $AgentToken = $config.AgentToken
 $Interval = $config.Interval
+$CurrentInterval = [math]::Max(15, [int]$Interval)
 $LogDir = "$env:ProgramData\AMPNM-Agent\logs"
 $LogFile = "$LogDir\agent.log"
 
@@ -227,13 +228,42 @@ function Send-Metrics {
             if (-not $deviceMatched) {
                 $deviceMatched = 'Not linked'
             }
-            Write-Log "Metrics sent successfully. Device: $deviceMatched"
+            if ($response.sync_interval_seconds) {
+                $suggested = [int]$response.sync_interval_seconds
+                if ($suggested -ge 15 -and $suggested -le 3600) {
+                    $script:CurrentInterval = $suggested
+                }
+            }
+            Write-Log "Metrics sent successfully. Device: $deviceMatched. Next sync: $script:CurrentInterval sec"
         } else {
             Write-Log "Server returned: $($response | ConvertTo-Json -Compress)"
         }
     }
     catch {
         Write-Log "Error sending metrics: $_"
+    }
+}
+
+function Sync-DeviceMapping {
+    param($Metrics)
+
+    if (-not $Metrics.host_ip) { return }
+
+    try {
+        $headers = @{ 'X-Agent-Token' = $AgentToken }
+        $hostIpEscaped = [uri]::EscapeDataString([string]$Metrics.host_ip)
+        $hostNameEscaped = [uri]::EscapeDataString([string]$Metrics.host_name)
+        $syncUrl = "$ServerUrl/device-by-ip?host_ip=$hostIpEscaped&host_name=$hostNameEscaped"
+        $sync = Invoke-RestMethod -Uri $syncUrl -Method Get -Headers $headers -TimeoutSec 15
+
+        if ($sync.sync_interval_seconds) {
+            $suggested = [int]$sync.sync_interval_seconds
+            if ($suggested -ge 15 -and $suggested -le 3600) {
+                $script:CurrentInterval = $suggested
+            }
+        }
+    } catch {
+        Write-Log "Device sync warning: $_"
     }
 }
 
@@ -244,13 +274,14 @@ Write-Log "Server: $ServerUrl"
 while ($true) {
     try {
         $metrics = Get-SystemMetrics
+        Sync-DeviceMapping -Metrics $metrics
         Send-Metrics -Metrics $metrics
     }
     catch {
         Write-Log "Collection error: $_"
     }
     
-    Start-Sleep -Seconds $Interval
+    Start-Sleep -Seconds $script:CurrentInterval
 }
 '@
     

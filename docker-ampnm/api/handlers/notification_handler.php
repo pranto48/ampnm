@@ -1,6 +1,7 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
+require_once __DIR__ . '/../../includes/smtp_mailer.php';
 
 switch ($action) {
     case 'get_smtp_settings':
@@ -50,6 +51,44 @@ switch ($action) {
             }
             echo json_encode(['success' => true, 'message' => 'SMTP settings saved successfully.']);
         }
+        break;
+
+    case 'send_test_email':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed.']);
+            exit;
+        }
+
+        $recipient_email = trim((string)($input['recipient_email'] ?? ''));
+        if ($recipient_email === '' || !filter_var($recipient_email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A valid recipient email is required.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT host, port, username, password, encryption, from_email, from_name FROM smtp_settings WHERE user_id = ?");
+        $stmt->execute([$current_user_id]);
+        $smtpSettings = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$smtpSettings) {
+            http_response_code(400);
+            echo json_encode(['error' => 'SMTP settings are not configured yet.']);
+            exit;
+        }
+
+        $subject = 'AMPNM SMTP Test Email';
+        $body = "This is a test email from AMPNM.\n\nSent at: " . gmdate('Y-m-d H:i:s') . " UTC";
+        $smtpError = null;
+        $sent = smtp_send_mail($smtpSettings, $recipient_email, $subject, $body, $smtpError);
+
+        if (!$sent) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Test email failed to send.', 'details' => $smtpError ?? 'Unknown SMTP error']);
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'message' => "Test email sent to {$recipient_email}."]);
         break;
 
     case 'get_all_devices_for_subscriptions':
