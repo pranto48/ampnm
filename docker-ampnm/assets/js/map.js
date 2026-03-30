@@ -180,7 +180,16 @@ function initMap() {
                 } else if (source_port_label || target_port_label) {
                     edgeLabel = `${source_port_label || '—'} ↔ ${target_port_label || '—'}`;
                 }
-                state.edges.update({ id, connection_type, source_port_label, target_port_label, label: edgeLabel });
+                const existingEdge = state.edges.get(id);
+                const srcDevice = state.nodes.get(existingEdge?.from)?.deviceData || null;
+                const tgtDevice = state.nodes.get(existingEdge?.to)?.deviceData || null;
+                const edgeTitle = MapApp.utils.buildEdgeTitle({
+                    ...(existingEdge || {}),
+                    connection_type,
+                    source_port_label,
+                    target_port_label
+                }, srcDevice, tgtDevice);
+                state.edges.update({ id, connection_type, source_port_label, target_port_label, label: edgeLabel, title: edgeTitle });
                 window.notyf.success('Connection updated.');
                 // Trigger color update
                 MapApp.ui.updateAndAnimateEdges();
@@ -362,7 +371,8 @@ function initMap() {
             if (confirm(`Delete map "${els.mapSelector.options[els.mapSelector.selectedIndex].text}"?`)) {
                 try {
                     await api.post('delete_map', { id: state.currentMapId });
-                    const firstMapId = await mapManager.loadMaps();
+                    await loadProxySelector();
+        const firstMapId = await mapManager.loadMaps();
                     await mapManager.switchMap(firstMapId);
                     window.notyf.success('Map deleted.');
                 } catch (error) {
@@ -726,6 +736,19 @@ function initMap() {
         makeDraggable(connectionLegend, mapWrapper);
     }
 
+
+    if (applyMapProxyBtn) {
+        applyMapProxyBtn.addEventListener('click', async () => {
+            if (!state.currentMapId) return;
+            try {
+                await api.post('assign_map_proxy', { map_id: state.currentMapId, proxy_id: mapProxySelector?.value || null });
+                window.notyf.success('Map proxy assignment applied.');
+            } catch (e) {
+                window.notyf.error('Failed to apply map proxy assignment.');
+            }
+        });
+    }
+
     // Initial Load
     (async () => {
         // Start agent registration polling for real-time notifications
@@ -746,6 +769,7 @@ function initMap() {
         const urlParams = new URLSearchParams(window.location.search);
         const mapToLoad = urlParams.get('map_id'); // Check for map_id in URL
         
+        await loadProxySelector();
         const firstMapId = await mapManager.loadMaps();
         const initialMapId = mapToLoad || firstMapId; // Prioritize URL param
         

@@ -19,7 +19,7 @@ if ($endpointBase !== '' && str_starts_with($requestPath, $endpointBase)) {
 }
 
 try {
-    if ($method === 'POST' && $suffix === '') {
+    if ($method === 'POST' && ($suffix === '' || $suffix === 'ingest')) {
         $_GET['action'] = 'submit_metrics';
         require __DIR__ . '/../../handlers/metrics_handler.php';
         exit;

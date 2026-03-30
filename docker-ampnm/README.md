@@ -47,6 +47,10 @@ environment:
   DB_PASSWORD: yourDbPassword
   ADMIN_PASSWORD: yourAdminPassword
   APP_LICENSE_KEY: your-license-key
+  TLS_ENFORCEMENT_MODE: strict
+  REQUIRE_AGENT_MTLS: "1"
+  ADMIN_MFA_REQUIRED: "1"
+  LOGIN_THROTTLE_MAX_ATTEMPTS: "8"
 ```
 
 ### Important Settings
@@ -108,6 +112,15 @@ Configure SMTP settings to receive alerts:
 
 ## 🔐 Security
 
+### Agent Channel Hardening
+
+- Preferred: mTLS (`REQUIRE_AGENT_MTLS=1`).
+- Alternative: rotating PSK + expiry with grace period (`action=rotate_agent_token_secret`).
+- Per-token controls available in token creation:
+  - scope patterns (`scope_site_pattern`, `scope_group_pattern`, `scope_device_pattern`)
+  - request rate cap (`rate_limit_per_minute`)
+  - token expiration (`expires_at`)
+
 ### Best Practices
 
 1. **Change Default Passwords**
@@ -126,6 +139,7 @@ Configure SMTP settings to receive alerts:
    - Set up reverse proxy (Nginx/Apache)
    - Configure SSL certificates
    - Enable HTTPS redirects
+   - Set `TLS_ENFORCEMENT_MODE=strict` to block plaintext login/API requests
 
 4. **Regular Backups**
    ```bash
@@ -181,6 +195,12 @@ docker-compose up -d
 ```
 
 ## 🐛 Troubleshooting
+
+## 📈 Internal Telemetry
+
+- Prometheus endpoint: `/metrics` (includes API, worker, scheduler telemetry).
+- Internal dashboard: **Monitoring → System Health**.
+- Full SLO + operational runbook: `TELEMETRY_RUNBOOK.md`.
 
 ### Ping Not Working
 

@@ -1,22 +1,19 @@
 # AMPNM Linux Monitoring Agent
 
-The Linux agent installs a small single-file Python collector under `/opt/ampnm-agent/`, stores runtime configuration in `/etc/ampnm-agent/config.env`, writes failures and delivery logs to `/var/log/ampnm-agent/agent.log`, and runs continuously as a `systemd` service named `ampnm-agent.service`.
+The Linux agent installs a small Bash-based collector under `/opt/ampnm-agent/`, stores runtime configuration in `/etc/ampnm-agent/config.env`, and runs continuously as a `systemd` service named `ampnm-agent.service`.
 
-It is designed to submit JSON to the existing `agent-metrics` endpoint with the `x-agent-token` header while including stable host identity fields such as `hostname`, `ip_address`, and `os_version`. The payload also preserves compatibility aliases like `host_name`, `host_ip`, and `cpu`.
+It is designed to submit a payload compatible with the current Supabase function at `supabase/functions/agent-metrics/index.ts`, including:
 
-## Collected metrics
-
-The runtime collects the following Linux metrics without any third-party Python packages:
-
-- CPU utilization derived from `/proc/stat` over a short sample window
-- Memory totals and utilization parsed from `/proc/meminfo`
-- Disk usage from `df -B1`, including the root filesystem plus a short list of top mounted filesystems
-- Load averages from `/proc/loadavg`
-- Network throughput from `/proc/net/dev`, sampled twice and reported for the primary interfaces
-- Uptime and boot time from `/proc/uptime` and `/proc/stat`
-- Top processes from `ps`, capped at roughly 50 rows by default
-- Service states from `systemctl list-units --type=service --all --no-pager --no-legend`, optionally enriched with `list-unit-files` output
-- Temperature and sensor data from `sensors` when available; sensor fields are omitted when unavailable
+- `hostname` / `host_name`
+- `ip_address` / `host_ip`
+- `cpu_usage` / `cpu`
+- `memory_usage`, `memory_total`
+- `disk_usage`, `disk_total`
+- `network_in`, `network_out`
+- `uptime_seconds`, `boot_time`, `os_version`
+- `load_1`, `load_5`, `load_15`
+- `temperature_c`, `sensor_summary`
+- `services`
 
 ## Supported Linux distributions
 
@@ -27,15 +24,16 @@ The agent targets `systemd`-based distributions with the following common packag
 - Fedora 38+
 - openSUSE Leap / Tumbleweed with `systemd`
 
-## Runtime dependencies
+### Runtime dependencies
 
+- `bash`
+- `coreutils`
+- `curl`
 - `python3`
 - `systemd`
 - `iproute2`
 - `procps`
-- `coreutils`
 - `util-linux`
-- `lm-sensors` optional, only for temperature collection
 
 ## Quick install with the generic shell installer
 
@@ -52,31 +50,11 @@ sudo ./install.sh \
 
 The installer will:
 
-1. Create a dedicated system user and group named `ampnm-agent` when possible
-2. Copy the runtime script to `/opt/ampnm-agent/ampnm-agent.sh`
-3. Write `/etc/ampnm-agent/config.env`
-4. Create `/var/log/ampnm-agent/agent.log` on first run
-5. Install `/etc/systemd/system/ampnm-agent.service`
-6. Run `systemctl daemon-reload`
-7. Run `systemctl enable --now ampnm-agent.service`
-
-### Configurable settings
-
-The collector interval remains package-configurable through `/etc/ampnm-agent/config.env`. The installer seeds the following defaults:
-
-```dotenv
-SERVER_URL=https://YOUR-PROJECT.supabase.co/functions/v1/agent-metrics
-AGENT_TOKEN=YOUR-AGENT-TOKEN
-INTERVAL=60
-REQUEST_TIMEOUT=30
-CPU_SAMPLE_SECONDS=1
-NETWORK_SAMPLE_SECONDS=1
-RETRY_COUNT=3
-RETRY_DELAY_SECONDS=5
-MAX_SERVICES=100
-MAX_PROCESSES=50
-MAX_FILESYSTEMS=5
-```
+1. Copy the runtime script to `/opt/ampnm-agent/ampnm-agent.sh`
+2. Write `/etc/ampnm-agent/config.env`
+3. Install `/etc/systemd/system/ampnm-agent.service`
+4. Run `systemctl daemon-reload`
+5. Run `systemctl enable --now ampnm-agent.service`
 
 ### Uninstall
 
@@ -91,23 +69,67 @@ Package definitions are included in:
 - `packaging/deb/`
 - `packaging/rpm/`
 
-After installing a package, create `/etc/ampnm-agent/config.env`, set the values shown above, and restart the service.
+### Debian / Ubuntu (`.deb`)
+
+Build:
+
+```bash
+./packaging/deb/build.sh
+```
+
+Install:
+
+```bash
+sudo dpkg -i dist/ampnm-agent_<version>_all.deb
+sudo install -d /etc/ampnm-agent
+sudo tee /etc/ampnm-agent/config.env >/dev/null <<'CFG'
+SERVER_URL=https://YOUR-PROJECT.supabase.co/functions/v1/agent-metrics
+AGENT_TOKEN=YOUR-AGENT-TOKEN
+INTERVAL=60
+REQUEST_TIMEOUT=30
+CFG
+sudo chmod 600 /etc/ampnm-agent/config.env
+sudo systemctl restart ampnm-agent.service
+```
+
+### RHEL / Rocky / Alma / Fedora (`.rpm`)
+
+Build:
+
+```bash
+./packaging/rpm/build.sh
+```
+
+Install:
+
+```bash
+sudo rpm -ivh dist/ampnm-agent-<version>-1.noarch.rpm
+sudo install -d /etc/ampnm-agent
+sudo tee /etc/ampnm-agent/config.env >/dev/null <<'CFG'
+SERVER_URL=https://YOUR-PROJECT.supabase.co/functions/v1/agent-metrics
+AGENT_TOKEN=YOUR-AGENT-TOKEN
+INTERVAL=60
+REQUEST_TIMEOUT=30
+CFG
+sudo chmod 600 /etc/ampnm-agent/config.env
+sudo systemctl restart ampnm-agent.service
+```
 
 ## Service management
 
 ```bash
 sudo systemctl status ampnm-agent.service
 sudo journalctl -u ampnm-agent.service -n 100 --no-pager
-sudo tail -n 100 /var/log/ampnm-agent/agent.log
 sudo systemctl restart ampnm-agent.service
 ```
 
 ## Notes on metrics collection
 
-- CPU and network throughput are sampled over short intervals so utilization and bytes-per-second are derived instead of guessed.
-- Root filesystem metrics are surfaced in the top-level fields, and additional mounted filesystems are provided in structured arrays.
-- Network throughput is reported in bytes/sec (`network_in`, `network_out`) and Mbps (`network_in_mbps`, `network_out_mbps`).
-- Posting retries transient HTTP and network errors before giving up and logging the failure.
+- CPU and network throughput are sampled over one second to align with the Windows agent behavior.
+- Disk metrics are based on the root filesystem (`/`).
+- Temperature values are read from `/sys/class/thermal` when the kernel exports them.
+- Service snapshots are collected from `systemctl list-unit-files --type=service` and enriched with active/sub-state values.
+- GPU metrics are currently left `null` for Linux to avoid introducing vendor-specific dependencies.
 
 ## Troubleshooting
 
@@ -115,7 +137,6 @@ sudo systemctl restart ampnm-agent.service
 
 ```bash
 sudo journalctl -u ampnm-agent.service -n 50 --no-pager
-sudo tail -n 50 /var/log/ampnm-agent/agent.log
 ```
 
 ### Dependency missing
@@ -124,6 +145,6 @@ Install the packages listed under **Runtime dependencies** and rerun the install
 
 ### Connectivity issues
 
-- Verify the `SERVER_URL` points at the `agent-metrics` endpoint.
+- Verify the `SERVER_URL` points at the Supabase function endpoint.
 - Verify the token is enabled.
 - Confirm outbound HTTPS access from the host.
