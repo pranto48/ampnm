@@ -50,6 +50,7 @@ $ScriptPath = "$InstallPath\AMPNM-Monitor.ps1"
 $ConfigPath = "$InstallPath\config.json"
 $NssmPath = "$InstallPath\nssm.exe"
 $NssmUrls = @(
+    "https://github.com/homebridge/nssm/releases/download/2.24-101-g897c7ad/nssm_x64.exe",
     "https://nssm.cc/release/nssm-2.24.zip",
     "https://github.com/nssm/nssm/releases/download/2.24/nssm-2.24.zip"
 )
@@ -85,6 +86,15 @@ function Install-NSSM {
     foreach ($nssmUrl in $NssmUrls) {
         try {
             Write-Status "Trying NSSM source: $nssmUrl"
+            if ($nssmUrl -like "*.exe") {
+                Invoke-WebRequest -Uri $nssmUrl -OutFile $NssmPath -UseBasicParsing
+                if (Test-Path $NssmPath) {
+                    Write-Status "NSSM installed successfully from direct executable" "Success"
+                    return $true
+                }
+                throw "Downloaded direct executable but file was not found at $NssmPath"
+            }
+
             Invoke-WebRequest -Uri $nssmUrl -OutFile $zipPath -UseBasicParsing
 
             Expand-Archive -Path $zipPath -DestinationPath "$InstallPath\nssm-temp" -Force
