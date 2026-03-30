@@ -10,6 +10,8 @@ function initEmailNotifications() {
         smtpEncryption: document.getElementById('smtpEncryption'),
         smtpFromEmail: document.getElementById('smtpFromEmail'),
         smtpFromName: document.getElementById('smtpFromName'),
+        testRecipientEmail: document.getElementById('testRecipientEmail'),
+        sendTestEmailBtn: document.getElementById('sendTestEmailBtn'),
         saveSmtpBtn: document.getElementById('saveSmtpBtn'),
         smtpLoader: document.getElementById('smtpLoader'),
 
@@ -86,6 +88,34 @@ function initEmailNotifications() {
             } finally {
                 els.saveSmtpBtn.disabled = false;
                 els.saveSmtpBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Settings';
+            }
+        });
+
+        els.sendTestEmailBtn?.addEventListener('click', async () => {
+            const recipientEmail = els.testRecipientEmail?.value?.trim();
+            if (!recipientEmail) {
+                window.notyf.error('Enter a recipient email for the test message.');
+                return;
+            }
+
+            const originalHtml = els.sendTestEmailBtn.innerHTML;
+            els.sendTestEmailBtn.disabled = true;
+            els.sendTestEmailBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+
+            try {
+                const result = await api.post('send_test_email', { recipient_email: recipientEmail });
+                if (result.success) {
+                    window.notyf.success(result.message || 'Test email sent.');
+                } else {
+                    const details = result.details ? ` (${result.details})` : '';
+                    window.notyf.error(`Error: ${result.error || 'Failed to send test email.'}${details}`);
+                }
+            } catch (error) {
+                window.notyf.error('An unexpected error occurred while sending test email.');
+                console.error(error);
+            } finally {
+                els.sendTestEmailBtn.disabled = false;
+                els.sendTestEmailBtn.innerHTML = originalHtml;
             }
         });
     } else {

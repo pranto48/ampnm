@@ -7,6 +7,19 @@ $action = $_GET['action'] ?? '';
 $handler = $_GET['handler'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
+// Lightweight health endpoint that can respond even when DB is down.
+if ($action === 'health') {
+    try {
+        $pdo = getDbConnection();
+        $pdo->query('SELECT 1');
+        echo json_encode(['status' => 'ok', 'db' => 'connected', 'timestamp' => date('c')]);
+    } catch (Throwable $e) {
+        http_response_code(503);
+        echo json_encode(['status' => 'degraded', 'db' => 'disconnected', 'error' => $e->getMessage(), 'timestamp' => date('c')]);
+    }
+    exit;
+}
+
 try {
     $pdo = getDbConnection(); // Get PDO connection early for all actions
 
@@ -156,11 +169,14 @@ try {
     $dashboardActions = ['get_dashboard_data'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs'];
-    $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
+    $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'send_test_email', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
     $licenseActions = ['get_current_license_info', 'update_app_license_key', 'force_license_recheck']; // Added license actions
     $metricsActions = [
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',
         'get_agent_tokens', 'create_agent_token', 'delete_agent_token', 'toggle_agent_token',
+        'create_device_from_host', 'register_host_ip', 'pull_device_by_ip',
+        'get_alert_settings', 'save_alert_settings',
+        'get_host_override',
         'get_all_host_overrides', 'save_host_override', 'delete_host_override',
         'export_host_overrides', 'import_host_overrides',
     ];
@@ -186,8 +202,6 @@ try {
     } elseif ($handler === 'floor_plan') {
         require __DIR__ . '/api/handlers/floor_plan_handler.php';
         echo json_encode(handleFloorPlanAction($action, $input, $pdo));
-    } elseif ($action === 'health') {
-        echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
     } else {
         http_response_code(404);
         echo json_encode(['error' => 'Invalid action']);

@@ -4,6 +4,7 @@
 // - GET    /api/agent/metrics/health
 // - GET    /api/agent/metrics/recent?limit=50
 // - GET    /api/agent/metrics/<HOSTNAME>/latest
+// - GET    /api/agent/metrics/device-by-ip?host_ip=1.2.3.4&host_name=HOST
 
 require_once __DIR__ . '/../../../includes/functions.php';
 
@@ -20,6 +21,12 @@ if ($endpointBase !== '' && str_starts_with($requestPath, $endpointBase)) {
 try {
     if ($method === 'POST' && $suffix === '') {
         $_GET['action'] = 'submit_metrics';
+        require __DIR__ . '/../../handlers/metrics_handler.php';
+        exit;
+    }
+
+    if ($method === 'GET' && $suffix === 'device-by-ip') {
+        $_GET['action'] = 'pull_device_by_ip';
         require __DIR__ . '/../../handlers/metrics_handler.php';
         exit;
     }
