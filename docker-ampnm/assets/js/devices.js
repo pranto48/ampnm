@@ -9,6 +9,11 @@ function initDevices() {
     const importDevicesFile = document.getElementById('importDevicesFile');
     const deviceSearchInput = document.getElementById('deviceSearchInput');
     const createNewDeviceLink = document.querySelector('a[href="create-device.php"]');
+    const selectAllDevices = document.getElementById('selectAllDevices');
+    const bulkTemplateSelect = document.getElementById('bulkTemplateSelect');
+    const bulkGroupSelect = document.getElementById('bulkGroupSelect');
+    const bulkApplyTemplateBtn = document.getElementById('bulkApplyTemplateBtn');
+    const bulkAssignGroupBtn = document.getElementById('bulkAssignGroupBtn');
 
     // Modals
     const detailsModal = document.getElementById('detailsModal');
@@ -70,6 +75,7 @@ function initDevices() {
 
         return `
             <tr data-id="${device.id}" class="border-b border-slate-700 hover:bg-slate-800/50">
+                <td class="px-3 py-4"><input type="checkbox" class="device-select" data-id="${device.id}"></td>
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${device.name}</div><div class="text-sm text-slate-400 capitalize">${device.type}</div></td>
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-slate-400 font-mono">${device.ip || 'N/A'}</div><div class="text-xs text-slate-500 mt-1 flex items-center gap-2">${monitorBadge}<span>${monitorDetail}</span></div></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">${mapLink}</td>
@@ -82,6 +88,22 @@ function initDevices() {
             </tr>
         `;
     };
+
+
+    const loadTemplatesAndGroups = async () => {
+        if (!bulkTemplateSelect || !bulkGroupSelect) return;
+        try {
+            const [templatesResult, groupsResult] = await Promise.all([api.get('get_templates'), api.get('get_host_groups')]);
+            const templates = templatesResult.templates || [];
+            const groups = groupsResult.host_groups || [];
+            bulkTemplateSelect.innerHTML = '<option value="">Select template...</option>' + templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            bulkGroupSelect.innerHTML = '<option value="">Select host group...</option>' + groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        } catch (error) {
+            console.error('Failed loading templates/groups', error);
+        }
+    };
+
+    const getSelectedDeviceIds = () => Array.from(document.querySelectorAll('.device-select:checked')).map(el => Number(el.dataset.id));
 
     const loadDevices = async () => {
         tableLoader.classList.remove('hidden');
@@ -383,7 +405,51 @@ function initDevices() {
         }
     });
 
+
+    if (selectAllDevices) {
+        selectAllDevices.addEventListener('change', (e) => {
+            document.querySelectorAll('.device-select').forEach(cb => { cb.checked = e.target.checked; });
+        });
+    }
+
+    if (bulkApplyTemplateBtn) {
+        bulkApplyTemplateBtn.addEventListener('click', async () => {
+            const templateId = Number(bulkTemplateSelect.value || 0);
+            const deviceIds = getSelectedDeviceIds();
+            if (!templateId || deviceIds.length === 0) {
+                window.notyf.error('Select a template and at least one device.');
+                return;
+            }
+            const result = await api.post('bulk_apply_template', { template_id: templateId, device_ids: deviceIds });
+            if (result.success) {
+                window.notyf.success('Template applied to selected devices.');
+                await loadDevices();
+            } else {
+                window.notyf.error(result.error || 'Template apply failed.');
+            }
+        });
+    }
+
+    if (bulkAssignGroupBtn) {
+        bulkAssignGroupBtn.addEventListener('click', async () => {
+            const groupId = Number(bulkGroupSelect.value || 0);
+            const deviceIds = getSelectedDeviceIds();
+            if (!groupId || deviceIds.length === 0) {
+                window.notyf.error('Select a host group and at least one device.');
+                return;
+            }
+            const result = await api.post('bulk_assign_group', { group_id: groupId, device_ids: deviceIds });
+            if (result.success) {
+                window.notyf.success('Devices assigned to host group.');
+                await loadDevices();
+            } else {
+                window.notyf.error(result.error || 'Group assign failed.');
+            }
+        });
+    }
+
     closeDetailsModal.addEventListener('click', () => closeModal('detailsModal'));
 
+    loadTemplatesAndGroups();
     loadDevices();
 }
