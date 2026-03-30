@@ -8,6 +8,8 @@
 $action = $_GET['action'] ?? '';
 $pdo = getDbConnection();
 
+require_once __DIR__ . '/../../includes/metrics_ingest_service.php';
+
 /**
  * Validate agent token
  */
@@ -464,78 +466,55 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 // Handle different actions
 switch ($action) {
     case 'submit_metrics':
-        // Accept metrics from Windows and Linux agents
         $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
-        
-        // Validate token
         $tokenInfo = validateAgentToken($pdo, $token);
         if (!$tokenInfo) {
             http_response_code(401);
             echo json_encode(['error' => 'Invalid or missing agent token']);
             exit;
         }
-        
-        // Validate required fields
-        $normalizedInput = normalizeMetricsPayload($input);
+
+        $normalizedInput = MetricsIngestService::normalizeMetricsPayload($input);
         if (empty($normalizedInput['host_ip'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'hostname is required']);
+            echo json_encode(['error' => 'host_ip is required']);
             exit;
         }
-        
-        // Try to find matching device (IP first, then hostname)
+
         $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
-        $device = findDeviceMatch($pdo, $normalizedInput['host_name'] ?? '', $normalizedInput['host_ip'] ?? '', $tokenUserId);
-        $autoCreatedDevice = false;
-        if (!$device && $tokenUserId) {
-            $created = createDeviceForHost(
-                $pdo,
-                $tokenUserId,
-                (string)($normalizedInput['host_name'] ?? ''),
-                $normalizedInput['host_ip'] ?? null,
-                (string)($normalizedInput['platform'] ?? 'unknown')
-            );
-            if ($created) {
-                $device = $created;
-                $autoCreatedDevice = true;
+        $idempotencyKey = MetricsIngestService::buildIdempotencyKey($input, $tokenUserId);
+
+        $message = [
+            'message_type' => 'metrics_submit',
+            'idempotency_key' => $idempotencyKey,
+            'payload' => array_merge($normalizedInput, [
+                'token_user_id' => $tokenUserId,
+                'token_id' => $tokenInfo['id'] ?? null,
+            ]),
+            'enqueued_at' => gmdate('c'),
+        ];
+
+        $enqueue = MetricsIngestQueue::enqueue($pdo, $message);
+        $processedInline = false;
+        if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
+            try {
+                MetricsIngestService::processMessage($pdo, $message);
+                $processedInline = true;
+            } catch (Throwable $e) {
+                error_log('Metrics inline fallback failed: ' . $e->getMessage());
             }
         }
-        $deviceId = $device ? $device['id'] : null;
-        if ($deviceId) {
-            touchDeviceFromMetrics($pdo, (int)$deviceId, (string)($normalizedInput['host_ip'] ?? ''), 'online');
-        }
-        
-        // Save metrics
-        $metricsId = saveHostMetrics($pdo, $normalizedInput, $deviceId);
-        
-        // Check thresholds and send alerts if needed
-        try {
-            require_once __DIR__ . '/../../includes/host_alerts.php';
-            $alertSystem = new HostAlertSystem($pdo);
-            $alertSystem->checkAndAlert(
-                $normalizedInput['host_ip'],
-                $normalizedInput['host_name'] ?? $normalizedInput['host_ip'],
-                $normalizedInput
-            );
-        } catch (Exception $e) {
-            error_log("Host Alert Error: " . $e->getMessage());
-        }
-        
-        // Cleanup old data occasionally (1 in 100 requests)
-        if (rand(1, 100) === 1) {
-            cleanupOldMetrics($pdo);
-        }
-        
+
         echo json_encode([
             'success' => true,
-            'metrics_id' => $metricsId,
-            'device_matched' => $device ? $device['name'] : null,
-            'device_id' => $deviceId ? (int)$deviceId : null,
-            'auto_device_created' => $autoCreatedDevice,
-            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
-            'platform' => $normalizedInput['platform'] ?? 'unknown',
+            'status' => 'accepted',
+            'queued' => true,
+            'processed_inline' => $processedInline,
+            'queue_transport' => $enqueue['transport'],
+            'queue_message_id' => $enqueue['message_id'],
+            'idempotency_key' => $idempotencyKey,
             'hostname' => $normalizedInput['host_name'] ?? null,
-            'ip_address' => $normalizedInput['host_ip'] ?? null
+            'ip_address' => $normalizedInput['host_ip'] ?? null,
         ]);
         break;
 
@@ -557,28 +536,53 @@ switch ($action) {
         }
 
         $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
-        $device = findDeviceMatch($pdo, $requestedHostName, $requestedIp, $tokenUserId);
-        $autoCreated = false;
-        if (!$device && $tokenUserId) {
-            $created = createDeviceForHost($pdo, $tokenUserId, $requestedHostName, $requestedIp ?: null, 'windows');
-            if ($created) {
-                $device = $created;
-                $autoCreated = true;
-            }
-        }
+        $idempotencyKey = MetricsIngestService::buildIdempotencyKey([
+            'agent_id' => $requestedHostName !== '' ? $requestedHostName : $requestedIp,
+            'timestamp' => gmdate('c'),
+            'sequence' => 'pull-device-by-ip',
+        ], $tokenUserId);
 
-        if ($device && !empty($device['id'])) {
-            touchDeviceFromMetrics($pdo, (int)$device['id'], $requestedIp, 'online');
+        $enqueue = MetricsIngestQueue::enqueue($pdo, [
+            'message_type' => 'pull_device_by_ip',
+            'idempotency_key' => $idempotencyKey,
+            'payload' => [
+                'host_ip' => $requestedIp ?: null,
+                'host_name' => $requestedHostName ?: null,
+                'token_user_id' => $tokenUserId,
+                'token_id' => $tokenInfo['id'] ?? null,
+            ],
+            'enqueued_at' => gmdate('c'),
+        ]);
+        $processedInline = false;
+        if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
+            try {
+                MetricsIngestService::processMessage($pdo, [
+                    'message_type' => 'pull_device_by_ip',
+                    'idempotency_key' => $idempotencyKey,
+                    'payload' => [
+                        'host_ip' => $requestedIp ?: null,
+                        'host_name' => $requestedHostName ?: null,
+                        'token_user_id' => $tokenUserId,
+                        'token_id' => $tokenInfo['id'] ?? null,
+                    ],
+                    'enqueued_at' => gmdate('c'),
+                ]);
+                $processedInline = true;
+            } catch (Throwable $e) {
+                error_log('Pull-device inline fallback failed: ' . $e->getMessage());
+            }
         }
 
         echo json_encode([
             'success' => true,
+            'status' => 'accepted',
+            'queued' => true,
+            'processed_inline' => $processedInline,
+            'queue_transport' => $enqueue['transport'],
+            'queue_message_id' => $enqueue['message_id'],
+            'idempotency_key' => $idempotencyKey,
             'host_ip' => $requestedIp ?: null,
             'host_name' => $requestedHostName ?: null,
-            'device' => $device ?: null,
-            'device_found' => (bool)$device,
-            'auto_device_created' => $autoCreated,
-            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
         ]);
         break;
         
