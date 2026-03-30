@@ -36,6 +36,7 @@ include 'header.php';
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Device</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">IP Address</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Map</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Proxy</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Last Seen</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th>

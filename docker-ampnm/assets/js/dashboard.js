@@ -13,6 +13,8 @@ function initDashboard() {
     const noRecentActivityMessage = document.getElementById('noRecentActivityMessage');
     const deviceInfoContainer = document.getElementById('deviceInfoContainer');
     const noDeviceInfoMessage = document.getElementById('noDeviceInfoMessage');
+    const proxyHealthList = document.getElementById('proxyHealthList');
+    const proxyHealthEmpty = document.getElementById('proxyHealthEmpty');
     const deviceInfoStatusFilter = document.getElementById('deviceInfoStatusFilter');
     const deviceInfoGridBtn = document.getElementById('deviceInfoGridBtn');
     const deviceInfoListBtn = document.getElementById('deviceInfoListBtn');
@@ -126,6 +128,29 @@ function initDashboard() {
         }).join('');
     };
 
+
+    const renderProxyHealth = (rows) => {
+        if (!proxyHealthList) return;
+        if (!Array.isArray(rows) || rows.length === 0) {
+            proxyHealthList.innerHTML = '';
+            proxyHealthEmpty?.classList.remove('hidden');
+            return;
+        }
+        proxyHealthEmpty?.classList.add('hidden');
+        proxyHealthList.innerHTML = rows.map((p) => {
+            const stale = Number(p.stale_alert || 0) > 0;
+            const lag = Number(p.queue_lag || 0);
+            const statusClass = stale ? 'text-red-300 border-red-500/30' : 'text-emerald-300 border-emerald-500/30';
+            return `<div class="bg-slate-900/60 border ${statusClass} rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2"><div class="text-white font-semibold">${p.name}</div><div class="text-xs uppercase">${p.status || 'unknown'}</div></div>
+                <div class="text-xs text-slate-400">Site: ${p.site || 'Unassigned'} • Version: ${p.version || 'n/a'}</div>
+                <div class="mt-2 text-sm text-slate-200">Latency: ${p.last_latency_ms ? `${p.last_latency_ms}ms` : 'n/a'}</div>
+                <div class="text-sm text-slate-200">Queue lag: ${lag}</div>
+                <div class="text-xs ${stale ? 'text-red-400' : 'text-slate-500'} mt-1">${stale ? 'Stale: last seen > 5 min' : `Last seen: ${formatLastSeen(p.last_seen)}`}</div>
+            </div>`;
+        }).join('');
+    };
+
     const loadDashboardData = async (mapId) => {
         if (!mapId) {
             dashboardLoader.classList.add('hidden');
@@ -188,6 +213,7 @@ function initDashboard() {
 
             latestDeviceRows = Array.isArray(data.devices) ? data.devices : [];
             renderDeviceInfo();
+            renderProxyHealth(data.proxy_health || []);
 
         } catch (error) {
             console.error("Failed to load dashboard data:", error);

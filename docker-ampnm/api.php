@@ -117,6 +117,7 @@ try {
         'get_floor_plan_devices', 'get_annotations',
         // Port usage
         'get_device_used_ports',
+        'get_proxies', 'get_proxy_health',
     ];
 
     // Define specific POST actions that 'viewer' role can perform
@@ -154,6 +155,7 @@ try {
     $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip']; // ping_all_devices removed
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports'];
     $dashboardActions = ['get_dashboard_data'];
+    $proxyActions = ['get_proxies', 'create_proxy_token', 'assign_device_proxy', 'assign_map_proxy', 'get_proxy_health'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs'];
     $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'send_test_email', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
@@ -186,6 +188,8 @@ try {
         require __DIR__ . '/api/handlers/license_handler.php';
     } elseif (in_array($action, $metricsActions)) {
         require __DIR__ . '/api/handlers/metrics_handler.php';
+    } elseif (in_array($action, $proxyActions)) {
+        require __DIR__ . '/api/handlers/proxy_handler.php';
     } elseif ($handler === 'floor_plan') {
         require __DIR__ . '/api/handlers/floor_plan_handler.php';
         echo json_encode(handleFloorPlanAction($action, $input, $pdo));

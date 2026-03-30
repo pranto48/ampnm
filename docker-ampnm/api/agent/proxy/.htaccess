@@ -1,0 +1,10 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  RewriteRule ^$ index.php [L]
+  RewriteRule ^health$ index.php [L,QSA]
+  RewriteRule ^auth-token$ index.php [L,QSA]
+  RewriteRule ^register$ index.php [L,QSA]
+  RewriteRule ^pull$ index.php [L,QSA]
+  RewriteRule ^results-batch$ index.php [L,QSA]
+</IfModule>
