@@ -2,6 +2,7 @@
 <?php
 
 require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../../includes/storage_policy.php';
 
 $interval = (int)(getenv('SCHEDULER_INTERVAL_SECONDS') ?: 30);
 if ($interval < 5) {
@@ -24,6 +25,8 @@ while (true) {
 
         $stmt2 = $pdo->prepare("DELETE FROM metrics_ingest_dedup WHERE status = 'done' AND processed_at < (NOW() - INTERVAL ? DAY)");
         $stmt2->execute([$retentionDays]);
+
+        runStorageRollupTick($pdo);
 
         @touch($heartbeatFile);
     } catch (Throwable $e) {

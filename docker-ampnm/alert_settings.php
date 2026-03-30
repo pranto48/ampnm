@@ -104,6 +104,37 @@ require_once 'header.php';
         </form>
     </div>
 
+    <!-- Storage Retention Policy -->
+    <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <i class="fas fa-database text-cyan-400"></i> Storage Retention Policy
+        </h2>
+        <p class="text-slate-400 text-sm mb-4">Configure short-term high-resolution retention and long-term rollups.</p>
+        <form id="storage-policy-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-slate-700/40 rounded-lg p-4">
+                <label class="text-xs text-slate-400">Host metrics raw retention (days)</label>
+                <input type="number" id="metrics-hires-days" min="7" max="120" value="30" class="w-full mt-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
+            </div>
+            <div class="bg-slate-700/40 rounded-lg p-4">
+                <label class="text-xs text-slate-400">Host metrics hourly rollup retention (days)</label>
+                <input type="number" id="metrics-hourly-days" min="30" max="2000" value="365" class="w-full mt-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
+            </div>
+            <div class="bg-slate-700/40 rounded-lg p-4">
+                <label class="text-xs text-slate-400">Status log raw retention (days)</label>
+                <input type="number" id="status-hires-days" min="7" max="120" value="30" class="w-full mt-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
+            </div>
+            <div class="bg-slate-700/40 rounded-lg p-4">
+                <label class="text-xs text-slate-400">Status log hourly rollup retention (days)</label>
+                <input type="number" id="status-hourly-days" min="30" max="2000" value="365" class="w-full mt-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm">
+            </div>
+            <div class="md:col-span-2 flex justify-end">
+                <button type="submit" class="bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                    <i class="fas fa-save"></i> Save Storage Policy
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Per-Host Overrides -->
     <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
         <div class="flex items-center justify-between mb-4">
@@ -273,6 +304,44 @@ document.getElementById('global-settings-form').addEventListener('submit', async
     }
 });
 
+async function loadStoragePolicy() {
+    try {
+        const res = await fetch(`${API_URL}?action=get_storage_policy&handler=metrics`);
+        const data = await res.json();
+        document.getElementById('metrics-hires-days').value = data.metrics_hires_days ?? 30;
+        document.getElementById('metrics-hourly-days').value = data.metrics_hourly_days ?? 365;
+        document.getElementById('status-hires-days').value = data.status_hires_days ?? 30;
+        document.getElementById('status-hourly-days').value = data.status_hourly_days ?? 365;
+    } catch (e) {
+        console.error('Failed to load storage policy:', e);
+    }
+}
+
+document.getElementById('storage-policy-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        const body = {
+            metrics_hires_days: +document.getElementById('metrics-hires-days').value,
+            metrics_hourly_days: +document.getElementById('metrics-hourly-days').value,
+            status_hires_days: +document.getElementById('status-hires-days').value,
+            status_hourly_days: +document.getElementById('status-hourly-days').value
+        };
+        const res = await fetch(`${API_URL}?action=save_storage_policy&handler=metrics`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const result = await res.json();
+        if (result.success) {
+            showNotice('Storage policy saved. Scheduler will apply retention and rollups.', 'success');
+        } else {
+            showNotice(result.error || 'Failed to save storage policy', 'error');
+        }
+    } catch (e) {
+        showNotice('Failed to save storage policy: ' + e.message, 'error');
+    }
+});
+
 // Per-Host Overrides
 async function loadOverrides() {
     try {
@@ -430,6 +499,7 @@ function showNotice(msg, type) {
 
 // Initialize
 loadGlobalSettings();
+loadStoragePolicy();
 loadOverrides();
 </script>
 
