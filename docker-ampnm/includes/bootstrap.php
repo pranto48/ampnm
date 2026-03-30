@@ -27,5 +27,17 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
 // Start session management after DB check.
 // This ensures sessions are available on all pages that include this bootstrap.
 if (session_status() === PHP_SESSION_NONE) {
+    $sessionDriver = strtolower((string)(getenv('SESSION_DRIVER') ?: 'files'));
+    if ($sessionDriver === 'redis' && class_exists('Redis')) {
+        $redisHost = getenv('REDIS_HOST') ?: '127.0.0.1';
+        $redisPort = (int)(getenv('REDIS_PORT') ?: 6379);
+        $redisDb = (int)(getenv('REDIS_DB') ?: 0);
+        $redisPassword = getenv('REDIS_PASSWORD') ?: '';
+
+        $authPart = $redisPassword !== '' ? '?auth=' . rawurlencode($redisPassword) . '&database=' . $redisDb : '?database=' . $redisDb;
+        ini_set('session.save_handler', 'redis');
+        ini_set('session.save_path', "tcp://{$redisHost}:{$redisPort}{$authPart}");
+    }
+
     session_start();
 }
