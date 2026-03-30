@@ -43,9 +43,8 @@ function getDbConnection() {
             ];
             $pdo = new PDO($dsn, DB_USERNAME, DB_PASSWORD, $options);
         } catch(PDOException $e) {
-            // For a real application, you would log this error and show a generic message.
-            // For this local tool, dying is acceptable to immediately see the problem.
-            die("ERROR: Could not connect to the database. " . $e->getMessage());
+            // Throw to caller so endpoints can return structured JSON instead of fatal HTML.
+            throw new RuntimeException("ERROR: Could not connect to the database. " . $e->getMessage(), 0, $e);
         }
     }
     

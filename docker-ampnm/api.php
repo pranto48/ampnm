@@ -8,6 +8,19 @@ $action = $_GET['action'] ?? '';
 $handler = $_GET['handler'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
+// Lightweight health endpoint that can respond even when DB is down.
+if ($action === 'health') {
+    try {
+        $pdo = getDbConnection();
+        $pdo->query('SELECT 1');
+        echo json_encode(['status' => 'ok', 'db' => 'connected', 'timestamp' => date('c')]);
+    } catch (Throwable $e) {
+        http_response_code(503);
+        echo json_encode(['status' => 'degraded', 'db' => 'disconnected', 'error' => $e->getMessage(), 'timestamp' => date('c')]);
+    }
+    exit;
+}
+
 try {
     $pdo = getDbConnection(); // Get PDO connection early for all actions
     securityEnsureSchema($pdo);
@@ -208,8 +221,6 @@ try {
     } elseif ($handler === 'floor_plan') {
         require __DIR__ . '/api/handlers/floor_plan_handler.php';
         echo json_encode(handleFloorPlanAction($action, $input, $pdo));
-    } elseif ($action === 'health') {
-        echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
     } else {
         http_response_code(404);
         echo json_encode(['error' => 'Invalid action']);
