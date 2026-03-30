@@ -337,6 +337,14 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="description" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Description</label>
                         <label class="flex items-center text-slate-300 sm:col-span-2"><input type="checkbox" data-tooltip-field="ports" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Ports Summary</label>
                     </div>
+                    <h3 class="text-lg font-semibold text-white pt-3 border-t border-slate-700/80 mt-2">Mouse Over Connection Information</h3>
+                    <p class="text-xs text-slate-500">Choose which fields are visible when hovering a connection on this map.</p>
+                    <div id="connectionTooltipFieldSettings" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="type" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Connection Type</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="source_target" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Source / Target</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="status" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Endpoint Status</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="ports" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Port Mapping</label>
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-700/80">
                         <div>
                             <label for="tooltipDensity" class="block text-xs font-medium text-slate-400 mb-1">Tooltip Layout</label>
