@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
             $_SESSION['user_role'] = $user['role']; // Store user role in session
+            recordAuthAttempt($pdo, strtolower($username), 'login', true);
             header('Location: index.php');
             exit;
         } else {
@@ -39,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+render_login:
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -74,6 +76,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="password" name="password" id="password" required
                        class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
                        placeholder="password">
+            </div>
+            <div>
+                <label for="mfa_code" class="block text-sm font-medium text-slate-300 mb-2">MFA Code (if enabled)</label>
+                <input type="text" name="mfa_code" id="mfa_code" inputmode="numeric" pattern="[0-9]{6}"
+                       class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
+                       placeholder="123456">
             </div>
             <button type="submit"
                     class="w-full px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none">

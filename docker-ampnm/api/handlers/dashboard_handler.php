@@ -2,6 +2,8 @@
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
+require_once __DIR__ . '/../../includes/proxy_service.php';
+ensureProxySchema($pdo);
 
 if ($action === 'get_dashboard_data') {
     $map_id = $_GET['map_id'] ?? null;
@@ -91,10 +93,23 @@ if ($action === 'get_dashboard_data') {
     $stmt->execute($params_recent_activity);
     $recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+
+    $proxyStmt = $pdo->prepare("SELECT p.id, p.name, p.site, p.status, p.version, p.last_seen, p.last_latency_ms,
+        SUM(CASE WHEN pc.next_due_at IS NOT NULL AND pc.next_due_at <= NOW() THEN 1 ELSE 0 END) AS queue_lag,
+        CASE WHEN p.last_seen IS NULL OR p.last_seen < DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 1 ELSE 0 END AS stale_alert
+        FROM proxies p
+        LEFT JOIN proxy_checks pc ON pc.proxy_id = p.id
+        WHERE p.user_id = ?
+        GROUP BY p.id
+        ORDER BY p.name ASC");
+    $proxyStmt->execute([$current_user_id]);
+    $proxyHealth = $proxyStmt->fetchAll(PDO::FETCH_ASSOC);
+
     echo json_encode([
         'map_stats' => $map_stats,
         'global_total_devices' => $global_total_devices,
         'devices' => $devices,
-        'recent_activity' => $recent_activity
+        'recent_activity' => $recent_activity,
+        'proxy_health' => $proxyHealth
     ]);
 }

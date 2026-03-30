@@ -10,6 +10,7 @@
     # These should not be rewritten to index.php
     RewriteRule ^api\.php$ - [L]
     RewriteRule ^public_map\.php$ - [L]
+    RewriteRule ^metrics$ metrics.php [L,QSA]
     RewriteRule ^database_setup\.php$ - [L]
     RewriteRule ^logout\.php$ - [L]
     RewriteRule ^license_setup\.php$ - [L]
@@ -23,6 +24,6 @@
     # This is for the main authenticated React app
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^((?!api\.php|public_map\.php|database_setup\.php|logout\.php|license_setup\.php|license_expired\.php).*)$ index.php [NC,L]
+    RewriteRule ^((?!api\.php|public_map\.php|metrics|database_setup\.php|logout\.php|license_setup\.php|license_expired\.php).*)$ index.php [NC,L]
 
 </IfModule>

@@ -40,6 +40,10 @@ RUN set -eux; \
         pdo_mysql \
         zip
 
+RUN set -eux; \
+    pecl install redis; \
+    docker-php-ext-enable redis
+
 # Enable Apache's mod_rewrite for pretty URLs
 RUN a2enmod rewrite
 

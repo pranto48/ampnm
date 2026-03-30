@@ -48,6 +48,16 @@ include 'header.php';
                     </div>
                 </div>
 
+
+                <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6 mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-white">Proxy Health Panel</h2>
+                        <span class="text-xs text-slate-400">Latency, queue lag, and stale proxy alerts</span>
+                    </div>
+                    <div id="proxyHealthList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                    <div id="proxyHealthEmpty" class="text-sm text-slate-500 py-4 hidden">No proxies registered yet.</div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Ping Test -->
                     <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
