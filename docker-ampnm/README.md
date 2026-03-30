@@ -196,6 +196,12 @@ docker-compose up -d
 
 ## 🐛 Troubleshooting
 
+## 📈 Internal Telemetry
+
+- Prometheus endpoint: `/metrics` (includes API, worker, scheduler telemetry).
+- Internal dashboard: **Monitoring → System Health**.
+- Full SLO + operational runbook: `TELEMETRY_RUNBOOK.md`.
+
 ### Ping Not Working
 
 **Issue**: "sh: 1: ping: not found"

@@ -2,6 +2,7 @@
 <?php
 
 require_once __DIR__ . '/../../includes/metrics_ingest_service.php';
+require_once __DIR__ . '/../../includes/telemetry.php';
 
 $once = in_array('--once', $argv, true);
 $maxAttempts = (int)(getenv('METRICS_INGEST_MAX_ATTEMPTS') ?: 5);
@@ -11,6 +12,7 @@ if ($maxAttempts < 1) {
 
 $pdo = getDbConnection();
 MetricsIngestQueue::ensureQueueTables($pdo);
+ensureTelemetrySchema($pdo);
 
 $stream = getenv('METRICS_INGEST_STREAM') ?: MetricsIngestQueue::DEFAULT_STREAM;
 $dlqStream = getenv('METRICS_INGEST_DLQ_STREAM') ?: MetricsIngestQueue::DEFAULT_DLQ_STREAM;
@@ -53,16 +55,21 @@ function processWithRetry(PDO $pdo, array $message, int $maxAttempts): array
 {
     $attempt = (int)($message['attempt'] ?? 0) + 1;
     $message['attempt'] = $attempt;
+    $correlationId = (string)($message['correlation_id'] ?? telemetryCorrelationId());
 
     try {
+        telemetryLog('worker.message.start', ['correlation_id' => $correlationId, 'attempt' => $attempt, 'message_type' => $message['message_type'] ?? 'metrics_submit']);
         $result = MetricsIngestService::processMessage($pdo, $message);
+        telemetryLog('worker.message.done', ['correlation_id' => $correlationId, 'status' => 'ok']);
         return ['status' => 'ok', 'result' => $result, 'message' => $message];
     } catch (InvalidArgumentException $e) {
         failToDeadLetter($pdo, $message, $e->getMessage());
+        telemetryEmitAlert($pdo, 'ingest_failed_job', 'warning', 'workers', 'Message moved to dead letter queue', ['error' => $e->getMessage()], $correlationId);
         return ['status' => 'dead_letter', 'error' => $e->getMessage(), 'message' => $message];
     } catch (Throwable $e) {
         if ($attempt >= $maxAttempts) {
             failToDeadLetter($pdo, $message, $e->getMessage());
+            telemetryEmitAlert($pdo, 'ingest_failed_job', 'critical', 'workers', 'Message exceeded max attempts', ['error' => $e->getMessage(), 'attempt' => $attempt], $correlationId);
             return ['status' => 'dead_letter', 'error' => $e->getMessage(), 'message' => $message];
         }
 
@@ -71,6 +78,7 @@ function processWithRetry(PDO $pdo, array $message, int $maxAttempts): array
 }
 
 while (true) {
+    telemetryMarkHeartbeat('metrics-worker');
     $processedAny = false;
 
     if ($supportsRedis) {
