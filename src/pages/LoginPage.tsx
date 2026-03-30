@@ -1,14 +1,14 @@
 import React from 'react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const LoginPage: React.FC = () => {
-  const history = useHistory();
+  const navigate = useNavigate();
 
   return (
     <div className="flex items-center justify-center h-screen bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-3xl font-bold mb-4">Login</h1>
-        <form onSubmit={() => history.push('/network-map')}>
+        <form onSubmit={() => navigate('/network-map')}>
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Email</label>
             <input
