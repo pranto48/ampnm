@@ -2,27 +2,30 @@
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
+require_once __DIR__ . '/../../includes/smtp_mailer.php';
 
-// Placeholder for email notification function
 function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) {
-    // In a real application, this would fetch SMTP settings and subscriptions,
-    // then use a mailer library (e.g., PHPMailer) to send emails.
-    // For now, we'll just log that a notification *would* be sent.
-    error_log("DEBUG: Notification triggered for device '{$device['name']}' (ID: {$device['id']}). Status changed from {$oldStatus} to {$newStatus}. Details: {$details}");
-
-    // Fetch SMTP settings for the current user
-    $stmtSmtp = $pdo->prepare("SELECT * FROM smtp_settings WHERE user_id = ?");
-    $stmtSmtp->execute([$_SESSION['user_id']]);
-    $smtpSettings = $stmtSmtp->fetch(PDO::FETCH_ASSOC);
-
-    if (!$smtpSettings) {
-        error_log("DEBUG: No SMTP settings found for user {$_SESSION['user_id']}. Cannot send email notification.");
+    if (!in_array($newStatus, ['online', 'offline', 'warning', 'critical'], true)) {
         return;
     }
 
-    // Fetch subscriptions for this device and status change
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+    if ($userId <= 0) {
+        error_log('Email notification skipped: invalid session user');
+        return;
+    }
+
+    $stmtSmtp = $pdo->prepare("SELECT * FROM smtp_settings WHERE user_id = ?");
+    $stmtSmtp->execute([$userId]);
+    $smtpSettings = $stmtSmtp->fetch(PDO::FETCH_ASSOC);
+
+    if (!$smtpSettings) {
+        error_log("Email notification skipped: no SMTP settings for user {$userId}.");
+        return;
+    }
+
     $sqlSubscriptions = "SELECT recipient_email FROM device_email_subscriptions WHERE user_id = ? AND device_id = ?";
-    $paramsSubscriptions = [$_SESSION['user_id'], $device['id']];
+    $paramsSubscriptions = [$userId, $device['id']];
 
     if ($newStatus === 'online') {
         $sqlSubscriptions .= " AND notify_on_online = TRUE";
@@ -32,9 +35,6 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
         $sqlSubscriptions .= " AND notify_on_warning = TRUE";
     } elseif ($newStatus === 'critical') {
         $sqlSubscriptions .= " AND notify_on_critical = TRUE";
-    } else {
-        // No specific notification for 'unknown' status changes
-        return;
     }
 
     $stmtSubscriptions = $pdo->prepare($sqlSubscriptions);
@@ -42,18 +42,24 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
     $recipients = $stmtSubscriptions->fetchAll(PDO::FETCH_COLUMN);
 
     if (empty($recipients)) {
-        error_log("DEBUG: No active subscriptions for device '{$device['name']}' on status '{$newStatus}'.");
+        error_log("Email notification skipped: no active subscriptions for device '{$device['name']}' status '{$newStatus}'.");
         return;
     }
 
-    // Simulate sending email
+    $subject = sprintf('AMPNM Alert: %s is %s', $device['name'], strtoupper($newStatus));
+    $body = "Device: {$device['name']}\n"
+        . "IP: " . ($device['ip'] ?? 'N/A') . "\n"
+        . "Previous Status: {$oldStatus}\n"
+        . "Current Status: {$newStatus}\n"
+        . "Details: {$details}\n"
+        . "Time (UTC): " . gmdate('Y-m-d H:i:s') . "\n";
+
     foreach ($recipients as $recipient) {
-        error_log("DEBUG: Simulating email to {$recipient} for device '{$device['name']}' status change to '{$newStatus}'.");
-        // In a real scenario, you'd use a mailer library here:
-        // $mailer = new PHPMailer(true);
-        // Configure $mailer with $smtpSettings
-        // Set recipient, subject, body
-        // $mailer->send();
+        $smtpError = null;
+        $sent = smtp_send_mail($smtpSettings, $recipient, $subject, $body, $smtpError);
+        if (!$sent) {
+            error_log("Email send failed for {$recipient} (device {$device['name']}, status {$newStatus}): " . ($smtpError ?? 'Unknown SMTP error'));
+        }
     }
 }
 

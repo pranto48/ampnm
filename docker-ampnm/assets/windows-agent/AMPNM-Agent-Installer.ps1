@@ -49,7 +49,10 @@ $LogPath = "$InstallPath\logs"
 $ScriptPath = "$InstallPath\AMPNM-Monitor.ps1"
 $ConfigPath = "$InstallPath\config.json"
 $NssmPath = "$InstallPath\nssm.exe"
-$NssmUrl = "https://nssm.cc/release/nssm-2.24.zip"
+$NssmUrls = @(
+    "https://nssm.cc/release/nssm-2.24.zip",
+    "https://github.com/nssm/nssm/releases/download/2.24/nssm-2.24.zip"
+)
 $LocalNssmPath = "$PSScriptRoot\nssm.exe"
 
 function Write-Status {
@@ -77,35 +80,39 @@ function Install-NSSM {
 
     Write-Status "NSSM not found locally. Trying online download..." "Warning"
     $zipPath = "$InstallPath\nssm.zip"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $NssmUrl -OutFile $zipPath -UseBasicParsing
+    foreach ($nssmUrl in $NssmUrls) {
+        try {
+            Write-Status "Trying NSSM source: $nssmUrl"
+            Invoke-WebRequest -Uri $nssmUrl -OutFile $zipPath -UseBasicParsing
 
-        Expand-Archive -Path $zipPath -DestinationPath "$InstallPath\nssm-temp" -Force
+            Expand-Archive -Path $zipPath -DestinationPath "$InstallPath\nssm-temp" -Force
 
-        $arch = if ([Environment]::Is64BitOperatingSystem) { "win64" } else { "win32" }
-        $nssmExe = Get-ChildItem -Path "$InstallPath\nssm-temp" -Recurse -Filter "nssm.exe" |
-                   Where-Object { $_.FullName -like "*$arch*" } |
-                   Select-Object -First 1
+            $arch = if ([Environment]::Is64BitOperatingSystem) { "win64" } else { "win32" }
+            $nssmExe = Get-ChildItem -Path "$InstallPath\nssm-temp" -Recurse -Filter "nssm.exe" |
+                       Where-Object { $_.FullName -like "*$arch*" } |
+                       Select-Object -First 1
 
-        if ($nssmExe) {
-            Copy-Item $nssmExe.FullName $NssmPath -Force
-            Write-Status "NSSM installed successfully" "Success"
-        } else {
-            throw "Could not find nssm.exe"
+            if ($nssmExe) {
+                Copy-Item $nssmExe.FullName $NssmPath -Force
+                Write-Status "NSSM installed successfully" "Success"
+                Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+                Remove-Item "$InstallPath\nssm-temp" -Recurse -Force -ErrorAction SilentlyContinue
+                return $true
+            }
+
+            throw "Downloaded archive but could not find nssm.exe"
         }
-
-        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-        Remove-Item "$InstallPath\nssm-temp" -Recurse -Force -ErrorAction SilentlyContinue
-
-        return $true
+        catch {
+            Write-Status "NSSM source failed: $nssmUrl ($($_.Exception.Message))" "Warning"
+            Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+            Remove-Item "$InstallPath\nssm-temp" -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
-    catch {
-        Write-Status "NSSM download failed: $_" "Warning"
-        Write-Status "Falling back to native Windows service installation (sc.exe)." "Warning"
-        return $false
-    }
+
+    Write-Status "Falling back to native Windows service installation (New-Service)." "Warning"
+    return $false
 }
 
 function Create-MonitorScript {
@@ -326,12 +333,17 @@ function Install-Service {
         & $NssmPath start $ServiceName
     }
     else {
-        Write-Status "Installing Windows Service with native sc.exe..."
-        $binPath = "`"$PSHOME\powershell.exe`" -ExecutionPolicy Bypass -NoProfile -File `"$ScriptPath`" -ConfigPath `"$ConfigPath`""
-        sc.exe create $ServiceName binPath= $binPath start= auto DisplayName= "AMPNM Monitoring Agent" | Out-Null
-        sc.exe description $ServiceName "Sends system metrics to AMPNM network monitor" | Out-Null
-        sc.exe failure $ServiceName reset= 86400 actions= restart/10000/restart/10000/restart/10000 | Out-Null
-        Start-Service -Name $ServiceName
+        Write-Status "Installing Windows Service with native New-Service..."
+        $binaryPathName = "`"$PSHOME\powershell.exe`" -ExecutionPolicy Bypass -NoProfile -File `"$ScriptPath`" -ConfigPath `"$ConfigPath`""
+
+        try {
+            New-Service -Name $ServiceName -BinaryPathName $binaryPathName -DisplayName "AMPNM Monitoring Agent" -Description "Sends system metrics to AMPNM network monitor" -StartupType Automatic -ErrorAction Stop | Out-Null
+            sc.exe failure $ServiceName reset= 86400 actions= restart/10000/restart/10000/restart/10000 | Out-Null
+            Start-Service -Name $ServiceName -ErrorAction Stop
+        }
+        catch {
+            Write-Status "Native service install/start failed: $($_.Exception.Message)" "Warning"
+        }
     }
 
     Start-Sleep -Seconds 3
@@ -341,8 +353,18 @@ function Install-Service {
         return $true
     }
 
+    if ($service) {
+        Write-Status "Current service state: $($service.Status)" "Warning"
+        try {
+            $svcDetail = sc.exe queryex $ServiceName
+            if ($svcDetail) {
+                Write-Host ($svcDetail | Out-String)
+            }
+        } catch { }
+    }
+
     Write-Status "Service installed but may not be running. Check logs at $LogPath" "Warning"
-    return $true
+    return $false
 }
 
 function Uninstall-Agent {
@@ -419,5 +441,7 @@ if (Install-Service) {
     Write-Host "To view logs: Get-Content $LogPath\agent.log -Tail 50" -ForegroundColor Yellow
     Write-Host "To uninstall: .\AMPNM-Agent-Installer.ps1 -Uninstall" -ForegroundColor Yellow
 } else {
-    Write-Status "Installation completed with warnings" "Warning"
+    Write-Status "Installation completed with warnings (service is not running)." "Warning"
+    Write-Host "Try running manually to inspect errors:" -ForegroundColor Yellow
+    Write-Host "  powershell -ExecutionPolicy Bypass -NoProfile -File `"$ScriptPath`" -ConfigPath `"$ConfigPath`"" -ForegroundColor Gray
 }
