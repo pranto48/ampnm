@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/bootstrap.php';
+require_once 'includes/security_hardening.php';
 
 // If user is already logged in, redirect to dashboard
 if (isset($_SESSION['user_id'])) {
@@ -16,11 +17,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = 'Please enter both username and password.';
     } else {
         $pdo = getDbConnection();
+        if (isLoginThrottled($pdo, $username)) {
+            $error_message = 'Too many failed login attempts. Please wait a few minutes and try again.';
+        } else {
         $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
+            clearFailedLoginAttempts($pdo, $username);
             // Password is correct, start session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
@@ -28,7 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: index.php');
             exit;
         } else {
+            recordFailedLoginAttempt($pdo, $username);
             $error_message = 'Invalid username or password.';
+        }
         }
     }
 }
