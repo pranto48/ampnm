@@ -24,7 +24,7 @@ function validateAgentToken($pdo, $token) {
     if (empty($token)) return false;
     ensureAgentTokenTable($pdo);
 
-    $stmt = $pdo->prepare("SELECT * FROM agent_tokens WHERE token = ? AND enabled = TRUE");
+    $stmt = $pdo->prepare("SELECT id, name, user_id FROM agent_tokens WHERE token = ? AND enabled = TRUE");
     $stmt->execute([$token]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -56,87 +56,6 @@ function ensureAgentTokenTable($pdo) {
             INDEX `idx_token` (`token`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
-    securityEnsureSchema($pdo);
-}
-
-function verifyAgentChannelAuth(PDO $pdo, array $tokenInfo): bool {
-    $requireMtls = (getenv('REQUIRE_AGENT_MTLS') ?: '0') === '1';
-    $authMode = (string)($tokenInfo['auth_mode'] ?? 'token');
-    $hasValidMtls = (($_SERVER['SSL_CLIENT_VERIFY'] ?? '') === 'SUCCESS');
-    $providedPsk = (string)($_SERVER['HTTP_X_AGENT_PSK'] ?? '');
-
-    if ($requireMtls && !$hasValidMtls) {
-        securityAuditLog($pdo, 'agent.mtls_required_missing', 'warning', 'agent_token', (string)($tokenInfo['id'] ?? ''));
-        return false;
-    }
-
-    if (in_array($authMode, ['mtls', 'hybrid'], true) && !$hasValidMtls) {
-        return false;
-    }
-
-    if (in_array($authMode, ['psk', 'hybrid'], true)) {
-        $currentOk = !empty($tokenInfo['psk_hash']) && $providedPsk !== '' && password_verify($providedPsk, $tokenInfo['psk_hash']);
-        $prevOk = false;
-        if (!$currentOk && !empty($tokenInfo['prev_psk_hash']) && $providedPsk !== '') {
-            $graceUntil = !empty($tokenInfo['prev_psk_grace_until']) ? strtotime((string)$tokenInfo['prev_psk_grace_until']) : 0;
-            if ($graceUntil > time() && password_verify($providedPsk, $tokenInfo['prev_psk_hash'])) {
-                $prevOk = true;
-            }
-        }
-        if (!$currentOk && !$prevOk) {
-            securityAuditLog($pdo, 'agent.psk_auth_failed', 'warning', 'agent_token', (string)($tokenInfo['id'] ?? ''));
-            return false;
-        }
-    }
-
-    return true;
-}
-
-function enforceTokenRateLimit(PDO $pdo, array $tokenInfo): bool {
-    $limit = max(1, (int)($tokenInfo['rate_limit_per_minute'] ?? 120));
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM security_audit_log WHERE event_type = 'agent.token_used' AND actor_type = 'agent_token' AND actor_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)");
-    $stmt->execute([(string)$tokenInfo['id']]);
-    $count = (int)$stmt->fetchColumn();
-    return $count < $limit;
-}
-
-function enforceTokenScope(PDO $pdo, array $tokenInfo, array $payload): bool {
-    $site = (string)($payload['site'] ?? $payload['site_id'] ?? '*');
-    $group = (string)($payload['group'] ?? $payload['group_id'] ?? '*');
-    $device = (string)($payload['device'] ?? $payload['host_name'] ?? $payload['host_ip'] ?? '*');
-
-    $sitePattern = (string)($tokenInfo['scope_site_pattern'] ?? '*');
-    $groupPattern = (string)($tokenInfo['scope_group_pattern'] ?? '*');
-    $devicePattern = (string)($tokenInfo['scope_device_pattern'] ?? '*');
-
-    $ok = fnmatch($sitePattern, $site) && fnmatch($groupPattern, $group) && fnmatch($devicePattern, $device);
-    if (!$ok) {
-        securityAuditLog($pdo, 'agent.scope_denied', 'warning', 'agent_token', (string)($tokenInfo['id'] ?? ''), [
-            'site' => $site,
-            'group' => $group,
-            'device' => $device,
-            'site_pattern' => $sitePattern,
-            'group_pattern' => $groupPattern,
-            'device_pattern' => $devicePattern,
-        ]);
-    }
-    return $ok;
-}
-
-function validateAgentPayloadSchema(array $payload): array {
-    $schemaVersion = (int)($payload['schema_version'] ?? 1);
-    if ($schemaVersion !== 1) {
-        return [false, 'Unsupported schema_version. Expected 1.'];
-    }
-    $hostIp = trim((string)($payload['host_ip'] ?? $payload['ip_address'] ?? ''));
-    $hostName = trim((string)($payload['host_name'] ?? $payload['hostname'] ?? ''));
-    if ($hostIp === '' && $hostName === '') {
-        return [false, 'host_ip or host_name is required'];
-    }
-    if ($hostIp !== '' && filter_var($hostIp, FILTER_VALIDATE_IP) === false) {
-        return [false, 'host_ip must be a valid IP address'];
-    }
-    return [true, null];
 }
 
 /**
@@ -598,31 +517,43 @@ switch ($action) {
             echo json_encode(['error' => 'host_ip is required']);
             exit;
         }
-
+        
+        // Try to find matching device (IP first, then hostname)
         $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
-        $idempotencyKey = MetricsIngestService::buildIdempotencyKey($input, $tokenUserId);
-
-        $message = [
-            'message_type' => 'metrics_submit',
-            'idempotency_key' => $idempotencyKey,
-            'correlation_id' => $correlationId,
-            'payload' => array_merge($normalizedInput, [
-                'token_user_id' => $tokenUserId,
-                'token_id' => $tokenInfo['id'] ?? null,
-            ]),
-            'enqueued_at' => gmdate('c'),
-        ];
-
-        telemetryLog('agent.metrics.accepted', ['correlation_id' => $correlationId, 'idempotency_key' => $idempotencyKey, 'host_ip' => $normalizedInput['host_ip'] ?? null]);
-        $enqueue = telemetryTimedExec($pdo, 'api', 'metrics.enqueue', fn() => MetricsIngestQueue::enqueue($pdo, $message), $correlationId);
-        $processedInline = false;
-        if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
-            try {
-                MetricsIngestService::processMessage($pdo, $message);
-                $processedInline = true;
-            } catch (Throwable $e) {
-                error_log('Metrics inline fallback failed: ' . $e->getMessage());
+        $device = findDeviceMatch($pdo, $normalizedInput['host_name'] ?? '', $normalizedInput['host_ip'] ?? '', $tokenUserId);
+        $autoCreatedDevice = false;
+        if (!$device && $tokenUserId) {
+            $created = createDeviceForHost(
+                $pdo,
+                $tokenUserId,
+                (string)($normalizedInput['host_name'] ?? ''),
+                $normalizedInput['host_ip'] ?? null,
+                (string)($normalizedInput['platform'] ?? 'unknown')
+            );
+            if ($created) {
+                $device = $created;
+                $autoCreatedDevice = true;
             }
+        }
+        $deviceId = $device ? $device['id'] : null;
+        if ($deviceId) {
+            touchDeviceFromMetrics($pdo, (int)$deviceId, (string)($normalizedInput['host_ip'] ?? ''), 'online');
+        }
+        
+        // Save metrics
+        $metricsId = saveHostMetrics($pdo, $normalizedInput, $deviceId);
+        
+        // Check thresholds and send alerts if needed
+        try {
+            require_once __DIR__ . '/../../includes/host_alerts.php';
+            $alertSystem = new HostAlertSystem($pdo);
+            $alertSystem->checkAndAlert(
+                $normalizedInput['host_ip'],
+                $normalizedInput['host_name'] ?? $normalizedInput['host_ip'],
+                $normalizedInput
+            );
+        } catch (Exception $e) {
+            error_log("Host Alert Error: " . $e->getMessage());
         }
 
         echo json_encode([
@@ -719,15 +650,57 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
-            'status' => 'accepted',
-            'queued' => true,
-            'processed_inline' => $processedInline,
-            'queue_transport' => $enqueue['transport'],
-            'queue_message_id' => $enqueue['message_id'],
-            'idempotency_key' => $idempotencyKey,
-            'correlation_id' => $correlationId,
+            'metrics_id' => $metricsId,
+            'device_matched' => $device ? $device['name'] : null,
+            'device_id' => $deviceId ? (int)$deviceId : null,
+            'auto_device_created' => $autoCreatedDevice,
+            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
+            'platform' => $normalizedInput['platform'] ?? 'unknown',
+            'hostname' => $normalizedInput['host_name'] ?? null,
+            'ip_address' => $normalizedInput['host_ip'] ?? null
+        ]);
+        break;
+
+    case 'pull_device_by_ip':
+        $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
+        $tokenInfo = validateAgentToken($pdo, $token);
+        if (!$tokenInfo) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid or missing agent token']);
+            exit;
+        }
+
+        $requestedIp = trim((string)($_GET['host_ip'] ?? $input['host_ip'] ?? ''));
+        $requestedHostName = trim((string)($_GET['host_name'] ?? $input['host_name'] ?? ''));
+        if ($requestedIp === '' && $requestedHostName === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'host_ip or host_name is required']);
+            exit;
+        }
+
+        $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
+        $device = findDeviceMatch($pdo, $requestedHostName, $requestedIp, $tokenUserId);
+        $autoCreated = false;
+        if (!$device && $tokenUserId) {
+            $created = createDeviceForHost($pdo, $tokenUserId, $requestedHostName, $requestedIp ?: null, 'windows');
+            if ($created) {
+                $device = $created;
+                $autoCreated = true;
+            }
+        }
+
+        if ($device && !empty($device['id'])) {
+            touchDeviceFromMetrics($pdo, (int)$device['id'], $requestedIp, 'online');
+        }
+
+        echo json_encode([
+            'success' => true,
             'host_ip' => $requestedIp ?: null,
             'host_name' => $requestedHostName ?: null,
+            'device' => $device ?: null,
+            'device_found' => (bool)$device,
+            'auto_device_created' => $autoCreated,
+            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
         ]);
         break;
         
@@ -969,7 +942,6 @@ switch ($action) {
     case 'get_agent_tokens':
         // List all agent tokens (admin only)
         ensureAgentTokenTable($pdo);
-        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'get_agent_tokens']);
         $stmt = $pdo->query("SELECT id, name, token, enabled, last_used_at, created_at FROM agent_tokens ORDER BY created_at DESC");
         $tokens = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($tokens);
@@ -985,14 +957,6 @@ switch ($action) {
         }
         $name = $input['name'] ?? 'Windows Agent ' . date('Y-m-d H:i');
         $token = generateAgentToken();
-        $authMode = in_array(($input['auth_mode'] ?? 'token'), ['token', 'psk', 'mtls', 'hybrid'], true) ? $input['auth_mode'] : 'token';
-        $scopeSite = $input['scope_site_pattern'] ?? '*';
-        $scopeGroup = $input['scope_group_pattern'] ?? '*';
-        $scopeDevice = $input['scope_device_pattern'] ?? '*';
-        $rpm = max(1, (int)($input['rate_limit_per_minute'] ?? 120));
-        $expiresAt = !empty($input['expires_at']) ? date('Y-m-d H:i:s', strtotime((string)$input['expires_at'])) : date('Y-m-d H:i:s', strtotime('+90 days'));
-        $rawPsk = !empty($input['psk']) ? (string)$input['psk'] : null;
-        $pskHash = $rawPsk ? password_hash($rawPsk, PASSWORD_DEFAULT) : null;
         
         $userId = $_SESSION['user_id'] ?? null;
         if (!$userId) { http_response_code(401); echo json_encode(['error' => 'Not authenticated']); exit; }
@@ -1028,6 +992,65 @@ switch ($action) {
         $stmt->execute([password_hash($newPsk, PASSWORD_DEFAULT), $graceSeconds, $tokenId]);
         securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'rotate_agent_token_secret', 'token_id' => $tokenId, 'grace_seconds' => $graceSeconds]);
         echo json_encode(['success' => true, 'token_id' => $tokenId, 'grace_period_seconds' => $graceSeconds]);
+        break;
+
+    case 'create_device_from_host':
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can add host devices']);
+            exit;
+        }
+        $userId = $_SESSION['user_id'] ?? null;
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Not authenticated']);
+            exit;
+        }
+        $hostIp = trim((string)($input['host_ip'] ?? ''));
+        $hostName = trim((string)($input['host_name'] ?? ''));
+        $platform = trim((string)($input['platform'] ?? 'unknown'));
+        if ($hostIp === '' && $hostName === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'host_ip or host_name is required']);
+            exit;
+        }
+        $device = createDeviceForHost($pdo, (int)$userId, $hostName, $hostIp ?: null, $platform);
+        echo json_encode(['success' => true, 'device' => $device]);
+        break;
+
+    case 'register_host_ip':
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can register hosts']);
+            exit;
+        }
+        $hostIp = trim((string)($input['host_ip'] ?? ''));
+        $hostName = trim((string)($input['host_name'] ?? ''));
+        $autoCreateDevice = !isset($input['create_device']) || !empty($input['create_device']);
+        if ($hostIp === '' || !filter_var($hostIp, FILTER_VALIDATE_IP)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Valid host_ip is required']);
+            exit;
+        }
+        $userId = $_SESSION['user_id'] ?? null;
+        $payload = normalizeMetricsPayload([
+            'host_ip' => $hostIp,
+            'host_name' => $hostName !== '' ? $hostName : $hostIp,
+            'cpu_percent' => null,
+            'memory_percent' => null,
+            'disk_percent' => null,
+            'network_in_mbps' => null,
+            'network_out_mbps' => null,
+            'gpu_percent' => null,
+            'platform' => 'unknown'
+        ]);
+        $deviceId = null;
+        if ($autoCreateDevice && $userId) {
+            $device = createDeviceForHost($pdo, (int)$userId, $payload['host_name'], $payload['host_ip'], 'unknown');
+            $deviceId = $device['id'] ?? null;
+        }
+        $metricsId = saveHostMetrics($pdo, $payload, $deviceId);
+        echo json_encode(['success' => true, 'metrics_id' => $metricsId, 'host_ip' => $hostIp, 'host_name' => $payload['host_name']]);
         break;
 
     case 'create_device_from_host':

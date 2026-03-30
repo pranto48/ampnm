@@ -18,21 +18,6 @@ function initMap() {
         deviceManager
     } = MapApp;
     const TOOLTIP_FIELDS_STORAGE_PREFIX = 'mapTooltipFields:';
-
-    const mapProxySelector = document.getElementById('mapProxySelector');
-    const applyMapProxyBtn = document.getElementById('applyMapProxyBtn');
-    const loadProxySelector = async () => {
-        if (!mapProxySelector) return;
-        try {
-            const result = await api.get('get_proxies');
-            const rows = Array.isArray(result.proxies) ? result.proxies : [];
-            mapProxySelector.innerHTML = ['<option value="">Unassigned</option>']
-                .concat(rows.map((p) => `<option value="${p.id}">${p.name}${p.site ? ` (${p.site})` : ''}</option>`)).join('');
-        } catch (e) {
-            mapProxySelector.innerHTML = '<option value="">Proxy load failed</option>';
-        }
-    };
-
     const TOOLTIP_DISPLAY_STORAGE_PREFIX = 'mapTooltipDisplay:';
 
     const loadTooltipFieldsForMap = (mapId) => {
@@ -53,26 +38,6 @@ function initMap() {
         if (!mapId) return;
         localStorage.setItem(`${TOOLTIP_FIELDS_STORAGE_PREFIX}${mapId}`, JSON.stringify(settings));
         state.tooltipFieldSettingsByMap[mapId] = settings;
-    };
-
-    const loadConnectionTooltipFieldsForMap = (mapId) => {
-        const defaults = MapApp.utils.getDefaultConnectionTooltipFields();
-        if (!mapId) return defaults;
-        try {
-            const raw = localStorage.getItem(`${CONNECTION_TOOLTIP_FIELDS_STORAGE_PREFIX}${mapId}`);
-            if (!raw) return defaults;
-            const parsed = JSON.parse(raw);
-            return { ...defaults, ...(parsed || {}) };
-        } catch (error) {
-            console.warn('Failed to load connection tooltip settings. Using defaults.', error);
-            return defaults;
-        }
-    };
-
-    const saveConnectionTooltipFieldsForMap = (mapId, settings) => {
-        if (!mapId) return;
-        localStorage.setItem(`${CONNECTION_TOOLTIP_FIELDS_STORAGE_PREFIX}${mapId}`, JSON.stringify(settings));
-        state.connectionTooltipFieldSettingsByMap[mapId] = settings;
     };
 
     const loadTooltipDisplayForMap = (mapId) => {
@@ -110,21 +75,6 @@ function initMap() {
         return settings;
     };
 
-    const applyConnectionTooltipFieldCheckboxes = (settings) => {
-        const merged = { ...MapApp.utils.getDefaultConnectionTooltipFields(), ...(settings || {}) };
-        document.querySelectorAll('[data-connection-tooltip-field]').forEach((checkbox) => {
-            checkbox.checked = merged[checkbox.dataset.connectionTooltipField] !== false;
-        });
-    };
-
-    const readConnectionTooltipFieldCheckboxes = () => {
-        const settings = MapApp.utils.getDefaultConnectionTooltipFields();
-        document.querySelectorAll('[data-connection-tooltip-field]').forEach((checkbox) => {
-            settings[checkbox.dataset.connectionTooltipField] = !!checkbox.checked;
-        });
-        return settings;
-    };
-
     const applyTooltipDisplayControls = (settings) => {
         const merged = { ...MapApp.utils.getDefaultTooltipDisplaySettings(), ...(settings || {}) };
         const density = document.getElementById('tooltipDensity');
@@ -157,18 +107,6 @@ function initMap() {
             }
         });
         if (updates.length > 0) state.nodes.update(updates);
-    };
-
-    const refreshEdgeTooltips = () => {
-        const updates = [];
-        state.edges.forEach((edge) => {
-            const fromNode = state.nodes.get(edge.from);
-            const toNode = state.nodes.get(edge.to);
-            const srcDevice = fromNode?.deviceData || null;
-            const tgtDevice = toNode?.deviceData || null;
-            updates.push({ id: edge.id, title: MapApp.utils.buildEdgeTitle(edge, srcDevice, tgtDevice) });
-        });
-        if (updates.length > 0) state.edges.update(updates);
     };
 
     const tooltipFontScaleInput = document.getElementById('tooltipFontScale');
@@ -458,7 +396,6 @@ function initMap() {
 
     els.mapSelector.addEventListener('change', (e) => {
         state.tooltipFieldSettingsByMap[e.target.value] = loadTooltipFieldsForMap(e.target.value);
-        state.connectionTooltipFieldSettingsByMap[e.target.value] = loadConnectionTooltipFieldsForMap(e.target.value);
         state.tooltipDisplaySettingsByMap[e.target.value] = loadTooltipDisplayForMap(e.target.value);
         mapManager.switchMap(e.target.value);
     });
@@ -606,7 +543,6 @@ function initMap() {
                 els.publicViewToggle.checked = currentMap.public_view_enabled;
                 MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
                 applyTooltipFieldCheckboxes(loadTooltipFieldsForMap(currentMap.id));
-                applyConnectionTooltipFieldCheckboxes(loadConnectionTooltipFieldsForMap(currentMap.id));
                 applyTooltipDisplayControls(loadTooltipDisplayForMap(currentMap.id));
                 openModal('mapSettingsModal');
             }
@@ -656,13 +592,11 @@ function initMap() {
             };
             try {
                 saveTooltipFieldsForMap(state.currentMapId, readTooltipFieldCheckboxes());
-                saveConnectionTooltipFieldsForMap(state.currentMapId, readConnectionTooltipFieldCheckboxes());
                 saveTooltipDisplayForMap(state.currentMapId, readTooltipDisplayControls());
                 await api.post('update_map', { id: state.currentMapId, updates });
                 await mapManager.loadMaps(); // Reload maps to get fresh data
                 await mapManager.switchMap(state.currentMapId); // Re-apply settings
                 refreshNodeTooltips();
-                refreshEdgeTooltips();
                 closeModal('mapSettingsModal');
                 window.notyf.success('Map settings saved.');
             } catch (error) {
@@ -674,13 +608,11 @@ function initMap() {
             try {
                 const updates = { background_color: null, background_image_url: null, public_view_enabled: false };
                 saveTooltipFieldsForMap(state.currentMapId, MapApp.utils.getDefaultTooltipFields());
-                saveConnectionTooltipFieldsForMap(state.currentMapId, MapApp.utils.getDefaultConnectionTooltipFields());
                 saveTooltipDisplayForMap(state.currentMapId, MapApp.utils.getDefaultTooltipDisplaySettings());
                 await api.post('update_map', { id: state.currentMapId, updates });
                 await mapManager.loadMaps();
                 await mapManager.switchMap(state.currentMapId);
                 refreshNodeTooltips();
-                refreshEdgeTooltips();
                 closeModal('mapSettingsModal');
                 window.notyf.success('Map background and public view reset to default.');
             } catch (error) {
@@ -844,7 +776,6 @@ function initMap() {
         if (initialMapId) {
             els.mapSelector.value = initialMapId;
             state.tooltipFieldSettingsByMap[initialMapId] = loadTooltipFieldsForMap(initialMapId);
-            state.connectionTooltipFieldSettingsByMap[initialMapId] = loadConnectionTooltipFieldsForMap(initialMapId);
             state.tooltipDisplaySettingsByMap[initialMapId] = loadTooltipDisplayForMap(initialMapId);
             applyTooltipDisplayControls(state.tooltipDisplaySettingsByMap[initialMapId]);
             await mapManager.switchMap(initialMapId);

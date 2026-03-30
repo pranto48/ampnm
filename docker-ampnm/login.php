@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/bootstrap.php';
+require_once 'includes/security_hardening.php';
 
 // If user is already logged in, redirect to dashboard
 if (isset($_SESSION['user_id'])) {
@@ -16,28 +17,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = 'Please enter both username and password.';
     } else {
         $pdo = getDbConnection();
-        if (isLoginThrottled($pdo, strtolower($username))) {
-            recordAuthAttempt($pdo, strtolower($username), 'login', false);
-            securityAuditLog($pdo, 'auth.login_throttled', 'warning', 'user', $username);
-            $error_message = 'Too many failed attempts. Please wait and try again.';
+        if (isLoginThrottled($pdo, $username)) {
+            $error_message = 'Too many failed login attempts. Please wait a few minutes and try again.';
         } else {
-        $stmt = $pdo->prepare("SELECT id, password, role, mfa_secret, mfa_enabled FROM users WHERE username = ?");
+        $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
-            $requireMfaForAdmin = (getenv('ADMIN_MFA_REQUIRED') ?: '0') === '1';
-            $mfaCode = trim((string)($_POST['mfa_code'] ?? ''));
-            $userSecret = (string)($user['mfa_secret'] ?? '');
-            $effectiveSecret = $userSecret !== '' ? $userSecret : (string)(getenv('ADMIN_MFA_TOTP_SECRET') ?: '');
-            if ($requireMfaForAdmin && $user['role'] === 'admin') {
-                if ($effectiveSecret === '' || !verifyTotpCode($effectiveSecret, $mfaCode)) {
-                    recordAuthAttempt($pdo, strtolower($username), 'login', false);
-                    securityAuditLog($pdo, 'auth.mfa_failed', 'warning', 'user', $username);
-                    $error_message = 'Invalid MFA code.';
-                    goto render_login;
-                }
-            }
+            clearFailedLoginAttempts($pdo, $username);
             // Password is correct, start session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
@@ -46,8 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: index.php');
             exit;
         } else {
-            recordAuthAttempt($pdo, strtolower($username), 'login', false);
-            securityAuditLog($pdo, 'auth.login_failed', 'warning', 'user', $username);
+            recordFailedLoginAttempt($pdo, $username);
             $error_message = 'Invalid username or password.';
         }
         }
