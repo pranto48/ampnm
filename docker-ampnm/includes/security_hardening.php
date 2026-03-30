@@ -81,3 +81,15 @@ function clearFailedLoginAttempts(PDO $pdo, string $username): void {
     $stmt = $pdo->prepare("DELETE FROM `login_attempts` WHERE `username` = ? OR `ip_address` = ?");
     $stmt->execute([$username, $ip]);
 }
+
+/**
+ * Backward-compatible helper used by some login.php variants.
+ * `$success = true` clears attempts, `$success = false` records a failed attempt.
+ */
+function recordAuthAttempt(PDO $pdo, string $username, bool $success): void {
+    if ($success) {
+        clearFailedLoginAttempts($pdo, $username);
+        return;
+    }
+    recordFailedLoginAttempt($pdo, $username);
+}
