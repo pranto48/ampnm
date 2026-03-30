@@ -257,6 +257,42 @@ try {
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
 
+        // TABLES FOR ASYNC METRICS INGEST
+        "CREATE TABLE IF NOT EXISTS `metrics_ingest_queue` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `idempotency_key` VARCHAR(255) NOT NULL,
+            `message_type` VARCHAR(50) NOT NULL,
+            `payload_json` LONGTEXT NOT NULL,
+            `attempt_count` INT UNSIGNED NOT NULL DEFAULT 0,
+            `status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+            `last_error` TEXT NULL,
+            `queued_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `processed_at` TIMESTAMP NULL,
+            UNIQUE KEY `uniq_metrics_ingest_queue_idem` (`idempotency_key`),
+            KEY `idx_metrics_ingest_queue_status` (`status`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        "CREATE TABLE IF NOT EXISTS `metrics_ingest_dead_letter` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `idempotency_key` VARCHAR(255) NOT NULL,
+            `message_type` VARCHAR(50) NOT NULL,
+            `payload_json` LONGTEXT NOT NULL,
+            `error_reason` TEXT NULL,
+            `failed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `uniq_metrics_ingest_dead_letter_idem` (`idempotency_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        "CREATE TABLE IF NOT EXISTS `metrics_ingest_dedup` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `idempotency_key` VARCHAR(255) NOT NULL,
+            `message_type` VARCHAR(50) NOT NULL,
+            `status` VARCHAR(20) NOT NULL DEFAULT 'processing',
+            `last_error` TEXT NULL,
+            `processed_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `uniq_metrics_ingest_dedup_idem` (`idempotency_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
         // TABLE FOR HOST METRICS (Windows Agent telemetry)
         "CREATE TABLE IF NOT EXISTS `host_metrics` (
             `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
