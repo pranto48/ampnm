@@ -110,6 +110,18 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                 </div>
             </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <h3 class="text-white font-semibold">Proxy Assignment</h3>
+                        <p class="text-xs text-slate-400">Assign all devices on the selected map to a proxy/site collector.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select id="mapProxySelector" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm"></select>
+                        <button id="applyMapProxyBtn" class="px-3 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700" <?= $is_admin ? '' : 'disabled' ?>>Apply to Map Devices</button>
+                    </div>
+                </div>
+            </div>
             <div id="network-map-wrapper">
                 <div id="network-map"></div>
                 <div id="context-menu" class="context-menu"></div>
