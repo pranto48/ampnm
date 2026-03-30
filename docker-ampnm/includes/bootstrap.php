@@ -3,6 +3,7 @@
 // It handles basic setup like loading functions and checking database integrity.
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/security_hardening.php';
 
 // This script should not run on the setup page itself to avoid a redirect loop.
 if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
@@ -40,4 +41,12 @@ if (session_status() === PHP_SESSION_NONE) {
     }
 
     session_start();
+}
+
+try {
+    $pdo = getDbConnection();
+    securityEnsureSchema($pdo);
+    enforceTlsForSensitiveRoutes($pdo);
+} catch (Throwable $e) {
+    error_log('Bootstrap security hardening warning: ' . $e->getMessage());
 }
