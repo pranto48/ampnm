@@ -80,6 +80,13 @@ MapApp.utils = {
         ports: true
     }),
 
+    getDefaultConnectionTooltipFields: () => ({
+        type: true,
+        source_target: true,
+        status: true,
+        ports: true
+    }),
+
     getDefaultTooltipDisplaySettings: () => ({
         density: 'comfortable', // compact | comfortable
         font_scale: 100, // percentage
@@ -110,6 +117,22 @@ MapApp.utils = {
         if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
             try {
                 const raw = localStorage.getItem(`mapTooltipDisplay:${currentMapId}`);
+                mapSettings = raw ? JSON.parse(raw) : {};
+            } catch (error) {
+                mapSettings = {};
+            }
+        }
+        return { ...defaults, ...(mapSettings || {}) };
+    },
+
+    getCurrentConnectionTooltipFields: () => {
+        const defaults = MapApp.utils.getDefaultConnectionTooltipFields();
+        const currentMapId = MapApp.state?.currentMapId;
+        if (!currentMapId) return defaults;
+        let mapSettings = MapApp.state?.connectionTooltipFieldSettingsByMap?.[currentMapId] || {};
+        if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
+            try {
+                const raw = localStorage.getItem(`mapConnectionTooltipFields:${currentMapId}`);
                 mapSettings = raw ? JSON.parse(raw) : {};
             } catch (error) {
                 mapSettings = {};
@@ -316,13 +339,14 @@ MapApp.utils = {
         const connType = edge.connection_type || 'unknown';
         const connLabel = typeLabels[connType] || connType;
         const connColor = typeColors[connType] || '#94a3b8';
+        const connectionTooltipFields = MapApp.utils.getCurrentConnectionTooltipFields();
 
         let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 200px; max-width: 300px; padding: 2px;">`;
 
         // Header
         title += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">`;
         title += `<div style="width:12px; height:3px; border-radius:2px; background:${connColor};"></div>`;
-        title += `<b style="font-size:13px; color:#f1f5f9;">${connLabel}</b>`;
+        title += `<b style="font-size:13px; color:#f1f5f9;">${connectionTooltipFields.type ? connLabel : 'Connection'}</b>`;
         title += `</div>`;
 
         title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-bottom:8px;"></div>`;
@@ -336,14 +360,22 @@ MapApp.utils = {
         const tgtStatus = tgtDevice ? (tgtDevice.status || 'unknown') : 'unknown';
         const statusDotColors = { online: '#22c55e', warning: '#eab308', critical: '#ef4444', offline: '#64748b', unknown: '#94a3b8' };
 
-        title += `<span style="color:#94a3b8;">Source:</span>`;
-        title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[srcStatus] || '#94a3b8'}; margin-right:4px;"></span>${srcName}</span>`;
+        if (connectionTooltipFields.source_target) {
+            title += `<span style="color:#94a3b8;">Source:</span>`;
+            title += `<span style="color:#e2e8f0;">${srcName}</span>`;
+            title += `<span style="color:#94a3b8;">Target:</span>`;
+            title += `<span style="color:#e2e8f0;">${tgtName}</span>`;
+        }
 
-        title += `<span style="color:#94a3b8;">Target:</span>`;
-        title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[tgtStatus] || '#94a3b8'}; margin-right:4px;"></span>${tgtName}</span>`;
+        if (connectionTooltipFields.status) {
+            title += `<span style="color:#94a3b8;">Source Status:</span>`;
+            title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[srcStatus] || '#94a3b8'}; margin-right:4px;"></span>${srcStatus}</span>`;
+            title += `<span style="color:#94a3b8;">Target Status:</span>`;
+            title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[tgtStatus] || '#94a3b8'}; margin-right:4px;"></span>${tgtStatus}</span>`;
+        }
 
         // Port mapping
-        if (edge.source_port_label || edge.target_port_label) {
+        if (connectionTooltipFields.ports && (edge.source_port_label || edge.target_port_label)) {
             title += `<span style="color:#94a3b8;">Ports:</span>`;
             title += `<span style="color:#22d3ee; font-family:monospace; font-weight:600;">${edge.source_port_label || '—'} ↔ ${edge.target_port_label || '—'}</span>`;
         }
@@ -351,7 +383,7 @@ MapApp.utils = {
         title += `</div>`;
 
         // Port mapping visual
-        if (edge.source_port_label && edge.target_port_label) {
+        if (connectionTooltipFields.ports && edge.source_port_label && edge.target_port_label) {
             title += `<div style="margin-top:8px; padding:6px 8px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); border-radius:6px; text-align:center;">`;
             title += `<span style="font-size:11px; color:#94a3b8;">Port Mapping</span><br>`;
             title += `<span style="font-size:13px; font-family:monospace; color:#22d3ee; font-weight:600;">${edge.source_port_label}</span>`;
