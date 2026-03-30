@@ -16,22 +16,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = 'Please enter both username and password.';
     } else {
         $pdo = getDbConnection();
-        $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE username = ?");
+        if (isLoginThrottled($pdo, strtolower($username))) {
+            recordAuthAttempt($pdo, strtolower($username), 'login', false);
+            securityAuditLog($pdo, 'auth.login_throttled', 'warning', 'user', $username);
+            $error_message = 'Too many failed attempts. Please wait and try again.';
+        } else {
+        $stmt = $pdo->prepare("SELECT id, password, role, mfa_secret, mfa_enabled FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
+            $requireMfaForAdmin = (getenv('ADMIN_MFA_REQUIRED') ?: '0') === '1';
+            $mfaCode = trim((string)($_POST['mfa_code'] ?? ''));
+            $userSecret = (string)($user['mfa_secret'] ?? '');
+            $effectiveSecret = $userSecret !== '' ? $userSecret : (string)(getenv('ADMIN_MFA_TOTP_SECRET') ?: '');
+            if ($requireMfaForAdmin && $user['role'] === 'admin') {
+                if ($effectiveSecret === '' || !verifyTotpCode($effectiveSecret, $mfaCode)) {
+                    recordAuthAttempt($pdo, strtolower($username), 'login', false);
+                    securityAuditLog($pdo, 'auth.mfa_failed', 'warning', 'user', $username);
+                    $error_message = 'Invalid MFA code.';
+                    goto render_login;
+                }
+            }
             // Password is correct, start session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
             $_SESSION['user_role'] = $user['role']; // Store user role in session
+            recordAuthAttempt($pdo, strtolower($username), 'login', true);
             header('Location: index.php');
             exit;
         } else {
+            recordAuthAttempt($pdo, strtolower($username), 'login', false);
+            securityAuditLog($pdo, 'auth.login_failed', 'warning', 'user', $username);
             $error_message = 'Invalid username or password.';
+        }
         }
     }
 }
+render_login:
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,6 +89,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="password" name="password" id="password" required
                        class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
                        placeholder="password">
+            </div>
+            <div>
+                <label for="mfa_code" class="block text-sm font-medium text-slate-300 mb-2">MFA Code (if enabled)</label>
+                <input type="text" name="mfa_code" id="mfa_code" inputmode="numeric" pattern="[0-9]{6}"
+                       class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
+                       placeholder="123456">
             </div>
             <button type="submit"
                     class="w-full px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none">

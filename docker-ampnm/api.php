@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/functions.php';
+require_once 'includes/security_hardening.php';
 
 header('Content-Type: application/json');
 
@@ -9,6 +10,7 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
 try {
     $pdo = getDbConnection(); // Get PDO connection early for all actions
+    securityEnsureSchema($pdo);
 
     // --- Public Actions (NO AUTH REQUIRED) ---
     // These actions must be handled and exit BEFORE any authentication checks.
@@ -151,6 +153,16 @@ try {
     }
 
     // Group actions by handler
+    $privilegedActions = [
+        'create_device', 'update_device', 'delete_device', 'copy_device',
+        'create_map', 'delete_map', 'create_edge', 'update_edge', 'delete_edge', 'update_map',
+        'create_user', 'delete_user', 'update_user_role', 'update_user_password',
+        'create_agent_token', 'delete_agent_token', 'toggle_agent_token', 'rotate_agent_token_secret',
+        'save_smtp_settings', 'save_alert_settings', 'save_storage_policy', 'save_host_override', 'delete_host_override'
+    ];
+    if (in_array($action, $privilegedActions, true) && ($_SESSION['user_id'] ?? null)) {
+        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)$_SESSION['user_id'], ['action' => $action]);
+    }
     $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
     $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip']; // ping_all_devices removed
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports'];
@@ -163,6 +175,7 @@ try {
     $metricsActions = [
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',
         'get_agent_tokens', 'create_agent_token', 'delete_agent_token', 'toggle_agent_token',
+        'rotate_agent_token_secret',
         'create_device_from_host', 'register_host_ip', 'pull_device_by_ip',
         'get_alert_settings', 'save_alert_settings',
         'get_storage_policy', 'save_storage_policy',

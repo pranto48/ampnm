@@ -10,7 +10,9 @@ $pdo = getDbConnection();
 
 require_once __DIR__ . '/../../includes/metrics_ingest_service.php';
 require_once __DIR__ . '/../../includes/storage_policy.php';
+require_once __DIR__ . '/../../includes/security_hardening.php';
 ensureStoragePolicySchema($pdo);
+securityEnsureSchema($pdo);
 
 /**
  * Validate agent token
@@ -19,11 +21,15 @@ function validateAgentToken($pdo, $token) {
     if (empty($token)) return false;
     ensureAgentTokenTable($pdo);
 
-    $stmt = $pdo->prepare("SELECT id, name, user_id FROM agent_tokens WHERE token = ? AND enabled = TRUE");
+    $stmt = $pdo->prepare("SELECT * FROM agent_tokens WHERE token = ? AND enabled = TRUE");
     $stmt->execute([$token]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($result) {
+        if (!empty($result['expires_at']) && strtotime((string)$result['expires_at']) < time()) {
+            securityAuditLog($pdo, 'agent.token_expired', 'warning', 'agent_token', (string)$result['id']);
+            return false;
+        }
         $updateStmt = $pdo->prepare("UPDATE agent_tokens SET last_used_at = NOW() WHERE id = ?");
         $updateStmt->execute([$result['id']]);
         return $result;
@@ -47,6 +53,87 @@ function ensureAgentTokenTable($pdo) {
             INDEX `idx_token` (`token`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    securityEnsureSchema($pdo);
+}
+
+function verifyAgentChannelAuth(PDO $pdo, array $tokenInfo): bool {
+    $requireMtls = (getenv('REQUIRE_AGENT_MTLS') ?: '0') === '1';
+    $authMode = (string)($tokenInfo['auth_mode'] ?? 'token');
+    $hasValidMtls = (($_SERVER['SSL_CLIENT_VERIFY'] ?? '') === 'SUCCESS');
+    $providedPsk = (string)($_SERVER['HTTP_X_AGENT_PSK'] ?? '');
+
+    if ($requireMtls && !$hasValidMtls) {
+        securityAuditLog($pdo, 'agent.mtls_required_missing', 'warning', 'agent_token', (string)($tokenInfo['id'] ?? ''));
+        return false;
+    }
+
+    if (in_array($authMode, ['mtls', 'hybrid'], true) && !$hasValidMtls) {
+        return false;
+    }
+
+    if (in_array($authMode, ['psk', 'hybrid'], true)) {
+        $currentOk = !empty($tokenInfo['psk_hash']) && $providedPsk !== '' && password_verify($providedPsk, $tokenInfo['psk_hash']);
+        $prevOk = false;
+        if (!$currentOk && !empty($tokenInfo['prev_psk_hash']) && $providedPsk !== '') {
+            $graceUntil = !empty($tokenInfo['prev_psk_grace_until']) ? strtotime((string)$tokenInfo['prev_psk_grace_until']) : 0;
+            if ($graceUntil > time() && password_verify($providedPsk, $tokenInfo['prev_psk_hash'])) {
+                $prevOk = true;
+            }
+        }
+        if (!$currentOk && !$prevOk) {
+            securityAuditLog($pdo, 'agent.psk_auth_failed', 'warning', 'agent_token', (string)($tokenInfo['id'] ?? ''));
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function enforceTokenRateLimit(PDO $pdo, array $tokenInfo): bool {
+    $limit = max(1, (int)($tokenInfo['rate_limit_per_minute'] ?? 120));
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM security_audit_log WHERE event_type = 'agent.token_used' AND actor_type = 'agent_token' AND actor_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)");
+    $stmt->execute([(string)$tokenInfo['id']]);
+    $count = (int)$stmt->fetchColumn();
+    return $count < $limit;
+}
+
+function enforceTokenScope(PDO $pdo, array $tokenInfo, array $payload): bool {
+    $site = (string)($payload['site'] ?? $payload['site_id'] ?? '*');
+    $group = (string)($payload['group'] ?? $payload['group_id'] ?? '*');
+    $device = (string)($payload['device'] ?? $payload['host_name'] ?? $payload['host_ip'] ?? '*');
+
+    $sitePattern = (string)($tokenInfo['scope_site_pattern'] ?? '*');
+    $groupPattern = (string)($tokenInfo['scope_group_pattern'] ?? '*');
+    $devicePattern = (string)($tokenInfo['scope_device_pattern'] ?? '*');
+
+    $ok = fnmatch($sitePattern, $site) && fnmatch($groupPattern, $group) && fnmatch($devicePattern, $device);
+    if (!$ok) {
+        securityAuditLog($pdo, 'agent.scope_denied', 'warning', 'agent_token', (string)($tokenInfo['id'] ?? ''), [
+            'site' => $site,
+            'group' => $group,
+            'device' => $device,
+            'site_pattern' => $sitePattern,
+            'group_pattern' => $groupPattern,
+            'device_pattern' => $devicePattern,
+        ]);
+    }
+    return $ok;
+}
+
+function validateAgentPayloadSchema(array $payload): array {
+    $schemaVersion = (int)($payload['schema_version'] ?? 1);
+    if ($schemaVersion !== 1) {
+        return [false, 'Unsupported schema_version. Expected 1.'];
+    }
+    $hostIp = trim((string)($payload['host_ip'] ?? $payload['ip_address'] ?? ''));
+    $hostName = trim((string)($payload['host_name'] ?? $payload['hostname'] ?? ''));
+    if ($hostIp === '' && $hostName === '') {
+        return [false, 'host_ip or host_name is required'];
+    }
+    if ($hostIp !== '' && filter_var($hostIp, FILTER_VALIDATE_IP) === false) {
+        return [false, 'host_ip must be a valid IP address'];
+    }
+    return [true, null];
 }
 
 /**
@@ -471,10 +558,36 @@ switch ($action) {
         $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
         $tokenInfo = validateAgentToken($pdo, $token);
         if (!$tokenInfo) {
+            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', null, ['reason' => 'invalid_token']);
             http_response_code(401);
             echo json_encode(['error' => 'Invalid or missing agent token']);
             exit;
         }
+        if (!verifyAgentChannelAuth($pdo, $tokenInfo)) {
+            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', (string)$tokenInfo['id'], ['reason' => 'channel_auth_failed']);
+            http_response_code(401);
+            echo json_encode(['error' => 'Agent channel authentication failed']);
+            exit;
+        }
+        if (!enforceTokenRateLimit($pdo, $tokenInfo)) {
+            securityAuditLog($pdo, 'agent.rate_limited', 'warning', 'agent_token', (string)$tokenInfo['id']);
+            http_response_code(429);
+            echo json_encode(['error' => 'Rate limit exceeded for token']);
+            exit;
+        }
+        [$schemaOk, $schemaError] = validateAgentPayloadSchema($input);
+        if (!$schemaOk) {
+            securityAuditLog($pdo, 'agent.payload_invalid', 'warning', 'agent_token', (string)$tokenInfo['id'], ['error' => $schemaError]);
+            http_response_code(400);
+            echo json_encode(['error' => $schemaError]);
+            exit;
+        }
+        if (!enforceTokenScope($pdo, $tokenInfo, $input)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Token scope does not allow this payload']);
+            exit;
+        }
+        securityAuditLog($pdo, 'agent.token_used', 'info', 'agent_token', (string)$tokenInfo['id'], ['action' => 'submit_metrics']);
 
         $normalizedInput = MetricsIngestService::normalizeMetricsPayload($input);
         if (empty($normalizedInput['host_ip'])) {
@@ -524,8 +637,21 @@ switch ($action) {
         $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
         $tokenInfo = validateAgentToken($pdo, $token);
         if (!$tokenInfo) {
+            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', null, ['reason' => 'invalid_token']);
             http_response_code(401);
             echo json_encode(['error' => 'Invalid or missing agent token']);
+            exit;
+        }
+        if (!verifyAgentChannelAuth($pdo, $tokenInfo)) {
+            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', (string)$tokenInfo['id'], ['reason' => 'channel_auth_failed']);
+            http_response_code(401);
+            echo json_encode(['error' => 'Agent channel authentication failed']);
+            exit;
+        }
+        if (!enforceTokenRateLimit($pdo, $tokenInfo)) {
+            securityAuditLog($pdo, 'agent.rate_limited', 'warning', 'agent_token', (string)$tokenInfo['id']);
+            http_response_code(429);
+            echo json_encode(['error' => 'Rate limit exceeded for token']);
             exit;
         }
 
@@ -538,6 +664,12 @@ switch ($action) {
         }
 
         $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
+        if (!enforceTokenScope($pdo, $tokenInfo, ['host_ip' => $requestedIp, 'host_name' => $requestedHostName])) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Token scope does not allow this payload']);
+            exit;
+        }
+        securityAuditLog($pdo, 'agent.token_used', 'info', 'agent_token', (string)$tokenInfo['id'], ['action' => 'pull_device_by_ip']);
         $idempotencyKey = MetricsIngestService::buildIdempotencyKey([
             'agent_id' => $requestedHostName !== '' ? $requestedHostName : $requestedIp,
             'timestamp' => gmdate('c'),
@@ -826,6 +958,7 @@ switch ($action) {
     case 'get_agent_tokens':
         // List all agent tokens (admin only)
         ensureAgentTokenTable($pdo);
+        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'get_agent_tokens']);
         $stmt = $pdo->query("SELECT id, name, token, enabled, last_used_at, created_at FROM agent_tokens ORDER BY created_at DESC");
         $tokens = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($tokens);
@@ -841,18 +974,49 @@ switch ($action) {
         }
         $name = $input['name'] ?? 'Windows Agent ' . date('Y-m-d H:i');
         $token = generateAgentToken();
+        $authMode = in_array(($input['auth_mode'] ?? 'token'), ['token', 'psk', 'mtls', 'hybrid'], true) ? $input['auth_mode'] : 'token';
+        $scopeSite = $input['scope_site_pattern'] ?? '*';
+        $scopeGroup = $input['scope_group_pattern'] ?? '*';
+        $scopeDevice = $input['scope_device_pattern'] ?? '*';
+        $rpm = max(1, (int)($input['rate_limit_per_minute'] ?? 120));
+        $expiresAt = !empty($input['expires_at']) ? date('Y-m-d H:i:s', strtotime((string)$input['expires_at'])) : date('Y-m-d H:i:s', strtotime('+90 days'));
+        $rawPsk = !empty($input['psk']) ? (string)$input['psk'] : null;
+        $pskHash = $rawPsk ? password_hash($rawPsk, PASSWORD_DEFAULT) : null;
         
         $userId = $_SESSION['user_id'] ?? null;
         if (!$userId) { http_response_code(401); echo json_encode(['error' => 'Not authenticated']); exit; }
-        $stmt = $pdo->prepare("INSERT INTO agent_tokens (user_id, token, name) VALUES (?, ?, ?)");
-        $stmt->execute([$userId, $token, $name]);
+        $stmt = $pdo->prepare("INSERT INTO agent_tokens (user_id, token, name, auth_mode, expires_at, scope_site_pattern, scope_group_pattern, scope_device_pattern, rate_limit_per_minute, psk_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$userId, $token, $name, $authMode, $expiresAt, $scopeSite, $scopeGroup, $scopeDevice, $rpm, $pskHash]);
+        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)$userId, ['action' => 'create_agent_token', 'token_id' => (int)$pdo->lastInsertId()]);
         
         echo json_encode([
             'success' => true,
             'id' => $pdo->lastInsertId(),
             'token' => $token,
-            'name' => $name
+            'name' => $name,
+            'expires_at' => $expiresAt,
         ]);
+        break;
+
+    case 'rotate_agent_token_secret':
+        ensureAgentTokenTable($pdo);
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can rotate token secrets']);
+            exit;
+        }
+        $tokenId = (int)($input['id'] ?? 0);
+        $newPsk = trim((string)($input['new_psk'] ?? ''));
+        $graceSeconds = max(60, (int)($input['grace_period_seconds'] ?? 3600));
+        if ($tokenId <= 0 || $newPsk === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'id and new_psk are required']);
+            exit;
+        }
+        $stmt = $pdo->prepare("UPDATE agent_tokens SET prev_psk_hash = psk_hash, psk_hash = ?, prev_psk_grace_until = DATE_ADD(NOW(), INTERVAL ? SECOND), last_rotated_at = NOW() WHERE id = ?");
+        $stmt->execute([password_hash($newPsk, PASSWORD_DEFAULT), $graceSeconds, $tokenId]);
+        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'rotate_agent_token_secret', 'token_id' => $tokenId, 'grace_seconds' => $graceSeconds]);
+        echo json_encode(['success' => true, 'token_id' => $tokenId, 'grace_period_seconds' => $graceSeconds]);
         break;
 
     case 'create_device_from_host':
@@ -930,6 +1094,7 @@ switch ($action) {
         
         $stmt = $pdo->prepare("DELETE FROM agent_tokens WHERE id = ?");
         $stmt->execute([$tokenId]);
+        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'delete_agent_token', 'token_id' => $tokenId]);
         
         echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
         break;
@@ -952,6 +1117,7 @@ switch ($action) {
         
         $stmt = $pdo->prepare("UPDATE agent_tokens SET enabled = ? WHERE id = ?");
         $stmt->execute([$enabled, $tokenId]);
+        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'toggle_agent_token', 'token_id' => $tokenId, 'enabled' => $enabled]);
         
         echo json_encode(['success' => true]);
         break;
