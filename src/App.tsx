@@ -37,7 +37,7 @@ const App = () => (
               <Route path="/login" element={<LoginPage />} />
               <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-              <Route path="/map" element={<ProtectedRoute><NetworkMapPage /></ProtectedRoute>} />
+              <Route path="/network-map" element={<ProtectedRoute><NetworkMapPage /></ProtectedRoute>} />
               <Route path="/network-graphs" element={<ProtectedRoute><NetworkGraphsPage /></ProtectedRoute>} />
               <Route path="/floor-plan" element={<ProtectedRoute><FloorPlanPage /></ProtectedRoute>} />
               <Route path="/host-metrics" element={<ProtectedRoute><HostMetricsPage /></ProtectedRoute>} />
