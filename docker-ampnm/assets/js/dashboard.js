@@ -11,8 +11,16 @@ function initDashboard() {
     const offlineCountEl = document.getElementById('offlineCount');
     const recentActivityListEl = document.getElementById('recentActivityList');
     const noRecentActivityMessage = document.getElementById('noRecentActivityMessage');
+    const deviceInfoContainer = document.getElementById('deviceInfoContainer');
+    const noDeviceInfoMessage = document.getElementById('noDeviceInfoMessage');
+    const deviceInfoStatusFilter = document.getElementById('deviceInfoStatusFilter');
+    const deviceInfoGridBtn = document.getElementById('deviceInfoGridBtn');
+    const deviceInfoListBtn = document.getElementById('deviceInfoListBtn');
+    const deviceInfoAnimateToggle = document.getElementById('deviceInfoAnimateToggle');
     // const manageDevicesLink = document.getElementById('manageDevicesLink'); // This element is not in index.php anymore, but keeping for consistency if it's added back.
     let statusChart = null;
+    let latestDeviceRows = [];
+    let deviceViewMode = 'grid';
 
     const pingForm = document.getElementById('pingForm');
     const pingHostInput = document.getElementById('pingHostInput');
@@ -31,6 +39,91 @@ function initDashboard() {
         critical: 'text-red-400',
         offline: 'text-slate-400',
         unknown: 'text-slate-500'
+    };
+
+    const statusBadgeClassMap = {
+        online: 'bg-green-500/20 text-green-300 border-green-500/30',
+        warning: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+        critical: 'bg-red-500/20 text-red-300 border-red-500/30',
+        offline: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+        unknown: 'bg-slate-600/20 text-slate-300 border-slate-500/30'
+    };
+
+    const formatLastSeen = (value) => {
+        if (!value) return 'Never';
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
+    };
+
+    const applyDeviceViewModeClasses = () => {
+        if (!deviceInfoContainer) return;
+        if (deviceViewMode === 'list') {
+            deviceInfoContainer.className = 'space-y-2';
+            deviceInfoGridBtn?.classList.replace('bg-cyan-600', 'bg-slate-700');
+            deviceInfoGridBtn?.classList.replace('text-white', 'text-slate-200');
+            deviceInfoListBtn?.classList.replace('bg-slate-700', 'bg-cyan-600');
+            deviceInfoListBtn?.classList.replace('text-slate-200', 'text-white');
+        } else {
+            deviceInfoContainer.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3';
+            deviceInfoListBtn?.classList.replace('bg-cyan-600', 'bg-slate-700');
+            deviceInfoListBtn?.classList.replace('text-white', 'text-slate-200');
+            deviceInfoGridBtn?.classList.replace('bg-slate-700', 'bg-cyan-600');
+            deviceInfoGridBtn?.classList.replace('text-slate-200', 'text-white');
+        }
+    };
+
+    const renderDeviceInfo = () => {
+        if (!deviceInfoContainer) return;
+        const selectedStatus = deviceInfoStatusFilter?.value || 'all';
+        const shouldAnimate = !!deviceInfoAnimateToggle?.checked;
+        const devices = latestDeviceRows.filter((d) => selectedStatus === 'all' ? true : d.status === selectedStatus);
+
+        applyDeviceViewModeClasses();
+
+        if (!devices.length) {
+            deviceInfoContainer.innerHTML = '';
+            noDeviceInfoMessage?.classList.remove('hidden');
+            return;
+        }
+        noDeviceInfoMessage?.classList.add('hidden');
+
+        deviceInfoContainer.innerHTML = devices.map((device, index) => {
+            const status = device.status || 'unknown';
+            const statusClass = statusBadgeClassMap[status] || statusBadgeClassMap.unknown;
+            const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+            const animClass = shouldAnimate ? 'dashboard-device-enter' : '';
+            const delay = shouldAnimate ? `style="animation-delay:${Math.min(index * 45, 400)}ms"` : '';
+            const safeDesc = (device.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            if (deviceViewMode === 'list') {
+                return `
+                    <div class="bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-3 flex items-center justify-between gap-3 ${animClass}" ${delay}>
+                        <div class="min-w-0">
+                            <div class="text-white font-medium truncate">${device.name}</div>
+                            <div class="text-xs text-slate-400 font-mono truncate">${device.ip || 'No IP'} • ${device.type || 'device'} • ${device.monitor_method || 'ping'}</div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full border text-xs ${statusClass}">${statusLabel}</span>
+                            <div class="text-[11px] text-slate-500 mt-1">Seen: ${formatLastSeen(device.last_seen)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            return `
+                <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-4 ${animClass}" ${delay}>
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <h4 class="text-white font-semibold truncate">${device.name}</h4>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full border text-xs ${statusClass}">${statusLabel}</span>
+                    </div>
+                    <div class="space-y-1 text-xs text-slate-300">
+                        <div><span class="text-slate-500">IP:</span> <span class="font-mono">${device.ip || 'No IP'}</span></div>
+                        <div><span class="text-slate-500">Type:</span> ${device.type || 'device'}</div>
+                        <div><span class="text-slate-500">Monitor:</span> ${device.monitor_method || 'ping'} | ${device.ping_interval || '-'}s</div>
+                        <div><span class="text-slate-500">Last Seen:</span> ${formatLastSeen(device.last_seen)}</div>
+                        ${safeDesc ? `<div class="text-slate-400 italic">${safeDesc}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
     };
 
     const loadDashboardData = async (mapId) => {
@@ -93,6 +186,9 @@ function initDashboard() {
                 noRecentActivityMessage.classList.remove('hidden');
             }
 
+            latestDeviceRows = Array.isArray(data.devices) ? data.devices : [];
+            renderDeviceInfo();
+
         } catch (error) {
             console.error("Failed to load dashboard data:", error);
         } finally {
@@ -108,6 +204,17 @@ function initDashboard() {
             dashboardLoader.classList.add('hidden');
         }
     });
+
+    deviceInfoGridBtn?.addEventListener('click', () => {
+        deviceViewMode = 'grid';
+        renderDeviceInfo();
+    });
+    deviceInfoListBtn?.addEventListener('click', () => {
+        deviceViewMode = 'list';
+        renderDeviceInfo();
+    });
+    deviceInfoStatusFilter?.addEventListener('change', renderDeviceInfo);
+    deviceInfoAnimateToggle?.addEventListener('change', renderDeviceInfo);
 
     // Disable ping form for viewer role
     if (window.userRole === 'viewer') {
