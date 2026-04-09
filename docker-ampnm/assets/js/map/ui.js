@@ -240,8 +240,13 @@ MapApp.ui = {
     },
 
     updateAndAnimateEdges: () => {
-        MapApp.state.tick++;
-        const animatedDashes = [4 - (MapApp.state.tick % 12), 8, MapApp.state.tick % 12];
+        const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
+        const runStyle = displaySettings.connection_run_style || 'auto';
+        const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) || 100));
+        const animationStep = speedPercent === 0 ? 0 : Math.max(1, Math.round(speedPercent / 50));
+        MapApp.state.tick += animationStep;
+        const dashOffset = MapApp.state.tick % 12;
+        const animatedDashes = [Math.max(1, 4 - dashOffset), 8, dashOffset];
         const updates = [];
         const allEdges = MapApp.state.edges.get();
         if (MapApp.state.nodes.length > 0 && allEdges.length > 0) {
@@ -253,8 +258,19 @@ MapApp.ui = {
                 const isActive = sourceStatus === 'online' && targetStatus === 'online';
                 const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
                 let dashes = false;
-                if (isActive) { dashes = animatedDashes; } 
-                else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') { dashes = [5, 5]; }
+                if (isActive) {
+                    if (runStyle === 'solid') {
+                        dashes = false;
+                    } else if (runStyle === 'dotted') {
+                        dashes = speedPercent === 0 ? [1, 6] : [1, 6, dashOffset];
+                    } else if (runStyle === 'dashed') {
+                        dashes = speedPercent === 0 ? [6, 6] : [6, 6, dashOffset];
+                    } else {
+                        dashes = speedPercent === 0 ? [5, 5] : animatedDashes;
+                    }
+                } else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
+                    dashes = [5, 5];
+                }
                 updates.push({ id: edge.id, color, dashes });
             });
         }

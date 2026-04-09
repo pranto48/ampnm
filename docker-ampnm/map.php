@@ -398,6 +398,21 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <input type="color" id="tooltipMutedColor" value="#94a3b8" class="p-1 h-10 w-full block bg-slate-900 border border-slate-600 cursor-pointer rounded-lg">
                         </div>
                     </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-700/80">
+                        <div>
+                            <label for="connectionRunStyle" class="block text-xs font-medium text-slate-400 mb-1">Connection Running Style</label>
+                            <select id="connectionRunStyle" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                                <option value="auto">Auto (default)</option>
+                                <option value="solid">Solid</option>
+                                <option value="dashed">Dashed</option>
+                                <option value="dotted">Dotted</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="connectionAnimationSpeed" class="block text-xs font-medium text-slate-400 mb-1">Connection Animation Speed <span id="connectionAnimationSpeedValue" class="text-cyan-400">100%</span></label>
+                            <input id="connectionAnimationSpeed" type="range" min="0" max="200" step="10" value="100" class="w-full accent-cyan-500">
+                        </div>
+                    </div>
                 </div>
                 <div class="flex justify-between items-center mt-6">
                     <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Reset to Default</button>

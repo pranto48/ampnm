@@ -124,6 +124,9 @@ function initMap() {
         const textColor = document.getElementById('tooltipTextColor');
         const mutedColor = document.getElementById('tooltipMutedColor');
         const accentColor = document.getElementById('tooltipAccentColor');
+        const connectionRunStyle = document.getElementById('connectionRunStyle');
+        const connectionAnimationSpeed = document.getElementById('connectionAnimationSpeed');
+        const connectionAnimationSpeedValue = document.getElementById('connectionAnimationSpeedValue');
         if (density) density.value = merged.density || 'comfortable';
         if (fontScale) fontScale.value = String(merged.font_scale ?? 100);
         if (fontScaleValue) fontScaleValue.textContent = `${merged.font_scale ?? 100}%`;
@@ -135,6 +138,9 @@ function initMap() {
         if (textColor) textColor.value = merged.panel_text_color || '#e2e8f0';
         if (mutedColor) mutedColor.value = merged.panel_muted_color || '#94a3b8';
         if (accentColor) accentColor.value = merged.panel_accent_color || '#22d3ee';
+        if (connectionRunStyle) connectionRunStyle.value = merged.connection_run_style || 'auto';
+        if (connectionAnimationSpeed) connectionAnimationSpeed.value = String(merged.connection_animation_speed ?? 100);
+        if (connectionAnimationSpeedValue) connectionAnimationSpeedValue.textContent = `${merged.connection_animation_speed ?? 100}%`;
     };
 
     const readTooltipDisplayControls = () => {
@@ -148,6 +154,8 @@ function initMap() {
         const panelTextColor = document.getElementById('tooltipTextColor')?.value || defaults.panel_text_color;
         const panelMutedColor = document.getElementById('tooltipMutedColor')?.value || defaults.panel_muted_color;
         const panelAccentColor = document.getElementById('tooltipAccentColor')?.value || defaults.panel_accent_color;
+        const connectionRunStyle = document.getElementById('connectionRunStyle')?.value || defaults.connection_run_style;
+        const connectionAnimationSpeed = Number(document.getElementById('connectionAnimationSpeed')?.value ?? defaults.connection_animation_speed);
         return {
             density: density === 'compact' ? 'compact' : 'comfortable',
             font_scale: Math.min(130, Math.max(85, fontScale)),
@@ -157,7 +165,9 @@ function initMap() {
             panel_bg_color: panelBgColor,
             panel_text_color: panelTextColor,
             panel_muted_color: panelMutedColor,
-            panel_accent_color: panelAccentColor
+            panel_accent_color: panelAccentColor,
+            connection_run_style: ['auto', 'solid', 'dashed', 'dotted'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
+            connection_animation_speed: Math.min(200, Math.max(0, connectionAnimationSpeed))
         };
     };
 
@@ -199,6 +209,16 @@ function initMap() {
             const tooltipBoxScaleValue = document.getElementById('tooltipBoxScaleValue');
             if (tooltipBoxScaleValue) {
                 tooltipBoxScaleValue.textContent = `${tooltipBoxScaleInput.value || 100}%`;
+            }
+        });
+    }
+
+    const connectionAnimationSpeedInput = document.getElementById('connectionAnimationSpeed');
+    if (connectionAnimationSpeedInput) {
+        connectionAnimationSpeedInput.addEventListener('input', () => {
+            const connectionAnimationSpeedValue = document.getElementById('connectionAnimationSpeedValue');
+            if (connectionAnimationSpeedValue) {
+                connectionAnimationSpeedValue.textContent = `${connectionAnimationSpeedInput.value || 100}%`;
             }
         });
     }

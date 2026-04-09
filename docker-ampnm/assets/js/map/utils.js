@@ -96,7 +96,9 @@ MapApp.utils = {
         panel_bg_color: '#0f172a',
         panel_text_color: '#e2e8f0',
         panel_muted_color: '#94a3b8',
-        panel_accent_color: '#22d3ee'
+        panel_accent_color: '#22d3ee',
+        connection_run_style: 'auto', // auto | solid | dashed | dotted
+        connection_animation_speed: 100 // percentage; 0 disables animation motion
     }),
 
     getTooltipFontStack: (fontFamilyKey) => {
