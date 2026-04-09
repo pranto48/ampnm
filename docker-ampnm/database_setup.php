@@ -190,6 +190,42 @@ try {
             FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
 
+        // TABLE FOR LOG BACKUP SCHEDULES
+        "CREATE TABLE IF NOT EXISTS `log_backup_schedules` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `name` VARCHAR(120) NOT NULL,
+            `target_type` ENUM('ftp', 'smb', 'email') NOT NULL,
+            `target_config` TEXT NULL,
+            `period_scope` ENUM('day', 'month', 'year') NOT NULL DEFAULT 'day',
+            `schedule_type` ENUM('daily', 'weekly', 'monthly') NOT NULL DEFAULT 'daily',
+            `schedule_time` TIME NOT NULL DEFAULT '00:15:00',
+            `day_of_week` TINYINT UNSIGNED NULL,
+            `day_of_month` TINYINT UNSIGNED NULL,
+            `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+            `last_run_at` TIMESTAMP NULL,
+            `next_run_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR LOG BACKUP RUN HISTORY
+        "CREATE TABLE IF NOT EXISTS `log_backup_runs` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `schedule_id` INT(10) UNSIGNED NULL,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `status` ENUM('success', 'failed') NOT NULL,
+            `target_type` ENUM('ftp', 'smb', 'email') NOT NULL,
+            `period_scope` ENUM('day', 'month', 'year') NOT NULL,
+            `file_name` VARCHAR(255) NULL,
+            `file_size_bytes` BIGINT UNSIGNED NULL,
+            `error_message` TEXT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`schedule_id`) REFERENCES `log_backup_schedules`(`id`) ON DELETE SET NULL,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
         "CREATE TABLE IF NOT EXISTS `network_graphs` (
             `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             `user_id` INT(6) UNSIGNED NOT NULL,
