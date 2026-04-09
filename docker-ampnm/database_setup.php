@@ -214,6 +214,12 @@ try {
             `encryption` ENUM('none', 'ssl', 'tls') DEFAULT 'tls',
             `from_email` VARCHAR(255) NOT NULL,
             `from_name` VARCHAR(255) NULL,
+            `bind_ip` VARCHAR(45) NULL,
+            `reply_to_email` VARCHAR(255) NULL,
+            `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]',
+            `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20,
+            `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240,
+            `allow_invalid_certs` TINYINT(1) DEFAULT 0,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY `user_id_unique` (`user_id`),
@@ -620,6 +626,32 @@ try {
     if (!columnExists($pdo, $dbname, 'host_metrics', 'temperature_celsius')) {
         $pdo->exec("ALTER TABLE `host_metrics` ADD COLUMN `temperature_celsius` DECIMAL(6,2) NULL AFTER `load_average`;");
         message("Upgraded 'host_metrics' table: added 'temperature_celsius' column.");
+    }
+
+    // MIGRATION: Add extended SMTP customization options
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'reply_to_email')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `reply_to_email` VARCHAR(255) NULL AFTER `from_name`;");
+        message("Upgraded 'smtp_settings' table: added 'reply_to_email' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'bind_ip')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `bind_ip` VARCHAR(45) NULL AFTER `from_name`;");
+        message("Upgraded 'smtp_settings' table: added 'bind_ip' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'subject_prefix')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]' AFTER `reply_to_email`;");
+        message("Upgraded 'smtp_settings' table: added 'subject_prefix' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'connection_timeout_seconds')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20 AFTER `subject_prefix`;");
+        message("Upgraded 'smtp_settings' table: added 'connection_timeout_seconds' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'max_emails_per_hour')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240 AFTER `connection_timeout_seconds`;");
+        message("Upgraded 'smtp_settings' table: added 'max_emails_per_hour' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'allow_invalid_certs')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `allow_invalid_certs` TINYINT(1) DEFAULT 0 AFTER `max_emails_per_hour`;");
+        message("Upgraded 'smtp_settings' table: added 'allow_invalid_certs' column.");
     }
 
     // Step 5: Check if the admin user has any maps
