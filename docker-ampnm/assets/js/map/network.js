@@ -163,6 +163,7 @@ MapApp.network = {
                     menuItems += `
                         <div class="context-menu-item" data-action="edit" data-id="${nodeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit</div>
                         ${node.deviceData.type === 'box' ? `<div class="context-menu-item" data-action="box-settings" data-id="${nodeId}"><i class="fas fa-vector-square fa-fw mr-2"></i>Box Settings</div>` : ''}
+                        ${node.deviceData.type !== 'box' ? `<div class="context-menu-item" data-action="view-metrics" data-id="${nodeId}"><i class="fas fa-chart-line fa-fw mr-2"></i>Metrics Graph</div>` : ''}
                         <div class="context-menu-item" data-action="change-icon" data-id="${nodeId}"><i class="fas fa-icons fa-fw mr-2"></i>Change Icon</div>
                         <div class="context-menu-item" data-action="copy" data-id="${nodeId}"><i class="fas fa-copy fa-fw mr-2"></i>Copy</div>
                         ${node.deviceData.ip ? `<div class="context-menu-item" data-action="ping" data-id="${nodeId}"><i class="fas fa-sync fa-fw mr-2"></i>Check Status</div>` : ''}
@@ -170,6 +171,7 @@ MapApp.network = {
                     `;
                 } else {
                     menuItems += `<div class="context-menu-item" data-action="view-details" data-id="${nodeId}"><i class="fas fa-info-circle fa-fw mr-2"></i>View Details</div>`;
+                    if (node.deviceData.type !== 'box') menuItems += `<div class="context-menu-item" data-action="view-metrics" data-id="${nodeId}"><i class="fas fa-chart-line fa-fw mr-2"></i>Metrics Graph</div>`;
                     if (node.deviceData.ip) {
                         menuItems += `<div class="context-menu-item" data-action="ping" data-id="${nodeId}"><i class="fas fa-sync fa-fw mr-2"></i>Check Status</div>`;
                     }
@@ -210,6 +212,8 @@ MapApp.network = {
                 if (window.userRole === 'admin') {
                     if (action === 'edit') {
                         MapApp.ui.openDeviceModal(id);
+                    } else if (action === 'view-metrics') {
+                        await MapApp.ui.openMetricsModal(id);
                     } else if (action === 'change-icon') {
                         // Inline icon/type change without leaving the map
                         const node = MapApp.state.nodes.get(id);
@@ -483,6 +487,8 @@ MapApp.network = {
                     if (action === 'view-details') {
                         // For now, just show a toast, but you could open a modal with device details
                         window.notyf.info('Viewer mode: Displaying read-only details (feature not fully implemented for viewers).');
+                    } else if (action === 'view-metrics') {
+                        await MapApp.ui.openMetricsModal(id);
                     } else if (action === 'ping') {
                         // Viewers can trigger pings, but the server-side API will handle the actual status update.
                         const icon = document.createElement('i');

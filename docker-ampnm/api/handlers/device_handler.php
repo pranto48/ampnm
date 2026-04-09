@@ -46,7 +46,7 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
         return;
     }
 
-    $subject = sprintf('AMPNM Alert: %s is %s', $device['name'], strtoupper($newStatus));
+    $subject = sprintf('Alert: %s is %s', $device['name'], strtoupper($newStatus));
     $body = "Device: {$device['name']}\n"
         . "IP: " . ($device['ip'] ?? 'N/A') . "\n"
         . "Previous Status: {$oldStatus}\n"
