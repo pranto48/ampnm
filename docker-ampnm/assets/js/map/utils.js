@@ -80,6 +80,13 @@ MapApp.utils = {
         ports: true
     }),
 
+    getDefaultConnectionTooltipFields: () => ({
+        type: true,
+        source_target: true,
+        status: true,
+        ports: true
+    }),
+
     getDefaultTooltipDisplaySettings: () => ({
         density: 'comfortable', // compact | comfortable
         font_scale: 100, // percentage
@@ -110,6 +117,22 @@ MapApp.utils = {
         if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
             try {
                 const raw = localStorage.getItem(`mapTooltipDisplay:${currentMapId}`);
+                mapSettings = raw ? JSON.parse(raw) : {};
+            } catch (error) {
+                mapSettings = {};
+            }
+        }
+        return { ...defaults, ...(mapSettings || {}) };
+    },
+
+    getCurrentConnectionTooltipFields: () => {
+        const defaults = MapApp.utils.getDefaultConnectionTooltipFields();
+        const currentMapId = MapApp.state?.currentMapId;
+        if (!currentMapId) return defaults;
+        let mapSettings = MapApp.state?.connectionTooltipFieldSettingsByMap?.[currentMapId] || {};
+        if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
+            try {
+                const raw = localStorage.getItem(`mapConnectionTooltipFields:${currentMapId}`);
                 mapSettings = raw ? JSON.parse(raw) : {};
             } catch (error) {
                 mapSettings = {};

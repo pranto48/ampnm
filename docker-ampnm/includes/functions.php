@@ -1,31 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
 
-if (!function_exists('securityAuditLog')) {
-    /**
-     * Backward-compatible security audit logger used by some api.php/login variants.
-     * Safe no-op style implementation so missing-table/missing-function issues do not
-     * break core workflows (map create, user create, token actions, etc.).
-     */
-    function securityAuditLog($pdoOrMessage, ?string $event = null, ?array $context = null): void {
-        try {
-            // Support both legacy signatures:
-            // 1) securityAuditLog($pdo, 'event_name', ['k'=>'v'])
-            // 2) securityAuditLog('message')
-            if ($pdoOrMessage instanceof PDO && $event !== null) {
-                $payload = $context ? json_encode($context, JSON_UNESCAPED_SLASHES) : null;
-                error_log("[SECURITY] {$event}" . ($payload ? " {$payload}" : ''));
-                return;
-            }
-
-            $message = is_string($pdoOrMessage) ? $pdoOrMessage : 'securityAuditLog called';
-            error_log("[SECURITY] {$message}");
-        } catch (Throwable $e) {
-            // Never throw from audit logging.
-        }
-    }
-}
-
 // Function to check a TCP port on a host
 function checkPortStatus($host, $port, $timeout = 1) {
     $startTime = microtime(true);

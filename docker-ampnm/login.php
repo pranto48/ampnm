@@ -1,6 +1,5 @@
 <?php
 require_once 'includes/bootstrap.php';
-require_once 'includes/security_hardening.php';
 
 // If user is already logged in, redirect to dashboard
 if (isset($_SESSION['user_id'])) {
@@ -17,30 +16,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = 'Please enter both username and password.';
     } else {
         $pdo = getDbConnection();
-        if (isLoginThrottled($pdo, $username)) {
-            $error_message = 'Too many failed login attempts. Please wait a few minutes and try again.';
-        } else {
         $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
-            clearFailedLoginAttempts($pdo, $username);
             // Password is correct, start session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
             $_SESSION['user_role'] = $user['role']; // Store user role in session
-            recordAuthAttempt($pdo, strtolower($username), 'login', true);
             header('Location: index.php');
             exit;
         } else {
-            recordFailedLoginAttempt($pdo, $username);
             $error_message = 'Invalid username or password.';
-        }
         }
     }
 }
-render_login:
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -76,12 +67,6 @@ render_login:
                 <input type="password" name="password" id="password" required
                        class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
                        placeholder="password">
-            </div>
-            <div>
-                <label for="mfa_code" class="block text-sm font-medium text-slate-300 mb-2">MFA Code (if enabled)</label>
-                <input type="text" name="mfa_code" id="mfa_code" inputmode="numeric" pattern="[0-9]{6}"
-                       class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
-                       placeholder="123456">
             </div>
             <button type="submit"
                     class="w-full px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none">

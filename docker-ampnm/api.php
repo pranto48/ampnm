@@ -1,6 +1,5 @@
 <?php
 require_once 'includes/functions.php';
-require_once 'includes/security_hardening.php';
 
 header('Content-Type: application/json');
 
@@ -8,22 +7,8 @@ $action = $_GET['action'] ?? '';
 $handler = $_GET['handler'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
-// Lightweight health endpoint that can respond even when DB is down.
-if ($action === 'health') {
-    try {
-        $pdo = getDbConnection();
-        $pdo->query('SELECT 1');
-        echo json_encode(['status' => 'ok', 'db' => 'connected', 'timestamp' => date('c')]);
-    } catch (Throwable $e) {
-        http_response_code(503);
-        echo json_encode(['status' => 'degraded', 'db' => 'disconnected', 'error' => $e->getMessage(), 'timestamp' => date('c')]);
-    }
-    exit;
-}
-
 try {
     $pdo = getDbConnection(); // Get PDO connection early for all actions
-    securityEnsureSchema($pdo);
 
     // --- Public Actions (NO AUTH REQUIRED) ---
     // These actions must be handled and exit BEFORE any authentication checks.
@@ -132,7 +117,6 @@ try {
         'get_floor_plan_devices', 'get_annotations',
         // Port usage
         'get_device_used_ports',
-        'get_proxies', 'get_proxy_health',
     ];
 
     // Define specific POST actions that 'viewer' role can perform
@@ -166,22 +150,10 @@ try {
     }
 
     // Group actions by handler
-    $privilegedActions = [
-        'create_device', 'update_device', 'delete_device', 'copy_device',
-        'create_map', 'delete_map', 'create_edge', 'update_edge', 'delete_edge', 'update_map',
-        'create_user', 'delete_user', 'update_user_role', 'update_user_password',
-        'create_agent_token', 'delete_agent_token', 'toggle_agent_token', 'rotate_agent_token_secret',
-        'save_smtp_settings', 'save_alert_settings', 'save_storage_policy', 'save_host_override', 'delete_host_override'
-    ];
-    if (in_array($action, $privilegedActions, true) && ($_SESSION['user_id'] ?? null)) {
-        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)$_SESSION['user_id'], ['action' => $action]);
-    }
     $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
-    $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip', 'get_templates', 'create_template', 'update_template', 'delete_template', 'get_host_groups', 'create_host_group', 'bulk_apply_template', 'bulk_assign_group', 'export_templates', 'import_templates']; // ping_all_devices removed
+    $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip']; // ping_all_devices removed
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports'];
     $dashboardActions = ['get_dashboard_data'];
-    $proxyActions = ['get_proxies', 'create_proxy_token', 'assign_device_proxy', 'assign_map_proxy', 'get_proxy_health'];
-    $templateActions = ['get_templates', 'create_template', 'update_template', 'delete_template', 'get_host_groups', 'create_host_group', 'bulk_apply_template', 'bulk_assign_group', 'export_templates', 'import_templates'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs'];
     $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'send_test_email', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
@@ -198,8 +170,6 @@ try {
 
     if (in_array($action, $pingActions)) {
         require __DIR__ . '/api/handlers/ping_handler.php';
-    } elseif (in_array($action, $templateActions)) {
-        require __DIR__ . '/api/handlers/template_handler.php';
     } elseif (in_array($action, $deviceActions)) {
         require __DIR__ . '/api/handlers/device_handler.php';
     } elseif (in_array($action, $mapActions)) {
@@ -216,11 +186,11 @@ try {
         require __DIR__ . '/api/handlers/license_handler.php';
     } elseif (in_array($action, $metricsActions)) {
         require __DIR__ . '/api/handlers/metrics_handler.php';
-    } elseif (in_array($action, $proxyActions)) {
-        require __DIR__ . '/api/handlers/proxy_handler.php';
     } elseif ($handler === 'floor_plan') {
         require __DIR__ . '/api/handlers/floor_plan_handler.php';
         echo json_encode(handleFloorPlanAction($action, $input, $pdo));
+    } elseif ($action === 'health') {
+        echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
     } else {
         http_response_code(404);
         echo json_encode(['error' => 'Invalid action']);

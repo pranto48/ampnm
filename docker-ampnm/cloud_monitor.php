@@ -80,10 +80,10 @@ function cloudRequest(string $url, string $anonKey, string $method = 'GET', ?arr
 function determineStatus(array $device, bool $success, float $latencyMs, float $packetLoss): string {
     if (!$success) return 'offline';
 
-    $warnLatency = $device['effective_warning_latency_threshold'] ?? ($device['warning_latency_threshold'] ?? null);
-    $critLatency = $device['effective_critical_latency_threshold'] ?? ($device['critical_latency_threshold'] ?? null);
-    $warnLoss = $device['effective_warning_packetloss_threshold'] ?? ($device['warning_packetloss_threshold'] ?? null);
-    $critLoss = $device['effective_critical_packetloss_threshold'] ?? ($device['critical_packetloss_threshold'] ?? null);
+    $warnLatency = $device['warning_latency_threshold'] ?? null;
+    $critLatency = $device['critical_latency_threshold'] ?? null;
+    $warnLoss = $device['warning_packetloss_threshold'] ?? null;
+    $critLoss = $device['critical_packetloss_threshold'] ?? null;
 
     if ($critLatency && $latencyMs >= $critLatency) return 'critical';
     if ($critLoss && $packetLoss >= $critLoss) return 'critical';

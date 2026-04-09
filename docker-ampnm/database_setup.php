@@ -32,7 +32,6 @@ function generateUuid() {
 </head>
 <body>
 <?php
-require_once __DIR__ . '/includes/storage_policy.php';
 try {
     // Connect to MySQL server (without selecting a database)
     $pdo = new PDO("mysql:host=$servername", $username, $password);
@@ -468,9 +467,6 @@ try {
         message("Table '$tableName' checked/created successfully.");
     }
 
-    ensureStoragePolicySchema($pdo);
-    message("Storage policy rollup tables checked/created successfully.");
-
     // Step 4: Schema migration section to handle upgrades
     // columnExists function is defined above
     
@@ -554,54 +550,6 @@ try {
         message("Upgraded 'device_edges' table: added 'target_port_label' column.");
     }
     // NEW MIGRATION: Add port_config column for custom port type/count definitions per device
-
-    // Proxy subsystem tables
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `proxies` (
-        `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        `user_id` INT(6) UNSIGNED NOT NULL,
-        `name` VARCHAR(120) NOT NULL,
-        `token` VARCHAR(255) NOT NULL UNIQUE,
-        `site` VARCHAR(120) NULL,
-        `status` ENUM('online','offline','degraded','unknown') DEFAULT 'unknown',
-        `last_seen` TIMESTAMP NULL,
-        `capabilities` JSON NULL,
-        `version` VARCHAR(60) NULL,
-        `last_latency_ms` DECIMAL(10,2) NULL,
-        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX `idx_proxy_user` (`user_id`),
-        INDEX `idx_proxy_site` (`site`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    message("Table 'proxies' checked/created successfully.");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `proxy_checks` (
-        `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        `proxy_id` INT(10) UNSIGNED NOT NULL,
-        `device_id` INT(6) UNSIGNED NOT NULL,
-        `assigned_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        `next_due_at` TIMESTAMP NULL,
-        `last_dispatched_at` TIMESTAMP NULL,
-        `last_result_at` TIMESTAMP NULL,
-        UNIQUE KEY `uniq_proxy_device` (`proxy_id`,`device_id`),
-        INDEX `idx_proxy_due` (`proxy_id`,`next_due_at`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    message("Table 'proxy_checks' checked/created successfully.");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `proxy_result_receipts` (
-        `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        `proxy_id` INT(10) UNSIGNED NOT NULL,
-        `idempotency_key` VARCHAR(191) NOT NULL,
-        `received_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY `uniq_proxy_idem` (`proxy_id`,`idempotency_key`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    message("Table 'proxy_result_receipts' checked/created successfully.");
-
-    if (!columnExists($pdo, $dbname, 'devices', 'proxy_id')) {
-        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `proxy_id` INT(10) UNSIGNED NULL AFTER `map_id`");
-        $pdo->exec("ALTER TABLE `devices` ADD INDEX `idx_devices_proxy` (`proxy_id`)");
-        message("Migrated 'devices' table: added 'proxy_id' column.");
-    }
-
     if (!columnExists($pdo, $dbname, 'devices', 'port_config')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `port_config` TEXT NULL AFTER `subchoice`;");
         message("Migrated 'devices' table: added 'port_config' column for custom port layouts.");
@@ -714,11 +662,7 @@ try {
     // Initialize app_settings for license management
     $settings_to_init = [
         'installation_id' => generateUuid(),
-        'app_license_key' => '', // Initially empty, user will fill this
-        'metrics_hires_days' => '30',
-        'metrics_hourly_days' => '365',
-        'status_hires_days' => '30',
-        'status_hourly_days' => '365'
+        'app_license_key' => '' // Initially empty, user will fill this
     ];
 
     foreach ($settings_to_init as $key => $value) {

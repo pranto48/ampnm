@@ -110,18 +110,6 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                 </div>
             </div>
-            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 mb-6">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div>
-                        <h3 class="text-white font-semibold">Proxy Assignment</h3>
-                        <p class="text-xs text-slate-400">Assign all devices on the selected map to a proxy/site collector.</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <select id="mapProxySelector" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm"></select>
-                        <button id="applyMapProxyBtn" class="px-3 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700" <?= $is_admin ? '' : 'disabled' ?>>Apply to Map Devices</button>
-                    </div>
-                </div>
-            </div>
             <div id="network-map-wrapper">
                 <div id="network-map"></div>
                 <div id="context-menu" class="context-menu"></div>
@@ -348,6 +336,14 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="last_seen" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Last Seen</label>
                         <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="description" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Description</label>
                         <label class="flex items-center text-slate-300 sm:col-span-2"><input type="checkbox" data-tooltip-field="ports" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Ports Summary</label>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white pt-3 border-t border-slate-700/80 mt-2">Mouse Over Connection Information</h3>
+                    <p class="text-xs text-slate-500">Choose which fields are visible when hovering a connection on this map.</p>
+                    <div id="connectionTooltipFieldSettings" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="type" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Connection Type</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="source_target" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Source / Target</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="status" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Endpoint Status</label>
+                        <label class="flex items-center text-slate-300"><input type="checkbox" data-connection-tooltip-field="ports" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Port Mapping</label>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-700/80">
                         <div>

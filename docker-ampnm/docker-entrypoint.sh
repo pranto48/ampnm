@@ -2,9 +2,6 @@
 set -euo pipefail
 
 APACHE_PORT="${APACHE_PORT:-2266}"
-TLS_ENFORCEMENT_MODE="${TLS_ENFORCEMENT_MODE:-warn}"
-REQUIRE_AGENT_MTLS="${REQUIRE_AGENT_MTLS:-0}"
-AGENT_PSK_ROTATION_DAYS="${AGENT_PSK_ROTATION_DAYS:-30}"
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║       AMPNM - Advanced Multi-Protocol Network Monitor     ║"
@@ -43,21 +40,6 @@ done
 echo "✓ All critical files present"
 echo ""
 
-echo "→ Security startup checks..."
-if [[ "${TLS_ENFORCEMENT_MODE}" == "strict" ]]; then
-    echo "✓ TLS_ENFORCEMENT_MODE=strict (unencrypted login/API requests will be blocked)"
-else
-    echo "⚠️  TLS_ENFORCEMENT_MODE=${TLS_ENFORCEMENT_MODE} (recommend: strict in production)"
-fi
-
-if [[ "${REQUIRE_AGENT_MTLS}" == "1" ]]; then
-    echo "✓ Agent channel requires mTLS (preferred hardening mode)"
-else
-    echo "⚠️  Agent mTLS not required; ensure rotating PSK is enabled with expiry"
-fi
-echo "  PSK rotation policy target: every ${AGENT_PSK_ROTATION_DAYS} days"
-echo ""
-
 # Set secure permissions
 echo "→ Setting secure file permissions..."
 chown -R www-data:www-data /var/www/html
@@ -79,7 +61,6 @@ echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  AMPNM is starting on port ${APACHE_PORT}"
 echo "  Access at: http://localhost:${APACHE_PORT}"
-echo "  Guidance: place behind HTTPS reverse proxy and set TLS_ENFORCEMENT_MODE=strict"
 echo "════════════════════════════════════════════════════════════"
 echo ""
 

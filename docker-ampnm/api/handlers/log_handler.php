@@ -1,7 +1,5 @@
 <?php
 // This file is included by api.php and assumes $pdo is available.
-require_once __DIR__ . '/../../includes/storage_policy.php';
-ensureStoragePolicySchema($pdo);
 $current_user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
 
@@ -37,40 +35,26 @@ if ($action === 'get_status_logs') {
             break;
     }
 
-    $useRollup = in_array($period, ['30d'], true);
-    if ($useRollup) {
-        $sql = "
-            SELECT
-                DATE_FORMAT(r.bucket_date, ?) as time_group,
-                SUM(r.warning_count) as warning_count,
-                SUM(r.critical_count) as critical_count,
-                SUM(r.offline_count) as offline_count
-            FROM device_status_logs_daily_rollup r
-            JOIN devices d ON r.device_id = d.id
-            WHERE d.map_id = ? AND r.bucket_date >= CURDATE() - INTERVAL 30 DAY
-        ";
-    } else {
-        $sql = "
-            SELECT
-                DATE_FORMAT(l.created_at, ?) as time_group,
-                SUM(CASE WHEN l.status = 'warning' THEN 1 ELSE 0 END) as warning_count,
-                SUM(CASE WHEN l.status = 'critical' THEN 1 ELSE 0 END) as critical_count,
-                SUM(CASE WHEN l.status = 'offline' THEN 1 ELSE 0 END) as offline_count
-            FROM device_status_logs l
-            JOIN devices d ON l.device_id = d.id
-            WHERE d.map_id = ? AND l.created_at >= NOW() - $interval
-        ";
-    }
-
+    $sql = "
+        SELECT
+            DATE_FORMAT(l.created_at, ?) as time_group,
+            SUM(CASE WHEN l.status = 'warning' THEN 1 ELSE 0 END) as warning_count,
+            SUM(CASE WHEN l.status = 'critical' THEN 1 ELSE 0 END) as critical_count,
+            SUM(CASE WHEN l.status = 'offline' THEN 1 ELSE 0 END) as offline_count
+        FROM device_status_logs l
+        JOIN devices d ON l.device_id = d.id
+        WHERE d.map_id = ? AND l.created_at >= NOW() - $interval
+    ";
+    
     $params = [$dateFormat, $map_id];
 
-    if ($user_role !== 'viewer') {
+    if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
         $sql .= " AND d.user_id = ?";
         $params[] = $current_user_id;
     }
 
     if ($device_id) {
-        $sql .= $useRollup ? " AND r.device_id = ?" : " AND l.device_id = ?";
+        $sql .= " AND l.device_id = ?";
         $params[] = $device_id;
     }
 

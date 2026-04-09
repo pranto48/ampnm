@@ -1,8 +1,7 @@
 <?php
-// Database configuration using environment variables for Docker compatibility.
-// In Docker Compose, DB is usually reachable by service name (e.g. "db"), not 127.0.0.1.
-define('DB_SERVER', getenv('DB_HOST') ?: (getenv('MYSQL_HOST') ?: 'db'));
-define('DB_PORT', getenv('DB_PORT') ?: (getenv('MYSQL_PORT') ?: '3306'));
+// Database configuration using environment variables for Docker compatibility
+// Forcing 127.0.0.1 as the host to resolve connection issues in the Docker environment.
+define('DB_SERVER', '127.0.0.1');
 define('DB_USERNAME', getenv('DB_USER') ?: 'root');
 define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
 define('DB_NAME', getenv('DB_NAME') ?: 'network_monitor');
@@ -36,7 +35,7 @@ function getDbConnection() {
     // If no connection exists (or it was lost), create a new one.
     if ($pdo === null) {
         try {
-            $dsn = "mysql:host=" . DB_SERVER . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+            $dsn = "mysql:host=" . DB_SERVER . ";dbname=" . DB_NAME . ";charset=utf8mb4";
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -44,8 +43,9 @@ function getDbConnection() {
             ];
             $pdo = new PDO($dsn, DB_USERNAME, DB_PASSWORD, $options);
         } catch(PDOException $e) {
-            // Throw to caller so endpoints can return structured JSON instead of fatal HTML.
-            throw new RuntimeException("ERROR: Could not connect to the database. " . $e->getMessage(), 0, $e);
+            // For a real application, you would log this error and show a generic message.
+            // For this local tool, dying is acceptable to immediately see the problem.
+            die("ERROR: Could not connect to the database. " . $e->getMessage());
         }
     }
     

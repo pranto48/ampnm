@@ -17,6 +17,8 @@ MapApp.state = {
     agentPollIntervalId: null,
     // Per-map mouse-over field visibility settings
     tooltipFieldSettingsByMap: {},
+    // Per-map connection tooltip field visibility settings
+    connectionTooltipFieldSettingsByMap: {},
     // Per-map mouse-over tooltip display preferences
     tooltipDisplaySettingsByMap: {}
 };

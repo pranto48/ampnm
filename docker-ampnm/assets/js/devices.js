@@ -9,11 +9,6 @@ function initDevices() {
     const importDevicesFile = document.getElementById('importDevicesFile');
     const deviceSearchInput = document.getElementById('deviceSearchInput');
     const createNewDeviceLink = document.querySelector('a[href="create-device.php"]');
-    const selectAllDevices = document.getElementById('selectAllDevices');
-    const bulkTemplateSelect = document.getElementById('bulkTemplateSelect');
-    const bulkGroupSelect = document.getElementById('bulkGroupSelect');
-    const bulkApplyTemplateBtn = document.getElementById('bulkApplyTemplateBtn');
-    const bulkAssignGroupBtn = document.getElementById('bulkAssignGroupBtn');
 
     // Modals
     const detailsModal = document.getElementById('detailsModal');
@@ -23,7 +18,6 @@ function initDevices() {
     const closeDetailsModal = document.getElementById('closeDetailsModal');
     
     let latencyChart = null;
-    let proxies = [];
 
     const api = {
         get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json()),
@@ -36,15 +30,6 @@ function initDevices() {
         critical: 'bg-red-500/20 text-red-400',
         offline: 'bg-slate-600/50 text-slate-400',
         unknown: 'bg-slate-600/50 text-slate-400'
-    };
-
-    const proxySelectHtml = (device) => {
-        const options = ['<option value="">Unassigned</option>'].concat(proxies.map((p) => `<option value="${p.id}" ${String(device.proxy_id||'')===String(p.id)?'selected':''}>${p.name}</option>`));
-        if (window.userRole !== 'admin') {
-            const assigned = proxies.find((p) => String(p.id) === String(device.proxy_id));
-            return `<span class="text-slate-300">${assigned ? assigned.name : 'Unassigned'}</span>`;
-        }
-        return `<select class="device-proxy-select bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white" data-id="${device.id}">${options.join('')}</select>`;
     };
 
     const renderDeviceRow = (device) => {
@@ -75,11 +60,9 @@ function initDevices() {
 
         return `
             <tr data-id="${device.id}" class="border-b border-slate-700 hover:bg-slate-800/50">
-                <td class="px-3 py-4"><input type="checkbox" class="device-select" data-id="${device.id}"></td>
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${device.name}</div><div class="text-sm text-slate-400 capitalize">${device.type}</div></td>
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-slate-400 font-mono">${device.ip || 'N/A'}</div><div class="text-xs text-slate-500 mt-1 flex items-center gap-2">${monitorBadge}<span>${monitorDetail}</span></div></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">${mapLink}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">${proxySelectHtml(device)}</td>
                 <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex items-center gap-2 text-xs leading-5 font-semibold rounded-full ${statusClass}"><div class="${statusIndicatorClass}"></div>${device.status}</span></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${lastSeen}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -89,30 +72,13 @@ function initDevices() {
         `;
     };
 
-
-    const loadTemplatesAndGroups = async () => {
-        if (!bulkTemplateSelect || !bulkGroupSelect) return;
-        try {
-            const [templatesResult, groupsResult] = await Promise.all([api.get('get_templates'), api.get('get_host_groups')]);
-            const templates = templatesResult.templates || [];
-            const groups = groupsResult.host_groups || [];
-            bulkTemplateSelect.innerHTML = '<option value="">Select template...</option>' + templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-            bulkGroupSelect.innerHTML = '<option value="">Select host group...</option>' + groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-        } catch (error) {
-            console.error('Failed loading templates/groups', error);
-        }
-    };
-
-    const getSelectedDeviceIds = () => Array.from(document.querySelectorAll('.device-select:checked')).map(el => Number(el.dataset.id));
-
     const loadDevices = async () => {
         tableLoader.classList.remove('hidden');
         noDevicesMessage.classList.add('hidden');
         devicesTableBody.innerHTML = '';
         
         try {
-            const [proxyResult, result] = await Promise.all([api.get('get_proxies'), api.get('get_devices')]);
-            proxies = Array.isArray(proxyResult.proxies) ? proxyResult.proxies : [];
+            const result = await api.get('get_devices'); // This fetches from api.php
             const devices = result.devices; // Access the 'devices' array from the response
             if (devices && devices.length > 0) {
                 devicesTableBody.innerHTML = devices.map(renderDeviceRow).join('');
@@ -215,19 +181,6 @@ function initDevices() {
         detailsModalLoader.classList.add('hidden');
         detailsModalContent.classList.remove('hidden');
     };
-
-    devicesTableBody.addEventListener('change', async (e) => {
-        const select = e.target.closest('.device-proxy-select');
-        if (!select) return;
-        const deviceId = Number(select.dataset.id);
-        const proxyId = select.value === '' ? null : Number(select.value);
-        try {
-            await api.post('assign_device_proxy', { device_id: deviceId, proxy_id: proxyId });
-            window.notyf.success('Proxy assignment updated.');
-        } catch (err) {
-            window.notyf.error('Failed to assign proxy.');
-        }
-    });
 
     devicesTableBody.addEventListener('click', async (e) => {
         const button = e.target.closest('button');
@@ -405,51 +358,7 @@ function initDevices() {
         }
     });
 
-
-    if (selectAllDevices) {
-        selectAllDevices.addEventListener('change', (e) => {
-            document.querySelectorAll('.device-select').forEach(cb => { cb.checked = e.target.checked; });
-        });
-    }
-
-    if (bulkApplyTemplateBtn) {
-        bulkApplyTemplateBtn.addEventListener('click', async () => {
-            const templateId = Number(bulkTemplateSelect.value || 0);
-            const deviceIds = getSelectedDeviceIds();
-            if (!templateId || deviceIds.length === 0) {
-                window.notyf.error('Select a template and at least one device.');
-                return;
-            }
-            const result = await api.post('bulk_apply_template', { template_id: templateId, device_ids: deviceIds });
-            if (result.success) {
-                window.notyf.success('Template applied to selected devices.');
-                await loadDevices();
-            } else {
-                window.notyf.error(result.error || 'Template apply failed.');
-            }
-        });
-    }
-
-    if (bulkAssignGroupBtn) {
-        bulkAssignGroupBtn.addEventListener('click', async () => {
-            const groupId = Number(bulkGroupSelect.value || 0);
-            const deviceIds = getSelectedDeviceIds();
-            if (!groupId || deviceIds.length === 0) {
-                window.notyf.error('Select a host group and at least one device.');
-                return;
-            }
-            const result = await api.post('bulk_assign_group', { group_id: groupId, device_ids: deviceIds });
-            if (result.success) {
-                window.notyf.success('Devices assigned to host group.');
-                await loadDevices();
-            } else {
-                window.notyf.error(result.error || 'Group assign failed.');
-            }
-        });
-    }
-
     closeDetailsModal.addEventListener('click', () => closeModal('detailsModal'));
 
-    loadTemplatesAndGroups();
     loadDevices();
 }

@@ -25,7 +25,6 @@
     <script src="assets/js/users.js"></script>
     <script src="assets/js/status_logs.js"></script>
     <script src="assets/js/email_notifications.js"></script>
-    <script src="assets/js/templates.js"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -144,8 +143,6 @@
             initEmailNotifications();
         } else if (page === 'network_graphs.php') {
             initNetworkGraphs();
-        } else if (page === 'templates.php') {
-            initTemplates();
         }
     });
     </script>

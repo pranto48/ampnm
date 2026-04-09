@@ -9,13 +9,6 @@ $action = $_GET['action'] ?? '';
 $pdo = getDbConnection();
 
 require_once __DIR__ . '/../../includes/metrics_ingest_service.php';
-require_once __DIR__ . '/../../includes/storage_policy.php';
-require_once __DIR__ . '/../../includes/security_hardening.php';
-require_once __DIR__ . '/../../includes/telemetry.php';
-ensureStoragePolicySchema($pdo);
-securityEnsureSchema($pdo);
-ensureTelemetrySchema($pdo);
-$correlationId = telemetryCorrelationId();
 
 /**
  * Validate agent token
@@ -29,10 +22,6 @@ function validateAgentToken($pdo, $token) {
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($result) {
-        if (!empty($result['expires_at']) && strtotime((string)$result['expires_at']) < time()) {
-            securityAuditLog($pdo, 'agent.token_expired', 'warning', 'agent_token', (string)$result['id']);
-            return false;
-        }
         $updateStmt = $pdo->prepare("UPDATE agent_tokens SET last_used_at = NOW() WHERE id = ?");
         $updateStmt->execute([$result['id']]);
         return $result;
@@ -480,36 +469,10 @@ switch ($action) {
         $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
         $tokenInfo = validateAgentToken($pdo, $token);
         if (!$tokenInfo) {
-            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', null, ['reason' => 'invalid_token']);
             http_response_code(401);
             echo json_encode(['error' => 'Invalid or missing agent token']);
             exit;
         }
-        if (!verifyAgentChannelAuth($pdo, $tokenInfo)) {
-            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', (string)$tokenInfo['id'], ['reason' => 'channel_auth_failed']);
-            http_response_code(401);
-            echo json_encode(['error' => 'Agent channel authentication failed']);
-            exit;
-        }
-        if (!enforceTokenRateLimit($pdo, $tokenInfo)) {
-            securityAuditLog($pdo, 'agent.rate_limited', 'warning', 'agent_token', (string)$tokenInfo['id']);
-            http_response_code(429);
-            echo json_encode(['error' => 'Rate limit exceeded for token']);
-            exit;
-        }
-        [$schemaOk, $schemaError] = validateAgentPayloadSchema($input);
-        if (!$schemaOk) {
-            securityAuditLog($pdo, 'agent.payload_invalid', 'warning', 'agent_token', (string)$tokenInfo['id'], ['error' => $schemaError]);
-            http_response_code(400);
-            echo json_encode(['error' => $schemaError]);
-            exit;
-        }
-        if (!enforceTokenScope($pdo, $tokenInfo, $input)) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Token scope does not allow this payload']);
-            exit;
-        }
-        securityAuditLog($pdo, 'agent.token_used', 'info', 'agent_token', (string)$tokenInfo['id'], ['action' => 'submit_metrics']);
 
         $normalizedInput = MetricsIngestService::normalizeMetricsPayload($input);
         if (empty($normalizedInput['host_ip'])) {
@@ -517,43 +480,29 @@ switch ($action) {
             echo json_encode(['error' => 'host_ip is required']);
             exit;
         }
-        
-        // Try to find matching device (IP first, then hostname)
+
         $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
-        $device = findDeviceMatch($pdo, $normalizedInput['host_name'] ?? '', $normalizedInput['host_ip'] ?? '', $tokenUserId);
-        $autoCreatedDevice = false;
-        if (!$device && $tokenUserId) {
-            $created = createDeviceForHost(
-                $pdo,
-                $tokenUserId,
-                (string)($normalizedInput['host_name'] ?? ''),
-                $normalizedInput['host_ip'] ?? null,
-                (string)($normalizedInput['platform'] ?? 'unknown')
-            );
-            if ($created) {
-                $device = $created;
-                $autoCreatedDevice = true;
+        $idempotencyKey = MetricsIngestService::buildIdempotencyKey($input, $tokenUserId);
+
+        $message = [
+            'message_type' => 'metrics_submit',
+            'idempotency_key' => $idempotencyKey,
+            'payload' => array_merge($normalizedInput, [
+                'token_user_id' => $tokenUserId,
+                'token_id' => $tokenInfo['id'] ?? null,
+            ]),
+            'enqueued_at' => gmdate('c'),
+        ];
+
+        $enqueue = MetricsIngestQueue::enqueue($pdo, $message);
+        $processedInline = false;
+        if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
+            try {
+                MetricsIngestService::processMessage($pdo, $message);
+                $processedInline = true;
+            } catch (Throwable $e) {
+                error_log('Metrics inline fallback failed: ' . $e->getMessage());
             }
-        }
-        $deviceId = $device ? $device['id'] : null;
-        if ($deviceId) {
-            touchDeviceFromMetrics($pdo, (int)$deviceId, (string)($normalizedInput['host_ip'] ?? ''), 'online');
-        }
-        
-        // Save metrics
-        $metricsId = saveHostMetrics($pdo, $normalizedInput, $deviceId);
-        
-        // Check thresholds and send alerts if needed
-        try {
-            require_once __DIR__ . '/../../includes/host_alerts.php';
-            $alertSystem = new HostAlertSystem($pdo);
-            $alertSystem->checkAndAlert(
-                $normalizedInput['host_ip'],
-                $normalizedInput['host_name'] ?? $normalizedInput['host_ip'],
-                $normalizedInput
-            );
-        } catch (Exception $e) {
-            error_log("Host Alert Error: " . $e->getMessage());
         }
 
         echo json_encode([
@@ -564,7 +513,6 @@ switch ($action) {
             'queue_transport' => $enqueue['transport'],
             'queue_message_id' => $enqueue['message_id'],
             'idempotency_key' => $idempotencyKey,
-            'correlation_id' => $correlationId,
             'hostname' => $normalizedInput['host_name'] ?? null,
             'ip_address' => $normalizedInput['host_ip'] ?? null,
         ]);
@@ -574,21 +522,8 @@ switch ($action) {
         $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
         $tokenInfo = validateAgentToken($pdo, $token);
         if (!$tokenInfo) {
-            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', null, ['reason' => 'invalid_token']);
             http_response_code(401);
             echo json_encode(['error' => 'Invalid or missing agent token']);
-            exit;
-        }
-        if (!verifyAgentChannelAuth($pdo, $tokenInfo)) {
-            securityAuditLog($pdo, 'agent.auth_failed', 'warning', 'agent_token', (string)$tokenInfo['id'], ['reason' => 'channel_auth_failed']);
-            http_response_code(401);
-            echo json_encode(['error' => 'Agent channel authentication failed']);
-            exit;
-        }
-        if (!enforceTokenRateLimit($pdo, $tokenInfo)) {
-            securityAuditLog($pdo, 'agent.rate_limited', 'warning', 'agent_token', (string)$tokenInfo['id']);
-            http_response_code(429);
-            echo json_encode(['error' => 'Rate limit exceeded for token']);
             exit;
         }
 
@@ -601,22 +536,15 @@ switch ($action) {
         }
 
         $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
-        if (!enforceTokenScope($pdo, $tokenInfo, ['host_ip' => $requestedIp, 'host_name' => $requestedHostName])) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Token scope does not allow this payload']);
-            exit;
-        }
-        securityAuditLog($pdo, 'agent.token_used', 'info', 'agent_token', (string)$tokenInfo['id'], ['action' => 'pull_device_by_ip']);
         $idempotencyKey = MetricsIngestService::buildIdempotencyKey([
             'agent_id' => $requestedHostName !== '' ? $requestedHostName : $requestedIp,
             'timestamp' => gmdate('c'),
             'sequence' => 'pull-device-by-ip',
         ], $tokenUserId);
 
-        $enqueuePayload = [
+        $enqueue = MetricsIngestQueue::enqueue($pdo, [
             'message_type' => 'pull_device_by_ip',
             'idempotency_key' => $idempotencyKey,
-            'correlation_id' => $correlationId,
             'payload' => [
                 'host_ip' => $requestedIp ?: null,
                 'host_name' => $requestedHostName ?: null,
@@ -624,16 +552,13 @@ switch ($action) {
                 'token_id' => $tokenInfo['id'] ?? null,
             ],
             'enqueued_at' => gmdate('c'),
-        ];
-        telemetryLog('agent.pull_device.accepted', ['correlation_id' => $correlationId, 'idempotency_key' => $idempotencyKey, 'host_ip' => $requestedIp ?: null]);
-        $enqueue = telemetryTimedExec($pdo, 'api', 'metrics.pull_device_enqueue', fn() => MetricsIngestQueue::enqueue($pdo, $enqueuePayload), $correlationId);
+        ]);
         $processedInline = false;
         if ((getenv('METRICS_INGEST_INLINE_FALLBACK') ?: '1') === '1') {
             try {
                 MetricsIngestService::processMessage($pdo, [
                     'message_type' => 'pull_device_by_ip',
                     'idempotency_key' => $idempotencyKey,
-                    'correlation_id' => $correlationId,
                     'payload' => [
                         'host_ip' => $requestedIp ?: null,
                         'host_name' => $requestedHostName ?: null,
@@ -650,57 +575,14 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
-            'metrics_id' => $metricsId,
-            'device_matched' => $device ? $device['name'] : null,
-            'device_id' => $deviceId ? (int)$deviceId : null,
-            'auto_device_created' => $autoCreatedDevice,
-            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
-            'platform' => $normalizedInput['platform'] ?? 'unknown',
-            'hostname' => $normalizedInput['host_name'] ?? null,
-            'ip_address' => $normalizedInput['host_ip'] ?? null
-        ]);
-        break;
-
-    case 'pull_device_by_ip':
-        $token = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? '';
-        $tokenInfo = validateAgentToken($pdo, $token);
-        if (!$tokenInfo) {
-            http_response_code(401);
-            echo json_encode(['error' => 'Invalid or missing agent token']);
-            exit;
-        }
-
-        $requestedIp = trim((string)($_GET['host_ip'] ?? $input['host_ip'] ?? ''));
-        $requestedHostName = trim((string)($_GET['host_name'] ?? $input['host_name'] ?? ''));
-        if ($requestedIp === '' && $requestedHostName === '') {
-            http_response_code(400);
-            echo json_encode(['error' => 'host_ip or host_name is required']);
-            exit;
-        }
-
-        $tokenUserId = !empty($tokenInfo['user_id']) ? (int)$tokenInfo['user_id'] : null;
-        $device = findDeviceMatch($pdo, $requestedHostName, $requestedIp, $tokenUserId);
-        $autoCreated = false;
-        if (!$device && $tokenUserId) {
-            $created = createDeviceForHost($pdo, $tokenUserId, $requestedHostName, $requestedIp ?: null, 'windows');
-            if ($created) {
-                $device = $created;
-                $autoCreated = true;
-            }
-        }
-
-        if ($device && !empty($device['id'])) {
-            touchDeviceFromMetrics($pdo, (int)$device['id'], $requestedIp, 'online');
-        }
-
-        echo json_encode([
-            'success' => true,
+            'status' => 'accepted',
+            'queued' => true,
+            'processed_inline' => $processedInline,
+            'queue_transport' => $enqueue['transport'],
+            'queue_message_id' => $enqueue['message_id'],
+            'idempotency_key' => $idempotencyKey,
             'host_ip' => $requestedIp ?: null,
             'host_name' => $requestedHostName ?: null,
-            'device' => $device ?: null,
-            'device_found' => (bool)$device,
-            'auto_device_created' => $autoCreated,
-            'sync_interval_seconds' => isset($device['ping_interval']) ? max(15, (int)$device['ping_interval']) : 60,
         ]);
         break;
         
@@ -760,7 +642,7 @@ switch ($action) {
         // Get historical metrics for charts
         $deviceId = $_GET['device_id'] ?? null;
         $hostIp = $_GET['host_ip'] ?? null;
-        $hours = min(max((int)($_GET['hours'] ?? 24), 1), 2160); // Max 90 days
+        $hours = min((int)($_GET['hours'] ?? 24), 168); // Max 7 days
         
         if (!$deviceId && !$hostIp) {
             http_response_code(400);
@@ -779,9 +661,6 @@ switch ($action) {
         $netOutExpr = hasColumn($historyColumns, 'network_out_mbps') ? '`network_out_mbps`' : '`network_out`';
         $gpuExpr = hasColumn($historyColumns, 'gpu_percent') ? '`gpu_percent`' : '`gpu_usage`';
 
-        $useHourlyRollup = $hours > 168 && $hours <= 24 * 45;
-        $useDailyRollup = $hours > 24 * 45;
-
         if ($deviceId) {
             $currentColumns = getTableColumns($pdo, 'host_metrics');
             $hostNameColumn = firstAvailableColumn($currentColumns, ['host_name', 'hostname']);
@@ -789,94 +668,28 @@ switch ($action) {
                 $stmt = $pdo->prepare("SELECT `{$hostNameColumn}` FROM host_metrics WHERE device_id = ? LIMIT 1");
                 $stmt->execute([$deviceId]);
                 $hostIdentifier = $stmt->fetchColumn();
-                if ($useDailyRollup) {
-                    $days = (int)ceil($hours / 24);
-                    $stmt = $pdo->prepare("
-                        SELECT id,
-                               cpu_avg AS cpu_percent,
-                               memory_avg AS memory_percent,
-                               disk_avg AS disk_percent,
-                               network_in_avg AS network_in_mbps,
-                               network_out_avg AS network_out_mbps,
-                               gpu_avg AS gpu_percent,
-                               bucket_date AS created_at
-                        FROM host_metrics_daily_rollup
-                        WHERE host_name = ? AND bucket_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-                        ORDER BY bucket_date ASC
-                    ");
-                    $stmt->execute([$hostIdentifier, $days]);
-                } elseif ($useHourlyRollup) {
-                    $stmt = $pdo->prepare("
-                        SELECT id,
-                               cpu_avg AS cpu_percent,
-                               memory_avg AS memory_percent,
-                               disk_avg AS disk_percent,
-                               network_in_avg AS network_in_mbps,
-                               network_out_avg AS network_out_mbps,
-                               gpu_avg AS gpu_percent,
-                               bucket_start AS created_at
-                        FROM host_metrics_hourly_rollup
-                        WHERE host_name = ? AND bucket_start >= DATE_SUB(NOW(), INTERVAL ? HOUR)
-                        ORDER BY bucket_start ASC
-                    ");
-                    $stmt->execute([$hostIdentifier, $hours]);
-                } else {
-                    $stmt = $pdo->prepare("
-                        SELECT id, {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
-                               {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent, {$recordedExpr} AS created_at
-                        FROM host_metrics_history
-                        WHERE {$hostNameExpr} = ? AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
-                        ORDER BY {$recordedExpr} ASC
-                    ");
-                    $stmt->execute([$hostIdentifier, $hours]);
-                }
+                $stmt = $pdo->prepare("
+                    SELECT id, {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
+                           {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent, {$recordedExpr} AS created_at
+                    FROM host_metrics_history
+                    WHERE {$hostNameExpr} = ? AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                    ORDER BY {$recordedExpr} ASC
+                ");
+                $stmt->execute([$hostIdentifier, $hours]);
             } else {
                 http_response_code(400);
                 echo json_encode(['error' => 'device_id lookup not supported by current schema; use host_ip']);
                 exit;
             }
         } else {
-            if ($useDailyRollup) {
-                $days = (int)ceil($hours / 24);
-                $stmt = $pdo->prepare("
-                    SELECT id,
-                           cpu_avg AS cpu_percent,
-                           memory_avg AS memory_percent,
-                           disk_avg AS disk_percent,
-                           network_in_avg AS network_in_mbps,
-                           network_out_avg AS network_out_mbps,
-                           gpu_avg AS gpu_percent,
-                           bucket_date AS created_at
-                    FROM host_metrics_daily_rollup
-                    WHERE host_ip = ? AND bucket_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-                    ORDER BY bucket_date ASC
-                ");
-                $stmt->execute([$hostIp, $days]);
-            } elseif ($useHourlyRollup) {
-                $stmt = $pdo->prepare("
-                    SELECT id,
-                           cpu_avg AS cpu_percent,
-                           memory_avg AS memory_percent,
-                           disk_avg AS disk_percent,
-                           network_in_avg AS network_in_mbps,
-                           network_out_avg AS network_out_mbps,
-                           gpu_avg AS gpu_percent,
-                           bucket_start AS created_at
-                    FROM host_metrics_hourly_rollup
-                    WHERE host_ip = ? AND bucket_start >= DATE_SUB(NOW(), INTERVAL ? HOUR)
-                    ORDER BY bucket_start ASC
-                ");
-                $stmt->execute([$hostIp, $hours]);
-            } else {
-                $stmt = $pdo->prepare("
-                    SELECT id, {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
-                           {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent, {$recordedExpr} AS created_at
-                    FROM host_metrics_history
-                    WHERE {$hostIpExpr} = ? AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
-                    ORDER BY {$recordedExpr} ASC
-                ");
-                $stmt->execute([$hostIp, $hours]);
-            }
+            $stmt = $pdo->prepare("
+                SELECT id, {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
+                       {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent, {$recordedExpr} AS created_at
+                FROM host_metrics_history
+                WHERE {$hostIpExpr} = ? AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                ORDER BY {$recordedExpr} ASC
+            ");
+            $stmt->execute([$hostIp, $hours]);
         }
         
         $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -960,16 +773,14 @@ switch ($action) {
         
         $userId = $_SESSION['user_id'] ?? null;
         if (!$userId) { http_response_code(401); echo json_encode(['error' => 'Not authenticated']); exit; }
-        $stmt = $pdo->prepare("INSERT INTO agent_tokens (user_id, token, name, auth_mode, expires_at, scope_site_pattern, scope_group_pattern, scope_device_pattern, rate_limit_per_minute, psk_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$userId, $token, $name, $authMode, $expiresAt, $scopeSite, $scopeGroup, $scopeDevice, $rpm, $pskHash]);
-        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)$userId, ['action' => 'create_agent_token', 'token_id' => (int)$pdo->lastInsertId()]);
+        $stmt = $pdo->prepare("INSERT INTO agent_tokens (user_id, token, name) VALUES (?, ?, ?)");
+        $stmt->execute([$userId, $token, $name]);
         
         echo json_encode([
             'success' => true,
             'id' => $pdo->lastInsertId(),
             'token' => $token,
-            'name' => $name,
-            'expires_at' => $expiresAt,
+            'name' => $name
         ]);
         break;
 
@@ -1048,7 +859,6 @@ switch ($action) {
         
         $stmt = $pdo->prepare("DELETE FROM agent_tokens WHERE id = ?");
         $stmt->execute([$tokenId]);
-        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'delete_agent_token', 'token_id' => $tokenId]);
         
         echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
         break;
@@ -1071,7 +881,6 @@ switch ($action) {
         
         $stmt = $pdo->prepare("UPDATE agent_tokens SET enabled = ? WHERE id = ?");
         $stmt->execute([$enabled, $tokenId]);
-        securityAuditLog($pdo, 'api.privileged_action', 'info', 'user', (string)($_SESSION['user_id'] ?? ''), ['action' => 'toggle_agent_token', 'token_id' => $tokenId, 'enabled' => $enabled]);
         
         echo json_encode(['success' => true]);
         break;
@@ -1116,20 +925,6 @@ switch ($action) {
             ]);
         }
         echo json_encode(['success' => true]);
-        break;
-
-    case 'get_storage_policy':
-        echo json_encode(getStoragePolicySettings());
-        break;
-
-    case 'save_storage_policy':
-        if (($_SESSION['user_role'] ?? '') !== 'admin') {
-            http_response_code(403);
-            echo json_encode(['error' => 'Forbidden']);
-            exit;
-        }
-        $saved = saveStoragePolicySettings($input);
-        echo json_encode(['success' => true, 'settings' => $saved]);
         break;
     
     case 'get_host_override':
