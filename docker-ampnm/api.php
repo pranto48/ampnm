@@ -107,7 +107,7 @@ try {
     // Define actions that 'viewer' role can perform (mostly GET requests for viewing)
     $viewer_allowed_get_actions = [
         'get_maps', 'get_devices', 'get_edges', 'get_dashboard_data', 'get_ping_history',
-        'get_status_logs', 'get_device_details', 'get_device_uptime',
+        'get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'get_device_details', 'get_device_uptime',
         'get_smtp_settings', 'get_all_devices_for_subscriptions', 'get_device_subscriptions',
         'health', 'get_current_license_info',
         // Host metrics viewing
@@ -155,7 +155,7 @@ try {
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports'];
     $dashboardActions = ['get_dashboard_data'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
-    $logActions = ['get_status_logs'];
+    $logActions = ['get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'save_log_backup_schedule', 'delete_log_backup_schedule', 'run_log_backup_now', 'run_due_log_backups'];
     $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'send_test_email', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
     $licenseActions = ['get_current_license_info', 'update_app_license_key', 'force_license_recheck']; // Added license actions
     $metricsActions = [

@@ -367,6 +367,52 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <input id="tooltipFontScale" type="range" min="85" max="130" step="5" value="100" class="w-full accent-cyan-500">
                         </div>
                     </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
+                        <div>
+                            <label for="tooltipFontFamily" class="block text-xs font-medium text-slate-400 mb-1">Font Family</label>
+                            <select id="tooltipFontFamily" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                                <option value="system">System UI</option>
+                                <option value="inter">Inter</option>
+                                <option value="roboto">Roboto</option>
+                                <option value="mono">Monospace</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="tooltipBoxScale" class="block text-xs font-medium text-slate-400 mb-1">Info Window Size <span id="tooltipBoxScaleValue" class="text-cyan-400">100%</span></label>
+                            <input id="tooltipBoxScale" type="range" min="85" max="130" step="5" value="100" class="w-full accent-cyan-500">
+                        </div>
+                        <div>
+                            <label for="tooltipAccentColor" class="block text-xs font-medium text-slate-400 mb-1">Accent Color</label>
+                            <input type="color" id="tooltipAccentColor" value="#22d3ee" class="p-1 h-10 w-full block bg-slate-900 border border-slate-600 cursor-pointer rounded-lg">
+                        </div>
+                        <div>
+                            <label for="tooltipBgColor" class="block text-xs font-medium text-slate-400 mb-1">Background Color</label>
+                            <input type="color" id="tooltipBgColor" value="#0f172a" class="p-1 h-10 w-full block bg-slate-900 border border-slate-600 cursor-pointer rounded-lg">
+                        </div>
+                        <div>
+                            <label for="tooltipTextColor" class="block text-xs font-medium text-slate-400 mb-1">Main Text Color</label>
+                            <input type="color" id="tooltipTextColor" value="#e2e8f0" class="p-1 h-10 w-full block bg-slate-900 border border-slate-600 cursor-pointer rounded-lg">
+                        </div>
+                        <div>
+                            <label for="tooltipMutedColor" class="block text-xs font-medium text-slate-400 mb-1">Label Text Color</label>
+                            <input type="color" id="tooltipMutedColor" value="#94a3b8" class="p-1 h-10 w-full block bg-slate-900 border border-slate-600 cursor-pointer rounded-lg">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-700/80">
+                        <div>
+                            <label for="connectionRunStyle" class="block text-xs font-medium text-slate-400 mb-1">Connection Running Style</label>
+                            <select id="connectionRunStyle" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                                <option value="auto">Auto (default)</option>
+                                <option value="solid">Solid</option>
+                                <option value="dashed">Dashed</option>
+                                <option value="dotted">Dotted</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="connectionAnimationSpeed" class="block text-xs font-medium text-slate-400 mb-1">Connection Animation Speed <span id="connectionAnimationSpeedValue" class="text-cyan-400">100%</span></label>
+                            <input id="connectionAnimationSpeed" type="range" min="0" max="200" step="10" value="100" class="w-full accent-cyan-500">
+                        </div>
+                    </div>
                 </div>
                 <div class="flex justify-between items-center mt-6">
                     <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Reset to Default</button>
@@ -390,6 +436,33 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 <!-- Unmapped devices will be listed here -->
             </div>
             <div id="placeDeviceLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
+        </div>
+    </div>
+
+    <!-- Metrics Graph Modal -->
+    <div id="metricsModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-4xl border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-white">Device Performance Graphs</h2>
+                <button id="closeMetricsModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex items-center gap-3 mb-4">
+                <span id="metricsDeviceTitle" class="text-sm text-cyan-300 font-semibold"></span>
+                <select id="metricsHoursRange" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm">
+                    <option value="6">Last 6h</option>
+                    <option value="24" selected>Last 24h</option>
+                    <option value="72">Last 3d</option>
+                    <option value="168">Last 7d</option>
+                </select>
+                <button id="refreshMetricsGraphBtn" class="px-3 py-2 bg-cyan-600 rounded-lg text-white text-sm">Refresh</button>
+            </div>
+            <div id="metricsGraphContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">CPU %</h3><div id="metricsCpuGraph"></div></div>
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">RAM %</h3><div id="metricsRamGraph"></div></div>
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">HDD %</h3><div id="metricsDiskGraph"></div></div>
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">Port Bandwidth (In/Out Mbps)</h3><div id="metricsNetGraph"></div></div>
+            </div>
+            <div id="metricsNoDataMessage" class="text-center text-slate-500 py-6 hidden">No metrics data available for this device yet.</div>
         </div>
     </div>
 </main>

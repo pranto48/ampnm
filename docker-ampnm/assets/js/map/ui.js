@@ -52,6 +52,16 @@ MapApp.ui = {
             publicViewLink: document.getElementById('publicViewLink'),
             copyPublicLinkBtn: document.getElementById('copyPublicLinkBtn'),
             openPublicLinkBtn: document.getElementById('openPublicLinkBtn'),
+            metricsModal: document.getElementById('metricsModal'),
+            closeMetricsModal: document.getElementById('closeMetricsModal'),
+            metricsDeviceTitle: document.getElementById('metricsDeviceTitle'),
+            metricsHoursRange: document.getElementById('metricsHoursRange'),
+            refreshMetricsGraphBtn: document.getElementById('refreshMetricsGraphBtn'),
+            metricsNoDataMessage: document.getElementById('metricsNoDataMessage'),
+            metricsCpuGraph: document.getElementById('metricsCpuGraph'),
+            metricsRamGraph: document.getElementById('metricsRamGraph'),
+            metricsDiskGraph: document.getElementById('metricsDiskGraph'),
+            metricsNetGraph: document.getElementById('metricsNetGraph'),
         };
     },
 
@@ -72,6 +82,68 @@ MapApp.ui = {
         // Use the existing edit-device page so admins can change icons, names, and IPs.
         // Keep navigation simple to avoid modal dependencies that were removed from the PHP map.
         window.location.href = `edit-device.php?id=${encodeURIComponent(deviceId)}&return=map`;
+    },
+
+    _renderMiniGraph: (containerEl, series, color = '#22d3ee', secondarySeries = null, secondaryColor = '#a78bfa') => {
+        if (!containerEl) return;
+        const width = 380;
+        const height = 120;
+        const pad = 12;
+        const toPoints = (values, min, max) => values.map((v, i) => {
+            const x = pad + (i * ((width - pad * 2) / Math.max(1, values.length - 1)));
+            const y = height - pad - (((v - min) / Math.max(0.0001, max - min)) * (height - pad * 2));
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+
+        const valuesPrimary = series.map(v => Number(v) || 0);
+        const valuesSecondary = secondarySeries ? secondarySeries.map(v => Number(v) || 0) : [];
+        const allValues = valuesSecondary.length ? valuesPrimary.concat(valuesSecondary) : valuesPrimary;
+        const max = Math.max(1, ...allValues);
+        const min = Math.min(0, ...allValues);
+
+        const poly1 = toPoints(valuesPrimary, min, max);
+        const poly2 = valuesSecondary.length ? toPoints(valuesSecondary, min, max) : '';
+        containerEl.innerHTML = `
+            <svg viewBox="0 0 ${width} ${height}" class="w-full h-28">
+                <rect x="0" y="0" width="${width}" height="${height}" fill="rgba(15,23,42,0.4)" />
+                <polyline fill="none" stroke="${color}" stroke-width="2.5" points="${poly1}" />
+                ${poly2 ? `<polyline fill="none" stroke="${secondaryColor}" stroke-width="2.5" points="${poly2}" />` : ''}
+                <text x="${width - 6}" y="14" text-anchor="end" fill="#94a3b8" font-size="10">max ${max.toFixed(1)}</text>
+            </svg>
+        `;
+    },
+
+    openMetricsModal: async (deviceId) => {
+        const node = MapApp.state.nodes.get(deviceId);
+        if (!node || !node.deviceData) {
+            window.notyf.error('Device data not found.');
+            return;
+        }
+        const { els } = MapApp.ui;
+        const loadMetrics = async () => {
+            const hours = Number(els.metricsHoursRange.value || 24);
+            const result = await fetch(`api.php?action=get_metrics_history&device_id=${encodeURIComponent(deviceId)}&hours=${hours}`);
+            const history = await result.json();
+            if (!Array.isArray(history) || history.length === 0) {
+                els.metricsNoDataMessage.classList.remove('hidden');
+                [els.metricsCpuGraph, els.metricsRamGraph, els.metricsDiskGraph, els.metricsNetGraph].forEach(el => { if (el) el.innerHTML = ''; });
+                return;
+            }
+            els.metricsNoDataMessage.classList.add('hidden');
+            MapApp.ui._renderMiniGraph(els.metricsCpuGraph, history.map(h => h.cpu_percent), '#22c55e');
+            MapApp.ui._renderMiniGraph(els.metricsRamGraph, history.map(h => h.memory_percent), '#38bdf8');
+            MapApp.ui._renderMiniGraph(els.metricsDiskGraph, history.map(h => h.disk_percent), '#f59e0b');
+            MapApp.ui._renderMiniGraph(els.metricsNetGraph, history.map(h => h.network_in_mbps), '#22d3ee', history.map(h => h.network_out_mbps), '#a78bfa');
+        };
+
+        els.metricsDeviceTitle.textContent = `${node.deviceData.name} (${node.deviceData.type || 'device'})`;
+        await loadMetrics();
+        openModal('metricsModal');
+
+        const refreshHandler = async () => { await loadMetrics(); };
+        els.refreshMetricsGraphBtn.onclick = refreshHandler;
+        els.metricsHoursRange.onchange = refreshHandler;
+        els.closeMetricsModal.onclick = () => closeModal('metricsModal');
     },
 
     openEdgeModal: (edgeId) => {
@@ -240,8 +312,13 @@ MapApp.ui = {
     },
 
     updateAndAnimateEdges: () => {
-        MapApp.state.tick++;
-        const animatedDashes = [4 - (MapApp.state.tick % 12), 8, MapApp.state.tick % 12];
+        const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
+        const runStyle = displaySettings.connection_run_style || 'auto';
+        const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) || 100));
+        const animationStep = speedPercent === 0 ? 0 : Math.max(1, Math.round(speedPercent / 50));
+        MapApp.state.tick += animationStep;
+        const dashOffset = MapApp.state.tick % 12;
+        const animatedDashes = [Math.max(1, 4 - dashOffset), 8, dashOffset];
         const updates = [];
         const allEdges = MapApp.state.edges.get();
         if (MapApp.state.nodes.length > 0 && allEdges.length > 0) {
@@ -253,8 +330,19 @@ MapApp.ui = {
                 const isActive = sourceStatus === 'online' && targetStatus === 'online';
                 const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
                 let dashes = false;
-                if (isActive) { dashes = animatedDashes; } 
-                else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') { dashes = [5, 5]; }
+                if (isActive) {
+                    if (runStyle === 'solid') {
+                        dashes = false;
+                    } else if (runStyle === 'dotted') {
+                        dashes = speedPercent === 0 ? [1, 6] : [1, 6, dashOffset];
+                    } else if (runStyle === 'dashed') {
+                        dashes = speedPercent === 0 ? [6, 6] : [6, 6, dashOffset];
+                    } else {
+                        dashes = speedPercent === 0 ? [5, 5] : animatedDashes;
+                    }
+                } else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
+                    dashes = [5, 5];
+                }
                 updates.push({ id: edge.id, color, dashes });
             });
         }
