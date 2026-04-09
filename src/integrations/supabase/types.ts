@@ -1076,17 +1076,12 @@ export type Database = {
           created_at: string
           enabled: boolean | null
           id: string
-          smtp_allow_invalid_certs: boolean | null
-          smtp_connection_timeout_seconds: number | null
           smtp_encryption: string | null
           smtp_from_email: string | null
           smtp_from_name: string | null
           smtp_host: string | null
-          smtp_max_emails_per_hour: number | null
           smtp_password: string | null
           smtp_port: number | null
-          smtp_reply_to_email: string | null
-          smtp_subject_prefix: string | null
           smtp_username: string | null
           updated_at: string
           user_id: string
@@ -1095,17 +1090,12 @@ export type Database = {
           created_at?: string
           enabled?: boolean | null
           id?: string
-          smtp_allow_invalid_certs?: boolean | null
-          smtp_connection_timeout_seconds?: number | null
           smtp_encryption?: string | null
           smtp_from_email?: string | null
           smtp_from_name?: string | null
           smtp_host?: string | null
-          smtp_max_emails_per_hour?: number | null
           smtp_password?: string | null
           smtp_port?: number | null
-          smtp_reply_to_email?: string | null
-          smtp_subject_prefix?: string | null
           smtp_username?: string | null
           updated_at?: string
           user_id: string
@@ -1114,17 +1104,12 @@ export type Database = {
           created_at?: string
           enabled?: boolean | null
           id?: string
-          smtp_allow_invalid_certs?: boolean | null
-          smtp_connection_timeout_seconds?: number | null
           smtp_encryption?: string | null
           smtp_from_email?: string | null
           smtp_from_name?: string | null
           smtp_host?: string | null
-          smtp_max_emails_per_hour?: number | null
           smtp_password?: string | null
           smtp_port?: number | null
-          smtp_reply_to_email?: string | null
-          smtp_subject_prefix?: string | null
           smtp_username?: string | null
           updated_at?: string
           user_id?: string
