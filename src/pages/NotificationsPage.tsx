@@ -46,13 +46,31 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const [smtp, setSmtp] = useState<Partial<SmtpSettings>>({ enabled: false, smtp_host: "", smtp_port: 587, smtp_username: "", smtp_password: "", smtp_encryption: "tls", smtp_from_name: "AMPNM", smtp_from_email: "" });
+  const [smtp, setSmtp] = useState<Partial<SmtpSettings>>({
+    enabled: false,
+    smtp_host: "",
+    smtp_port: 587,
+    smtp_username: "",
+    smtp_password: "",
+    smtp_encryption: "tls",
+    smtp_from_name: "AMPNM",
+    smtp_from_email: "",
+    smtp_reply_to_email: "",
+    smtp_subject_prefix: "[AMPNM]",
+    smtp_connection_timeout_seconds: 30,
+    smtp_max_emails_per_hour: 240,
+    smtp_allow_invalid_certs: false,
+  });
 
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [newEmail, setNewEmail] = useState("");
   const [newDeviceId, setNewDeviceId] = useState("");
+  const [newSubNotifyOnOnline, setNewSubNotifyOnOnline] = useState(true);
+  const [newSubNotifyOnOffline, setNewSubNotifyOnOffline] = useState(true);
+  const [newSubNotifyOnWarning, setNewSubNotifyOnWarning] = useState(false);
+  const [newSubNotifyOnCritical, setNewSubNotifyOnCritical] = useState(true);
 
   const [policies, setPolicies] = useState<any[]>([]);
   const [newPolicy, setNewPolicy] = useState<AlertPolicyForm>({
@@ -166,11 +184,22 @@ export default function NotificationsPage() {
 
   const addSub = async () => {
     if (!newEmail || !newDeviceId) return;
-    const { error } = await supabase.from("device_email_subscriptions").insert({ email: newEmail, device_id: newDeviceId });
+    const { error } = await supabase.from("device_email_subscriptions").insert({
+      email: newEmail,
+      device_id: newDeviceId,
+      notify_on_online: newSubNotifyOnOnline,
+      notify_on_offline: newSubNotifyOnOffline,
+      notify_on_warning: newSubNotifyOnWarning,
+      notify_on_critical: newSubNotifyOnCritical,
+    });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else {
       toast({ title: "Subscription added" });
       setNewEmail("");
+      setNewSubNotifyOnOnline(true);
+      setNewSubNotifyOnOffline(true);
+      setNewSubNotifyOnWarning(false);
+      setNewSubNotifyOnCritical(true);
       fetchSubs();
     }
   };
@@ -329,7 +358,15 @@ export default function NotificationsPage() {
                     </Select>
                   </div>
                   <div><Label>From Name</Label><Input value={smtp.smtp_from_name ?? ""} onChange={(e) => setSmtp({ ...smtp, smtp_from_name: e.target.value })} /></div>
-                  <div className="md:col-span-2"><Label>From Email</Label><Input value={smtp.smtp_from_email ?? ""} onChange={(e) => setSmtp({ ...smtp, smtp_from_email: e.target.value })} placeholder="alerts@example.com" /></div>
+                  <div><Label>From Email</Label><Input value={smtp.smtp_from_email ?? ""} onChange={(e) => setSmtp({ ...smtp, smtp_from_email: e.target.value })} placeholder="alerts@example.com" /></div>
+                  <div><Label>Reply-To Email (optional)</Label><Input value={smtp.smtp_reply_to_email ?? ""} onChange={(e) => setSmtp({ ...smtp, smtp_reply_to_email: e.target.value })} placeholder="noc@example.com" /></div>
+                  <div><Label>Subject Prefix</Label><Input value={smtp.smtp_subject_prefix ?? ""} onChange={(e) => setSmtp({ ...smtp, smtp_subject_prefix: e.target.value })} placeholder="[AMPNM]" /></div>
+                  <div><Label>Connection Timeout (seconds)</Label><Input type="number" min={5} value={smtp.smtp_connection_timeout_seconds ?? 30} onChange={(e) => setSmtp({ ...smtp, smtp_connection_timeout_seconds: Number(e.target.value) })} /></div>
+                  <div><Label>Max Emails / Hour</Label><Input type="number" min={1} value={smtp.smtp_max_emails_per_hour ?? 240} onChange={(e) => setSmtp({ ...smtp, smtp_max_emails_per_hour: Number(e.target.value) })} /></div>
+                  <div className="md:col-span-2 flex items-center gap-3 border rounded-md px-3 py-2">
+                    <Switch checked={smtp.smtp_allow_invalid_certs ?? false} onCheckedChange={(v) => setSmtp({ ...smtp, smtp_allow_invalid_certs: v })} />
+                    <Label>Allow invalid TLS certificates (self-signed SMTP)</Label>
+                  </div>
                 </div>
                 <Button onClick={saveSmtp}><Save className="h-4 w-4 mr-1" /> Save Settings</Button>
               </CardContent>
@@ -348,6 +385,15 @@ export default function NotificationsPage() {
                     </Select>
                   </div>
                   <div><Label>Email</Label><Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="admin@example.com" className="w-[250px]" /></div>
+                  <div className="border rounded-md p-2 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Alert types</p>
+                    <div className="flex flex-wrap gap-3">
+                      <label className="flex items-center gap-2 text-xs"><Switch checked={newSubNotifyOnOnline} onCheckedChange={setNewSubNotifyOnOnline} /> Online</label>
+                      <label className="flex items-center gap-2 text-xs"><Switch checked={newSubNotifyOnOffline} onCheckedChange={setNewSubNotifyOnOffline} /> Offline</label>
+                      <label className="flex items-center gap-2 text-xs"><Switch checked={newSubNotifyOnWarning} onCheckedChange={setNewSubNotifyOnWarning} /> Warning</label>
+                      <label className="flex items-center gap-2 text-xs"><Switch checked={newSubNotifyOnCritical} onCheckedChange={setNewSubNotifyOnCritical} /> Critical</label>
+                    </div>
+                  </div>
                   <Button size="sm" onClick={addSub}><Plus className="h-4 w-4 mr-1" /> Add</Button>
                 </div>
                 <Table>
