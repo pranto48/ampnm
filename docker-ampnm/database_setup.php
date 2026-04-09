@@ -190,6 +190,42 @@ try {
             FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
 
+        // TABLE FOR LOG BACKUP SCHEDULES
+        "CREATE TABLE IF NOT EXISTS `log_backup_schedules` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `name` VARCHAR(120) NOT NULL,
+            `target_type` ENUM('ftp', 'smb', 'email') NOT NULL,
+            `target_config` TEXT NULL,
+            `period_scope` ENUM('day', 'month', 'year') NOT NULL DEFAULT 'day',
+            `schedule_type` ENUM('daily', 'weekly', 'monthly') NOT NULL DEFAULT 'daily',
+            `schedule_time` TIME NOT NULL DEFAULT '00:15:00',
+            `day_of_week` TINYINT UNSIGNED NULL,
+            `day_of_month` TINYINT UNSIGNED NULL,
+            `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+            `last_run_at` TIMESTAMP NULL,
+            `next_run_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR LOG BACKUP RUN HISTORY
+        "CREATE TABLE IF NOT EXISTS `log_backup_runs` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `schedule_id` INT(10) UNSIGNED NULL,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `status` ENUM('success', 'failed') NOT NULL,
+            `target_type` ENUM('ftp', 'smb', 'email') NOT NULL,
+            `period_scope` ENUM('day', 'month', 'year') NOT NULL,
+            `file_name` VARCHAR(255) NULL,
+            `file_size_bytes` BIGINT UNSIGNED NULL,
+            `error_message` TEXT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`schedule_id`) REFERENCES `log_backup_schedules`(`id`) ON DELETE SET NULL,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
         "CREATE TABLE IF NOT EXISTS `network_graphs` (
             `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             `user_id` INT(6) UNSIGNED NOT NULL,
@@ -214,6 +250,12 @@ try {
             `encryption` ENUM('none', 'ssl', 'tls') DEFAULT 'tls',
             `from_email` VARCHAR(255) NOT NULL,
             `from_name` VARCHAR(255) NULL,
+            `bind_ip` VARCHAR(45) NULL,
+            `reply_to_email` VARCHAR(255) NULL,
+            `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]',
+            `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20,
+            `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240,
+            `allow_invalid_certs` TINYINT(1) DEFAULT 0,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY `user_id_unique` (`user_id`),
@@ -620,6 +662,32 @@ try {
     if (!columnExists($pdo, $dbname, 'host_metrics', 'temperature_celsius')) {
         $pdo->exec("ALTER TABLE `host_metrics` ADD COLUMN `temperature_celsius` DECIMAL(6,2) NULL AFTER `load_average`;");
         message("Upgraded 'host_metrics' table: added 'temperature_celsius' column.");
+    }
+
+    // MIGRATION: Add extended SMTP customization options
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'reply_to_email')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `reply_to_email` VARCHAR(255) NULL AFTER `from_name`;");
+        message("Upgraded 'smtp_settings' table: added 'reply_to_email' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'bind_ip')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `bind_ip` VARCHAR(45) NULL AFTER `from_name`;");
+        message("Upgraded 'smtp_settings' table: added 'bind_ip' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'subject_prefix')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]' AFTER `reply_to_email`;");
+        message("Upgraded 'smtp_settings' table: added 'subject_prefix' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'connection_timeout_seconds')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20 AFTER `subject_prefix`;");
+        message("Upgraded 'smtp_settings' table: added 'connection_timeout_seconds' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'max_emails_per_hour')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240 AFTER `connection_timeout_seconds`;");
+        message("Upgraded 'smtp_settings' table: added 'max_emails_per_hour' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'allow_invalid_certs')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `allow_invalid_certs` TINYINT(1) DEFAULT 0 AFTER `max_emails_per_hour`;");
+        message("Upgraded 'smtp_settings' table: added 'allow_invalid_certs' column.");
     }
 
     // Step 5: Check if the admin user has any maps
