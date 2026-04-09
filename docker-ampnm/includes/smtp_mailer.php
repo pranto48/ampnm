@@ -34,6 +34,7 @@ function smtp_send_mail(array $settings, string $toEmail, string $subject, strin
     $encryption = strtolower(trim((string)($settings['encryption'] ?? 'tls')));
     $fromEmail = trim((string)($settings['from_email'] ?? $username));
     $fromName = trim((string)($settings['from_name'] ?? 'AMPNM'));
+    $bindIp = trim((string)($settings['bind_ip'] ?? ''));
     $replyToEmail = trim((string)($settings['reply_to_email'] ?? ''));
     $subjectPrefix = trim((string)($settings['subject_prefix'] ?? ''));
     $timeoutSeconds = (int)($settings['connection_timeout_seconds'] ?? 20);
@@ -49,13 +50,19 @@ function smtp_send_mail(array $settings, string $toEmail, string $subject, strin
     }
 
     $transport = $encryption === 'ssl' ? "ssl://{$host}:{$port}" : "tcp://{$host}:{$port}";
-    $context = stream_context_create([
+    $socketContext = [
         'ssl' => [
             'verify_peer' => !$allowInvalidCerts,
             'verify_peer_name' => !$allowInvalidCerts,
             'allow_self_signed' => $allowInvalidCerts,
         ],
-    ]);
+    ];
+    if ($bindIp !== '') {
+        $socketContext['socket'] = [
+            'bindto' => "{$bindIp}:0",
+        ];
+    }
+    $context = stream_context_create($socketContext);
     $socket = @stream_socket_client($transport, $errno, $errstr, $timeoutSeconds, STREAM_CLIENT_CONNECT, $context);
     if (!$socket) {
         $error = "SMTP connection failed: {$errstr} ({$errno})";

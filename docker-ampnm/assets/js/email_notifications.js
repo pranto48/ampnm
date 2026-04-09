@@ -11,6 +11,7 @@ function initEmailNotifications() {
         smtpFromEmail: document.getElementById('smtpFromEmail'),
         smtpFromName: document.getElementById('smtpFromName'),
         smtpReplyToEmail: document.getElementById('smtpReplyToEmail'),
+        smtpBindIp: document.getElementById('smtpBindIp'),
         smtpSubjectPrefix: document.getElementById('smtpSubjectPrefix'),
         smtpTimeoutSeconds: document.getElementById('smtpTimeoutSeconds'),
         smtpMaxEmailsPerHour: document.getElementById('smtpMaxEmailsPerHour'),
@@ -60,6 +61,7 @@ function initEmailNotifications() {
                 els.smtpFromEmail.value = settings.from_email || '';
                 els.smtpFromName.value = settings.from_name || '';
                 els.smtpReplyToEmail.value = settings.reply_to_email || '';
+                els.smtpBindIp.value = settings.bind_ip || '';
                 els.smtpSubjectPrefix.value = settings.subject_prefix || '[AMPNM]';
                 els.smtpTimeoutSeconds.value = settings.connection_timeout_seconds || 20;
                 els.smtpMaxEmailsPerHour.value = settings.max_emails_per_hour || 240;

@@ -214,6 +214,7 @@ try {
             `encryption` ENUM('none', 'ssl', 'tls') DEFAULT 'tls',
             `from_email` VARCHAR(255) NOT NULL,
             `from_name` VARCHAR(255) NULL,
+            `bind_ip` VARCHAR(45) NULL,
             `reply_to_email` VARCHAR(255) NULL,
             `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]',
             `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20,
@@ -631,6 +632,10 @@ try {
     if (!columnExists($pdo, $dbname, 'smtp_settings', 'reply_to_email')) {
         $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `reply_to_email` VARCHAR(255) NULL AFTER `from_name`;");
         message("Upgraded 'smtp_settings' table: added 'reply_to_email' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'bind_ip')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `bind_ip` VARCHAR(45) NULL AFTER `from_name`;");
+        message("Upgraded 'smtp_settings' table: added 'bind_ip' column.");
     }
     if (!columnExists($pdo, $dbname, 'smtp_settings', 'subject_prefix')) {
         $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]' AFTER `reply_to_email`;");

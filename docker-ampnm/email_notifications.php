@@ -44,6 +44,11 @@ include 'header.php';
                         <label for="smtpReplyToEmail" class="block text-sm font-medium text-slate-400 mb-1">Reply-To Email (Optional)</label>
                         <input type="email" id="smtpReplyToEmail" name="reply_to_email" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
                     </div>
+                    <div>
+                        <label for="smtpBindIp" class="block text-sm font-medium text-slate-400 mb-1">Mail Outbound IP (Optional)</label>
+                        <input type="text" id="smtpBindIp" name="bind_ip" placeholder="192.168.20.5" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        <p class="text-xs text-slate-500 mt-1">Set your internet-facing host IP to force SMTP traffic out that interface.</p>
+                    </div>
                     <div class="md:col-span-2">
                         <label for="smtpFromName" class="block text-sm font-medium text-slate-400 mb-1">From Name (Optional)</label>
                         <input type="text" id="smtpFromName" name="from_name" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
