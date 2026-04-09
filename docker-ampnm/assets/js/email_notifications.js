@@ -10,6 +10,11 @@ function initEmailNotifications() {
         smtpEncryption: document.getElementById('smtpEncryption'),
         smtpFromEmail: document.getElementById('smtpFromEmail'),
         smtpFromName: document.getElementById('smtpFromName'),
+        smtpReplyToEmail: document.getElementById('smtpReplyToEmail'),
+        smtpSubjectPrefix: document.getElementById('smtpSubjectPrefix'),
+        smtpTimeoutSeconds: document.getElementById('smtpTimeoutSeconds'),
+        smtpMaxEmailsPerHour: document.getElementById('smtpMaxEmailsPerHour'),
+        smtpAllowInvalidCerts: document.getElementById('smtpAllowInvalidCerts'),
         testRecipientEmail: document.getElementById('testRecipientEmail'),
         sendTestEmailBtn: document.getElementById('sendTestEmailBtn'),
         saveSmtpBtn: document.getElementById('saveSmtpBtn'),
@@ -54,6 +59,11 @@ function initEmailNotifications() {
                 els.smtpEncryption.value = settings.encryption || 'tls';
                 els.smtpFromEmail.value = settings.from_email || '';
                 els.smtpFromName.value = settings.from_name || '';
+                els.smtpReplyToEmail.value = settings.reply_to_email || '';
+                els.smtpSubjectPrefix.value = settings.subject_prefix || '[AMPNM]';
+                els.smtpTimeoutSeconds.value = settings.connection_timeout_seconds || 20;
+                els.smtpMaxEmailsPerHour.value = settings.max_emails_per_hour || 240;
+                els.smtpAllowInvalidCerts.checked = Number(settings.allow_invalid_certs || 0) === 1;
             }
         } catch (error) {
             console.error('Failed to load SMTP settings:', error);
@@ -72,6 +82,7 @@ function initEmailNotifications() {
 
             const formData = new FormData(els.smtpSettingsForm);
             const data = Object.fromEntries(formData.entries());
+            data.allow_invalid_certs = els.smtpAllowInvalidCerts.checked;
 
             try {
                 const result = await api.post('save_smtp_settings', data);

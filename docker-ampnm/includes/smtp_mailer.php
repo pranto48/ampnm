@@ -34,20 +34,35 @@ function smtp_send_mail(array $settings, string $toEmail, string $subject, strin
     $encryption = strtolower(trim((string)($settings['encryption'] ?? 'tls')));
     $fromEmail = trim((string)($settings['from_email'] ?? $username));
     $fromName = trim((string)($settings['from_name'] ?? 'AMPNM'));
+    $replyToEmail = trim((string)($settings['reply_to_email'] ?? ''));
+    $subjectPrefix = trim((string)($settings['subject_prefix'] ?? ''));
+    $timeoutSeconds = (int)($settings['connection_timeout_seconds'] ?? 20);
+    $allowInvalidCerts = !empty($settings['allow_invalid_certs']);
 
     if ($host === '' || $port <= 0 || $username === '' || $password === '' || $fromEmail === '' || $toEmail === '') {
         $error = 'Missing SMTP configuration fields';
         return false;
     }
 
+    if ($timeoutSeconds < 5 || $timeoutSeconds > 120) {
+        $timeoutSeconds = 20;
+    }
+
     $transport = $encryption === 'ssl' ? "ssl://{$host}:{$port}" : "tcp://{$host}:{$port}";
-    $socket = @stream_socket_client($transport, $errno, $errstr, 20, STREAM_CLIENT_CONNECT);
+    $context = stream_context_create([
+        'ssl' => [
+            'verify_peer' => !$allowInvalidCerts,
+            'verify_peer_name' => !$allowInvalidCerts,
+            'allow_self_signed' => $allowInvalidCerts,
+        ],
+    ]);
+    $socket = @stream_socket_client($transport, $errno, $errstr, $timeoutSeconds, STREAM_CLIENT_CONNECT, $context);
     if (!$socket) {
         $error = "SMTP connection failed: {$errstr} ({$errno})";
         return false;
     }
 
-    stream_set_timeout($socket, 20);
+    stream_set_timeout($socket, $timeoutSeconds);
 
     if (!smtpExpectCode($socket, [220], $error)) { fclose($socket); return false; }
     if (!smtpCommand($socket, 'EHLO ampnm.local', [250], $error)) { fclose($socket); return false; }
@@ -71,8 +86,12 @@ function smtp_send_mail(array $settings, string $toEmail, string $subject, strin
     if (!smtpCommand($socket, 'DATA', [354], $error)) { fclose($socket); return false; }
 
     $safeFromName = str_replace(["\r", "\n"], '', $fromName);
-    $safeSubject = str_replace(["\r", "\n"], '', $subject);
+    $subjectWithPrefix = $subjectPrefix !== '' ? "{$subjectPrefix} {$subject}" : $subject;
+    $safeSubject = str_replace(["\r", "\n"], '', $subjectWithPrefix);
     $message = "From: {$safeFromName} <{$fromEmail}>\r\n";
+    if ($replyToEmail !== '') {
+        $message .= "Reply-To: <{$replyToEmail}>\r\n";
+    }
     $message .= "To: <{$toEmail}>\r\n";
     $message .= "Subject: {$safeSubject}\r\n";
     $message .= "MIME-Version: 1.0\r\n";
@@ -86,4 +105,3 @@ function smtp_send_mail(array $settings, string $toEmail, string $subject, strin
     fclose($socket);
     return true;
 }
-

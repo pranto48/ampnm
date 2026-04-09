@@ -90,8 +90,26 @@ MapApp.utils = {
     getDefaultTooltipDisplaySettings: () => ({
         density: 'comfortable', // compact | comfortable
         font_scale: 100, // percentage
-        max_width: 320
+        max_width: 320,
+        font_family: 'system', // system | inter | roboto | mono
+        box_scale: 100,
+        panel_bg_color: '#0f172a',
+        panel_text_color: '#e2e8f0',
+        panel_muted_color: '#94a3b8',
+        panel_accent_color: '#22d3ee',
+        connection_run_style: 'auto', // auto | solid | dashed | dotted
+        connection_animation_speed: 100 // percentage; 0 disables animation motion
     }),
+
+    getTooltipFontStack: (fontFamilyKey) => {
+        const stacks = {
+            system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            inter: "Inter, 'Segoe UI', Roboto, sans-serif",
+            roboto: "Roboto, 'Segoe UI', Arial, sans-serif",
+            mono: "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
+        };
+        return stacks[fontFamilyKey] || stacks.system;
+    },
 
     getCurrentTooltipFields: () => {
         const defaults = MapApp.utils.getDefaultTooltipFields();
@@ -154,68 +172,77 @@ MapApp.utils = {
         const densityCompact = tooltipDisplay.density === 'compact';
         const fontScale = Math.min(130, Math.max(85, Number(tooltipDisplay.font_scale) || 100));
         const maxWidth = Math.min(480, Math.max(260, Number(tooltipDisplay.max_width) || 320));
+        const boxScale = Math.min(130, Math.max(85, Number(tooltipDisplay.box_scale) || 100));
+        const panelBgColor = tooltipDisplay.panel_bg_color || '#0f172a';
+        const panelTextColor = tooltipDisplay.panel_text_color || '#e2e8f0';
+        const panelMutedColor = tooltipDisplay.panel_muted_color || '#94a3b8';
+        const panelAccentColor = tooltipDisplay.panel_accent_color || '#22d3ee';
+        const fontStack = MapApp.utils.getTooltipFontStack(tooltipDisplay.font_family);
         const baseFont = Math.round((densityCompact ? 11 : 12) * (fontScale / 100));
         const headerFont = Math.round((densityCompact ? 13 : 14) * (fontScale / 100));
-        const spacing = densityCompact ? 3 : 5;
-        const sectionMargin = densityCompact ? 6 : 8;
+        const spacing = Math.round((densityCompact ? 3 : 5) * (boxScale / 100));
+        const sectionMargin = Math.round((densityCompact ? 6 : 8) * (boxScale / 100));
+        const minWidth = Math.round(230 * (boxScale / 100));
+        const headerPaddingY = Math.round(2 * (boxScale / 100));
+        const headerPaddingX = Math.round(8 * (boxScale / 100));
 
-        let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 230px; max-width: ${maxWidth}px; padding: 2px; line-height:1.35;">`;
+        let title = `<div style="font-family:${fontStack}; min-width:${minWidth}px; max-width:${maxWidth}px; padding:${Math.max(2, Math.round(4 * (boxScale / 100)))}px; line-height:1.35; background:${panelBgColor}; border:1px solid rgba(148,163,184,0.35); border-radius:8px;">`;
 
         // Header: Name + Status badge
         title += `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:${sectionMargin}px;">`;
-        title += `<b style="font-size:${headerFont}px; color:#f1f5f9;">${deviceData.name}</b>`;
-        title += `<span style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; color:#fff; background:${statusColor};">${statusLabel}</span>`;
+        title += `<b style="font-size:${headerFont}px; color:${panelTextColor};">${deviceData.name}</b>`;
+        title += `<span style="display:inline-block; padding:${headerPaddingY}px ${headerPaddingX}px; border-radius:9999px; font-size:${Math.max(10, Math.round(11 * (fontScale / 100)))}px; font-weight:600; color:#fff; background:${statusColor};">${statusLabel}</span>`;
         title += `</div>`;
 
         // Divider
-        title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-bottom:${sectionMargin}px;"></div>`;
+        title += `<div style="border-top:1px solid ${panelMutedColor}55; margin-bottom:${sectionMargin}px;"></div>`;
 
         // Details grid
         title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: ${spacing}px 10px; font-size:${baseFont}px;">`;
 
         // IP
         if (tooltipFields.ip) {
-            title += `<span style="color:#94a3b8;">IP Address:</span>`;
-            title += `<span style="color:#e2e8f0; font-family:monospace;">${deviceData.ip || 'N/A'}</span>`;
+            title += `<span style="color:${panelMutedColor};">IP Address:</span>`;
+            title += `<span style="color:${panelTextColor}; font-family:monospace;">${deviceData.ip || 'N/A'}</span>`;
         }
 
         // Type
         if (tooltipFields.type) {
             const typeLabel = (deviceData.type || 'server').charAt(0).toUpperCase() + (deviceData.type || 'server').slice(1);
-            title += `<span style="color:#94a3b8;">Type:</span>`;
-            title += `<span style="color:#e2e8f0;">${typeLabel}${deviceData.subchoice ? ' (#' + deviceData.subchoice + ')' : ''}</span>`;
+            title += `<span style="color:${panelMutedColor};">Type:</span>`;
+            title += `<span style="color:${panelTextColor};">${typeLabel}${deviceData.subchoice ? ' (#' + deviceData.subchoice + ')' : ''}</span>`;
         }
 
         // Monitor method
         if (tooltipFields.monitor && deviceData.monitor_method) {
-            title += `<span style="color:#94a3b8;">Monitor:</span>`;
-            title += `<span style="color:#e2e8f0;">${deviceData.monitor_method}${deviceData.check_port ? ':' + deviceData.check_port : ''}</span>`;
+            title += `<span style="color:${panelMutedColor};">Monitor:</span>`;
+            title += `<span style="color:${panelTextColor};">${deviceData.monitor_method}${deviceData.check_port ? ':' + deviceData.check_port : ''}</span>`;
         }
 
         // Latency
         if (tooltipFields.latency && deviceData.last_avg_time !== null && deviceData.last_avg_time !== undefined) {
             const latency = parseFloat(deviceData.last_avg_time);
             const latColor = latency < 50 ? '#22c55e' : latency < 150 ? '#eab308' : '#ef4444';
-            title += `<span style="color:#94a3b8;">Latency:</span>`;
+            title += `<span style="color:${panelMutedColor};">Latency:</span>`;
             title += `<span style="color:${latColor}; font-weight:600;">${latency}ms</span>`;
         }
 
         // TTL
         if (tooltipFields.ttl && deviceData.last_ttl) {
-            title += `<span style="color:#94a3b8;">TTL:</span>`;
-            title += `<span style="color:#e2e8f0;">${deviceData.last_ttl}</span>`;
+            title += `<span style="color:${panelMutedColor};">TTL:</span>`;
+            title += `<span style="color:${panelTextColor};">${deviceData.last_ttl}</span>`;
         }
 
         // Ping interval
         if (tooltipFields.interval && deviceData.ping_interval) {
-            title += `<span style="color:#94a3b8;">Interval:</span>`;
-            title += `<span style="color:#e2e8f0;">${deviceData.ping_interval}s</span>`;
+            title += `<span style="color:${panelMutedColor};">Interval:</span>`;
+            title += `<span style="color:${panelTextColor};">${deviceData.ping_interval}s</span>`;
         }
 
         // Last seen
         if (tooltipFields.last_seen && deviceData.last_seen) {
-            title += `<span style="color:#94a3b8;">Last Seen:</span>`;
-            title += `<span style="color:#e2e8f0;">${deviceData.last_seen}</span>`;
+            title += `<span style="color:${panelMutedColor};">Last Seen:</span>`;
+            title += `<span style="color:${panelTextColor};">${deviceData.last_seen}</span>`;
         }
 
         title += `</div>`;
@@ -238,14 +265,14 @@ MapApp.utils = {
         // Description
         if (tooltipFields.description && deviceData.description) {
             const desc = deviceData.description.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            title += `<div style="margin-top:6px; font-size:${Math.max(10, baseFont - 1)}px; color:#94a3b8; font-style:italic;">${desc}</div>`;
+            title += `<div style="margin-top:6px; font-size:${Math.max(10, baseFont - 1)}px; color:${panelMutedColor}; font-style:italic;">${desc}</div>`;
         }
 
         // Ports summary
         const ports = MapApp.utils.getPortsFromDevice(deviceData);
         if (tooltipFields.ports && ports.length > 0) {
-            title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-top:${sectionMargin}px; padding-top:6px;">`;
-            title += `<div style="font-size:${Math.max(10, baseFont - 1)}px; font-weight:600; color:#cbd5e1; margin-bottom:4px;">Ports (${ports.length})</div>`;
+            title += `<div style="border-top:1px solid ${panelMutedColor}55; margin-top:${sectionMargin}px; padding-top:6px;">`;
+            title += `<div style="font-size:${Math.max(10, baseFont - 1)}px; font-weight:600; color:${panelAccentColor}; margin-bottom:4px;">Ports (${ports.length})</div>`;
             const portGroups = {};
             ports.forEach(p => {
                 const key = p.type || (p.name.startsWith('G') ? 'GE' : p.name.startsWith('S0') ? 'Serial' : p.name.startsWith('SFP') ? 'SFP' : p.name.startsWith('Mgmt') ? 'Mgmt' : 'Port');
@@ -258,7 +285,7 @@ MapApp.utils = {
                 const color = colorMap[type] || '#94a3b8';
                 let line = `<span style="color:${color}">■</span> ${type}: ${group.names.length}x (${group.names[0]}–${group.names[group.names.length-1]})`;
                 if (group.vlan) line += ` <span style="color:#fbbf24;font-size:${Math.max(10, baseFont - 2)}px;">[VLAN ${group.vlan}]</span>`;
-                title += `<div style="font-size:${Math.max(10, baseFont - 1)}px; color:#e2e8f0;">${line}</div>`;
+                title += `<div style="font-size:${Math.max(10, baseFont - 1)}px; color:${panelTextColor};">${line}</div>`;
             }
             title += `</div>`;
         }
@@ -340,19 +367,28 @@ MapApp.utils = {
         const connLabel = typeLabels[connType] || connType;
         const connColor = typeColors[connType] || '#94a3b8';
         const connectionTooltipFields = MapApp.utils.getCurrentConnectionTooltipFields();
+        const tooltipDisplay = MapApp.utils.getCurrentTooltipDisplaySettings();
+        const fontScale = Math.min(130, Math.max(85, Number(tooltipDisplay.font_scale) || 100));
+        const maxWidth = Math.min(480, Math.max(260, Number(tooltipDisplay.max_width) || 320));
+        const boxScale = Math.min(130, Math.max(85, Number(tooltipDisplay.box_scale) || 100));
+        const panelBgColor = tooltipDisplay.panel_bg_color || '#0f172a';
+        const panelTextColor = tooltipDisplay.panel_text_color || '#e2e8f0';
+        const panelMutedColor = tooltipDisplay.panel_muted_color || '#94a3b8';
+        const panelAccentColor = tooltipDisplay.panel_accent_color || '#22d3ee';
+        const fontStack = MapApp.utils.getTooltipFontStack(tooltipDisplay.font_family);
 
-        let title = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 200px; max-width: 300px; padding: 2px;">`;
+        let title = `<div style="font-family:${fontStack}; min-width:${Math.round(200 * (boxScale / 100))}px; max-width:${maxWidth}px; padding:${Math.max(2, Math.round(4 * (boxScale / 100)))}px; background:${panelBgColor}; border:1px solid rgba(148,163,184,0.35); border-radius:8px;">`;
 
         // Header
         title += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">`;
-        title += `<div style="width:12px; height:3px; border-radius:2px; background:${connColor};"></div>`;
-        title += `<b style="font-size:13px; color:#f1f5f9;">${connectionTooltipFields.type ? connLabel : 'Connection'}</b>`;
+        title += `<div style="width:12px; height:3px; border-radius:2px; background:${panelAccentColor || connColor};"></div>`;
+        title += `<b style="font-size:${Math.round(13 * (fontScale / 100))}px; color:${panelTextColor};">${connectionTooltipFields.type ? connLabel : 'Connection'}</b>`;
         title += `</div>`;
 
-        title += `<div style="border-top:1px solid rgba(148,163,184,0.2); margin-bottom:8px;"></div>`;
+        title += `<div style="border-top:1px solid ${panelMutedColor}55; margin-bottom:8px;"></div>`;
 
         // Connected devices
-        title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px;">`;
+        title += `<div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:${Math.round(12 * (fontScale / 100))}px;">`;
 
         const srcName = srcDevice ? srcDevice.name : 'Unknown';
         const tgtName = tgtDevice ? tgtDevice.name : 'Unknown';
@@ -361,34 +397,34 @@ MapApp.utils = {
         const statusDotColors = { online: '#22c55e', warning: '#eab308', critical: '#ef4444', offline: '#64748b', unknown: '#94a3b8' };
 
         if (connectionTooltipFields.source_target) {
-            title += `<span style="color:#94a3b8;">Source:</span>`;
-            title += `<span style="color:#e2e8f0;">${srcName}</span>`;
-            title += `<span style="color:#94a3b8;">Target:</span>`;
-            title += `<span style="color:#e2e8f0;">${tgtName}</span>`;
+            title += `<span style="color:${panelMutedColor};">Source:</span>`;
+            title += `<span style="color:${panelTextColor};">${srcName}</span>`;
+            title += `<span style="color:${panelMutedColor};">Target:</span>`;
+            title += `<span style="color:${panelTextColor};">${tgtName}</span>`;
         }
 
         if (connectionTooltipFields.status) {
-            title += `<span style="color:#94a3b8;">Source Status:</span>`;
-            title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[srcStatus] || '#94a3b8'}; margin-right:4px;"></span>${srcStatus}</span>`;
-            title += `<span style="color:#94a3b8;">Target Status:</span>`;
-            title += `<span style="color:#e2e8f0;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[tgtStatus] || '#94a3b8'}; margin-right:4px;"></span>${tgtStatus}</span>`;
+            title += `<span style="color:${panelMutedColor};">Source Status:</span>`;
+            title += `<span style="color:${panelTextColor};"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[srcStatus] || '#94a3b8'}; margin-right:4px;"></span>${srcStatus}</span>`;
+            title += `<span style="color:${panelMutedColor};">Target Status:</span>`;
+            title += `<span style="color:${panelTextColor};"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${statusDotColors[tgtStatus] || '#94a3b8'}; margin-right:4px;"></span>${tgtStatus}</span>`;
         }
 
         // Port mapping
         if (connectionTooltipFields.ports && (edge.source_port_label || edge.target_port_label)) {
-            title += `<span style="color:#94a3b8;">Ports:</span>`;
-            title += `<span style="color:#22d3ee; font-family:monospace; font-weight:600;">${edge.source_port_label || '—'} ↔ ${edge.target_port_label || '—'}</span>`;
+            title += `<span style="color:${panelMutedColor};">Ports:</span>`;
+            title += `<span style="color:${panelAccentColor}; font-family:monospace; font-weight:600;">${edge.source_port_label || '—'} ↔ ${edge.target_port_label || '—'}</span>`;
         }
 
         title += `</div>`;
 
         // Port mapping visual
         if (connectionTooltipFields.ports && edge.source_port_label && edge.target_port_label) {
-            title += `<div style="margin-top:8px; padding:6px 8px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); border-radius:6px; text-align:center;">`;
-            title += `<span style="font-size:11px; color:#94a3b8;">Port Mapping</span><br>`;
-            title += `<span style="font-size:13px; font-family:monospace; color:#22d3ee; font-weight:600;">${edge.source_port_label}</span>`;
+            title += `<div style="margin-top:8px; padding:6px 8px; background:${panelAccentColor}1A; border:1px solid ${panelAccentColor}55; border-radius:6px; text-align:center;">`;
+            title += `<span style="font-size:11px; color:${panelMutedColor};">Port Mapping</span><br>`;
+            title += `<span style="font-size:${Math.round(13 * (fontScale / 100))}px; font-family:monospace; color:${panelAccentColor}; font-weight:600;">${edge.source_port_label}</span>`;
             title += `<span style="font-size:11px; color:#64748b; margin:0 6px;">⟷</span>`;
-            title += `<span style="font-size:13px; font-family:monospace; color:#22d3ee; font-weight:600;">${edge.target_port_label}</span>`;
+            title += `<span style="font-size:${Math.round(13 * (fontScale / 100))}px; font-family:monospace; color:${panelAccentColor}; font-weight:600;">${edge.target_port_label}</span>`;
             title += `</div>`;
         }
 
