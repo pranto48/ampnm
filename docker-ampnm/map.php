@@ -438,6 +438,33 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             <div id="placeDeviceLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
         </div>
     </div>
+
+    <!-- Metrics Graph Modal -->
+    <div id="metricsModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-4xl border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-white">Device Performance Graphs</h2>
+                <button id="closeMetricsModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex items-center gap-3 mb-4">
+                <span id="metricsDeviceTitle" class="text-sm text-cyan-300 font-semibold"></span>
+                <select id="metricsHoursRange" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm">
+                    <option value="6">Last 6h</option>
+                    <option value="24" selected>Last 24h</option>
+                    <option value="72">Last 3d</option>
+                    <option value="168">Last 7d</option>
+                </select>
+                <button id="refreshMetricsGraphBtn" class="px-3 py-2 bg-cyan-600 rounded-lg text-white text-sm">Refresh</button>
+            </div>
+            <div id="metricsGraphContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">CPU %</h3><div id="metricsCpuGraph"></div></div>
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">RAM %</h3><div id="metricsRamGraph"></div></div>
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">HDD %</h3><div id="metricsDiskGraph"></div></div>
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><h3 class="text-sm text-slate-300 mb-2">Port Bandwidth (In/Out Mbps)</h3><div id="metricsNetGraph"></div></div>
+            </div>
+            <div id="metricsNoDataMessage" class="text-center text-slate-500 py-6 hidden">No metrics data available for this device yet.</div>
+        </div>
+    </div>
 </main>
 
 <!-- Load device icons library for JavaScript icon mapping -->
