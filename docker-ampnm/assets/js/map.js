@@ -117,10 +117,24 @@ function initMap() {
         const fontScale = document.getElementById('tooltipFontScale');
         const fontScaleValue = document.getElementById('tooltipFontScaleValue');
         const maxWidth = document.getElementById('tooltipMaxWidth');
+        const fontFamily = document.getElementById('tooltipFontFamily');
+        const boxScale = document.getElementById('tooltipBoxScale');
+        const boxScaleValue = document.getElementById('tooltipBoxScaleValue');
+        const bgColor = document.getElementById('tooltipBgColor');
+        const textColor = document.getElementById('tooltipTextColor');
+        const mutedColor = document.getElementById('tooltipMutedColor');
+        const accentColor = document.getElementById('tooltipAccentColor');
         if (density) density.value = merged.density || 'comfortable';
         if (fontScale) fontScale.value = String(merged.font_scale ?? 100);
         if (fontScaleValue) fontScaleValue.textContent = `${merged.font_scale ?? 100}%`;
         if (maxWidth) maxWidth.value = String(merged.max_width ?? 320);
+        if (fontFamily) fontFamily.value = merged.font_family || 'system';
+        if (boxScale) boxScale.value = String(merged.box_scale ?? 100);
+        if (boxScaleValue) boxScaleValue.textContent = `${merged.box_scale ?? 100}%`;
+        if (bgColor) bgColor.value = merged.panel_bg_color || '#0f172a';
+        if (textColor) textColor.value = merged.panel_text_color || '#e2e8f0';
+        if (mutedColor) mutedColor.value = merged.panel_muted_color || '#94a3b8';
+        if (accentColor) accentColor.value = merged.panel_accent_color || '#22d3ee';
     };
 
     const readTooltipDisplayControls = () => {
@@ -128,10 +142,22 @@ function initMap() {
         const density = document.getElementById('tooltipDensity')?.value || defaults.density;
         const fontScale = Number(document.getElementById('tooltipFontScale')?.value ?? defaults.font_scale);
         const maxWidth = Number(document.getElementById('tooltipMaxWidth')?.value ?? defaults.max_width);
+        const fontFamily = document.getElementById('tooltipFontFamily')?.value || defaults.font_family;
+        const boxScale = Number(document.getElementById('tooltipBoxScale')?.value ?? defaults.box_scale);
+        const panelBgColor = document.getElementById('tooltipBgColor')?.value || defaults.panel_bg_color;
+        const panelTextColor = document.getElementById('tooltipTextColor')?.value || defaults.panel_text_color;
+        const panelMutedColor = document.getElementById('tooltipMutedColor')?.value || defaults.panel_muted_color;
+        const panelAccentColor = document.getElementById('tooltipAccentColor')?.value || defaults.panel_accent_color;
         return {
             density: density === 'compact' ? 'compact' : 'comfortable',
             font_scale: Math.min(130, Math.max(85, fontScale)),
-            max_width: Math.min(480, Math.max(260, maxWidth))
+            max_width: Math.min(480, Math.max(260, maxWidth)),
+            font_family: ['system', 'inter', 'roboto', 'mono'].includes(fontFamily) ? fontFamily : defaults.font_family,
+            box_scale: Math.min(130, Math.max(85, boxScale)),
+            panel_bg_color: panelBgColor,
+            panel_text_color: panelTextColor,
+            panel_muted_color: panelMutedColor,
+            panel_accent_color: panelAccentColor
         };
     };
 
@@ -163,6 +189,16 @@ function initMap() {
             const tooltipFontScaleValue = document.getElementById('tooltipFontScaleValue');
             if (tooltipFontScaleValue) {
                 tooltipFontScaleValue.textContent = `${tooltipFontScaleInput.value || 100}%`;
+            }
+        });
+    }
+
+    const tooltipBoxScaleInput = document.getElementById('tooltipBoxScale');
+    if (tooltipBoxScaleInput) {
+        tooltipBoxScaleInput.addEventListener('input', () => {
+            const tooltipBoxScaleValue = document.getElementById('tooltipBoxScaleValue');
+            if (tooltipBoxScaleValue) {
+                tooltipBoxScaleValue.textContent = `${tooltipBoxScaleInput.value || 100}%`;
             }
         });
     }
