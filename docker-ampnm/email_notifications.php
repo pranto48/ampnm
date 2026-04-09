@@ -137,6 +137,7 @@ include 'header.php';
                     <table class="min-w-full">
                         <thead class="border-b border-slate-700">
                             <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Device</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Recipient</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Triggers</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th>

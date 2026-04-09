@@ -225,6 +225,7 @@ MapApp.network = {
                         const device = node.deviceData;
                         const currentType = device.type || 'server';
                         const currentSub = parseInt(device.subchoice, 10) || 0;
+                        const currentIconSize = Math.max(20, Math.min(180, parseInt(device.icon_size, 10) || 50));
 
                         // Lightweight modal built on the fly (keeps compatibility with non-React map)
                         const modalId = 'changeIconModal';
@@ -241,7 +242,7 @@ MapApp.network = {
                         overlay.style.alignItems = 'center';
                         overlay.style.justifyContent = 'center';
                         overlay.innerHTML = `
-                            <div style="width: min(520px, 92vw); background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(51, 65, 85, 0.9); border-radius: 12px; padding: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
+                            <div style="width: min(620px, 94vw); background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(51, 65, 85, 0.9); border-radius: 12px; padding: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); max-height: 90vh; overflow:auto;">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
                                     <div style="font-weight: 700; color: #fff;">Change Icon</div>
                                     <button type="button" data-ci-close style="background: transparent; border: 0; color: rgba(226,232,240,0.7); font-size: 22px; cursor: pointer;">×</button>
@@ -254,6 +255,16 @@ MapApp.network = {
                                     <div>
                                         <label style="display:block; font-size: 12px; color: rgba(148,163,184,1); margin-bottom: 6px;">Variant</label>
                                         <select data-ci-variant style="width: 100%; background: rgba(2,6,23,0.8); border: 1px solid rgba(71,85,105,1); color: #fff; padding: 10px 12px; border-radius: 10px;"></select>
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size: 12px; color: rgba(148,163,184,1); margin-bottom: 6px;">Icon Size (20-180px)</label>
+                                        <input data-ci-size type="number" min="20" max="180" step="1" value="${currentIconSize}" style="width: 100%; background: rgba(2,6,23,0.8); border: 1px solid rgba(71,85,105,1); color: #fff; padding: 10px 12px; border-radius: 10px;">
+                                    </div>
+                                    <div style="padding: 10px 12px; border-radius: 10px; background: rgba(2,6,23,0.55); border: 1px solid rgba(51,65,85,0.7);">
+                                        <label style="display:block; font-size: 12px; color: rgba(148,163,184,1); margin-bottom: 6px;">Upload Custom PNG/JPG/SVG/WebP (optional)</label>
+                                        <input data-ci-upload type="file" accept=".png,.jpg,.jpeg,.gif,.svg,.webp,image/*" style="width: 100%; font-size: 12px; color: #e2e8f0;">
+                                        <div data-ci-upload-note style="margin-top: 6px; font-size: 12px; color: #94a3b8;">Upload replaces current icon with the custom image.</div>
+                                        ${device.icon_url ? `<div style="margin-top: 8px; font-size: 11px; color: #67e8f9;">Current custom icon: ${String(device.icon_url)}</div>` : ''}
                                     </div>
                                     <div data-ci-preview style="display:flex; align-items:center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(2,6,23,0.55); border: 1px solid rgba(51,65,85,0.7);">
                                         <i data-ci-preview-icon class="fas fa-circle" style="color: rgba(226,232,240,0.9);"></i>
@@ -282,6 +293,8 @@ MapApp.network = {
                         const previewIcon = overlay.querySelector('[data-ci-preview-icon]');
                         const previewTitle = overlay.querySelector('[data-ci-preview-title]');
                         const previewSub = overlay.querySelector('[data-ci-preview-sub]');
+                        const sizeInput = overlay.querySelector('[data-ci-size]');
+                        const uploadInput = overlay.querySelector('[data-ci-upload]');
                         const saveBtn = overlay.querySelector('[data-ci-save]');
 
                         const lib = window.deviceIconsLibrary || {};
@@ -346,7 +359,34 @@ MapApp.network = {
                             try {
                                 const nextType = typeSelect.value;
                                 const nextSub = parseInt(variantSelect.value, 10) || 0;
-                                const updated = await MapApp.api.post('update_device', { id, updates: { type: nextType, subchoice: nextSub } });
+                                const nextSize = Math.max(20, Math.min(180, parseInt(sizeInput.value, 10) || currentIconSize));
+                                let nextIconUrl = device.icon_url || null;
+
+                                const selectedFile = uploadInput?.files && uploadInput.files[0] ? uploadInput.files[0] : null;
+                                if (selectedFile) {
+                                    const formData = new FormData();
+                                    formData.append('id', String(id));
+                                    formData.append('iconFile', selectedFile);
+
+                                    const uploadRes = await fetch(`${MapApp.config.API_URL}?action=upload_device_icon`, {
+                                        method: 'POST',
+                                        body: formData,
+                                    });
+                                    const uploadData = await uploadRes.json();
+                                    if (!uploadRes.ok || !uploadData.success) {
+                                        throw new Error(uploadData.error || 'Icon upload failed.');
+                                    }
+                                    nextIconUrl = uploadData.url || nextIconUrl;
+                                }
+
+                                const updates = {
+                                    type: nextType,
+                                    subchoice: nextSub,
+                                    icon_size: nextSize,
+                                    icon_url: nextIconUrl
+                                };
+
+                                const updated = await MapApp.api.post('update_device', { id, updates });
 
                                 // Update the node data and redraw icon
                                 node.deviceData = updated;
