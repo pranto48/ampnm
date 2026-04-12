@@ -218,7 +218,7 @@ function checkHttpConnectivity($host) {
  * @param string $color The color of the icon (e.g., '#ffffff').
  * @return string The SVG data URL.
  */
-function generateFaSvgDataUrl(string $iconCode, int $size, string $color): string {
+function generateFaSvgDataUrl($iconCode, $size, $color) {
     // Ensure the icon code is properly escaped for XML
     $escapedIconCode = htmlspecialchars($iconCode);
 
