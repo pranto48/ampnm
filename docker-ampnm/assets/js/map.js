@@ -223,6 +223,27 @@ function initMap() {
         });
     }
 
+    const mapSettingsTabButtons = document.querySelectorAll('.map-settings-tab-btn');
+    const mapSettingsPanels = document.querySelectorAll('[data-map-settings-panel]');
+    const activateMapSettingsPanel = (tab) => {
+        mapSettingsPanels.forEach((panel) => {
+            panel.classList.toggle('hidden', panel.getAttribute('data-map-settings-panel') !== tab);
+        });
+        mapSettingsTabButtons.forEach((btn) => {
+            const isActive = btn.getAttribute('data-map-settings-tab') === tab;
+            btn.classList.toggle('bg-cyan-700', isActive);
+            btn.classList.toggle('text-white', isActive);
+            btn.classList.toggle('bg-slate-700', !isActive);
+            btn.classList.toggle('text-slate-200', !isActive);
+        });
+    };
+    if (mapSettingsTabButtons.length > 0) {
+        mapSettingsTabButtons.forEach((btn) => {
+            btn.addEventListener('click', () => activateMapSettingsPanel(btn.getAttribute('data-map-settings-tab')));
+        });
+        activateMapSettingsPanel('device');
+    }
+
     // Cleanup function for SPA navigation
     window.cleanup = () => {
         if (state.animationFrameId) {

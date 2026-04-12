@@ -324,6 +324,12 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                 </div>
                 <div class="border-t border-slate-700 pt-4 mt-4 space-y-3">
+                    <div class="flex flex-wrap gap-2 pb-2">
+                        <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-cyan-700 text-white" data-map-settings-tab="device">Mouse Over Device Information</button>
+                        <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="connection">Mouse Over Connection Information</button>
+                        <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="motion">Connection Running Options</button>
+                    </div>
+                    <div data-map-settings-panel="device" class="space-y-3">
                     <h3 class="text-lg font-semibold text-white">Mouse Over Device Information</h3>
                     <p class="text-xs text-slate-500">Choose which fields are visible when hovering a device on this map.</p>
                     <div id="tooltipFieldSettings" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
@@ -337,6 +343,8 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <label class="flex items-center text-slate-300"><input type="checkbox" data-tooltip-field="description" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Description</label>
                         <label class="flex items-center text-slate-300 sm:col-span-2"><input type="checkbox" data-tooltip-field="ports" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500 mr-2" checked>Ports Summary</label>
                     </div>
+                    </div>
+                    <div data-map-settings-panel="connection" class="space-y-3 hidden">
                     <h3 class="text-lg font-semibold text-white pt-3 border-t border-slate-700/80 mt-2">Mouse Over Connection Information</h3>
                     <p class="text-xs text-slate-500">Choose which fields are visible when hovering a connection on this map.</p>
                     <div id="connectionTooltipFieldSettings" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
@@ -398,6 +406,8 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <input type="color" id="tooltipMutedColor" value="#94a3b8" class="p-1 h-10 w-full block bg-slate-900 border border-slate-600 cursor-pointer rounded-lg">
                         </div>
                     </div>
+                    </div>
+                    <div data-map-settings-panel="motion" class="space-y-3 hidden">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-700/80">
                         <div>
                             <label for="connectionRunStyle" class="block text-xs font-medium text-slate-400 mb-1">Connection Running Style</label>
@@ -412,6 +422,8 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <label for="connectionAnimationSpeed" class="block text-xs font-medium text-slate-400 mb-1">Connection Animation Speed <span id="connectionAnimationSpeedValue" class="text-cyan-400">100%</span></label>
                             <input id="connectionAnimationSpeed" type="range" min="0" max="200" step="10" value="100" class="w-full accent-cyan-500">
                         </div>
+                    </div>
+                    <p class="text-xs text-slate-500">Use this panel to control how connection lines run and animate on the map.</p>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mt-6">

@@ -326,10 +326,9 @@ MapApp.ui = {
         const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
         const runStyle = displaySettings.connection_run_style || 'auto';
         const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) || 100));
-        const animationStep = speedPercent === 0 ? 0 : Math.max(1, Math.round(speedPercent / 50));
+        const animationStep = speedPercent === 0 ? 0 : Math.max(1, Math.round(speedPercent / 20));
         MapApp.state.tick += animationStep;
-        const dashOffset = MapApp.state.tick % 12;
-        const animatedDashes = [Math.max(1, 4 - dashOffset), 8, dashOffset];
+        const phase = MapApp.state.tick % 4;
         const updates = [];
         const allEdges = MapApp.state.edges.get();
         if (MapApp.state.nodes.length > 0 && allEdges.length > 0) {
@@ -338,18 +337,18 @@ MapApp.ui = {
                 const sourceStatus = deviceStatusMap.get(edge.from);
                 const targetStatus = deviceStatusMap.get(edge.to);
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
-                const isActive = sourceStatus === 'online' && targetStatus === 'online';
+                const isRunning = !isOffline;
                 const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
                 let dashes = false;
-                if (isActive) {
+                if (isRunning) {
                     if (runStyle === 'solid') {
                         dashes = false;
                     } else if (runStyle === 'dotted') {
-                        dashes = speedPercent === 0 ? [1, 6] : [1, 6, dashOffset];
+                        dashes = speedPercent === 0 ? [1, 6] : (phase % 2 === 0 ? [1, 5] : [2, 4]);
                     } else if (runStyle === 'dashed') {
-                        dashes = speedPercent === 0 ? [6, 6] : [6, 6, dashOffset];
+                        dashes = speedPercent === 0 ? [8, 6] : (phase % 2 === 0 ? [6, 6] : [10, 4]);
                     } else {
-                        dashes = speedPercent === 0 ? [5, 5] : animatedDashes;
+                        dashes = speedPercent === 0 ? [6, 6] : [[3, 7], [5, 5], [7, 3], [5, 5]][phase];
                     }
                 } else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
                     dashes = [5, 5];
