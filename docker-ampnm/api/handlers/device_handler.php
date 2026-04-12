@@ -46,7 +46,7 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
         return;
     }
 
-    $subject = sprintf('AMPNM Alert: %s is %s', $device['name'], strtoupper($newStatus));
+    $subject = sprintf('Alert: %s is %s', $device['name'], strtoupper($newStatus));
     $body = "Device: {$device['name']}\n"
         . "IP: " . ($device['ip'] ?? 'N/A') . "\n"
         . "Previous Status: {$oldStatus}\n"
@@ -96,10 +96,64 @@ function logStatusChange($pdo, $deviceId, $oldStatus, $newStatus, $details) {
     }
 }
 
+function getFreshAgentMetrics(PDO $pdo, int $deviceId, int $freshnessSeconds = 180): ?array {
+    static $hasDeviceIdColumn = null;
+    if ($hasDeviceIdColumn === null) {
+        $columns = $pdo->query("SHOW COLUMNS FROM host_metrics")->fetchAll(PDO::FETCH_COLUMN, 0);
+        $hasDeviceIdColumn = in_array('device_id', $columns, true);
+    }
+    if (!$hasDeviceIdColumn) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            COALESCE(last_seen, created_at) AS seen_at,
+            COALESCE(cpu_percent, cpu_usage) AS cpu_percent,
+            COALESCE(memory_percent, memory_usage) AS memory_percent,
+            COALESCE(disk_percent, disk_usage) AS disk_percent,
+            COALESCE(gpu_percent, gpu_usage) AS gpu_percent
+        FROM host_metrics
+        WHERE device_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$deviceId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row || empty($row['seen_at'])) {
+        return null;
+    }
+
+    $seenTs = strtotime((string)$row['seen_at']);
+    if (!$seenTs) {
+        return null;
+    }
+
+    $isFresh = (time() - $seenTs) <= $freshnessSeconds;
+    $row['is_fresh'] = $isFresh;
+    return $row;
+}
+
 function evaluateDeviceCheck($pdo, $device, &$details, &$last_avg_time, &$last_ttl, &$check_output = '') {
     $monitorMethod = $device['monitor_method'] ?? 'ping';
     $hasPort = !empty($device['check_port']) && is_numeric($device['check_port']);
     $last_seen = $device['last_seen'];
+    $deviceId = isset($device['id']) ? (int)$device['id'] : 0;
+
+    if ($deviceId > 0) {
+        $agentMetrics = getFreshAgentMetrics($pdo, $deviceId);
+        if ($agentMetrics && !empty($agentMetrics['is_fresh'])) {
+            $last_seen = date('Y-m-d H:i:s');
+            $details = sprintf(
+                'Agent telemetry active (CPU %s%%, RAM %s%%, Disk %s%%, GPU %s%%).',
+                round((float)($agentMetrics['cpu_percent'] ?? 0), 1),
+                round((float)($agentMetrics['memory_percent'] ?? 0), 1),
+                round((float)($agentMetrics['disk_percent'] ?? 0), 1),
+                round((float)($agentMetrics['gpu_percent'] ?? 0), 1)
+            );
+            return ['status' => 'online', 'last_seen' => $last_seen];
+        }
+    }
 
     if (empty($device['ip'])) {
         $details = 'Device has no IP configured for monitoring.';
