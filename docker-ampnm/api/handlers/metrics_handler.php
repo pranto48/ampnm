@@ -139,10 +139,10 @@ function createDeviceForHost(PDO $pdo, int $userId, string $hostName, ?string $h
     if ($existing) return $existing;
 
     $insert = $pdo->prepare("
-        INSERT INTO devices (user_id, name, ip, monitor_method, type, status, ping_interval, show_live_ping)
-        VALUES (?, ?, ?, 'ping', ?, 'online', 60, 1)
+        INSERT INTO devices (user_id, name, ip, monitor_method, type, status, ping_interval, show_live_ping, description)
+        VALUES (?, ?, ?, 'ping', ?, 'online', NULL, 0, ?)
     ");
-    $insert->execute([$userId, $safeName, $hostIp, $deviceType]);
+    $insert->execute([$userId, $safeName, $hostIp, $deviceType, 'Auto-created from agent telemetry']);
     $newId = (int)$pdo->lastInsertId();
 
     $fetch = $pdo->prepare("SELECT id, name, ip FROM devices WHERE id = ? LIMIT 1");
@@ -664,18 +664,34 @@ switch ($action) {
         if ($deviceId) {
             $currentColumns = getTableColumns($pdo, 'host_metrics');
             $hostNameColumn = firstAvailableColumn($currentColumns, ['host_name', 'hostname']);
+            $hostIpColumn = firstAvailableColumn($currentColumns, ['host_ip', 'ip_address']);
             if (hasColumn($currentColumns, 'device_id') && $hostNameColumn) {
                 $stmt = $pdo->prepare("SELECT `{$hostNameColumn}` FROM host_metrics WHERE device_id = ? LIMIT 1");
                 $stmt->execute([$deviceId]);
                 $hostIdentifier = $stmt->fetchColumn();
+                if (!$hostIdentifier && $hostIpColumn) {
+                    $stmt = $pdo->prepare("SELECT `{$hostIpColumn}` FROM host_metrics WHERE device_id = ? LIMIT 1");
+                    $stmt->execute([$deviceId]);
+                    $hostIdentifier = $stmt->fetchColumn();
+                }
+                if (!$hostIdentifier) {
+                    $deviceLookup = $pdo->prepare("SELECT ip, name FROM devices WHERE id = ? LIMIT 1");
+                    $deviceLookup->execute([$deviceId]);
+                    $deviceRow = $deviceLookup->fetch(PDO::FETCH_ASSOC) ?: [];
+                    $hostIdentifier = $deviceRow['ip'] ?? $deviceRow['name'] ?? null;
+                }
+                if (!$hostIdentifier) {
+                    echo json_encode([]);
+                    exit;
+                }
                 $stmt = $pdo->prepare("
                     SELECT id, {$cpuExpr} AS cpu_percent, {$memoryExpr} AS memory_percent, {$diskExpr} AS disk_percent,
                            {$netInExpr} AS network_in_mbps, {$netOutExpr} AS network_out_mbps, {$gpuExpr} AS gpu_percent, {$recordedExpr} AS created_at
                     FROM host_metrics_history
-                    WHERE {$hostNameExpr} = ? AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                    WHERE ({$hostNameExpr} = ? OR {$hostIpExpr} = ?) AND {$recordedExpr} >= DATE_SUB(NOW(), INTERVAL ? HOUR)
                     ORDER BY {$recordedExpr} ASC
                 ");
-                $stmt->execute([$hostIdentifier, $hours]);
+                $stmt->execute([$hostIdentifier, $hostIdentifier, $hours]);
             } else {
                 http_response_code(400);
                 echo json_encode(['error' => 'device_id lookup not supported by current schema; use host_ip']);
