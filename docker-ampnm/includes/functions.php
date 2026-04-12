@@ -106,7 +106,8 @@ function parsePingOutput($output) {
 
 // Function to save a ping result to the database
 function savePingResult($pdo, $host, $pingResult) {
-    $parsed = parsePingOutput($pingResult['output'] ?? '');
+    $pingOutput = isset($pingResult['output']) ? $pingResult['output'] : '';
+    $parsed = parsePingOutput($pingOutput);
 
     // Normalize values to satisfy NOT NULL schema constraints and avoid type warnings
     $packetLoss = isset($parsed['packet_loss']) ? (int)$parsed['packet_loss'] : 100;
@@ -124,7 +125,7 @@ function savePingResult($pdo, $host, $pingResult) {
         $minTime,
         $maxTime,
         $successFlag,
-        $pingResult['output'] ?? ''
+        $pingOutput
     ]);
 }
 
