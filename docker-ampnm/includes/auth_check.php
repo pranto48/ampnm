@@ -20,7 +20,7 @@ if (!isset($_SESSION['user_role'])) {
     $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    $_SESSION['user_role'] = $user_data['role'] ?? 'viewer'; // Default to viewer if not found
+    $_SESSION['user_role'] = (isset($user_data['role']) && $user_data['role'] !== '') ? $user_data['role'] : 'viewer'; // Default to viewer if not found
 }
 
 // --- Role-based page access control ---
@@ -37,7 +37,7 @@ if ($_SESSION['user_role'] !== 'admin' && in_array($current_page, $admin_only_pa
 // which is included above. It populates $_SESSION with license status.
 
 // Check license status and redirect if necessary
-$license_status_code = $_SESSION['license_status_code'] ?? 'unknown';
+$license_status_code = isset($_SESSION['license_status_code']) ? $_SESSION['license_status_code'] : 'unknown';
 $app_license_key = getAppLicenseKey();
 
 // If license key is not configured, redirect to setup page
