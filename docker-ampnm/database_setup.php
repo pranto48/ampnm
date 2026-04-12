@@ -6,8 +6,9 @@ $password = getenv('MYSQL_ROOT_PASSWORD') ?: ''; // Get root password from Docke
 $dbname = getenv('DB_NAME') ?: 'network_monitor';
 
 function message($text, $is_error = false) {
-    $color = $is_error ? '#ef4444' : '#22c55e';
-    echo "<p style='color: $color; margin: 4px 0; font-family: monospace;'>$text</p>";
+    $safeText = htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8');
+    $typeClass = $is_error ? 'error' : 'success';
+    echo "<div class='setup-log {$typeClass}' data-setup-log='1'><span class='dot'></span><span>{$safeText}</span></div>";
 }
 
 // Function to generate a UUID (Universally Unique Identifier)
@@ -25,12 +26,131 @@ function generateUuid() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Database Setup</title>
     <style>
-        body { background-color: #0f172a; color: #cbd5e1; font-family: sans-serif; padding: 2rem; }
-        .loader { border: 4px solid #334155; border-top: 4px solid #22d3ee; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; margin-right: 10px; vertical-align: middle; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        :root {
+            --bg: #020617;
+            --panel: #0f172a;
+            --panel-border: #334155;
+            --text: #cbd5e1;
+            --muted: #94a3b8;
+            --accent: #22d3ee;
+            --accent-2: #6366f1;
+            --ok: #22c55e;
+            --err: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 20% 10%, rgba(34, 211, 238, 0.15), transparent 30%),
+                radial-gradient(circle at 80% 0%, rgba(99, 102, 241, 0.14), transparent 28%),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            padding: 24px;
+        }
+        .setup-shell { max-width: 920px; margin: 0 auto; }
+        .setup-card {
+            background: linear-gradient(180deg, rgba(15,23,42,0.95), rgba(15,23,42,0.88));
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 24px 70px rgba(0,0,0,0.45);
+        }
+        .setup-title { margin: 0 0 8px; color: #f8fafc; font-size: clamp(24px, 3vw, 34px); }
+        .setup-subtitle { margin: 0 0 16px; color: var(--muted); }
+        .progress-wrap { margin-bottom: 16px; }
+        .progress-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: var(--muted); font-size: 13px; }
+        .progress-rail {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            height: 14px;
+            border-radius: 999px;
+            border: 1px solid #334155;
+            background: rgba(15, 23, 42, 0.75);
+        }
+        .progress-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 8%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            box-shadow: 0 0 16px rgba(34, 211, 238, 0.45);
+            border-radius: inherit;
+            transition: width 420ms cubic-bezier(.22,.61,.36,1);
+        }
+        .progress-glow {
+            position: absolute; inset: 0;
+            background: linear-gradient(120deg, transparent 35%, rgba(255,255,255,0.22) 50%, transparent 65%);
+            transform: translateX(-120%);
+            animation: pulseSweep 2.5s linear infinite;
+            pointer-events: none;
+        }
+        .log-box {
+            margin-top: 14px;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            background: rgba(2,6,23,0.55);
+            padding: 12px;
+            max-height: 50vh;
+            overflow: auto;
+        }
+        .setup-log {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            margin: 5px 0;
+            color: #d1fae5;
+            opacity: 0;
+            transform: translateY(4px);
+            animation: reveal .32s ease forwards;
+        }
+        .setup-log.error { color: #fecaca; }
+        .setup-log .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--ok);
+            box-shadow: 0 0 10px rgba(34,197,94,.55);
+            flex: 0 0 auto;
+        }
+        .setup-log.error .dot { background: var(--err); box-shadow: 0 0 10px rgba(239,68,68,.6); }
+        .loader { border: 3px solid #334155; border-top: 3px solid var(--accent); border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite; display: inline-block; margin-right: 8px; vertical-align: middle; }
+        .actions { margin-top: 14px; }
+        .actions a { color: var(--accent); text-decoration: none; font-size: 1rem; }
+        .badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(15,23,42,.8);
+            border: 1px solid #334155;
+            color: #67e8f9;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulseSweep { to { transform: translateX(120%); } }
+        @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
+<div class="setup-shell">
+    <div class="setup-card">
+        <div class="badge"><span class="loader"></span><span>Running setup workflow</span></div>
+        <h1 class="setup-title">Docker AMPNM Installation Progress</h1>
+        <p class="setup-subtitle">Preparing database, tables, migrations, defaults, and indexes. Please wait…</p>
+        <div class="progress-wrap">
+            <div class="progress-meta">
+                <span id="setupProgressLabel">Starting setup…</span>
+                <span id="setupProgressPct">0%</span>
+            </div>
+            <div class="progress-rail">
+                <div id="setupProgressFill" class="progress-fill"></div>
+                <div class="progress-glow"></div>
+            </div>
+        </div>
+        <div id="setupLogBox" class="log-box">
 <?php
 try {
     // Connect to MySQL server (without selecting a database)
@@ -190,6 +310,42 @@ try {
             FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
 
+        // TABLE FOR LOG BACKUP SCHEDULES
+        "CREATE TABLE IF NOT EXISTS `log_backup_schedules` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `name` VARCHAR(120) NOT NULL,
+            `target_type` ENUM('ftp', 'smb', 'email') NOT NULL,
+            `target_config` TEXT NULL,
+            `period_scope` ENUM('day', 'month', 'year') NOT NULL DEFAULT 'day',
+            `schedule_type` ENUM('daily', 'weekly', 'monthly') NOT NULL DEFAULT 'daily',
+            `schedule_time` TIME NOT NULL DEFAULT '00:15:00',
+            `day_of_week` TINYINT UNSIGNED NULL,
+            `day_of_month` TINYINT UNSIGNED NULL,
+            `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+            `last_run_at` TIMESTAMP NULL,
+            `next_run_at` TIMESTAMP NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR LOG BACKUP RUN HISTORY
+        "CREATE TABLE IF NOT EXISTS `log_backup_runs` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `schedule_id` INT(10) UNSIGNED NULL,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `status` ENUM('success', 'failed') NOT NULL,
+            `target_type` ENUM('ftp', 'smb', 'email') NOT NULL,
+            `period_scope` ENUM('day', 'month', 'year') NOT NULL,
+            `file_name` VARCHAR(255) NULL,
+            `file_size_bytes` BIGINT UNSIGNED NULL,
+            `error_message` TEXT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`schedule_id`) REFERENCES `log_backup_schedules`(`id`) ON DELETE SET NULL,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
         "CREATE TABLE IF NOT EXISTS `network_graphs` (
             `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             `user_id` INT(6) UNSIGNED NOT NULL,
@@ -214,6 +370,12 @@ try {
             `encryption` ENUM('none', 'ssl', 'tls') DEFAULT 'tls',
             `from_email` VARCHAR(255) NOT NULL,
             `from_name` VARCHAR(255) NULL,
+            `bind_ip` VARCHAR(45) NULL,
+            `reply_to_email` VARCHAR(255) NULL,
+            `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]',
+            `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20,
+            `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240,
+            `allow_invalid_certs` TINYINT(1) DEFAULT 0,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY `user_id_unique` (`user_id`),
@@ -622,6 +784,32 @@ try {
         message("Upgraded 'host_metrics' table: added 'temperature_celsius' column.");
     }
 
+    // MIGRATION: Add extended SMTP customization options
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'reply_to_email')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `reply_to_email` VARCHAR(255) NULL AFTER `from_name`;");
+        message("Upgraded 'smtp_settings' table: added 'reply_to_email' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'bind_ip')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `bind_ip` VARCHAR(45) NULL AFTER `from_name`;");
+        message("Upgraded 'smtp_settings' table: added 'bind_ip' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'subject_prefix')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `subject_prefix` VARCHAR(120) DEFAULT '[AMPNM]' AFTER `reply_to_email`;");
+        message("Upgraded 'smtp_settings' table: added 'subject_prefix' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'connection_timeout_seconds')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20 AFTER `subject_prefix`;");
+        message("Upgraded 'smtp_settings' table: added 'connection_timeout_seconds' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'max_emails_per_hour')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240 AFTER `connection_timeout_seconds`;");
+        message("Upgraded 'smtp_settings' table: added 'max_emails_per_hour' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'smtp_settings', 'allow_invalid_certs')) {
+        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `allow_invalid_certs` TINYINT(1) DEFAULT 0 AFTER `max_emails_per_hour`;");
+        message("Upgraded 'smtp_settings' table: added 'allow_invalid_certs' column.");
+    }
+
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
     $stmt->execute([$admin_id]);
@@ -676,7 +864,7 @@ try {
     }
 
 
-    echo "<h2 style='color: #06b6d4; font-family: sans-serif;'>Database setup completed successfully!</h2>";
+    echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";
     echo "<p style='color: #94a3b8;'><span class='loader'></span>Redirecting to the application in 3 seconds...</p>";
     echo '<meta http-equiv="refresh" content="3;url=index.php">';
 
@@ -685,6 +873,33 @@ try {
     exit(1);
 }
 ?>
-    <a href="index.php" style="color: #22d3ee; text-decoration: none; font-size: 1.2rem;">&larr; Go to Dashboard</a>
+        </div>
+        <div class="actions">
+            <a href="index.php">&larr; Go to Dashboard</a>
+        </div>
+    </div>
+</div>
+<script>
+(() => {
+    const logs = Array.from(document.querySelectorAll('[data-setup-log]'));
+    const fill = document.getElementById('setupProgressFill');
+    const pct = document.getElementById('setupProgressPct');
+    const label = document.getElementById('setupProgressLabel');
+    const logBox = document.getElementById('setupLogBox');
+    if (!fill || !pct || !label || !logBox) return;
+
+    const total = Math.max(1, logs.length);
+    const hasError = logs.some(row => row.classList.contains('error'));
+    logs.forEach((row, idx) => { row.style.animationDelay = `${idx * 65}ms`; });
+
+    const progressValue = hasError ? Math.min(96, Math.round((total / (total + 2)) * 100)) : 100;
+    fill.style.width = progressValue + '%';
+    pct.textContent = progressValue + '%';
+    label.textContent = hasError
+        ? `Completed with warnings (${total} steps logged)`
+        : `Completed successfully (${total} steps)`;
+    logBox.scrollTop = logBox.scrollHeight;
+})();
+</script>
 </body>
 </html>

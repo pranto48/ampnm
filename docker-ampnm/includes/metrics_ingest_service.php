@@ -305,8 +305,8 @@ class MetricsIngestService
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($existing) return $existing;
 
-        $insert = $pdo->prepare("INSERT INTO devices (user_id, name, ip, monitor_method, type, status, ping_interval, show_live_ping) VALUES (?, ?, ?, 'ping', ?, 'online', 60, 1)");
-        $insert->execute([$userId, $safeName, $hostIp, $deviceType]);
+        $insert = $pdo->prepare("INSERT INTO devices (user_id, name, ip, monitor_method, type, status, ping_interval, show_live_ping, description) VALUES (?, ?, ?, 'ping', ?, 'online', NULL, 0, ?)");
+        $insert->execute([$userId, $safeName, $hostIp, $deviceType, 'Auto-created from agent telemetry']);
         $newId = (int)$pdo->lastInsertId();
 
         $fetch = $pdo->prepare("SELECT id, name, ip FROM devices WHERE id = ? LIMIT 1");
