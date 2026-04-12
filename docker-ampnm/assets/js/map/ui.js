@@ -122,8 +122,19 @@ MapApp.ui = {
         const { els } = MapApp.ui;
         const loadMetrics = async () => {
             const hours = Number(els.metricsHoursRange.value || 24);
-            const result = await fetch(`api.php?action=get_metrics_history&device_id=${encodeURIComponent(deviceId)}&hours=${hours}`);
-            const history = await result.json();
+            let history = [];
+            let result = await fetch(`api.php?action=get_metrics_history&device_id=${encodeURIComponent(deviceId)}&hours=${hours}`);
+            if (result.ok) {
+                history = await result.json();
+            }
+
+            if ((!Array.isArray(history) || history.length === 0) && node.deviceData?.ip) {
+                result = await fetch(`api.php?action=get_metrics_history&host_ip=${encodeURIComponent(node.deviceData.ip)}&hours=${hours}`);
+                if (result.ok) {
+                    history = await result.json();
+                }
+            }
+
             if (!Array.isArray(history) || history.length === 0) {
                 els.metricsNoDataMessage.classList.remove('hidden');
                 [els.metricsCpuGraph, els.metricsRamGraph, els.metricsDiskGraph, els.metricsNetGraph].forEach(el => { if (el) el.innerHTML = ''; });
