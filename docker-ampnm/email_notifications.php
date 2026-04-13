@@ -40,9 +40,36 @@ include 'header.php';
                         <label for="smtpFromEmail" class="block text-sm font-medium text-slate-400 mb-1">From Email Address</label>
                         <input type="email" id="smtpFromEmail" name="from_email" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
                     </div>
+                    <div>
+                        <label for="smtpReplyToEmail" class="block text-sm font-medium text-slate-400 mb-1">Reply-To Email (Optional)</label>
+                        <input type="email" id="smtpReplyToEmail" name="reply_to_email" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    </div>
+                    <div>
+                        <label for="smtpBindIp" class="block text-sm font-medium text-slate-400 mb-1">Mail Outbound IP (Optional)</label>
+                        <input type="text" id="smtpBindIp" name="bind_ip" placeholder="192.168.20.5" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        <p class="text-xs text-slate-500 mt-1">Set your internet-facing host IP to force SMTP traffic out that interface.</p>
+                    </div>
                     <div class="md:col-span-2">
                         <label for="smtpFromName" class="block text-sm font-medium text-slate-400 mb-1">From Name (Optional)</label>
                         <input type="text" id="smtpFromName" name="from_name" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    </div>
+                    <div>
+                        <label for="smtpSubjectPrefix" class="block text-sm font-medium text-slate-400 mb-1">Subject Prefix</label>
+                        <input type="text" id="smtpSubjectPrefix" name="subject_prefix" placeholder="[AMPNM]" maxlength="120" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    </div>
+                    <div>
+                        <label for="smtpTimeoutSeconds" class="block text-sm font-medium text-slate-400 mb-1">Connection Timeout (seconds)</label>
+                        <input type="number" id="smtpTimeoutSeconds" name="connection_timeout_seconds" min="5" max="120" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    </div>
+                    <div>
+                        <label for="smtpMaxEmailsPerHour" class="block text-sm font-medium text-slate-400 mb-1">Max Emails Per Hour</label>
+                        <input type="number" id="smtpMaxEmailsPerHour" name="max_emails_per_hour" min="1" max="10000" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    </div>
+                    <div class="flex items-center">
+                        <label class="flex items-center text-sm font-medium text-slate-400">
+                            <input type="checkbox" id="smtpAllowInvalidCerts" name="allow_invalid_certs" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500">
+                            <span class="ml-2">Allow invalid TLS certificates (self-signed SMTP)</span>
+                        </label>
                     </div>
                 </div>
                 <div class="flex justify-end">
@@ -110,6 +137,7 @@ include 'header.php';
                     <table class="min-w-full">
                         <thead class="border-b border-slate-700">
                             <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Device</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Recipient</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Triggers</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th>

@@ -7,6 +7,7 @@
 // - GET    /api/agent/metrics/device-by-ip?host_ip=1.2.3.4&host_name=HOST
 
 require_once __DIR__ . '/../../../includes/functions.php';
+require_once __DIR__ . '/../../../includes/agent_metrics_compat.php';
 
 header('Content-Type: application/json');
 
@@ -20,14 +21,46 @@ if ($endpointBase !== '' && str_starts_with($requestPath, $endpointBase)) {
 
 try {
     if ($method === 'POST' && ($suffix === '' || $suffix === 'ingest')) {
-        $_GET['action'] = 'submit_metrics';
-        require __DIR__ . '/../../handlers/metrics_handler.php';
+        $pdo = getDbConnection();
+        $token = agentCompatGetHeader('X-Agent-Token');
+        $tokenInfo = agentCompatValidateToken($pdo, $token);
+        if (!$tokenInfo) {
+            http_response_code(401);
+            echo json_encode(array('error' => 'Invalid or missing agent token'));
+            exit;
+        }
+        $payload = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+        $saved = agentCompatSaveMetrics($pdo, $payload, (int)$tokenInfo['user_id']);
+        if (empty($saved['ok'])) {
+            http_response_code(400);
+            echo json_encode(array('error' => $saved['error']));
+            exit;
+        }
+        echo json_encode(array('success' => true, 'host_ip' => $saved['host_ip'], 'host_name' => $saved['host_name'], 'device_id' => $saved['device_id']));
         exit;
     }
 
     if ($method === 'GET' && $suffix === 'device-by-ip') {
-        $_GET['action'] = 'pull_device_by_ip';
-        require __DIR__ . '/../../handlers/metrics_handler.php';
+        $pdo = getDbConnection();
+        $token = agentCompatGetHeader('X-Agent-Token');
+        $tokenInfo = agentCompatValidateToken($pdo, $token);
+        if (!$tokenInfo) {
+            http_response_code(401);
+            echo json_encode(array('error' => 'Invalid or missing agent token'));
+            exit;
+        }
+        $hostIp = isset($_GET['host_ip']) ? trim((string)$_GET['host_ip']) : '';
+        $hostName = isset($_GET['host_name']) ? trim((string)$_GET['host_name']) : '';
+        if ($hostIp === '' && $hostName === '') {
+            http_response_code(400);
+            echo json_encode(array('error' => 'host_ip or host_name is required'));
+            exit;
+        }
+        $device = agentCompatFindOrCreateDevice($pdo, (int)$tokenInfo['user_id'], $hostName, $hostIp);
+        echo json_encode(array('success' => true, 'device_found' => !empty($device), 'device' => $device));
         exit;
     }
 

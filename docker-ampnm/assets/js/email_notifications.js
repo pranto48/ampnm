@@ -10,6 +10,12 @@ function initEmailNotifications() {
         smtpEncryption: document.getElementById('smtpEncryption'),
         smtpFromEmail: document.getElementById('smtpFromEmail'),
         smtpFromName: document.getElementById('smtpFromName'),
+        smtpReplyToEmail: document.getElementById('smtpReplyToEmail'),
+        smtpBindIp: document.getElementById('smtpBindIp'),
+        smtpSubjectPrefix: document.getElementById('smtpSubjectPrefix'),
+        smtpTimeoutSeconds: document.getElementById('smtpTimeoutSeconds'),
+        smtpMaxEmailsPerHour: document.getElementById('smtpMaxEmailsPerHour'),
+        smtpAllowInvalidCerts: document.getElementById('smtpAllowInvalidCerts'),
         testRecipientEmail: document.getElementById('testRecipientEmail'),
         sendTestEmailBtn: document.getElementById('sendTestEmailBtn'),
         saveSmtpBtn: document.getElementById('saveSmtpBtn'),
@@ -35,6 +41,7 @@ function initEmailNotifications() {
     };
 
     let currentSelectedDeviceId = null;
+    let currentSelectedDeviceLabel = '';
 
     const api = {
         get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json()),
@@ -54,6 +61,12 @@ function initEmailNotifications() {
                 els.smtpEncryption.value = settings.encryption || 'tls';
                 els.smtpFromEmail.value = settings.from_email || '';
                 els.smtpFromName.value = settings.from_name || '';
+                els.smtpReplyToEmail.value = settings.reply_to_email || '';
+                els.smtpBindIp.value = settings.bind_ip || '';
+                els.smtpSubjectPrefix.value = settings.subject_prefix || '[AMPNM]';
+                els.smtpTimeoutSeconds.value = settings.connection_timeout_seconds || 20;
+                els.smtpMaxEmailsPerHour.value = settings.max_emails_per_hour || 240;
+                els.smtpAllowInvalidCerts.checked = Number(settings.allow_invalid_certs || 0) === 1;
             }
         } catch (error) {
             console.error('Failed to load SMTP settings:', error);
@@ -72,6 +85,7 @@ function initEmailNotifications() {
 
             const formData = new FormData(els.smtpSettingsForm);
             const data = Object.fromEntries(formData.entries());
+            data.allow_invalid_certs = els.smtpAllowInvalidCerts.checked;
 
             try {
                 const result = await api.post('save_smtp_settings', data);
@@ -130,6 +144,9 @@ function initEmailNotifications() {
     const populateDeviceSelect = async () => {
         try {
             const devices = await api.get('get_all_devices_for_subscriptions');
+            if (!Array.isArray(devices)) {
+                throw new Error(devices?.error || 'Invalid device list response');
+            }
             els.deviceSelect.innerHTML = '<option value="">-- Select a device --</option>' + 
                 devices.map(d => `<option value="${d.id}">${d.name} (${d.ip || 'No IP'}) ${d.map_name ? `[${d.map_name}]` : ''}</option>`).join('');
         } catch (error) {
@@ -145,9 +162,13 @@ function initEmailNotifications() {
 
         try {
             const subscriptions = await api.get('get_device_subscriptions', { device_id: deviceId });
+            if (!Array.isArray(subscriptions)) {
+                throw new Error(subscriptions?.error || 'Invalid subscriptions response');
+            }
             if (subscriptions.length > 0) {
                 els.subscriptionsTable.innerHTML = subscriptions.map(sub => `
                     <tr class="border-b border-slate-700">
+                        <td class="px-6 py-4 whitespace-nowrap text-slate-300">${currentSelectedDeviceLabel || 'Selected device'}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-white">${sub.recipient_email}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-slate-400">
                             ${sub.notify_on_online ? '<span class="inline-block bg-green-500/20 text-green-400 px-2 py-1 rounded-full text-xs mr-1 mb-1">Online</span>' : ''}
@@ -188,11 +209,13 @@ function initEmailNotifications() {
         currentSelectedDeviceId = e.target.value;
         if (currentSelectedDeviceId) {
             els.subscriptionDeviceId.value = currentSelectedDeviceId;
-            els.selectedDeviceName.textContent = els.deviceSelect.options[els.deviceSelect.selectedIndex].text;
+            currentSelectedDeviceLabel = els.deviceSelect.options[els.deviceSelect.selectedIndex].text;
+            els.selectedDeviceName.textContent = currentSelectedDeviceLabel;
             els.subscriptionFormContainer.classList.remove('hidden');
             resetSubscriptionForm();
             loadDeviceSubscriptions(currentSelectedDeviceId);
         } else {
+            currentSelectedDeviceLabel = '';
             els.subscriptionFormContainer.classList.add('hidden');
             els.subscriptionsTable.innerHTML = '';
             els.noSubscriptionsMessage.classList.add('hidden');
