@@ -159,6 +159,13 @@ MapApp.utils = {
         return { ...defaults, ...(mapSettings || {}) };
     },
 
+    asTooltipElement: (htmlContent) => {
+        if (typeof document === 'undefined') return htmlContent;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = htmlContent;
+        return wrapper;
+    },
+
     buildNodeTitle: (deviceData) => {
         const statusColors = {
             online: '#22c55e', warning: '#eab308', critical: '#ef4444',
@@ -291,7 +298,7 @@ MapApp.utils = {
         }
 
         title += `</div>`;
-        return title;
+        return MapApp.utils.asTooltipElement(title);
     },
 
     /**
@@ -429,7 +436,7 @@ MapApp.utils = {
         }
 
         title += `</div>`;
-        return title;
+        return MapApp.utils.asTooltipElement(title);
     },
 
     /**
