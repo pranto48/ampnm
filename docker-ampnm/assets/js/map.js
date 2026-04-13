@@ -243,6 +243,13 @@ function initMap() {
         });
         activateMapSettingsPanel('device');
     }
+    document.addEventListener('click', (evt) => {
+        const tabBtn = evt.target && evt.target.closest ? evt.target.closest('.map-settings-tab-btn') : null;
+        if (!tabBtn) return;
+        const tab = tabBtn.getAttribute('data-map-settings-tab');
+        if (!tab) return;
+        activateMapSettingsPanel(tab);
+    });
 
     // Cleanup function for SPA navigation
     window.cleanup = () => {
@@ -671,6 +678,7 @@ function initMap() {
                 applyConnectionTooltipFieldCheckboxes(loadConnectionTooltipFieldsForMap(currentMap.id));
                 applyTooltipDisplayControls(loadTooltipDisplayForMap(currentMap.id));
                 openModal('mapSettingsModal');
+                activateMapSettingsPanel('device');
             }
         });
         els.cancelMapSettingsBtn.addEventListener('click', () => closeModal('mapSettingsModal'));
