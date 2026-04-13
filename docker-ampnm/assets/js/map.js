@@ -117,10 +117,30 @@ function initMap() {
         const fontScale = document.getElementById('tooltipFontScale');
         const fontScaleValue = document.getElementById('tooltipFontScaleValue');
         const maxWidth = document.getElementById('tooltipMaxWidth');
+        const fontFamily = document.getElementById('tooltipFontFamily');
+        const boxScale = document.getElementById('tooltipBoxScale');
+        const boxScaleValue = document.getElementById('tooltipBoxScaleValue');
+        const bgColor = document.getElementById('tooltipBgColor');
+        const textColor = document.getElementById('tooltipTextColor');
+        const mutedColor = document.getElementById('tooltipMutedColor');
+        const accentColor = document.getElementById('tooltipAccentColor');
+        const connectionRunStyle = document.getElementById('connectionRunStyle');
+        const connectionAnimationSpeed = document.getElementById('connectionAnimationSpeed');
+        const connectionAnimationSpeedValue = document.getElementById('connectionAnimationSpeedValue');
         if (density) density.value = merged.density || 'comfortable';
         if (fontScale) fontScale.value = String(merged.font_scale ?? 100);
         if (fontScaleValue) fontScaleValue.textContent = `${merged.font_scale ?? 100}%`;
         if (maxWidth) maxWidth.value = String(merged.max_width ?? 320);
+        if (fontFamily) fontFamily.value = merged.font_family || 'system';
+        if (boxScale) boxScale.value = String(merged.box_scale ?? 100);
+        if (boxScaleValue) boxScaleValue.textContent = `${merged.box_scale ?? 100}%`;
+        if (bgColor) bgColor.value = merged.panel_bg_color || '#0f172a';
+        if (textColor) textColor.value = merged.panel_text_color || '#e2e8f0';
+        if (mutedColor) mutedColor.value = merged.panel_muted_color || '#94a3b8';
+        if (accentColor) accentColor.value = merged.panel_accent_color || '#22d3ee';
+        if (connectionRunStyle) connectionRunStyle.value = merged.connection_run_style || 'auto';
+        if (connectionAnimationSpeed) connectionAnimationSpeed.value = String(merged.connection_animation_speed ?? 100);
+        if (connectionAnimationSpeedValue) connectionAnimationSpeedValue.textContent = `${merged.connection_animation_speed ?? 100}%`;
     };
 
     const readTooltipDisplayControls = () => {
@@ -128,10 +148,26 @@ function initMap() {
         const density = document.getElementById('tooltipDensity')?.value || defaults.density;
         const fontScale = Number(document.getElementById('tooltipFontScale')?.value ?? defaults.font_scale);
         const maxWidth = Number(document.getElementById('tooltipMaxWidth')?.value ?? defaults.max_width);
+        const fontFamily = document.getElementById('tooltipFontFamily')?.value || defaults.font_family;
+        const boxScale = Number(document.getElementById('tooltipBoxScale')?.value ?? defaults.box_scale);
+        const panelBgColor = document.getElementById('tooltipBgColor')?.value || defaults.panel_bg_color;
+        const panelTextColor = document.getElementById('tooltipTextColor')?.value || defaults.panel_text_color;
+        const panelMutedColor = document.getElementById('tooltipMutedColor')?.value || defaults.panel_muted_color;
+        const panelAccentColor = document.getElementById('tooltipAccentColor')?.value || defaults.panel_accent_color;
+        const connectionRunStyle = document.getElementById('connectionRunStyle')?.value || defaults.connection_run_style;
+        const connectionAnimationSpeed = Number(document.getElementById('connectionAnimationSpeed')?.value ?? defaults.connection_animation_speed);
         return {
             density: density === 'compact' ? 'compact' : 'comfortable',
             font_scale: Math.min(130, Math.max(85, fontScale)),
-            max_width: Math.min(480, Math.max(260, maxWidth))
+            max_width: Math.min(480, Math.max(260, maxWidth)),
+            font_family: ['system', 'inter', 'roboto', 'mono'].includes(fontFamily) ? fontFamily : defaults.font_family,
+            box_scale: Math.min(130, Math.max(85, boxScale)),
+            panel_bg_color: panelBgColor,
+            panel_text_color: panelTextColor,
+            panel_muted_color: panelMutedColor,
+            panel_accent_color: panelAccentColor,
+            connection_run_style: ['auto', 'solid', 'dashed', 'dotted'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
+            connection_animation_speed: Math.min(200, Math.max(0, connectionAnimationSpeed))
         };
     };
 
@@ -166,6 +202,54 @@ function initMap() {
             }
         });
     }
+
+    const tooltipBoxScaleInput = document.getElementById('tooltipBoxScale');
+    if (tooltipBoxScaleInput) {
+        tooltipBoxScaleInput.addEventListener('input', () => {
+            const tooltipBoxScaleValue = document.getElementById('tooltipBoxScaleValue');
+            if (tooltipBoxScaleValue) {
+                tooltipBoxScaleValue.textContent = `${tooltipBoxScaleInput.value || 100}%`;
+            }
+        });
+    }
+
+    const connectionAnimationSpeedInput = document.getElementById('connectionAnimationSpeed');
+    if (connectionAnimationSpeedInput) {
+        connectionAnimationSpeedInput.addEventListener('input', () => {
+            const connectionAnimationSpeedValue = document.getElementById('connectionAnimationSpeedValue');
+            if (connectionAnimationSpeedValue) {
+                connectionAnimationSpeedValue.textContent = `${connectionAnimationSpeedInput.value || 100}%`;
+            }
+        });
+    }
+
+    const mapSettingsTabButtons = document.querySelectorAll('.map-settings-tab-btn');
+    const mapSettingsPanels = document.querySelectorAll('[data-map-settings-panel]');
+    const activateMapSettingsPanel = (tab) => {
+        mapSettingsPanels.forEach((panel) => {
+            panel.classList.toggle('hidden', panel.getAttribute('data-map-settings-panel') !== tab);
+        });
+        mapSettingsTabButtons.forEach((btn) => {
+            const isActive = btn.getAttribute('data-map-settings-tab') === tab;
+            btn.classList.toggle('bg-cyan-700', isActive);
+            btn.classList.toggle('text-white', isActive);
+            btn.classList.toggle('bg-slate-700', !isActive);
+            btn.classList.toggle('text-slate-200', !isActive);
+        });
+    };
+    if (mapSettingsTabButtons.length > 0) {
+        mapSettingsTabButtons.forEach((btn) => {
+            btn.addEventListener('click', () => activateMapSettingsPanel(btn.getAttribute('data-map-settings-tab')));
+        });
+        activateMapSettingsPanel('device');
+    }
+    document.addEventListener('click', (evt) => {
+        const tabBtn = evt.target && evt.target.closest ? evt.target.closest('.map-settings-tab-btn') : null;
+        if (!tabBtn) return;
+        const tab = tabBtn.getAttribute('data-map-settings-tab');
+        if (!tab) return;
+        activateMapSettingsPanel(tab);
+    });
 
     // Cleanup function for SPA navigation
     window.cleanup = () => {
@@ -594,6 +678,7 @@ function initMap() {
                 applyConnectionTooltipFieldCheckboxes(loadConnectionTooltipFieldsForMap(currentMap.id));
                 applyTooltipDisplayControls(loadTooltipDisplayForMap(currentMap.id));
                 openModal('mapSettingsModal');
+                activateMapSettingsPanel('device');
             }
         });
         els.cancelMapSettingsBtn.addEventListener('click', () => closeModal('mapSettingsModal'));

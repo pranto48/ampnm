@@ -18,7 +18,7 @@ switch ($action) {
         break;
 
     case 'get_smtp_settings':
-        $stmt = $pdo->prepare("SELECT host, port, username, password, encryption, from_email, from_name FROM smtp_settings WHERE user_id = ?");
+        $stmt = $pdo->prepare("SELECT host, port, username, password, encryption, from_email, from_name, bind_ip, reply_to_email, subject_prefix, connection_timeout_seconds, max_emails_per_hour, allow_invalid_certs FROM smtp_settings WHERE user_id = ?");
         $stmt->execute([$current_user_id]);
         $settings = $stmt->fetch(PDO::FETCH_ASSOC);
         // Mask password for security, or don't send it at all if not needed by frontend
@@ -37,11 +37,42 @@ switch ($action) {
             $encryption = $input['encryption'] ?? 'tls';
             $from_email = $input['from_email'] ?? '';
             $from_name = $input['from_name'] ?? null;
+            $bind_ip = trim((string)($input['bind_ip'] ?? ''));
+            $reply_to_email = trim((string)($input['reply_to_email'] ?? ''));
+            $subject_prefix = trim((string)($input['subject_prefix'] ?? '[AMPNM]'));
+            $connection_timeout_seconds = (int)($input['connection_timeout_seconds'] ?? 20);
+            $max_emails_per_hour = (int)($input['max_emails_per_hour'] ?? 240);
+            $allow_invalid_certs = !empty($input['allow_invalid_certs']) ? 1 : 0;
 
             if (empty($host) || empty($port) || empty($username) || empty($from_email)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Host, Port, Username, and From Email are required.']);
                 exit;
+            }
+            if ($reply_to_email !== '' && !filter_var($reply_to_email, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Reply-To email is invalid.']);
+                exit;
+            }
+            if ($bind_ip !== '' && !filter_var($bind_ip, FILTER_VALIDATE_IP)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Mail outbound IP must be a valid IP address.']);
+                exit;
+            }
+            if ($connection_timeout_seconds < 5 || $connection_timeout_seconds > 120) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Connection timeout must be between 5 and 120 seconds.']);
+                exit;
+            }
+            if ($max_emails_per_hour < 1 || $max_emails_per_hour > 10000) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Max emails per hour must be between 1 and 10000.']);
+                exit;
+            }
+            $reply_to_email = $reply_to_email === '' ? null : $reply_to_email;
+            $bind_ip = $bind_ip === '' ? null : $bind_ip;
+            if ($subject_prefix === '') {
+                $subject_prefix = '[AMPNM]';
             }
 
             // Check if settings already exist for this user
@@ -54,13 +85,16 @@ switch ($action) {
                 if ($password === '********') {
                     $password = $existingSettings['password'];
                 }
-                $sql = "UPDATE smtp_settings SET host = ?, port = ?, username = ?, password = ?, encryption = ?, from_email = ?, from_name = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?";
+                $sql = "UPDATE smtp_settings
+                        SET host = ?, port = ?, username = ?, password = ?, encryption = ?, from_email = ?, from_name = ?, bind_ip = ?, reply_to_email = ?, subject_prefix = ?, connection_timeout_seconds = ?, max_emails_per_hour = ?, allow_invalid_certs = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = ?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$host, $port, $username, $password, $encryption, $from_email, $from_name, $current_user_id]);
+                $stmt->execute([$host, $port, $username, $password, $encryption, $from_email, $from_name, $bind_ip, $reply_to_email, $subject_prefix, $connection_timeout_seconds, $max_emails_per_hour, $allow_invalid_certs, $current_user_id]);
             } else {
-                $sql = "INSERT INTO smtp_settings (user_id, host, port, username, password, encryption, from_email, from_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO smtp_settings (user_id, host, port, username, password, encryption, from_email, from_name, bind_ip, reply_to_email, subject_prefix, connection_timeout_seconds, max_emails_per_hour, allow_invalid_certs)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$current_user_id, $host, $port, $username, $password, $encryption, $from_email, $from_name]);
+                $stmt->execute([$current_user_id, $host, $port, $username, $password, $encryption, $from_email, $from_name, $bind_ip, $reply_to_email, $subject_prefix, $connection_timeout_seconds, $max_emails_per_hour, $allow_invalid_certs]);
             }
             echo json_encode(['success' => true, 'message' => 'SMTP settings saved successfully.']);
         }
@@ -80,7 +114,7 @@ switch ($action) {
             exit;
         }
 
-        $stmt = $pdo->prepare("SELECT host, port, username, password, encryption, from_email, from_name FROM smtp_settings WHERE user_id = ?");
+        $stmt = $pdo->prepare("SELECT host, port, username, password, encryption, from_email, from_name, bind_ip, reply_to_email, subject_prefix, connection_timeout_seconds, max_emails_per_hour, allow_invalid_certs FROM smtp_settings WHERE user_id = ?");
         $stmt->execute([$current_user_id]);
         $smtpSettings = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -90,7 +124,8 @@ switch ($action) {
             exit;
         }
 
-        $subject = 'AMPNM SMTP Test Email';
+        $subjectPrefix = trim((string)($smtpSettings['subject_prefix'] ?? '[AMPNM]'));
+        $subject = ($subjectPrefix !== '' ? $subjectPrefix . ' ' : '') . 'SMTP Test Email';
         $body = "This is a test email from AMPNM.\n\nSent at: " . gmdate('Y-m-d H:i:s') . " UTC";
         $smtpError = null;
         $sent = smtp_send_mail($smtpSettings, $recipient_email, $subject, $body, $smtpError);
