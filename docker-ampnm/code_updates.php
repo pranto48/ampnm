@@ -70,7 +70,7 @@ $remoteReachable = null;
 $aheadCount = null;
 $behindCount = null;
 $workingTreeClean = null;
-$targetUpstreamRef = 'origin/' . $canonicalBranch;
+$updateAvailable = false;
 
 $action = $_POST['action'] ?? null;
 $statusMessage = '';
@@ -181,6 +181,7 @@ if ($isGitRepo) {
     $remoteReachable = $metrics['remoteReachable'];
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
+    $updateAvailable = ($behindCount !== null && $behindCount > 0);
 }
 
 if ($action === 'check' && $isGitRepo) {
@@ -205,17 +206,16 @@ if ($action === 'check' && $isGitRepo) {
     $remoteReachable = $metrics['remoteReachable'];
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
+    $updateAvailable = ($behindCount !== null && $behindCount > 0);
 }
 
 if ($action === 'update' && $isGitRepo) {
-    $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
-    $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
-    if ($currentBranch !== $canonicalBranch) {
-        $checkoutOutput = runGitCommand($repoPath, 'git checkout ' . escapeshellarg($canonicalBranch));
-        $commandOutput['Branch Switch'] = 'Warning: switched to target branch before pulling.' . "\n" . $checkoutOutput;
-        $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
-    }
-    $pullOutput = runGitCommand($repoPath, 'git pull --ff-only origin ' . escapeshellarg($canonicalBranch));
+    if (!$updateAvailable) {
+        $statusMessage = 'No remote changes detected. Repository is already up to date.';
+        $statusType = 'info';
+    } else {
+        $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
+    $pullOutput = runGitCommand($repoPath, 'git pull --ff-only');
     $statusOutput = runGitCommand($repoPath, 'git status -sb');
     $commandOutput['Fetch'] = $fetchOutput;
     $commandOutput['Pull'] = $pullOutput;
@@ -235,6 +235,8 @@ if ($action === 'update' && $isGitRepo) {
         $statusType = 'error';
     }
 
+    }
+
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
     $localCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD'));
     $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
@@ -247,6 +249,7 @@ if ($action === 'update' && $isGitRepo) {
     $remoteReachable = $metrics['remoteReachable'];
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
+    $updateAvailable = ($behindCount !== null && $behindCount > 0);
 }
 
 if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
@@ -288,6 +291,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
             $remoteReachable = $metrics['remoteReachable'];
             $aheadCount = $metrics['aheadCount'];
             $behindCount = $metrics['behindCount'];
+            $updateAvailable = ($behindCount !== null && $behindCount > 0);
         } else {
             $statusMessage = 'Clone failed. Review the output below for details.';
             $statusType = 'error';
@@ -413,7 +417,12 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                             </dd>
                         </div>
                     </dl>
-                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check for Updates" to compare or "🚀 Update AmpNM" to pull the newest code from <code><?php echo htmlspecialchars($targetUpstreamRef); ?></code> and auto-restart this Docker app.</p>
+                    <?php if ($updateAvailable === true): ?>
+                        <p class="mt-3 text-xs inline-flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-500/20 text-cyan-200 border border-emerald-500/30">New update available</p>
+                    <?php elseif ($behindCount === 0): ?>
+                        <p class="mt-3 text-xs inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-700 text-slate-200 border border-slate-600">Already up to date</p>
+                    <?php endif; ?>
+                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check for Updates" to compare or "🚀 Update AmpNM" to pull the newest code and auto-restart this Docker app.</p>
                 </div>
 
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
@@ -433,11 +442,14 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                             <input type="hidden" name="action" value="update">
                             <label class="block text-sm text-slate-400">Repository Path</label>
                             <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                            <button type="submit" class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-2<?php echo !$isGitRepo ? ' opacity-60 cursor-not-allowed' : ''; ?>" <?php echo !$isGitRepo ? 'disabled aria-disabled="true"' : ''; ?>>
+                            <button type="submit" class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-2<?php echo (!$isGitRepo || !$updateAvailable) ? ' opacity-60 cursor-not-allowed' : ''; ?>" <?php echo (!$isGitRepo || !$updateAvailable) ? 'disabled aria-disabled="true"' : ''; ?>>
                                 <i class="fas fa-cloud-download-alt"></i>
                                 <span>🚀 Update AmpNM</span>
                             </button>
-                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only origin <?php echo htmlspecialchars($canonicalBranch); ?></code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.</p>
+                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.</p>
+                            <?php if ($isGitRepo && !$updateAvailable): ?>
+                                <p class="text-xs text-amber-200">No remote changes detected</p>
+                            <?php endif; ?>
                         </form>
                         <?php if (!$isGitRepo && $gitAvailable): ?>
                             <form method="POST" class="space-y-3 md:col-span-2">
