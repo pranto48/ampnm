@@ -73,6 +73,7 @@ $workingTreeClean = null;
 $updateAvailable = false;
 
 $action = $_POST['action'] ?? null;
+$forceUpdate = isset($_POST['force_update']) && $_POST['force_update'] === '1';
 $statusMessage = '';
 $statusType = '';
 $commandOutput = [];
@@ -210,31 +211,37 @@ if ($action === 'check' && $isGitRepo) {
 }
 
 if ($action === 'update' && $isGitRepo) {
-    if (!$updateAvailable) {
+    if ($workingTreeClean === false && !$forceUpdate) {
+        $statusMessage = 'Update blocked: local changes detected. Commit or stash changes first, then try again.';
+        $statusType = 'error';
+    } elseif (!$updateAvailable) {
         $statusMessage = 'No remote changes detected. Repository is already up to date.';
         $statusType = 'info';
     } else {
+        if ($workingTreeClean === false && $forceUpdate) {
+            $commandOutput['Force Update Warning'] = 'WARNING: Force update enabled while working tree has local changes. Pull may fail or require manual conflict resolution.';
+        }
+
         $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
-    $pullOutput = runGitCommand($repoPath, 'git pull --ff-only');
-    $statusOutput = runGitCommand($repoPath, 'git status -sb');
-    $commandOutput['Fetch'] = $fetchOutput;
-    $commandOutput['Pull'] = $pullOutput;
-    $commandOutput['Status'] = $statusOutput;
+        $pullOutput = runGitCommand($repoPath, 'git pull --ff-only');
+        $statusOutput = runGitCommand($repoPath, 'git status -sb');
+        $commandOutput['Fetch'] = $fetchOutput;
+        $commandOutput['Pull'] = $pullOutput;
+        $commandOutput['Status'] = $statusOutput;
 
-    $pullLower = strtolower($pullOutput);
-    $pullSucceeded = !str_contains($pullLower, 'fatal:') && !str_contains($pullLower, 'error:');
+        $pullLower = strtolower($pullOutput);
+        $pullSucceeded = !str_contains($pullLower, 'fatal:') && !str_contains($pullLower, 'error:');
 
-    if ($pullSucceeded) {
-        $composeDirectory = __DIR__;
-        $restartOutput = runShellCommand('cd ' . escapeshellarg($composeDirectory) . ' && (docker compose restart 2>&1 || docker-compose restart 2>&1)');
-        $commandOutput['Restart'] = $restartOutput;
-        $statusMessage = 'AmpNM updated from GitHub and Docker services were restarted automatically.';
-        $statusType = 'success';
-    } else {
-        $statusMessage = 'Update failed before restart. Review the logs below for details.';
-        $statusType = 'error';
-    }
-
+        if ($pullSucceeded) {
+            $composeDirectory = __DIR__;
+            $restartOutput = runShellCommand('cd ' . escapeshellarg($composeDirectory) . ' && (docker compose restart 2>&1 || docker-compose restart 2>&1)');
+            $commandOutput['Restart'] = $restartOutput;
+            $statusMessage = 'AmpNM updated from GitHub and Docker services were restarted automatically.';
+            $statusType = 'success';
+        } else {
+            $statusMessage = 'Update failed before restart. Review the logs below for details.';
+            $statusType = 'error';
+        }
     }
 
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
@@ -442,11 +449,16 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                             <input type="hidden" name="action" value="update">
                             <label class="block text-sm text-slate-400">Repository Path</label>
                             <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                            <label class="flex items-start gap-2 text-xs text-slate-300">
+                                <input type="checkbox" name="force_update" value="1" class="mt-0.5" <?php echo $forceUpdate ? 'checked' : ''; ?>>
+                                <span><span class="font-semibold text-amber-200">Force update (advanced)</span> &mdash; continue even with local changes. Use only if you understand the risk of failed pulls or manual conflict resolution.</span>
+                            </label>
                             <button type="submit" class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-2<?php echo (!$isGitRepo || !$updateAvailable) ? ' opacity-60 cursor-not-allowed' : ''; ?>" <?php echo (!$isGitRepo || !$updateAvailable) ? 'disabled aria-disabled="true"' : ''; ?>>
                                 <i class="fas fa-cloud-download-alt"></i>
                                 <span>🚀 Update AmpNM</span>
                             </button>
-                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.</p>
+                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.
+                            Local uncommitted changes can block updates or cause conflicts, so commit/stash first unless you intentionally use force update.</p>
                             <?php if ($isGitRepo && !$updateAvailable): ?>
                                 <p class="text-xs text-amber-200">No remote changes detected</p>
                             <?php endif; ?>
