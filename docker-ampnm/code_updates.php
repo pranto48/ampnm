@@ -78,6 +78,52 @@ $statusMessage = '';
 $statusType = '';
 $commandOutput = [];
 
+$updateLockPath = '/tmp/ampnm-code-update.lock';
+$updateLockHandle = null;
+
+function acquireUpdateLock(string $lockPath, array &$commandOutput)
+{
+    $commandOutput['Lock'] = ($commandOutput['Lock'] ?? '') . "Lock file: {$lockPath}
+";
+
+    $handle = fopen($lockPath, 'c');
+    if ($handle === false) {
+        $commandOutput['Lock'] .= 'Failed to open lock file for update operations.
+';
+        return false;
+    }
+
+    if (!flock($handle, LOCK_EX | LOCK_NB)) {
+        $commandOutput['Lock'] .= 'Lock acquisition failed: another session currently holds the lock.
+';
+        fclose($handle);
+        return false;
+    }
+
+    ftruncate($handle, 0);
+    fwrite($handle, sprintf('pid=%s time=%s action=%s
+', getmypid(), date('c'), $_POST['action'] ?? 'unknown'));
+    fflush($handle);
+    $commandOutput['Lock'] .= sprintf('Lock acquired by pid %s at %s.
+', (string) getmypid(), date('c'));
+
+    return $handle;
+}
+
+function releaseUpdateLock($handle, array &$commandOutput): void
+{
+    if (!is_resource($handle)) {
+        return;
+    }
+
+    $commandOutput['Lock'] = ($commandOutput['Lock'] ?? '') . sprintf('Lock releasing by pid %s at %s.
+', (string) getmypid(), date('c'));
+    flock($handle, LOCK_UN);
+    fclose($handle);
+    $commandOutput['Lock'] .= 'Lock released.
+';
+}
+
 function runGitCommand(string $repoPath, string $command): string
 {
     $escapedPath = escapeshellarg($repoPath);
@@ -191,7 +237,14 @@ if ($isGitRepo) {
     $updateAvailable = ($behindCount !== null && $behindCount > 0);
 }
 
-if ($action === 'check' && $isGitRepo) {
+if (($action === 'check' || $action === 'update') && $isGitRepo) {
+    $updateLockHandle = acquireUpdateLock($updateLockPath, $commandOutput);
+    if ($updateLockHandle === false) {
+        $statusMessage = 'Update already in progress by another session.';
+        $statusType = 'warning';
+    } else {
+        try {
+            if ($action === 'check') {
     $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
     $commandOutput['Fetch'] = $fetchOutput;
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
@@ -214,9 +267,9 @@ if ($action === 'check' && $isGitRepo) {
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
     $updateAvailable = ($behindCount !== null && $behindCount > 0);
-}
+            }
 
-if ($action === 'update' && $isGitRepo) {
+            if ($action === 'update') {
     if ($workingTreeClean === false && !$forceUpdate) {
         $statusMessage = 'Update blocked: local changes detected. Commit or stash changes first, then try again.';
         $statusType = 'error';
@@ -321,6 +374,11 @@ if ($action === 'update' && $isGitRepo) {
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
     $updateAvailable = ($behindCount !== null && $behindCount > 0);
+            }
+        } finally {
+            releaseUpdateLock($updateLockHandle, $commandOutput);
+        }
+    }
 }
 
 if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
