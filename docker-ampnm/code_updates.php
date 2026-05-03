@@ -84,6 +84,8 @@ $forceUpdate = isset($_POST['force_update']) && $_POST['force_update'] === '1';
 $statusMessage = '';
 $statusType = '';
 $commandOutput = [];
+$auditLogPath = rtrim(getenv('AMPNM_AUDIT_LOG_PATH') ?: '/var/log/ampnm', '/\\') . DIRECTORY_SEPARATOR . 'code-update-audit.log';
+$latestAuditEntries = [];
 
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
@@ -161,6 +163,65 @@ function runGitCommand(string $repoPath, string $command): string
 function runShellCommand(string $command): string
 {
     return shell_exec($command) ?? '';
+}
+
+function getClientIpAddress(): string
+{
+    $keys = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
+    foreach ($keys as $key) {
+        if (!empty($_SERVER[$key])) {
+            $value = (string) $_SERVER[$key];
+            if ($key === 'HTTP_X_FORWARDED_FOR') {
+                $parts = explode(',', $value);
+                return trim((string) ($parts[0] ?? 'unknown'));
+            }
+            return trim($value);
+        }
+    }
+    return 'unknown';
+}
+
+function redactSensitiveOutput(string $output): string
+{
+    $redacted = preg_replace('/(authorization:\s*bearer\s+)[^\s]+/i', '$1[REDACTED]', $output);
+    $redacted = preg_replace('/(token=)[^\s&]+/i', '$1[REDACTED]', (string) $redacted);
+    $redacted = preg_replace('/(password=)[^\s&]+/i', '$1[REDACTED]', (string) $redacted);
+    return (string) $redacted;
+}
+
+function appendAuditLog(string $logPath, array $entry): bool
+{
+    $directory = dirname($logPath);
+    if (!is_dir($directory) && !mkdir($directory, 0750, true)) {
+        return false;
+    }
+    if (!file_exists($logPath)) {
+        touch($logPath);
+        @chmod($logPath, 0640);
+    }
+    return file_put_contents($logPath, json_encode($entry, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
+}
+
+function readRecentAuditLogs(string $logPath, int $limit = 10): array
+{
+    if (!is_file($logPath)) {
+        return [];
+    }
+    $lines = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false || empty($lines)) {
+        return [];
+    }
+    $rows = [];
+    foreach (array_reverse($lines) as $line) {
+        $decoded = json_decode($line, true);
+        if (is_array($decoded)) {
+            $rows[] = $decoded;
+        }
+        if (count($rows) >= $limit) {
+            break;
+        }
+    }
+    return $rows;
 }
 
 function resolveAllowedRepoPath(?string $path, string $allowedBase): array
@@ -295,6 +356,8 @@ if ($isGitRepo) {
 }
 
 if (($action === 'check' || $action === 'update') && $isGitRepo) {
+    $oldCommitForAudit = $localCommit;
+    $restartResultForAudit = 'not_applicable';
     $updateLockHandle = acquireUpdateLock($updateLockPath, $commandOutput);
     if ($updateLockHandle === false) {
         $statusMessage = 'Update already in progress by another session.';
@@ -391,11 +454,12 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
             }
 
             if (!$healthPassed) {
-                $healthLog[] = 'Health check result: FAIL';
+            $healthLog[] = 'Health check result: FAIL';
             }
 
             $commandOutput['Restart'] = $restartOutput;
             $commandOutput['Health Check'] = implode("\n", $healthLog);
+            $restartResultForAudit = ($restartSucceeded && $healthPassed) ? 'success' : 'failed';
 
             if ($pullSucceeded && $restartSucceeded && $healthPassed) {
                 $statusMessage = 'AmpNM updated from GitHub, containers restarted, and health checks passed.';
@@ -410,6 +474,7 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
                 $statusType = ($restartSucceeded || $healthPassed) ? 'warning' : 'error';
             }
         } else {
+            $restartResultForAudit = 'skipped_pull_failed';
             $statusMessage = "Update failed before restart. Manual recovery steps:\n"
                 . "1) Review Pull output for conflicts/errors.\n"
                 . "2) Resolve git issues locally (stash/commit/reset as needed).\n"
@@ -432,6 +497,20 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
     $behindCount = $metrics['behindCount'];
     $updateAvailable = ($behindCount !== null && $behindCount > 0);
             }
+
+            $auditEntry = [
+                'timestamp' => date('c'),
+                'action' => $action,
+                'user_id' => $_SESSION['user_id'] ?? null,
+                'username' => $_SESSION['username'] ?? ($_SESSION['user'] ?? 'unknown'),
+                'client_ip' => getClientIpAddress(),
+                'repo_path' => $repoPath,
+                'old_commit' => $oldCommitForAudit ?: null,
+                'new_commit' => $localCommit ?: null,
+                'restart_result' => $action === 'check' ? 'not_applicable' : $restartResultForAudit,
+                'status_type' => $statusType,
+            ];
+            appendAuditLog($auditLogPath, $auditEntry);
         } finally {
             releaseUpdateLock($updateLockHandle, $commandOutput);
         }
@@ -439,6 +518,8 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
 }
 
 if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
+    $oldCommitForAudit = null;
+    $restartResultForAudit = 'not_applicable';
     $cloneTarget = $repoPath;
     $parentDir = dirname($cloneTarget);
     $commandOutput['Validation'] = '';
@@ -482,8 +563,28 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
             $statusMessage = 'Clone failed. Review the output below for details.';
             $statusType = 'error';
         }
+
+        $auditEntry = [
+            'timestamp' => date('c'),
+            'action' => 'clone',
+            'user_id' => $_SESSION['user_id'] ?? null,
+            'username' => $_SESSION['username'] ?? ($_SESSION['user'] ?? 'unknown'),
+            'client_ip' => getClientIpAddress(),
+            'repo_path' => $repoPath,
+            'old_commit' => $oldCommitForAudit,
+            'new_commit' => $localCommit ?: null,
+            'restart_result' => $restartResultForAudit,
+            'status_type' => $statusType,
+        ];
+        appendAuditLog($auditLogPath, $auditEntry);
     }
 }
+
+foreach ($commandOutput as $title => $output) {
+    $commandOutput[$title] = redactSensitiveOutput((string) $output);
+}
+
+$latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
 
 ?>
 <main>
@@ -676,6 +777,38 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                         </div>
                     </div>
                 <?php endif; ?>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-xl font-semibold text-white">Recent Update Audit</h2>
+                        <span class="text-xs text-slate-500">Last 10 actions</span>
+                    </div>
+                    <?php if (empty($latestAuditEntries)): ?>
+                        <p class="text-sm text-slate-400">No audit records yet.</p>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-xs text-left text-slate-300">
+                                <thead class="text-slate-400 border-b border-slate-700">
+                                    <tr>
+                                        <th class="py-2 pr-4">Time</th><th class="py-2 pr-4">Action</th><th class="py-2 pr-4">User</th><th class="py-2 pr-4">IP</th><th class="py-2 pr-4">Commits</th><th class="py-2 pr-4">Restart</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($latestAuditEntries as $entry): ?>
+                                        <tr class="border-b border-slate-700/60">
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) ($entry['timestamp'] ?? '')); ?></td>
+                                            <td class="py-2 pr-4"><?php echo htmlspecialchars((string) ($entry['action'] ?? '')); ?></td>
+                                            <td class="py-2 pr-4"><?php echo htmlspecialchars((string) (($entry['username'] ?? 'unknown') . ' #' . ($entry['user_id'] ?? 'n/a'))); ?></td>
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) ($entry['client_ip'] ?? 'unknown')); ?></td>
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) (($entry['old_commit'] ?? 'n/a') . ' → ' . ($entry['new_commit'] ?? 'n/a'))); ?></td>
+                                            <td class="py-2 pr-4"><?php echo htmlspecialchars((string) ($entry['restart_result'] ?? 'n/a')); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <div class="space-y-6">
