@@ -89,6 +89,9 @@ $latestAuditEntries = [];
 
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
+$updateStatePath = getenv('AMPNM_UPDATE_STATE_FILE') ?: (__DIR__ . '/storage/update_state.json');
+$lastCheckedAt = null;
+$scheduledUpdateAvailable = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedToken = isset($_POST['csrf_token']) ? (string) $_POST['csrf_token'] : '';
@@ -326,12 +329,62 @@ function collectSyncMetrics(string $repoPath, string $upstreamRef): array
     return $metrics;
 }
 
+
+function readUpdateState(string $path): array
+{
+    if (!is_file($path)) {
+        return [];
+    }
+
+    $raw = file_get_contents($path);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function writeUpdateState(string $path, array $state): void
+{
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    file_put_contents($path, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+}
+
+function performUpdateCheck(string $repoPath, string $upstreamRef, string $statePath, array &$commandOutput): array
+{
+    $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
+    $commandOutput['Fetch'] = $fetchOutput;
+
+    $metrics = collectSyncMetrics($repoPath, $upstreamRef);
+    $state = [
+        'ok' => true,
+        'checked_at' => gmdate('c'),
+        'repo_path' => $repoPath,
+        'upstream_ref' => $upstreamRef,
+        'behind_count' => $metrics['behindCount'],
+        'ahead_count' => $metrics['aheadCount'],
+        'update_available' => ($metrics['behindCount'] !== null && $metrics['behindCount'] > 0),
+    ];
+
+    writeUpdateState($statePath, $state);
+
+    return $metrics;
+}
+
 $currentBranch = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD')) : '';
 $localCommit = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD')) : '';
 $upstreamRef = $isGitRepo ? $targetUpstreamRef : '';
 $remoteCommit = '';
 $remoteUrl = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git config --get remote.origin.url')) : '';
 $originConfigured = $remoteUrl !== '';
+$updateState = readUpdateState($updateStatePath);
+$lastCheckedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
+$scheduledUpdateAvailable = !empty($updateState['update_available']);
 
 if ($isGitRepo) {
     if (!$originConfigured) {
@@ -348,11 +401,12 @@ if ($isGitRepo) {
     }
 
     $metrics = collectSyncMetrics($repoPath, $upstreamRef);
-    $workingTreeClean = $metrics['workingTreeClean'];
+$workingTreeClean = $metrics['workingTreeClean'];
     $remoteReachable = $metrics['remoteReachable'];
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
     $updateAvailable = ($behindCount !== null && $behindCount > 0);
+    $lastCheckedAt = gmdate('c');
 }
 
 if (($action === 'check' || $action === 'update') && $isGitRepo) {
@@ -365,8 +419,7 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
     } else {
         try {
             if ($action === 'check') {
-    $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
-    $commandOutput['Fetch'] = $fetchOutput;
+    $metrics = performUpdateCheck($repoPath, $upstreamRef, $updateStatePath, $commandOutput);
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
     if ($currentBranch !== $canonicalBranch) {
         $commandOutput['Branch Check'] = sprintf('Warning: current branch is "%s", expected "%s". Sync metrics are still computed against %s.', $currentBranch ?: 'unknown', $canonicalBranch, $targetUpstreamRef);
@@ -382,11 +435,12 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
     }
 
     $metrics = collectSyncMetrics($repoPath, $upstreamRef);
-    $workingTreeClean = $metrics['workingTreeClean'];
+$workingTreeClean = $metrics['workingTreeClean'];
     $remoteReachable = $metrics['remoteReachable'];
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
     $updateAvailable = ($behindCount !== null && $behindCount > 0);
+    $lastCheckedAt = gmdate('c');
             }
 
             if ($action === 'update') {
@@ -491,11 +545,12 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
     }
 
     $metrics = collectSyncMetrics($repoPath, $upstreamRef);
-    $workingTreeClean = $metrics['workingTreeClean'];
+$workingTreeClean = $metrics['workingTreeClean'];
     $remoteReachable = $metrics['remoteReachable'];
     $aheadCount = $metrics['aheadCount'];
     $behindCount = $metrics['behindCount'];
     $updateAvailable = ($behindCount !== null && $behindCount > 0);
+    $lastCheckedAt = gmdate('c');
             }
 
             $auditEntry = [
@@ -620,6 +675,14 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
             </div>
         <?php endif; ?>
 
+
+        <?php if ($scheduledUpdateAvailable): ?>
+            <div class="mb-6 bg-amber-500/10 border border-amber-500/40 text-amber-100 rounded-lg p-4">
+                <p class="font-semibold">Update available: scheduled check detected new commits upstream.</p>
+                <p class="text-sm mt-1">Use <span class="font-semibold">🚀 Update AmpNM</span> to apply manually. Auto-pull is disabled by design.</p>
+            </div>
+        <?php endif; ?>
+
         <?php if ($statusMessage): ?>
             <div class="mb-6 <?php echo $statusType === 'success' ? 'bg-green-500/10 border-green-500/40 text-green-200' : ($statusType === 'error' ? 'bg-red-500/10 border-red-500/40 text-red-200' : 'bg-slate-700/50 border-slate-600 text-slate-200'); ?> border rounded-lg p-4">
                 <p class="font-semibold flex items-center gap-2">
@@ -709,7 +772,8 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
                     <?php elseif ($behindCount === 0): ?>
                         <p class="mt-3 text-xs inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-700 text-slate-200 border border-slate-600">Already up to date</p>
                     <?php endif; ?>
-                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check for Updates" to compare or "🚀 Update AmpNM" to pull the newest code and auto-restart this Docker app.</p>
+                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check now" to compare or "🚀 Update AmpNM" to pull the newest code and auto-restart this Docker app.</p>
+                    <p class="text-xs text-slate-400 mt-2">Last checked at: <?php echo $lastCheckedAt ? htmlspecialchars($lastCheckedAt) . ' (UTC)' : 'Never'; ?></p>
                 </div>
 
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
@@ -722,7 +786,7 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
                             <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="/var/www/html/docker-ampnm">
                             <button type="submit" class="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center gap-2<?php echo !$isGitRepo ? ' opacity-60 cursor-not-allowed' : ''; ?>" <?php echo !$isGitRepo ? 'disabled aria-disabled="true"' : ''; ?>>
                                 <i class="fas fa-sync-alt"></i>
-                                <span>↻ Check for Updates</span>
+                                <span>↻ Check now</span>
                             </button>
                             <p class="text-xs text-slate-500">Fetches remote metadata so you can compare local commits against <code><?php echo htmlspecialchars($targetUpstreamRef); ?></code> without applying changes.</p>
                         </form>
