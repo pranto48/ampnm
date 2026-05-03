@@ -2,7 +2,7 @@
 require_once 'includes/auth_check.php';
 include 'header.php';
 
-$canonicalRepoUrl = 'https://github.com/pranto48/ampnm-project.git';
+$canonicalRepoUrl = 'https://github.com/pranto48/ampnm.git';
 
 $autoDetection = (function (string $startPath): array {
     $normalize = static function (string $path): string {
@@ -211,8 +211,20 @@ if ($action === 'update' && $isGitRepo) {
     $commandOutput['Fetch'] = $fetchOutput;
     $commandOutput['Pull'] = $pullOutput;
     $commandOutput['Status'] = $statusOutput;
-    $statusMessage = 'Update attempt finished. Review the logs below for details.';
-    $statusType = str_contains(strtolower($pullOutput), 'up to date') || !str_contains(strtolower($pullOutput), 'error') ? 'success' : 'error';
+
+    $pullLower = strtolower($pullOutput);
+    $pullSucceeded = !str_contains($pullLower, 'fatal:') && !str_contains($pullLower, 'error:');
+
+    if ($pullSucceeded) {
+        $composeDirectory = __DIR__;
+        $restartOutput = runShellCommand('cd ' . escapeshellarg($composeDirectory) . ' && (docker compose restart 2>&1 || docker-compose restart 2>&1)');
+        $commandOutput['Restart'] = $restartOutput;
+        $statusMessage = 'AmpNM updated from GitHub and Docker services were restarted automatically.';
+        $statusType = 'success';
+    } else {
+        $statusMessage = 'Update failed before restart. Review the logs below for details.';
+        $statusType = 'error';
+    }
 
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
     $localCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD'));
@@ -280,8 +292,8 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
                 <p class="text-sm text-slate-400 uppercase tracking-wide">Maintenance</p>
-                <h1 class="text-3xl font-bold text-white">Docker Code Updates</h1>
-                <p class="text-slate-400 mt-1">Sync the AMPNM Docker app with the latest code from <a href="https://github.com/pranto48/ampnm-project" class="text-cyan-400 hover:underline" target="_blank" rel="noopener noreferrer">github.com/pranto48/ampnm-project</a>.</p>
+                <h1 class="text-3xl font-bold text-white">Docker Update Manager</h1>
+                <p class="text-slate-400 mt-1">Sync the AMPNM Docker app with the latest code from <a href="https://github.com/pranto48/ampnm" class="text-cyan-400 hover:underline" target="_blank" rel="noopener noreferrer">github.com/pranto48/ampnm</a>.</p>
             </div>
             <div class="flex items-center gap-2 text-sm text-slate-400 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
                 <i class="fas fa-shield-alt text-cyan-400"></i>
@@ -365,7 +377,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                         </div>
                         <div>
                             <dt class="text-slate-400">Sync Target</dt>
-                            <dd class="mt-1">github.com/pranto48/ampnm-project.git</dd>
+                            <dd class="mt-1">github.com/pranto48/ampnm.git</dd>
                         </div>
                         <div>
                             <dt class="text-slate-400">Ahead / Behind</dt>
@@ -392,7 +404,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                             </dd>
                         </div>
                     </dl>
-                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "Fetch Latest" to compare or "Apply Update" to pull the newest code into this container.</p>
+                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check for Updates" to compare or "🚀 Update AmpNM" to pull the newest code and auto-restart this Docker app.</p>
                 </div>
 
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
@@ -404,7 +416,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                             <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="/var/www/html/docker-ampnm">
                             <button type="submit" class="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center gap-2<?php echo !$isGitRepo ? ' opacity-60 cursor-not-allowed' : ''; ?>" <?php echo !$isGitRepo ? 'disabled aria-disabled="true"' : ''; ?>>
                                 <i class="fas fa-sync-alt"></i>
-                                <span>Fetch Latest</span>
+                                <span>↻ Check for Updates</span>
                             </button>
                             <p class="text-xs text-slate-500">Fetches remote metadata so you can compare local and remote commits without applying changes.</p>
                         </form>
@@ -414,9 +426,9 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                             <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500">
                             <button type="submit" class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-2<?php echo !$isGitRepo ? ' opacity-60 cursor-not-allowed' : ''; ?>" <?php echo !$isGitRepo ? 'disabled aria-disabled="true"' : ''; ?>>
                                 <i class="fas fa-cloud-download-alt"></i>
-                                <span>Apply Update</span>
+                                <span>🚀 Update AmpNM</span>
                             </button>
-                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> to sync the Docker app with the latest release. Remote <code>origin</code> is auto-set to the canonical GitHub URL when missing.</p>
+                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.</p>
                         </form>
                         <?php if (!$isGitRepo && $gitAvailable): ?>
                             <form method="POST" class="space-y-3 md:col-span-2">
@@ -456,7 +468,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                     <h3 class="text-lg font-semibold text-white mb-3">How it works</h3>
                     <ul class="list-disc list-inside space-y-2 text-sm text-slate-300">
                         <li>Targets the Docker app at <code>portal.itsupport.com.bd/docker-ampnm</code> (current container path: <code><?php echo htmlspecialchars($defaultRepoPath); ?></code>). We auto-detect the nearest <code>.git</code> above this folder and use it as the default path.</li>
-                        <li>Checks out updates from the official repository: <code>https://github.com/pranto48/ampnm-project.git</code>.</li>
+                        <li>Checks out updates from the official repository: <code>https://github.com/pranto48/ampnm.git</code>.</li>
                         <li>Uses <span class="font-semibold">fetch</span> to compare and <span class="font-semibold">pull</span> to apply new versions without overwriting local, uncommitted changes.</li>
                     </ul>
                 </div>
