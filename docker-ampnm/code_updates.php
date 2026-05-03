@@ -3,6 +3,7 @@ require_once 'includes/auth_check.php';
 include 'header.php';
 
 $canonicalRepoUrl = 'https://github.com/pranto48/ampnm.git';
+$canonicalBranch = getenv('AMPNM_UPDATE_BRANCH') ?: 'main';
 
 $autoDetection = (function (string $startPath): array {
     $normalize = static function (string $path): string {
@@ -69,6 +70,7 @@ $remoteReachable = null;
 $aheadCount = null;
 $behindCount = null;
 $workingTreeClean = null;
+$targetUpstreamRef = 'origin/' . $canonicalBranch;
 
 $action = $_POST['action'] ?? null;
 $statusMessage = '';
@@ -155,7 +157,7 @@ function collectSyncMetrics(string $repoPath, string $upstreamRef): array
 
 $currentBranch = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD')) : '';
 $localCommit = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD')) : '';
-$upstreamRef = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref --symbolic-full-name @{u}')) : '';
+$upstreamRef = $isGitRepo ? $targetUpstreamRef : '';
 $remoteCommit = '';
 $remoteUrl = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git config --get remote.origin.url')) : '';
 $originConfigured = $remoteUrl !== '';
@@ -169,9 +171,6 @@ if ($isGitRepo) {
         $originConfigured = true;
     }
 
-    if ($upstreamRef === '' || str_starts_with($upstreamRef, 'fatal:')) {
-        $upstreamRef = 'origin/main';
-    }
     $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
     if (str_starts_with($remoteCommit, 'fatal:')) {
         $remoteCommit = '';
@@ -187,6 +186,10 @@ if ($isGitRepo) {
 if ($action === 'check' && $isGitRepo) {
     $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
     $commandOutput['Fetch'] = $fetchOutput;
+    $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
+    if ($currentBranch !== $canonicalBranch) {
+        $commandOutput['Branch Check'] = sprintf('Warning: current branch is "%s", expected "%s". Sync metrics are still computed against %s.', $currentBranch ?: 'unknown', $canonicalBranch, $targetUpstreamRef);
+    }
     $statusOutput = runGitCommand($repoPath, 'git status -sb');
     $commandOutput['Status'] = $statusOutput;
     $statusMessage = 'Fetched latest metadata. Compare local and remote commits below.';
@@ -206,7 +209,13 @@ if ($action === 'check' && $isGitRepo) {
 
 if ($action === 'update' && $isGitRepo) {
     $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
-    $pullOutput = runGitCommand($repoPath, 'git pull --ff-only');
+    $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
+    if ($currentBranch !== $canonicalBranch) {
+        $checkoutOutput = runGitCommand($repoPath, 'git checkout ' . escapeshellarg($canonicalBranch));
+        $commandOutput['Branch Switch'] = 'Warning: switched to target branch before pulling.' . "\n" . $checkoutOutput;
+        $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
+    }
+    $pullOutput = runGitCommand($repoPath, 'git pull --ff-only origin ' . escapeshellarg($canonicalBranch));
     $statusOutput = runGitCommand($repoPath, 'git status -sb');
     $commandOutput['Fetch'] = $fetchOutput;
     $commandOutput['Pull'] = $pullOutput;
@@ -268,7 +277,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
             $originConfigured = true;
             $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
             $localCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD'));
-            $upstreamRef = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref --symbolic-full-name @{u}')) ?: 'origin/main';
+            $upstreamRef = $targetUpstreamRef;
             $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
             if (str_starts_with($remoteCommit, 'fatal:')) {
                 $remoteCommit = '';
@@ -353,7 +362,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                         </div>
                         <div>
                             <dt class="text-slate-400">Upstream Ref</dt>
-                            <dd class="font-mono text-slate-100 mt-1"><?php echo $upstreamRef ?: 'origin/main'; ?></dd>
+                            <dd class="font-mono text-slate-100 mt-1"><?php echo $upstreamRef ?: htmlspecialchars($targetUpstreamRef); ?></dd>
                         </div>
                         <div>
                             <dt class="text-slate-400">Remote Commit</dt>
@@ -377,7 +386,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                         </div>
                         <div>
                             <dt class="text-slate-400">Sync Target</dt>
-                            <dd class="mt-1">github.com/pranto48/ampnm.git</dd>
+                            <dd class="mt-1 font-mono">github.com/pranto48/ampnm.git (<?php echo htmlspecialchars($targetUpstreamRef); ?>)</dd>
                         </div>
                         <div>
                             <dt class="text-slate-400">Ahead / Behind</dt>
@@ -404,7 +413,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                             </dd>
                         </div>
                     </dl>
-                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check for Updates" to compare or "🚀 Update AmpNM" to pull the newest code and auto-restart this Docker app.</p>
+                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check for Updates" to compare or "🚀 Update AmpNM" to pull the newest code from <code><?php echo htmlspecialchars($targetUpstreamRef); ?></code> and auto-restart this Docker app.</p>
                 </div>
 
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
@@ -418,7 +427,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                                 <i class="fas fa-sync-alt"></i>
                                 <span>↻ Check for Updates</span>
                             </button>
-                            <p class="text-xs text-slate-500">Fetches remote metadata so you can compare local and remote commits without applying changes.</p>
+                            <p class="text-xs text-slate-500">Fetches remote metadata so you can compare local commits against <code><?php echo htmlspecialchars($targetUpstreamRef); ?></code> without applying changes.</p>
                         </form>
                         <form method="POST" class="space-y-3">
                             <input type="hidden" name="action" value="update">
@@ -428,7 +437,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                                 <i class="fas fa-cloud-download-alt"></i>
                                 <span>🚀 Update AmpNM</span>
                             </button>
-                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.</p>
+                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only origin <?php echo htmlspecialchars($canonicalBranch); ?></code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.</p>
                         </form>
                         <?php if (!$isGitRepo && $gitAvailable): ?>
                             <form method="POST" class="space-y-3 md:col-span-2">
@@ -468,7 +477,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                     <h3 class="text-lg font-semibold text-white mb-3">How it works</h3>
                     <ul class="list-disc list-inside space-y-2 text-sm text-slate-300">
                         <li>Targets the Docker app at <code>portal.itsupport.com.bd/docker-ampnm</code> (current container path: <code><?php echo htmlspecialchars($defaultRepoPath); ?></code>). We auto-detect the nearest <code>.git</code> above this folder and use it as the default path.</li>
-                        <li>Checks out updates from the official repository: <code>https://github.com/pranto48/ampnm.git</code>.</li>
+                        <li>Checks out updates from the official repository: <code>https://github.com/pranto48/ampnm.git</code> on branch <code><?php echo htmlspecialchars($canonicalBranch); ?></code> (<code><?php echo htmlspecialchars($targetUpstreamRef); ?></code>).</li>
                         <li>Uses <span class="font-semibold">fetch</span> to compare and <span class="font-semibold">pull</span> to apply new versions without overwriting local, uncommitted changes.</li>
                     </ul>
                 </div>
