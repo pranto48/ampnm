@@ -90,6 +90,12 @@ function runShellCommand(string $command): string
     return shell_exec($command) ?? '';
 }
 
+function commandLooksSuccessful(string $output): bool
+{
+    $normalized = strtolower($output);
+    return !str_contains($normalized, 'fatal:') && !str_contains($normalized, 'error:');
+}
+
 function safeTrim(?string $value): string
 {
     $value = $value ?? '';
@@ -229,17 +235,75 @@ if ($action === 'update' && $isGitRepo) {
         $commandOutput['Pull'] = $pullOutput;
         $commandOutput['Status'] = $statusOutput;
 
-        $pullLower = strtolower($pullOutput);
-        $pullSucceeded = !str_contains($pullLower, 'fatal:') && !str_contains($pullLower, 'error:');
+        $pullSucceeded = commandLooksSuccessful($pullOutput);
 
         if ($pullSucceeded) {
             $composeDirectory = __DIR__;
             $restartOutput = runShellCommand('cd ' . escapeshellarg($composeDirectory) . ' && (docker compose restart 2>&1 || docker-compose restart 2>&1)');
+            $restartSucceeded = commandLooksSuccessful($restartOutput);
+
+            $healthcheckUrl = trim((string) getenv('AMPNM_HEALTHCHECK_URL'));
+            $healthTargets = ['http://127.0.0.1/'];
+            if ($healthcheckUrl !== '') {
+                $healthTargets[] = $healthcheckUrl;
+            }
+
+            $maxAttempts = 5;
+            $sleepSeconds = 2;
+            $healthLog = [];
+            $healthPassed = false;
+
+            for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+                $healthLog[] = "Attempt {$attempt}/{$maxAttempts}";
+                $attemptFailed = false;
+
+                foreach ($healthTargets as $target) {
+                    $probeOutput = runShellCommand('curl -fsS --max-time 10 ' . escapeshellarg($target) . ' 2>&1');
+                    $probePassed = trim($probeOutput) !== '' && !str_contains(strtolower($probeOutput), 'curl:');
+                    $healthLog[] = sprintf('[%s] %s', $probePassed ? 'PASS' : 'FAIL', $target);
+                    $healthLog[] = $probeOutput !== '' ? $probeOutput : 'No output';
+
+                    if (!$probePassed) {
+                        $attemptFailed = true;
+                    }
+                }
+
+                if (!$attemptFailed) {
+                    $healthPassed = true;
+                    $healthLog[] = 'Health check result: PASS';
+                    break;
+                }
+
+                if ($attempt < $maxAttempts) {
+                    $healthLog[] = "Health check result: FAIL (retrying in {$sleepSeconds}s)";
+                    sleep($sleepSeconds);
+                }
+            }
+
+            if (!$healthPassed) {
+                $healthLog[] = 'Health check result: FAIL';
+            }
+
             $commandOutput['Restart'] = $restartOutput;
-            $statusMessage = 'AmpNM updated from GitHub and Docker services were restarted automatically.';
-            $statusType = 'success';
+            $commandOutput['Health Check'] = implode("\n", $healthLog);
+
+            if ($pullSucceeded && $restartSucceeded && $healthPassed) {
+                $statusMessage = 'AmpNM updated from GitHub, containers restarted, and health checks passed.';
+                $statusType = 'success';
+            } else {
+                $statusMessage = "Update completed with issues. Manual recovery steps:\n"
+                    . "1) Inspect Command Logs (Pull/Restart/Health Check).\n"
+                    . "2) Run docker compose ps and docker compose logs.\n"
+                    . "3) Re-run docker compose restart.\n"
+                    . "4) Verify endpoints manually via curl.\n"
+                    . "5) Roll back or redeploy if service remains unhealthy.";
+                $statusType = ($restartSucceeded || $healthPassed) ? 'warning' : 'error';
+            }
         } else {
-            $statusMessage = 'Update failed before restart. Review the logs below for details.';
+            $statusMessage = "Update failed before restart. Manual recovery steps:\n"
+                . "1) Review Pull output for conflicts/errors.\n"
+                . "2) Resolve git issues locally (stash/commit/reset as needed).\n"
+                . "3) Re-run update after repository is clean.";
             $statusType = 'error';
         }
     }
