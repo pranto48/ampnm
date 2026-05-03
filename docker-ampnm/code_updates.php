@@ -4,6 +4,13 @@ include 'header.php';
 
 $canonicalRepoUrl = 'https://github.com/pranto48/ampnm.git';
 $canonicalBranch = getenv('AMPNM_UPDATE_BRANCH') ?: 'main';
+$targetUpstreamRef = 'origin/' . $canonicalBranch;
+$allowedRepoBase = rtrim(getenv('AMPNM_ALLOWED_REPO_BASE') ?: '/var/www/html', '/\\');
+
+if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || $_SESSION['csrf_token'] === '') {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
 
 $autoDetection = (function (string $startPath): array {
     $normalize = static function (string $path): string {
@@ -81,6 +88,26 @@ $commandOutput = [];
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $postedToken = isset($_POST['csrf_token']) ? (string) $_POST['csrf_token'] : '';
+    if ($postedToken === '' || !hash_equals($csrfToken, $postedToken)) {
+        $statusMessage = 'Request rejected: invalid or missing CSRF token.';
+        $statusType = 'error';
+        $action = null;
+    } else {
+        $repoValidation = resolveAllowedRepoPath($_POST['repo_path'] ?? $repoPath, $allowedRepoBase);
+        if (!$repoValidation['ok']) {
+            $statusMessage = 'Request rejected: ' . $repoValidation['error'];
+            $statusType = 'error';
+            $action = null;
+        } else {
+            $repoPath = $repoValidation['path'];
+            $gitMarker = $repoPath . DIRECTORY_SEPARATOR . '.git';
+            $isGitRepo = $gitAvailable && (is_dir($gitMarker) || is_file($gitMarker));
+        }
+    }
+}
+
 function acquireUpdateLock(string $lockPath, array &$commandOutput)
 {
     $commandOutput['Lock'] = ($commandOutput['Lock'] ?? '') . "Lock file: {$lockPath}
@@ -134,6 +161,36 @@ function runGitCommand(string $repoPath, string $command): string
 function runShellCommand(string $command): string
 {
     return shell_exec($command) ?? '';
+}
+
+function resolveAllowedRepoPath(?string $path, string $allowedBase): array
+{
+    $candidate = rtrim((string) ($path ?? ''), '/\\');
+    if ($candidate === '') {
+        return ['ok' => false, 'error' => 'Repository path is required.'];
+    }
+
+    $baseRealPath = realpath($allowedBase);
+    if ($baseRealPath === false || !is_dir($baseRealPath)) {
+        return ['ok' => false, 'error' => 'Configured allowed repository base path is invalid.'];
+    }
+
+    $resolvedPath = realpath($candidate);
+    if ($resolvedPath === false) {
+        $parentRealPath = realpath(dirname($candidate));
+        if ($parentRealPath === false) {
+            return ['ok' => false, 'error' => 'Repository path does not exist and parent directory could not be resolved.'];
+        }
+        $resolvedPath = rtrim($parentRealPath, '/\\') . DIRECTORY_SEPARATOR . basename($candidate);
+    }
+
+    $baseWithSeparator = rtrim($baseRealPath, '/\\') . DIRECTORY_SEPARATOR;
+    $isAllowed = $resolvedPath === $baseRealPath || str_starts_with($resolvedPath, $baseWithSeparator);
+    if (!$isAllowed) {
+        return ['ok' => false, 'error' => 'Repository path is outside the allowed base path.'];
+    }
+
+    return ['ok' => true, 'path' => $resolvedPath];
 }
 
 function commandLooksSuccessful(string $output): bool
@@ -559,6 +616,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                     <div class="grid md:grid-cols-2 gap-4">
                         <form method="POST" class="space-y-3">
                             <input type="hidden" name="action" value="check">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <label class="block text-sm text-slate-400">Repository Path</label>
                             <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="/var/www/html/docker-ampnm">
                             <button type="submit" class="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center gap-2<?php echo !$isGitRepo ? ' opacity-60 cursor-not-allowed' : ''; ?>" <?php echo !$isGitRepo ? 'disabled aria-disabled="true"' : ''; ?>>
@@ -569,6 +627,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                         </form>
                         <form method="POST" class="space-y-3">
                             <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <label class="block text-sm text-slate-400">Repository Path</label>
                             <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500">
                             <label class="flex items-start gap-2 text-xs text-slate-300">
@@ -588,6 +647,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
                         <?php if (!$isGitRepo && $gitAvailable): ?>
                             <form method="POST" class="space-y-3 md:col-span-2">
                                 <input type="hidden" name="action" value="clone">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                 <label class="block text-sm text-slate-400">Clone into Path</label>
                                 <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="/var/www/html/ampnm-project">
                                 <button type="submit" class="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center justify-center gap-2">
