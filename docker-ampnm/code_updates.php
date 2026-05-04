@@ -422,7 +422,7 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
     $metrics = performUpdateCheck($repoPath, $upstreamRef, $updateStatePath, $commandOutput);
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
     if ($currentBranch !== $canonicalBranch) {
-        $commandOutput['Branch Check'] = sprintf('Warning: current branch is "%s", expected "%s". Sync metrics are still computed against %s.', $currentBranch ?: 'unknown', $canonicalBranch, $targetUpstreamRef);
+        $commandOutput['Branch Check'] = sprintf('Warning: current branch is "%s", expected "%s". Sync metrics are computed against %s.', $currentBranch ?: 'unknown', $canonicalBranch, $targetUpstreamRef);
     }
     $statusOutput = runGitCommand($repoPath, 'git status -sb');
     $commandOutput['Status'] = $statusOutput;
@@ -444,7 +444,22 @@ $workingTreeClean = $metrics['workingTreeClean'];
             }
 
             if ($action === 'update') {
-    if ($workingTreeClean === false && !$forceUpdate) {
+    $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
+    if ($currentBranch !== $canonicalBranch) {
+        $commandOutput['Branch Check'] = sprintf(
+            'Warning: current branch is "%s"; switching to "%s" before update.',
+            $currentBranch ?: 'unknown',
+            $canonicalBranch
+        );
+        $checkoutOutput = runGitCommand($repoPath, 'git checkout ' . escapeshellarg($canonicalBranch));
+        $commandOutput['Checkout'] = $checkoutOutput;
+        $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
+    }
+
+    if ($currentBranch !== $canonicalBranch) {
+        $statusMessage = sprintf('Update blocked: unable to switch to required branch "%s". Resolve checkout errors and try again.', $canonicalBranch);
+        $statusType = 'error';
+    } elseif ($workingTreeClean === false && !$forceUpdate) {
         $statusMessage = 'Update blocked: local changes detected. Commit or stash changes first, then try again.';
         $statusType = 'error';
     } elseif (!$updateAvailable) {
@@ -772,7 +787,7 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
                     <?php elseif ($behindCount === 0): ?>
                         <p class="mt-3 text-xs inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-700 text-slate-200 border border-slate-600">Already up to date</p>
                     <?php endif; ?>
-                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check now" to compare or "🚀 Update AmpNM" to pull the newest code and auto-restart this Docker app.</p>
+                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check now" to compare against <code><?php echo htmlspecialchars($targetUpstreamRef); ?></code> or "🚀 Update AmpNM" to pull from that target and auto-restart this Docker app.</p>
                     <p class="text-xs text-slate-400 mt-2">Last checked at: <?php echo $lastCheckedAt ? htmlspecialchars($lastCheckedAt) . ' (UTC)' : 'Never'; ?></p>
                 </div>
 
@@ -803,7 +818,7 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
                                 <i class="fas fa-cloud-download-alt"></i>
                                 <span>🚀 Update AmpNM</span>
                             </button>
-                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> from <code>https://github.com/pranto48/ampnm.git</code>, then automatically restarts this Docker app with <code>docker compose restart</code>.
+                            <p class="text-xs text-slate-500">Runs <code>git fetch --all</code> then <code>git pull --ff-only</code> from <code>https://github.com/pranto48/ampnm.git</code> on <code><?php echo htmlspecialchars($targetUpstreamRef); ?></code>, then automatically restarts this Docker app with <code>docker compose restart</code>.
                             Local uncommitted changes can block updates or cause conflicts, so commit/stash first unless you intentionally use force update.</p>
                             <?php if ($isGitRepo && !$updateAvailable): ?>
                                 <p class="text-xs text-amber-200">No remote changes detected</p>
