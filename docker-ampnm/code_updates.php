@@ -77,7 +77,7 @@ $remoteReachable = null;
 $aheadCount = null;
 $behindCount = null;
 $workingTreeClean = null;
-$updateAvailable = false;
+$updateAvailable = ($behindCount !== null && $behindCount > 0);
 
 $action = $_POST['action'] ?? null;
 $forceUpdate = isset($_POST['force_update']) && $_POST['force_update'] === '1';
@@ -361,14 +361,18 @@ function performUpdateCheck(string $repoPath, string $upstreamRef, string $state
     $commandOutput['Fetch'] = $fetchOutput;
 
     $metrics = collectSyncMetrics($repoPath, $upstreamRef);
+    $behindCount = $metrics['behindCount'];
+    $aheadCount = $metrics['aheadCount'];
+    $updateAvailable = ($behindCount !== null && $behindCount > 0);
+
     $state = [
         'ok' => true,
         'checked_at' => gmdate('c'),
         'repo_path' => $repoPath,
         'upstream_ref' => $upstreamRef,
-        'behind_count' => $metrics['behindCount'],
-        'ahead_count' => $metrics['aheadCount'],
-        'update_available' => ($metrics['behindCount'] !== null && $metrics['behindCount'] > 0),
+        'behind_count' => $behindCount,
+        'ahead_count' => $aheadCount,
+        'update_available' => $updateAvailable,
     ];
 
     writeUpdateState($statePath, $state);
