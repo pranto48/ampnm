@@ -169,6 +169,17 @@ function runShellCommand(string $command): string
     return shell_exec($command) ?? '';
 }
 
+function runShellCommandWithStatus(string $command): array
+{
+    $output = [];
+    $exitCode = 1;
+    exec($command . ' 2>&1', $output, $exitCode);
+    return [
+        'output' => implode("\n", $output),
+        'exitCode' => $exitCode,
+    ];
+}
+
 function getClientIpAddress(): string
 {
     $keys = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
@@ -493,9 +504,10 @@ $workingTreeClean = $metrics['workingTreeClean'];
                 $attemptFailed = false;
 
                 foreach ($healthTargets as $target) {
-                    $probeOutput = runShellCommand('curl -fsS --max-time 10 ' . escapeshellarg($target) . ' 2>&1');
-                    $probePassed = trim($probeOutput) !== '' && !str_contains(strtolower($probeOutput), 'curl:');
-                    $healthLog[] = sprintf('[%s] %s', $probePassed ? 'PASS' : 'FAIL', $target);
+                    $probeResult = runShellCommandWithStatus('curl -fsS --max-time 10 ' . escapeshellarg($target));
+                    $probeOutput = trim($probeResult['output']);
+                    $probePassed = $probeResult['exitCode'] === 0;
+                    $healthLog[] = sprintf('[%s] %s (exit=%d)', $probePassed ? 'PASS' : 'FAIL', $target, $probeResult['exitCode']);
                     $healthLog[] = $probeOutput !== '' ? $probeOutput : 'No output';
 
                     if (!$probePassed) {
