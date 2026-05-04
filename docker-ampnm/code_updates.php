@@ -84,12 +84,14 @@ $statusType = '';
 $commandOutput = [];
 $auditLogPath = rtrim(getenv('AMPNM_AUDIT_LOG_PATH') ?: '/var/log/ampnm', '/\\') . DIRECTORY_SEPARATOR . 'code-update-audit.log';
 $latestAuditEntries = [];
+$auditStorageMode = 'file';
 
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
 $updateStatePath = getenv('AMPNM_UPDATE_STATE_FILE') ?: (__DIR__ . '/storage/update_state.json');
 $lastCheckedAt = null;
 $scheduledUpdateAvailable = false;
+$auditPdo = function_exists('getDbConnection') ? getDbConnection() : null;
 $repoPathValidation = resolveAllowedRepoPath($repoPath, $allowedRepoBase);
 if ($repoPathValidation['ok']) {
     $repoPath = $repoPathValidation['path'];
@@ -245,6 +247,133 @@ function readRecentAuditLogs(string $logPath, int $limit = 10): array
     return $rows;
 }
 
+
+function ensureAuditTable(PDO $pdo): bool
+{
+    static $ensured = false;
+    if ($ensured) {
+        return true;
+    }
+
+    $sql = "CREATE TABLE IF NOT EXISTS code_update_audit_logs (
+"
+        . "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+"
+        . "timestamp_utc DATETIME NOT NULL,
+"
+        . "action VARCHAR(16) NOT NULL,
+"
+        . "user_id BIGINT NULL,
+"
+        . "username VARCHAR(255) NULL,
+"
+        . "client_ip VARCHAR(64) NULL,
+"
+        . "repo_path VARCHAR(1024) NOT NULL,
+"
+        . "old_commit VARCHAR(64) NULL,
+"
+        . "new_commit VARCHAR(64) NULL,
+"
+        . "restart_result VARCHAR(64) NULL,
+"
+        . "status_type VARCHAR(32) NULL,
+"
+        . "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+"
+        . "INDEX idx_code_update_audit_logs_timestamp (timestamp_utc),
+"
+        . "INDEX idx_code_update_audit_logs_action (action)
+"
+        . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+    $ensured = $pdo->exec($sql) !== false;
+    return $ensured;
+}
+
+function appendAuditLogDb(PDO $pdo, array $entry): bool
+{
+    if (!ensureAuditTable($pdo)) {
+        return false;
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO code_update_audit_logs (timestamp_utc, action, user_id, username, client_ip, repo_path, old_commit, new_commit, restart_result, status_type)
+         VALUES (:timestamp_utc, :action, :user_id, :username, :client_ip, :repo_path, :old_commit, :new_commit, :restart_result, :status_type)'
+    );
+
+    $timestampUtc = isset($entry['timestamp']) ? gmdate('Y-m-d H:i:s', strtotime((string) $entry['timestamp'])) : gmdate('Y-m-d H:i:s');
+
+    return $stmt->execute([
+        ':timestamp_utc' => $timestampUtc,
+        ':action' => $entry['action'] ?? null,
+        ':user_id' => $entry['user_id'] ?? null,
+        ':username' => $entry['username'] ?? null,
+        ':client_ip' => $entry['client_ip'] ?? null,
+        ':repo_path' => $entry['repo_path'] ?? null,
+        ':old_commit' => $entry['old_commit'] ?? null,
+        ':new_commit' => $entry['new_commit'] ?? null,
+        ':restart_result' => $entry['restart_result'] ?? null,
+        ':status_type' => $entry['status_type'] ?? null,
+    ]);
+}
+
+function readRecentAuditLogsDb(PDO $pdo, int $limit = 10): array
+{
+    if (!ensureAuditTable($pdo)) {
+        return [];
+    }
+
+    $limit = max(1, min(100, $limit));
+    $stmt = $pdo->query('SELECT timestamp_utc, action, user_id, username, client_ip, repo_path, old_commit, new_commit, restart_result, status_type FROM code_update_audit_logs ORDER BY id DESC LIMIT ' . $limit);
+    if ($stmt === false) {
+        return [];
+    }
+
+    $rows = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $row['timestamp'] = isset($row['timestamp_utc']) ? gmdate('c', strtotime((string) $row['timestamp_utc'] . ' UTC')) : '';
+        unset($row['timestamp_utc']);
+        $rows[] = $row;
+    }
+
+    return $rows;
+}
+
+function persistAuditEntry(array $entry, ?PDO $pdo, string $logPath, string &$storageMode): bool
+{
+    if ($pdo instanceof PDO) {
+        try {
+            if (appendAuditLogDb($pdo, $entry)) {
+                $storageMode = 'database';
+                return true;
+            }
+        } catch (Throwable $e) {
+            // Fallback to append-only file when DB logging is unavailable.
+        }
+    }
+
+    $storageMode = 'file';
+    return appendAuditLog($logPath, $entry);
+}
+
+function readLatestAuditEntries(?PDO $pdo, string $logPath, int $limit, string &$storageMode): array
+{
+    if ($pdo instanceof PDO) {
+        try {
+            $rows = readRecentAuditLogsDb($pdo, $limit);
+            if (!empty($rows)) {
+                $storageMode = 'database';
+                return $rows;
+            }
+        } catch (Throwable $e) {
+            // Continue to file fallback.
+        }
+    }
+
+    $storageMode = 'file';
+    return readRecentAuditLogs($logPath, $limit);
+}
 function resolveAllowedRepoPath(?string $path, string $allowedBase): array
 {
     $candidate = rtrim((string) ($path ?? ''), '/\\');
@@ -595,7 +724,7 @@ $workingTreeClean = $metrics['workingTreeClean'];
                 'restart_result' => $action === 'check' ? 'not_applicable' : $restartResultForAudit,
                 'status_type' => $statusType,
             ];
-            appendAuditLog($auditLogPath, $auditEntry);
+            persistAuditEntry($auditEntry, $auditPdo, $auditLogPath, $auditStorageMode);
         } finally {
             releaseUpdateLock($updateLockHandle, $commandOutput);
         }
@@ -661,7 +790,7 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
             'restart_result' => $restartResultForAudit,
             'status_type' => $statusType,
         ];
-        appendAuditLog($auditLogPath, $auditEntry);
+        persistAuditEntry($auditEntry, $auditPdo, $auditLogPath, $auditStorageMode);
     }
 }
 
@@ -669,7 +798,7 @@ foreach ($commandOutput as $title => $output) {
     $commandOutput[$title] = redactSensitiveOutput((string) $output);
 }
 
-$latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
+$latestAuditEntries = readLatestAuditEntries($auditPdo, $auditLogPath, 10, $auditStorageMode);
 
 ?>
 <main>
@@ -875,10 +1004,11 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
                     </div>
                 <?php endif; ?>
 
+                <?php if (($_SESSION['user_role'] ?? 'viewer') === 'admin'): ?>
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="text-xl font-semibold text-white">Recent Update Audit</h2>
-                        <span class="text-xs text-slate-500">Last 10 actions</span>
+                        <span class="text-xs text-slate-500">Last 10 actions (<?php echo htmlspecialchars($auditStorageMode); ?>)</span>
                     </div>
                     <?php if (empty($latestAuditEntries)): ?>
                         <p class="text-sm text-slate-400">No audit records yet.</p>
@@ -906,6 +1036,7 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
                         </div>
                     <?php endif; ?>
                 </div>
+                <?php endif; ?>
             </div>
 
             <div class="space-y-6">
