@@ -87,6 +87,11 @@ $auditLogPath = rtrim(getenv('AMPNM_AUDIT_LOG_PATH') ?: '/var/log/ampnm', '/\\')
 $latestAuditEntries = [];
 $auditStorageMode = 'file';
 $updateScriptResult = [];
+$backupBasePath = rtrim(getenv('BACKUP_BASE') ?: '/var/www/html/docker-ampnm/data/code_backups', '/\\');
+$recentBackups = [];
+$rollbackBackupPath = '';
+$rollbackLogFilePath = '';
+$showRollbackFailureBanner = false;
 
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
@@ -412,6 +417,54 @@ function readLatestAuditEntries(?PDO $pdo, string $logPath, int $limit, string &
     $storageMode = 'file';
     return readRecentAuditLogs($logPath, $limit);
 }
+
+function listRecentBackupFolders(string $backupBasePath, int $limit = 5): array
+{
+    $limit = max(1, min(20, $limit));
+    $rows = [];
+
+    if (!is_dir($backupBasePath)) {
+        return $rows;
+    }
+
+    $entries = scandir($backupBasePath, SCANDIR_SORT_DESCENDING);
+    if ($entries === false) {
+        return $rows;
+    }
+
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+
+        $fullPath = rtrim($backupBasePath, '/\\') . DIRECTORY_SEPARATOR . $entry;
+        if (!is_dir($fullPath)) {
+            continue;
+        }
+
+        $commitFile = $fullPath . DIRECTORY_SEPARATOR . 'git_commit.txt';
+        $legacyCommitFile = $fullPath . DIRECTORY_SEPARATOR . 'previous_commit.txt';
+        $commitHash = null;
+        if (is_file($commitFile)) {
+            $commitHash = safeTrim((string) file_get_contents($commitFile));
+        } elseif (is_file($legacyCommitFile)) {
+            $commitHash = safeTrim((string) file_get_contents($legacyCommitFile));
+        }
+
+        $rows[] = [
+            'timestamp_folder' => $entry,
+            'path' => $fullPath,
+            'git_commit' => $commitHash !== '' ? $commitHash : null,
+        ];
+
+        if (count($rows) >= $limit) {
+            break;
+        }
+    }
+
+    return $rows;
+}
+
 function resolveAllowedRepoPath(?string $path, string $allowedBase): array
 {
     $candidate = rtrim((string) ($path ?? ''), '/\\');
@@ -757,6 +810,10 @@ foreach ($commandOutput as $title => $output) {
 }
 
 $latestAuditEntries = readLatestAuditEntries($auditPdo, $auditLogPath, 10, $auditStorageMode);
+$recentBackups = listRecentBackupFolders($backupBasePath, 5);
+$rollbackBackupPath = (string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? ($recentBackups[0]['path'] ?? 'n/a'));
+$rollbackLogFilePath = (string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['LOG_FILE'] ?? $updateScriptResult['log_file_path'] ?? 'n/a');
+$showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
 
 ?>
 <main>
@@ -806,6 +863,20 @@ $latestAuditEntries = readLatestAuditEntries($auditPdo, $auditLogPath, 10, $audi
                     <i class="fas fa-info-circle"></i>
                     <span><?php echo htmlspecialchars($statusMessage); ?></span>
                 </p>
+            </div>
+        <?php endif; ?>
+
+
+        <?php if ($showRollbackFailureBanner): ?>
+            <div class="mb-6 bg-red-600/15 border border-red-500/60 text-red-100 rounded-lg p-4">
+                <p class="font-semibold mb-2">Update failed — rollback may be required immediately.</p>
+                <p class="text-sm">Last backup path: <code><?php echo htmlspecialchars($rollbackBackupPath); ?></code></p>
+                <p class="text-sm">Update log file: <code><?php echo htmlspecialchars($rollbackLogFilePath); ?></code></p>
+                <ol class="list-decimal list-inside text-sm mt-2 space-y-1">
+                    <li>Stop app services: <code>docker compose down</code></li>
+                    <li>Restore backup into source path (example): <code>rsync -a --delete <?php echo htmlspecialchars($rollbackBackupPath); ?>/code/ <?php echo htmlspecialchars($repoPath); ?>/</code></li>
+                    <li>Restart services and validate health endpoints/UI.</li>
+                </ol>
             </div>
         <?php endif; ?>
 
@@ -1029,6 +1100,34 @@ $latestAuditEntries = readLatestAuditEntries($auditPdo, $auditLogPath, 10, $audi
                         <li>If the code was copied without <code>.git</code>, use "Clone from GitHub" to pull a fresh working copy into the desired path.</li>
                     </ul>
                 </div>
+                
+                <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
+                    <h3 class="text-lg font-semibold text-white mb-3">Recent backups</h3>
+                    <p class="text-xs text-slate-400 mb-3">Base directory: <code><?php echo htmlspecialchars($backupBasePath); ?></code></p>
+                    <?php if (empty($recentBackups)): ?>
+                        <p class="text-sm text-slate-400">No backup folders found yet.</p>
+                    <?php else: ?>
+                        <ul class="space-y-3 text-sm text-slate-300">
+                            <?php foreach ($recentBackups as $backup): ?>
+                                <li class="border border-slate-700 rounded p-2 bg-slate-900/40">
+                                    <p class="font-mono text-slate-100"><?php echo htmlspecialchars((string) $backup['timestamp_folder']); ?></p>
+                                    <p class="text-xs text-slate-400 break-all"><?php echo htmlspecialchars((string) $backup['path']); ?></p>
+                                    <p class="text-xs mt-1">Commit: <span class="font-mono text-slate-200"><?php echo htmlspecialchars((string) ($backup['git_commit'] ?? 'n/a')); ?></span></p>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
+                    <h3 class="text-lg font-semibold text-white mb-3">How to rollback</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-slate-300">
+                        <li>Stop services: <code>docker compose down</code> (or <code>docker compose stop</code>).</li>
+                        <li>Restore the chosen backup directory's <code>code/</code> into the repo path with <code>rsync -a --delete &lt;backup_path&gt;/code/ &lt;repo_path&gt;/</code>.</li>
+                        <li>Restart services: <code>docker compose up -d --build</code> (or <code>docker compose restart</code>).</li>
+                        <li>Validate health: open app UI, run smoke tests, and check container logs for errors.</li>
+                    </ol>
+                </div>
+
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
                     <h3 class="text-lg font-semibold text-white mb-3">Environment & tooling</h3>
                     <dl class="space-y-3 text-sm text-slate-300">
