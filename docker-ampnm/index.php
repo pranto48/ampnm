@@ -1,6 +1,12 @@
 <?php
 require_once 'includes/auth_check.php';
+require_once 'includes/update_state.php';
 include 'header.php';
+
+$updateState = readUpdateStateFile();
+$dashboardUpdateAvailable = !empty($updateState['update_available']);
+$dashboardBehindCount = isset($updateState['behind_count']) ? (int) $updateState['behind_count'] : null;
+$dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
 ?>
 
 <main id="app">
@@ -11,6 +17,17 @@ include 'header.php';
                 <!-- Populated by JS -->
             </div>
         </div>
+        <?php if ($dashboardUpdateAvailable): ?>
+            <div class="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-amber-100">
+                <p class="font-semibold">
+                    Update available<?php echo $dashboardBehindCount !== null ? ': ' . $dashboardBehindCount . ' commit(s) behind upstream.' : '.'; ?>
+                </p>
+                <p class="text-sm mt-1">
+                    Last checked at <?php echo $dashboardLastCheckedAt ? htmlspecialchars($dashboardLastCheckedAt) . ' (UTC)' : 'unknown time'; ?>.
+                    Open <a href="code_updates.php" class="underline font-semibold hover:text-amber-50">Code Updates</a> to run <span class="font-semibold">↻ Check now</span> or manually apply with <span class="font-semibold">🚀 Update AmpNM</span>.
+                </p>
+            </div>
+        <?php endif; ?>
 
         <div id="dashboard-content">
             <div class="text-center py-16" id="dashboardLoader"><div class="loader mx-auto"></div></div>

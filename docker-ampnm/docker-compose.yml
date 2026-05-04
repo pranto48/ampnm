@@ -24,6 +24,9 @@ services:
       - CLOUD_SYNC_URL=https://ynjuvlzvzvnqhvvfdjdc.supabase.co/functions/v1/cloud-monitor
       - CLOUD_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluanV2bHp2enZucWh2dmZkamRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0NTg2MzksImV4cCI6MjA4MjAzNDYzOX0.IiKXzf4GD20GCkkpmh5e0URrUOeDFtyzrQfuRcHeZmY
       - CLOUD_POLL_INTERVAL=15
+      # Non-disruptive update awareness scheduler (fetch + behind count only).
+      - AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER=1
+      - AMPNM_UPDATE_CHECK_INTERVAL_SECONDS=3600
     restart: unless-stopped
     # network_mode: host is required for the ping command to work correctly.
     network_mode: "host"
@@ -50,4 +53,3 @@ services:
 
 volumes:
   db_data:
-

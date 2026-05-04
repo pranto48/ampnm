@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/auth_check.php';
+require_once 'includes/update_state.php';
 include 'header.php';
 
 $canonicalRepoUrl = 'https://github.com/pranto48/ampnm.git';
@@ -88,7 +89,7 @@ $auditStorageMode = 'file';
 
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
-$updateStatePath = getenv('AMPNM_UPDATE_STATE_FILE') ?: (__DIR__ . '/storage/update_state.json');
+$updateStatePath = getUpdateStatePath();
 $lastCheckedAt = null;
 $scheduledUpdateAvailable = false;
 $auditPdo = function_exists('getDbConnection') ? getDbConnection() : null;
@@ -477,21 +478,6 @@ function collectSyncMetrics(string $repoPath, string $upstreamRef): array
 }
 
 
-function readUpdateState(string $path): array
-{
-    if (!is_file($path)) {
-        return [];
-    }
-
-    $raw = file_get_contents($path);
-    if ($raw === false || $raw === '') {
-        return [];
-    }
-
-    $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
-}
-
 function writeUpdateState(string $path, array $state): void
 {
     $dir = dirname($path);
@@ -533,7 +519,7 @@ $upstreamRef = $isGitRepo ? $targetUpstreamRef : '';
 $remoteCommit = '';
 $remoteUrl = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git config --get remote.origin.url')) : '';
 $originConfigured = $remoteUrl !== '';
-$updateState = readUpdateState($updateStatePath);
+$updateState = readUpdateStateFile($updateStatePath);
 $lastCheckedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
 $scheduledUpdateAvailable = !empty($updateState['update_available']);
 
@@ -560,7 +546,6 @@ if ($isGitRepo) {
         $aheadCount = $metrics['aheadCount'];
         $behindCount = $metrics['behindCount'];
         $updateAvailable = ($behindCount !== null && $behindCount > 0);
-        $lastCheckedAt = gmdate('c');
     }
 }
 
