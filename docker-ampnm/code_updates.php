@@ -427,7 +427,7 @@ if (($action === 'check' || $action === 'update') && $isGitRepo) {
     $metrics = performUpdateCheck($repoPath, $upstreamRef, $updateStatePath, $commandOutput);
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
     if ($currentBranch !== $canonicalBranch) {
-        $commandOutput['Branch Check'] = sprintf('Warning: current branch is "%s", expected "%s". Sync metrics are still computed against %s.', $currentBranch ?: 'unknown', $canonicalBranch, $targetUpstreamRef);
+        $commandOutput['Branch Check'] = sprintf('Warning: current branch is "%s", expected "%s". Sync metrics are computed against %s.', $currentBranch ?: 'unknown', $canonicalBranch, $targetUpstreamRef);
     }
     $statusOutput = runGitCommand($repoPath, 'git status -sb');
     $commandOutput['Status'] = $statusOutput;
@@ -780,7 +780,7 @@ $latestAuditEntries = readRecentAuditLogs($auditLogPath, 10);
                     <?php elseif ($behindCount === 0): ?>
                         <p class="mt-3 text-xs inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-700 text-slate-200 border border-slate-600">Already up to date</p>
                     <?php endif; ?>
-                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check now" to compare or "🚀 Update AmpNM" to pull the newest code and auto-restart this Docker app.</p>
+                    <p class="text-xs text-slate-500 mt-3">If commits differ, use "↻ Check now" to compare against <code><?php echo htmlspecialchars($targetUpstreamRef); ?></code> or "🚀 Update AmpNM" to pull from that target and auto-restart this Docker app.</p>
                     <p class="text-xs text-slate-400 mt-2">Last checked at: <?php echo $lastCheckedAt ? htmlspecialchars($lastCheckedAt) . ' (UTC)' : 'Never'; ?></p>
                 </div>
 
