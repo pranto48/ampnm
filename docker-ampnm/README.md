@@ -279,3 +279,37 @@ This software requires a valid license key.
 ---
 
 **Made with ❤️ by IT Support Bangladesh**
+
+## 🔄 Container Update Runtime (`scripts/update.sh`)
+
+The update script is included in the image at `scripts/update.sh` and is executable by default.
+
+### Required environment variables / paths
+
+- `HOST_APP_DIR`
+  - Path to the **host-mounted application source** that should be backed up and updated.
+  - Example: `/var/www/html` when the host repo is bind-mounted there.
+- Backup path
+  - Controlled by `BACKUP_BASE` (default: `/var/www/html/docker-ampnm/data/code_backups`).
+  - Ensure this directory is bind-mounted if you want durable backups across container recreations.
+- Compose location
+  - Controlled by `APP_DIR` (script checks compose files in this directory for restart).
+  - Set this to the directory that contains `docker-compose.yml`/`compose.yml`.
+- Update repo URL override
+  - `REPO_URL` overrides the default repository source used for clone/fetch.
+
+### Recommended bind mounts
+
+```yaml
+services:
+  app:
+    volumes:
+      - ${HOST_APP_DIR}:/var/www/html
+      - ./data/code_backups:/var/www/html/docker-ampnm/data/code_backups
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+Notes:
+- Mounting `/var/run/docker.sock` is required if the script should run `docker compose restart` from inside the container.
+- If your compose files live elsewhere, set `APP_DIR` accordingly.
+
