@@ -86,6 +86,7 @@ $commandOutput = [];
 $auditLogPath = rtrim(getenv('AMPNM_AUDIT_LOG_PATH') ?: '/var/log/ampnm', '/\\') . DIRECTORY_SEPARATOR . 'code-update-audit.log';
 $latestAuditEntries = [];
 $auditStorageMode = 'file';
+$updateScriptResult = [];
 
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
@@ -186,6 +187,42 @@ function runShellCommandWithStatus(string $command): array
     return [
         'output' => implode("\n", $output),
         'exitCode' => $exitCode,
+    ];
+}
+
+function runUpdateScript(string $repoPath, string $upstreamRef, bool $forceUpdate): array
+{
+    $scriptPath = realpath(__DIR__ . '/scripts/update.sh') ?: (__DIR__ . '/scripts/update.sh');
+    $resultFile = '/tmp/ampnm_update_result.env';
+    $envOverrides = [
+        'AMPNM_REPO_PATH=' . $repoPath,
+        'AMPNM_UPSTREAM_REF=' . $upstreamRef,
+        'AMPNM_FORCE_UPDATE=' . ($forceUpdate ? '1' : '0'),
+        'AMPNM_RESULT_FILE=' . $resultFile,
+    ];
+    $escapedEnv = implode(' ', array_map('escapeshellarg', $envOverrides));
+    $command = 'env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+
+    $output = [];
+    $exitCode = 1;
+    exec($command, $output, $exitCode);
+
+    $parsedResult = [];
+    if (is_file($resultFile)) {
+        $lines = file($resultFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        foreach ($lines as $line) {
+            if (str_starts_with(trim($line), '#') || strpos($line, '=') === false) {
+                continue;
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $parsedResult[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+    }
+
+    return [
+        'output' => implode("\n", $output),
+        'exitCode' => $exitCode,
+        'result' => $parsedResult,
     ];
 }
 
@@ -598,85 +635,21 @@ $workingTreeClean = $metrics['workingTreeClean'];
             $commandOutput['Force Update Warning'] = 'WARNING: Force update enabled while working tree has local changes. Pull may fail or require manual conflict resolution.';
         }
 
-        $fetchOutput = runGitCommand($repoPath, 'git fetch --all --prune');
-        $pullOutput = runGitCommand($repoPath, 'git pull --ff-only');
-        $statusOutput = runGitCommand($repoPath, 'git status -sb');
-        $commandOutput['Fetch'] = $fetchOutput;
-        $commandOutput['Pull'] = $pullOutput;
-        $commandOutput['Status'] = $statusOutput;
+        $scriptRun = runUpdateScript($repoPath, $upstreamRef, $forceUpdateEnabled && $forceUpdate);
+        $updateScriptResult = $scriptRun['result'];
+        $commandOutput['Update Script'] = "=== Step: launch update script ===\n"
+            . ($scriptRun['output'] !== '' ? $scriptRun['output'] : 'No output')
+            . "\n=== Step: parse result file ===\n"
+            . (!empty($updateScriptResult) ? json_encode($updateScriptResult, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : 'No parsed result values');
 
-        $pullSucceeded = commandLooksSuccessful($pullOutput);
-
-        if ($pullSucceeded) {
-            $composeDirectory = __DIR__;
-            $restartOutput = runShellCommand('cd ' . escapeshellarg($composeDirectory) . ' && (docker compose restart 2>&1 || docker-compose restart 2>&1)');
-            $restartSucceeded = commandLooksSuccessful($restartOutput);
-
-            $healthcheckUrl = trim((string) getenv('AMPNM_HEALTHCHECK_URL'));
-            $healthTargets = ['http://127.0.0.1/'];
-            if ($healthcheckUrl !== '') {
-                $healthTargets[] = $healthcheckUrl;
-            }
-
-            $maxAttempts = 5;
-            $sleepSeconds = 2;
-            $healthLog = [];
-            $healthPassed = false;
-
-            for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-                $healthLog[] = "Attempt {$attempt}/{$maxAttempts}";
-                $attemptFailed = false;
-
-                foreach ($healthTargets as $target) {
-                    $probeResult = runShellCommandWithStatus('curl -fsS --max-time 10 ' . escapeshellarg($target));
-                    $probeOutput = trim($probeResult['output']);
-                    $probePassed = $probeResult['exitCode'] === 0;
-                    $healthLog[] = sprintf('[%s] %s (exit=%d)', $probePassed ? 'PASS' : 'FAIL', $target, $probeResult['exitCode']);
-                    $healthLog[] = $probeOutput !== '' ? $probeOutput : 'No output';
-
-                    if (!$probePassed) {
-                        $attemptFailed = true;
-                    }
-                }
-
-                if (!$attemptFailed) {
-                    $healthPassed = true;
-                    $healthLog[] = 'Health check result: PASS';
-                    break;
-                }
-
-                if ($attempt < $maxAttempts) {
-                    $healthLog[] = "Health check result: FAIL (retrying in {$sleepSeconds}s)";
-                    sleep($sleepSeconds);
-                }
-            }
-
-            if (!$healthPassed) {
-            $healthLog[] = 'Health check result: FAIL';
-            }
-
-            $commandOutput['Restart'] = $restartOutput;
-            $commandOutput['Health Check'] = implode("\n", $healthLog);
-            $restartResultForAudit = ($restartSucceeded && $healthPassed) ? 'success' : 'failed';
-
-            if ($pullSucceeded && $restartSucceeded && $healthPassed) {
-                $statusMessage = 'AmpNM updated from GitHub, containers restarted, and health checks passed.';
-                $statusType = 'success';
-            } else {
-                $statusMessage = "Update completed with issues. Manual recovery steps:\n"
-                    . "1) Inspect Command Logs (Pull/Restart/Health Check).\n"
-                    . "2) Run docker compose ps and docker compose logs.\n"
-                    . "3) Re-run docker compose restart.\n"
-                    . "4) Verify endpoints manually via curl.\n"
-                    . "5) Roll back or redeploy if service remains unhealthy.";
-                $statusType = ($restartSucceeded || $healthPassed) ? 'warning' : 'error';
-            }
+        $scriptStatus = strtolower((string) ($updateScriptResult['STATUS'] ?? ''));
+        $scriptSucceeded = $scriptRun['exitCode'] === 0 && in_array($scriptStatus, ['success', 'ok', 'passed'], true);
+        $restartResultForAudit = $scriptSucceeded ? 'success' : 'failed';
+        if ($scriptSucceeded) {
+            $statusMessage = 'AmpNM updated via update script successfully.';
+            $statusType = 'success';
         } else {
-            $restartResultForAudit = 'skipped_pull_failed';
-            $statusMessage = "Update failed before restart. Manual recovery steps:\n"
-                . "1) Review Pull output for conflicts/errors.\n"
-                . "2) Resolve git issues locally (stash/commit/reset as needed).\n"
-                . "3) Re-run update after repository is clean.";
+            $statusMessage = 'Update script completed with errors. Review Command Logs for details.';
             $statusType = 'error';
         }
     }
@@ -971,6 +944,19 @@ $latestAuditEntries = readLatestAuditEntries($auditPdo, $auditLogPath, 10, $audi
                         <?php endif; ?>
                     </div>
                 </div>
+
+                <?php if (!empty($updateScriptResult)): ?>
+                    <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
+                        <h2 class="text-xl font-semibold text-white mb-4">Update Script Result</h2>
+                        <dl class="grid md:grid-cols-2 gap-3 text-sm">
+                            <div><dt class="text-slate-400">Status</dt><dd class="font-mono text-slate-100"><?php echo htmlspecialchars((string) ($updateScriptResult['STATUS'] ?? $updateScriptResult['status'] ?? 'unknown')); ?></dd></div>
+                            <div><dt class="text-slate-400">New Commit Hash</dt><dd class="font-mono text-slate-100 break-all"><?php echo htmlspecialchars((string) ($updateScriptResult['NEW_COMMIT_HASH'] ?? $updateScriptResult['new_commit_hash'] ?? 'n/a')); ?></dd></div>
+                            <div><dt class="text-slate-400">Backup Path</dt><dd class="font-mono text-slate-100 break-all"><?php echo htmlspecialchars((string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? 'n/a')); ?></dd></div>
+                            <div><dt class="text-slate-400">Log File Path</dt><dd class="font-mono text-slate-100 break-all"><?php echo htmlspecialchars((string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['log_file_path'] ?? 'n/a')); ?></dd></div>
+                            <div><dt class="text-slate-400">Timestamp</dt><dd class="font-mono text-slate-100"><?php echo htmlspecialchars((string) ($updateScriptResult['TIMESTAMP'] ?? $updateScriptResult['timestamp'] ?? 'n/a')); ?></dd></div>
+                        </dl>
+                    </div>
+                <?php endif; ?>
 
                 <?php if (!empty($commandOutput)): ?>
                     <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
