@@ -83,7 +83,7 @@ $forceUpdateEnabled = filter_var(getenv('AMPNM_FORCE_UPDATE_ENABLED') ?: '0', FI
 $statusMessage = '';
 $statusType = '';
 $commandOutput = [];
-$auditLogPath = rtrim(getenv('AMPNM_AUDIT_LOG_PATH') ?: '/var/log/ampnm', '/\\') . DIRECTORY_SEPARATOR . 'code-update-audit.log';
+$auditLogPath = rtrim(getenv('AMPNM_AUDIT_LOG_PATH') ?: '/var/log/ampnm', '/\\') . DIRECTORY_SEPARATOR . 'code-update-audit.jsonl';
 $latestAuditEntries = [];
 $auditStorageMode = 'file';
 $updateScriptResult = [];
@@ -318,6 +318,18 @@ function ensureAuditTable(PDO $pdo): bool
 "
         . "new_commit VARCHAR(64) NULL,
 "
+        . "session_id VARCHAR(128) NULL,
+"
+        . "action_type VARCHAR(32) NULL,
+"
+        . "source_commit VARCHAR(64) NULL,
+"
+        . "target_commit VARCHAR(64) NULL,
+"
+        . "backup_path VARCHAR(1024) NULL,
+"
+        . "update_log_file VARCHAR(1024) NULL,
+"
         . "restart_result VARCHAR(64) NULL,
 "
         . "status_type VARCHAR(32) NULL,
@@ -331,7 +343,27 @@ function ensureAuditTable(PDO $pdo): bool
         . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
     $ensured = $pdo->exec($sql) !== false;
-    return $ensured;
+    if (!$ensured) {
+        return false;
+    }
+
+    $requiredColumns = [
+        'session_id' => 'ALTER TABLE code_update_audit_logs ADD COLUMN session_id VARCHAR(128) NULL AFTER username',
+        'action_type' => 'ALTER TABLE code_update_audit_logs ADD COLUMN action_type VARCHAR(32) NULL AFTER session_id',
+        'source_commit' => 'ALTER TABLE code_update_audit_logs ADD COLUMN source_commit VARCHAR(64) NULL AFTER new_commit',
+        'target_commit' => 'ALTER TABLE code_update_audit_logs ADD COLUMN target_commit VARCHAR(64) NULL AFTER source_commit',
+        'backup_path' => 'ALTER TABLE code_update_audit_logs ADD COLUMN backup_path VARCHAR(1024) NULL AFTER target_commit',
+        'update_log_file' => 'ALTER TABLE code_update_audit_logs ADD COLUMN update_log_file VARCHAR(1024) NULL AFTER backup_path',
+    ];
+
+    foreach ($requiredColumns as $column => $alterSql) {
+        $checkStmt = $pdo->query("SHOW COLUMNS FROM code_update_audit_logs LIKE " . $pdo->quote($column));
+        if ($checkStmt === false || $checkStmt->fetch(PDO::FETCH_ASSOC) === false) {
+            $pdo->exec($alterSql);
+        }
+    }
+
+    return true;
 }
 
 function appendAuditLogDb(PDO $pdo, array $entry): bool
@@ -341,8 +373,8 @@ function appendAuditLogDb(PDO $pdo, array $entry): bool
     }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO code_update_audit_logs (timestamp_utc, action, user_id, username, client_ip, repo_path, old_commit, new_commit, restart_result, status_type)
-         VALUES (:timestamp_utc, :action, :user_id, :username, :client_ip, :repo_path, :old_commit, :new_commit, :restart_result, :status_type)'
+        'INSERT INTO code_update_audit_logs (timestamp_utc, action, user_id, username, session_id, action_type, client_ip, repo_path, old_commit, new_commit, source_commit, target_commit, backup_path, update_log_file, restart_result, status_type)
+         VALUES (:timestamp_utc, :action, :user_id, :username, :session_id, :action_type, :client_ip, :repo_path, :old_commit, :new_commit, :source_commit, :target_commit, :backup_path, :update_log_file, :restart_result, :status_type)'
     );
 
     $timestampUtc = isset($entry['timestamp']) ? gmdate('Y-m-d H:i:s', strtotime((string) $entry['timestamp'])) : gmdate('Y-m-d H:i:s');
@@ -352,10 +384,16 @@ function appendAuditLogDb(PDO $pdo, array $entry): bool
         ':action' => $entry['action'] ?? null,
         ':user_id' => $entry['user_id'] ?? null,
         ':username' => $entry['username'] ?? null,
+        ':session_id' => $entry['session_id'] ?? null,
+        ':action_type' => $entry['action_type'] ?? null,
         ':client_ip' => $entry['client_ip'] ?? null,
         ':repo_path' => $entry['repo_path'] ?? null,
         ':old_commit' => $entry['old_commit'] ?? null,
         ':new_commit' => $entry['new_commit'] ?? null,
+        ':source_commit' => $entry['source_commit'] ?? null,
+        ':target_commit' => $entry['target_commit'] ?? null,
+        ':backup_path' => $entry['backup_path'] ?? null,
+        ':update_log_file' => $entry['update_log_file'] ?? null,
         ':restart_result' => $entry['restart_result'] ?? null,
         ':status_type' => $entry['status_type'] ?? null,
     ]);
@@ -368,7 +406,7 @@ function readRecentAuditLogsDb(PDO $pdo, int $limit = 10): array
     }
 
     $limit = max(1, min(100, $limit));
-    $stmt = $pdo->query('SELECT timestamp_utc, action, user_id, username, client_ip, repo_path, old_commit, new_commit, restart_result, status_type FROM code_update_audit_logs ORDER BY id DESC LIMIT ' . $limit);
+    $stmt = $pdo->query('SELECT timestamp_utc, action, user_id, username, session_id, action_type, client_ip, repo_path, old_commit, new_commit, source_commit, target_commit, backup_path, update_log_file, restart_result, status_type FROM code_update_audit_logs ORDER BY id DESC LIMIT ' . $limit);
     if ($stmt === false) {
         return [];
     }
@@ -726,12 +764,18 @@ $workingTreeClean = $metrics['workingTreeClean'];
             $auditEntry = [
                 'timestamp' => date('c'),
                 'action' => $action,
+                'action_type' => $action,
                 'user_id' => $_SESSION['user_id'] ?? null,
                 'username' => $_SESSION['username'] ?? ($_SESSION['user'] ?? 'unknown'),
+                'session_id' => session_id() ?: null,
                 'client_ip' => getClientIpAddress(),
                 'repo_path' => $repoPath,
                 'old_commit' => $oldCommitForAudit ?: null,
                 'new_commit' => $localCommit ?: null,
+                'source_commit' => $oldCommitForAudit ?: null,
+                'target_commit' => $remoteCommit ?: null,
+                'backup_path' => $action === 'update' ? ((string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? '')) : null,
+                'update_log_file' => $action === 'update' ? ((string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['LOG_FILE'] ?? $updateScriptResult['log_file_path'] ?? '')) : null,
                 'restart_result' => $action === 'check' ? 'not_applicable' : $restartResultForAudit,
                 'status_type' => $statusType,
             ];
@@ -1049,7 +1093,7 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                 <?php if (($_SESSION['user_role'] ?? 'viewer') === 'admin'): ?>
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
                     <div class="flex items-center justify-between mb-3">
-                        <h2 class="text-xl font-semibold text-white">Recent Update Audit</h2>
+                        <h2 class="text-xl font-semibold text-white">Recent update events</h2>
                         <span class="text-xs text-slate-500">Last 10 actions (<?php echo htmlspecialchars($auditStorageMode); ?>)</span>
                     </div>
                     <?php if (empty($latestAuditEntries)): ?>
@@ -1059,7 +1103,7 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                             <table class="min-w-full text-xs text-left text-slate-300">
                                 <thead class="text-slate-400 border-b border-slate-700">
                                     <tr>
-                                        <th class="py-2 pr-4">Time</th><th class="py-2 pr-4">Action</th><th class="py-2 pr-4">User</th><th class="py-2 pr-4">IP</th><th class="py-2 pr-4">Commits</th><th class="py-2 pr-4">Restart</th>
+                                        <th class="py-2 pr-4">Time</th><th class="py-2 pr-4">Action</th><th class="py-2 pr-4">User / Session</th><th class="py-2 pr-4">Status</th><th class="py-2 pr-4">Source → Target</th><th class="py-2 pr-4">Backup / Log</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1067,10 +1111,10 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                                         <tr class="border-b border-slate-700/60">
                                             <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) ($entry['timestamp'] ?? '')); ?></td>
                                             <td class="py-2 pr-4"><?php echo htmlspecialchars((string) ($entry['action'] ?? '')); ?></td>
-                                            <td class="py-2 pr-4"><?php echo htmlspecialchars((string) (($entry['username'] ?? 'unknown') . ' #' . ($entry['user_id'] ?? 'n/a'))); ?></td>
-                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) ($entry['client_ip'] ?? 'unknown')); ?></td>
-                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) (($entry['old_commit'] ?? 'n/a') . ' → ' . ($entry['new_commit'] ?? 'n/a'))); ?></td>
-                                            <td class="py-2 pr-4"><?php echo htmlspecialchars((string) ($entry['restart_result'] ?? 'n/a')); ?></td>
+                                            <td class="py-2 pr-4"><?php echo htmlspecialchars((string) (($entry['username'] ?? 'unknown') . ' #' . ($entry['user_id'] ?? 'n/a'))); ?><div class="font-mono text-[10px] text-slate-400"><?php echo htmlspecialchars((string) ($entry['session_id'] ?? 'n/a')); ?></div></td>
+                                            <td class="py-2 pr-4"><?php echo htmlspecialchars((string) ($entry['status_type'] ?? 'unknown')); ?></td>
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) (($entry['source_commit'] ?? $entry['old_commit'] ?? 'n/a') . ' → ' . ($entry['target_commit'] ?? $entry['new_commit'] ?? 'n/a'))); ?></td>
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) ($entry['backup_path'] ?? 'n/a')); ?><div class="text-[10px] text-slate-400"><?php echo htmlspecialchars((string) ($entry['update_log_file'] ?? 'n/a')); ?></div></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
