@@ -7,10 +7,7 @@ $canonicalBranch = getenv('AMPNM_UPDATE_BRANCH') ?: 'main';
 $targetUpstreamRef = 'origin/' . $canonicalBranch;
 $allowedRepoBase = rtrim(getenv('AMPNM_ALLOWED_REPO_BASE') ?: '/var/www/html', '/\\');
 
-if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || $_SESSION['csrf_token'] === '') {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-$csrfToken = $_SESSION['csrf_token'];
+$csrfToken = ensureCsrfTokenInSession();
 
 $autoDetection = (function (string $startPath): array {
     $normalize = static function (string $path): string {
@@ -93,10 +90,18 @@ $updateLockHandle = null;
 $updateStatePath = getenv('AMPNM_UPDATE_STATE_FILE') ?: (__DIR__ . '/storage/update_state.json');
 $lastCheckedAt = null;
 $scheduledUpdateAvailable = false;
+$repoPathValidation = resolveAllowedRepoPath($repoPath, $allowedRepoBase);
+if ($repoPathValidation['ok']) {
+    $repoPath = $repoPathValidation['path'];
+} else {
+    $statusMessage = 'Repository path warning: ' . $repoPathValidation['error'];
+    $statusType = 'error';
+    $isGitRepo = false;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedToken = isset($_POST['csrf_token']) ? (string) $_POST['csrf_token'] : '';
-    if ($postedToken === '' || !hash_equals($csrfToken, $postedToken)) {
+    if (!isValidCsrfToken($postedToken)) {
         $statusMessage = 'Request rejected: invalid or missing CSRF token.';
         $statusType = 'error';
         $action = null;
@@ -106,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $statusMessage = 'Request rejected: ' . $repoValidation['error'];
             $statusType = 'error';
             $action = null;
+            $isGitRepo = false;
         } else {
             $repoPath = $repoValidation['path'];
             $gitMarker = $repoPath . DIRECTORY_SEPARATOR . '.git';

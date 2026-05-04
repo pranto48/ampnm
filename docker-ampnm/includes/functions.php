@@ -1,6 +1,38 @@
 <?php
 require_once __DIR__ . '/../config.php';
 
+function ensureCsrfTokenInSession(): string
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return '';
+    }
+
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token']) || $_SESSION['csrf_token'] === '') {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return (string) $_SESSION['csrf_token'];
+}
+
+function isValidCsrfToken(?string $token): bool
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return false;
+    }
+
+    $sessionToken = $_SESSION['csrf_token'] ?? '';
+    if (!is_string($sessionToken) || $sessionToken === '') {
+        return false;
+    }
+
+    $provided = (string) ($token ?? '');
+    if ($provided === '') {
+        return false;
+    }
+
+    return hash_equals($sessionToken, $provided);
+}
+
 // Function to check a TCP port on a host
 function checkPortStatus($host, $port, $timeout = 1) {
     $startTime = microtime(true);
