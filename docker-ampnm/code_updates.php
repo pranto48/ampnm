@@ -402,6 +402,8 @@ $updateState = readUpdateState($updateStatePath);
 $lastCheckedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
 $scheduledUpdateAvailable = !empty($updateState['update_available']);
 
+$isUpdateAction = ($action === 'check' || $action === 'update');
+
 if ($isGitRepo) {
     if (!$originConfigured) {
         $escapedOrigin = escapeshellarg($canonicalRepoUrl);
@@ -411,21 +413,23 @@ if ($isGitRepo) {
         $originConfigured = true;
     }
 
-    $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
-    if (str_starts_with($remoteCommit, 'fatal:')) {
-        $remoteCommit = '';
-    }
+    if (!$isUpdateAction) {
+        $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
+        if (str_starts_with($remoteCommit, 'fatal:')) {
+            $remoteCommit = '';
+        }
 
-    $metrics = collectSyncMetrics($repoPath, $upstreamRef);
-$workingTreeClean = $metrics['workingTreeClean'];
-    $remoteReachable = $metrics['remoteReachable'];
-    $aheadCount = $metrics['aheadCount'];
-    $behindCount = $metrics['behindCount'];
-    $updateAvailable = ($behindCount !== null && $behindCount > 0);
-    $lastCheckedAt = gmdate('c');
+        $metrics = collectSyncMetrics($repoPath, $upstreamRef);
+        $workingTreeClean = $metrics['workingTreeClean'];
+        $remoteReachable = $metrics['remoteReachable'];
+        $aheadCount = $metrics['aheadCount'];
+        $behindCount = $metrics['behindCount'];
+        $updateAvailable = ($behindCount !== null && $behindCount > 0);
+        $lastCheckedAt = gmdate('c');
+    }
 }
 
-if (($action === 'check' || $action === 'update') && $isGitRepo) {
+if ($isUpdateAction && $isGitRepo) {
     $oldCommitForAudit = $localCommit;
     $restartResultForAudit = 'not_applicable';
     $updateLockHandle = acquireUpdateLock($updateLockPath, $commandOutput);
