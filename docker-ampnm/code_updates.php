@@ -231,6 +231,41 @@ function runUpdateScript(string $repoPath, string $upstreamRef, bool $forceUpdat
     ];
 }
 
+function runRestoreScript(string $repoPath, string $backupPath): array
+{
+    $scriptPath = realpath(__DIR__ . '/scripts/restore_backup.sh') ?: (__DIR__ . '/scripts/restore_backup.sh');
+    $resultFile = '/tmp/ampnm_restore_result.env';
+    $envOverrides = [
+        'HOST_APP_DIR=' . $repoPath,
+        'BACKUP_PATH=' . $backupPath,
+        'RESULT_ENV_FILE=' . $resultFile,
+    ];
+    $escapedEnv = implode(' ', array_map('escapeshellarg', $envOverrides));
+    $command = 'env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+
+    $output = [];
+    $exitCode = 1;
+    exec($command, $output, $exitCode);
+
+    $parsedResult = [];
+    if (is_file($resultFile)) {
+        $lines = file($resultFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        foreach ($lines as $line) {
+            if (str_starts_with(trim($line), '#') || strpos($line, '=') === false) {
+                continue;
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $parsedResult[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+    }
+
+    return [
+        'output' => implode("\n", $output),
+        'exitCode' => $exitCode,
+        'result' => $parsedResult,
+    ];
+}
+
 function getClientIpAddress(): string
 {
     $keys = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
@@ -651,7 +686,7 @@ $updateState = readUpdateStateFile($updateStatePath);
 $lastCheckedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
 $scheduledUpdateAvailable = !empty($updateState['update_available']);
 
-$isUpdateAction = ($action === 'check' || $action === 'update');
+$isUpdateAction = ($action === 'check' || $action === 'update' || $action === 'rollback');
 
 if ($isGitRepo) {
     if (!$originConfigured) {
@@ -761,6 +796,53 @@ $workingTreeClean = $metrics['workingTreeClean'];
     $lastCheckedAt = gmdate('c');
             }
 
+            if ($action === 'rollback') {
+    $requestedBackupPath = isset($_POST['backup_path']) ? trim((string) $_POST['backup_path']) : '';
+    $resolvedBackupPath = realpath($requestedBackupPath);
+    $backupBaseReal = realpath($backupBasePath);
+
+    if ($requestedBackupPath === '' || $resolvedBackupPath === false || !is_dir($resolvedBackupPath)) {
+        $statusMessage = 'Rollback failed: backup path is missing or invalid.';
+        $statusType = 'error';
+    } elseif ($backupBaseReal === false || !str_starts_with($resolvedBackupPath, rtrim($backupBaseReal, '/\\') . DIRECTORY_SEPARATOR)) {
+        $statusMessage = 'Rollback rejected: backup path is outside the allowed backup directory.';
+        $statusType = 'error';
+    } else {
+        $restoreRun = runRestoreScript($repoPath, $resolvedBackupPath);
+        $updateScriptResult = $restoreRun['result'];
+        $commandOutput['Rollback Script'] = "=== Step: launch rollback script ===\n"
+            . ($restoreRun['output'] !== '' ? $restoreRun['output'] : 'No output')
+            . "\n=== Step: parse result file ===\n"
+            . (!empty($updateScriptResult) ? json_encode($updateScriptResult, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : 'No parsed result values');
+
+        $scriptStatus = strtolower((string) ($updateScriptResult['STATUS'] ?? ''));
+        $scriptSucceeded = $restoreRun['exitCode'] === 0 && in_array($scriptStatus, ['success', 'ok', 'passed'], true);
+        $restartResultForAudit = $scriptSucceeded ? 'success' : 'failed';
+        if ($scriptSucceeded) {
+            $statusMessage = 'Rollback completed successfully and services restarted.';
+            $statusType = 'success';
+        } else {
+            $statusMessage = 'Rollback script reported errors. Review Command Logs for details.';
+            $statusType = 'error';
+        }
+    }
+
+    $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
+    $localCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD'));
+    $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
+    if (str_starts_with($remoteCommit, 'fatal:')) {
+        $remoteCommit = '';
+    }
+
+    $metrics = collectSyncMetrics($repoPath, $upstreamRef);
+$workingTreeClean = $metrics['workingTreeClean'];
+    $remoteReachable = $metrics['remoteReachable'];
+    $aheadCount = $metrics['aheadCount'];
+    $behindCount = $metrics['behindCount'];
+    $updateAvailable = ($behindCount !== null && $behindCount > 0);
+    $lastCheckedAt = gmdate('c');
+            }
+
             $auditEntry = [
                 'timestamp' => date('c'),
                 'action' => $action,
@@ -774,8 +856,8 @@ $workingTreeClean = $metrics['workingTreeClean'];
                 'new_commit' => $localCommit ?: null,
                 'source_commit' => $oldCommitForAudit ?: null,
                 'target_commit' => $remoteCommit ?: null,
-                'backup_path' => $action === 'update' ? ((string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? '')) : null,
-                'update_log_file' => $action === 'update' ? ((string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['LOG_FILE'] ?? $updateScriptResult['log_file_path'] ?? '')) : null,
+                'backup_path' => ($action === 'update' || $action === 'rollback') ? ((string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? ($_POST['backup_path'] ?? ''))) : null,
+                'update_log_file' => ($action === 'update' || $action === 'rollback') ? ((string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['LOG_FILE'] ?? $updateScriptResult['log_file_path'] ?? '')) : null,
                 'restart_result' => $action === 'check' ? 'not_applicable' : $restartResultForAudit,
                 'status_type' => $statusType,
             ];
@@ -1157,6 +1239,16 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                                     <p class="font-mono text-slate-100"><?php echo htmlspecialchars((string) $backup['timestamp_folder']); ?></p>
                                     <p class="text-xs text-slate-400 break-all"><?php echo htmlspecialchars((string) $backup['path']); ?></p>
                                     <p class="text-xs mt-1">Commit: <span class="font-mono text-slate-200"><?php echo htmlspecialchars((string) ($backup['git_commit'] ?? 'n/a')); ?></span></p>
+                                    <form method="POST" class="mt-2" onsubmit="return confirm('Restore this backup and restart services?');">
+                                        <input type="hidden" name="action" value="rollback">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                                        <input type="hidden" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>">
+                                        <input type="hidden" name="backup_path" value="<?php echo htmlspecialchars((string) $backup['path']); ?>">
+                                        <button type="submit" class="w-full px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs flex items-center justify-center gap-2">
+                                            <i class="fas fa-history"></i>
+                                            <span>Restore this version</span>
+                                        </button>
+                                    </form>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
