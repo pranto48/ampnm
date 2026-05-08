@@ -21,7 +21,7 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="bg-slate-900 text-slate-300 min-h-screen">
-    <nav class="bg-slate-800/50 backdrop-blur-lg shadow-lg sticky top-0 z-50">
+    <nav class="bg-slate-800/50 backdrop-blur-lg shadow-lg sticky top-0 z-50 nav-3d-shell">
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
@@ -29,8 +29,8 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
                     <button id="mobile-menu-button" class="md:hidden p-2 text-slate-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
                         <i class="fas fa-bars h-6 w-6"></i>
                     </button>
-                    <a href="index.php" class="flex items-center gap-2 text-white font-bold ml-3 md:ml-0">
-                        <i class="fas fa-shield-halved text-cyan-400 text-2xl"></i>
+                    <a href="index.php" class="flex items-center gap-2 text-white font-bold ml-3 md:ml-0 brand-3d">
+                        <i class="fas fa-shield-halved text-cyan-400 text-2xl brand-icon-3d"></i>
                         <span>AMPNM</span>
                     </a>
                 </div>
@@ -39,8 +39,8 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
                 <div id="main-nav-wrapper" class="fixed inset-y-0 left-0 w-64 bg-slate-800/95 backdrop-blur-lg z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:w-auto md:bg-transparent md:backdrop-blur-none md:transform-none md:transition-none md:flex md:items-center">
                     <!-- Close button for mobile sidebar -->
                     <div class="flex items-center justify-between p-4 border-b border-slate-700 md:hidden">
-                        <a href="index.php" class="flex items-center gap-2 text-white font-bold">
-                            <i class="fas fa-shield-halved text-cyan-400 text-2xl"></i>
+                        <a href="index.php" class="flex items-center gap-2 text-white font-bold brand-3d">
+                            <i class="fas fa-shield-halved text-cyan-400 text-2xl brand-icon-3d"></i>
                             <span>AMPNM</span>
                         </a>
                         <button id="close-mobile-menu-button" class="p-2 text-slate-300 hover:text-white focus:outline-none">
