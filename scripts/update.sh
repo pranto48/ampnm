@@ -2,10 +2,15 @@
 set -e
 
 REPO_URL="${REPO_URL:-https://github.com/pranto48/ampnm.git}"
-APP_DIR="${APP_DIR:-/var/www/html/docker-ampnm}"
-# HOST_APP_DIR should point to the host-mounted project root used by this container.
+#
+# APP_DIR is the container path where docker compose is executed (repo root mount).
+# Example mapping after restructure: host /var/www/html -> container /var/www/html.
+APP_DIR="${APP_DIR:-/var/www/html}"
+# HOST_APP_DIR should point to the host-mounted project root used by this container
+# (same root path by default after removing docker-ampnm subfolder nesting).
 HOST_APP_DIR="${HOST_APP_DIR:-${APP_DIR}}"
-BACKUP_BASE="${BACKUP_BASE:-/var/www/html/docker-ampnm/data/code_backups}"
+# BACKUP_BASE stores code snapshots under the repo root's data tree.
+BACKUP_BASE="${BACKUP_BASE:-/var/www/html/data/code_backups}"
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d_%H%M%S)}"
 BACKUP_DIR="${BACKUP_BASE}/${TIMESTAMP}"
 LOG_FILE="${LOG_FILE:-/tmp/ampnm_update_${TIMESTAMP}.log}"
