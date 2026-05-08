@@ -2,6 +2,42 @@
 require_once 'includes/auth_check.php';
 require_once 'includes/update_state.php';
 
+function getRestorePointsPath(): string
+{
+    return __DIR__ . '/storage/update_restore_points.json';
+}
+
+function readRestorePoints(): array
+{
+    $path = getRestorePointsPath();
+    if (!is_file($path)) {
+        return [];
+    }
+    $raw = file_get_contents($path);
+    if ($raw === false || trim($raw) === '') {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function writeRestorePoints(array $items): void
+{
+    $path = getRestorePointsPath();
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    file_put_contents($path, json_encode(array_values($items), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+}
+
+function appendRestorePoint(array $entry): void
+{
+    $existing = readRestorePoints();
+    array_unshift($existing, $entry);
+    writeRestorePoints(array_slice($existing, 0, 20));
+}
+
 if (($_SESSION['user_role'] ?? 'viewer') !== 'admin') {
     http_response_code(403);
     include 'header.php';
@@ -13,35 +49,96 @@ if (($_SESSION['user_role'] ?? 'viewer') !== 'admin') {
 $repoPath = realpath(__DIR__) ?: __DIR__;
 $statusMessage = '';
 $statusType = '';
+$lockPath = '/tmp/ampnm-code-update.lock';
+$lockHandle = null;
+
+function acquireOpsLock(string $lockPath)
+{
+    $handle = fopen($lockPath, 'c');
+    if ($handle === false) {
+        return false;
+    }
+    if (!flock($handle, LOCK_EX | LOCK_NB)) {
+        fclose($handle);
+        return false;
+    }
+    return $handle;
+}
+
+function releaseOpsLock($handle): void
+{
+    if (!is_resource($handle)) {
+        return;
+    }
+    flock($handle, LOCK_UN);
+    fclose($handle);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $lockHandle = acquireOpsLock($lockPath);
+    if ($lockHandle === false) {
+        $statusMessage = 'Another update/restore operation is already running. Please wait and retry.';
+        $statusType = 'error';
+    }
     $action = $_POST['action'] ?? '';
-    if ($action === 'update') {
+    if ($statusType !== 'error' && $action === 'update') {
+        $previousCommit = trim(shell_exec('cd ' . escapeshellarg($repoPath) . ' && git rev-parse HEAD 2>/dev/null') ?? '');
         $cmd = 'cd ' . escapeshellarg($repoPath) . ' && bash ' . escapeshellarg($repoPath . '/scripts/update.sh') . ' 2>&1';
         exec($cmd, $out, $code);
         $statusMessage = $code === 0 ? 'Update completed successfully.' : 'Update command failed.';
         $statusType = $code === 0 ? 'success' : 'error';
-    } elseif ($action === 'restore') {
+        if ($code === 0) {
+            $backupPath = '';
+            foreach ($out as $line) {
+                if (str_contains($line, 'Creating backup at ')) {
+                    $backupPath = trim((string) substr($line, strpos($line, 'Creating backup at ') + strlen('Creating backup at ')));
+                }
+            }
+            $newCommit = trim(shell_exec('cd ' . escapeshellarg($repoPath) . ' && git rev-parse HEAD 2>/dev/null') ?? '');
+            appendRestorePoint([
+                'timestamp' => gmdate('c'),
+                'previous_commit' => $previousCommit,
+                'backup_path' => $backupPath,
+                'new_commit' => $newCommit,
+            ]);
+        }
+    } elseif ($statusType !== 'error' && $action === 'restore') {
+        $selected = trim((string) ($_POST['backup_path'] ?? ''));
         $backupBase = rtrim(getenv('BACKUP_BASE') ?: '/var/www/html/docker-ampnm/data/code_backups', '/\\');
-        $candidates = glob($backupBase . '/backup_*', GLOB_ONLYDIR) ?: [];
-        rsort($candidates);
-        $latest = $candidates[0] ?? '';
-        if ($latest !== '') {
-            $cmd = 'HOST_APP_DIR=' . escapeshellarg($repoPath) . ' BACKUP_PATH=' . escapeshellarg($latest) . ' bash ' . escapeshellarg($repoPath . '/scripts/restore_backup.sh') . ' 2>&1';
+        $resolvedBase = realpath($backupBase);
+        $resolvedSelected = $selected !== '' ? realpath($selected) : false;
+        $valid = $resolvedBase !== false && $resolvedSelected !== false && str_starts_with($resolvedSelected, rtrim($resolvedBase, '/\\') . DIRECTORY_SEPARATOR);
+        if ($valid) {
+            $cmd = 'HOST_APP_DIR=' . escapeshellarg($repoPath) . ' BACKUP_PATH=' . escapeshellarg($resolvedSelected) . ' bash ' . escapeshellarg($repoPath . '/scripts/restore_backup.sh') . ' 2>&1';
             exec($cmd, $out, $code);
-            $statusMessage = $code === 0 ? 'Restore completed from latest backup.' : 'Restore command failed.';
+            $restoredCommit = '';
+            foreach ($out as $line) {
+                if (stripos($line, 'Restarting services') !== false) {
+                    $restartResult = 'Restart attempted';
+                }
+            }
+            $commitFile = $resolvedSelected . '/previous_commit.txt';
+            if (is_file($commitFile)) {
+                $restoredCommit = trim((string) file_get_contents($commitFile));
+            }
+            $statusMessage = $code === 0
+                ? 'Restore completed. Restored commit: ' . ($restoredCommit !== '' ? $restoredCommit : 'unknown') . '. Service restart: ' . ($restartResult ?? 'see logs') . '.'
+                : 'Restore command failed.';
             $statusType = $code === 0 ? 'success' : 'error';
         } else {
-            $statusMessage = 'No backups found to restore.';
+            $statusMessage = 'No valid backup selected to restore.';
             $statusType = 'error';
         }
     }
+    releaseOpsLock($lockHandle);
 }
 
 include 'header.php';
 $commitHash = trim(shell_exec('cd ' . escapeshellarg($repoPath) . ' && git rev-parse --short HEAD 2>/dev/null') ?? '');
 $branchName = trim(shell_exec('cd ' . escapeshellarg($repoPath) . ' && git rev-parse --abbrev-ref HEAD 2>/dev/null') ?? '');
 $updateState = readUpdateStateFile();
+$restorePoints = readRestorePoints();
+$latestRestorePoint = $restorePoints[0] ?? null;
 $updateAvailable = !empty($updateState['update_available']);
 $behindCount = isset($updateState['behind_count']) ? (int) $updateState['behind_count'] : null;
 $checkedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
@@ -58,7 +155,23 @@ $checkedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_
     </div>
     <div class="flex flex-wrap gap-3">
       <form method="post"><input type="hidden" name="action" value="update"><button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium"><i class="fas fa-sync-alt mr-2"></i>Update</button></form>
-      <form method="post"><input type="hidden" name="action" value="restore"><button type="submit" class="px-4 py-2 bg-yellow-600/80 hover:bg-yellow-700 text-white rounded-lg font-medium"><i class="fas fa-undo mr-2"></i>Restore Previous Version</button></form>
+      <form method="post" onsubmit="return confirm('Restore selected backup and restart services?');">
+        <input type="hidden" name="action" value="restore">
+        <select name="backup_path" class="px-3 py-2 rounded bg-slate-900 text-slate-200 border border-slate-700" <?= empty($restorePoints) ? 'disabled' : '' ?>>
+          <?php foreach ($restorePoints as $point): ?>
+            <option value="<?= htmlspecialchars((string) ($point['backup_path'] ?? '')) ?>"><?= htmlspecialchars((string) (($point['timestamp'] ?? '') . ' | ' . (($point['backup_path'] ?? 'n/a')))) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <button type="submit" <?= empty($restorePoints) ? 'disabled' : '' ?> class="px-4 py-2 bg-yellow-600/80 hover:bg-yellow-700 disabled:opacity-50 text-white rounded-lg font-medium"><i class="fas fa-undo mr-2"></i>Restore Previous Version</button>
+      </form>
+    </div>
+    <div class="mt-6 text-slate-300">
+      <h2 class="text-lg font-semibold text-white mb-2">Recent Restore Points</h2>
+      <?php if ($latestRestorePoint): ?>
+        <p class="text-sm">Latest: <code><?= htmlspecialchars((string) ($latestRestorePoint['timestamp'] ?? 'n/a')) ?></code> | prev <code><?= htmlspecialchars((string) ($latestRestorePoint['previous_commit'] ?? 'n/a')) ?></code> | new <code><?= htmlspecialchars((string) ($latestRestorePoint['new_commit'] ?? 'n/a')) ?></code></p>
+      <?php else: ?>
+        <p class="text-sm text-amber-300">No restore points available yet.</p>
+      <?php endif; ?>
     </div>
   </div>
 </main>
