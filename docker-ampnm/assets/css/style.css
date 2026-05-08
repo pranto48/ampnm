@@ -96,7 +96,18 @@ button:hover, a.hoverable:hover {
 .nav-link:hover {
     background-color: #334155; /* slate-700 */
     color: #ffffff;
-    transform: translateY(-2px) scale(1.02); /* Lift and slightly scale on hover */
+    transform: perspective(720px) translateY(-2px) rotateX(5deg) scale(1.02); /* Lift + subtle 3D tilt */
+    box-shadow: 0 10px 20px rgba(34, 211, 238, 0.2);
+}
+.nav-link i {
+    color: #67e8f9;
+    text-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
+    transition: transform 0.25s ease, color 0.25s ease, text-shadow 0.25s ease;
+}
+.nav-link:hover i {
+    color: #22d3ee;
+    transform: translateZ(10px) scale(1.08);
+    text-shadow: 0 0 14px rgba(34, 211, 238, 0.75);
 }
 #main-nav .nav-sublink {
     padding-left: 2.5rem;
@@ -149,6 +160,26 @@ button:hover, a.hoverable:hover {
     0% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 211, 238, 0.4); }
     50% { transform: scale(1.01); box-shadow: 0 0 8px rgba(34, 211, 238, 0.7); }
     100% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 211, 238, 0.4); }
+}
+
+.nav-3d-shell {
+    border-bottom: 1px solid rgba(34, 211, 238, 0.25);
+    box-shadow: 0 6px 22px rgba(15, 23, 42, 0.55), inset 0 -1px 0 rgba(34, 211, 238, 0.14);
+}
+
+.brand-3d {
+    transform-style: preserve-3d;
+}
+
+.brand-icon-3d {
+    animation: brand-float-3d 2.6s ease-in-out infinite;
+    filter: drop-shadow(0 4px 10px rgba(34, 211, 238, 0.45));
+}
+
+@keyframes brand-float-3d {
+    0% { transform: perspective(700px) rotateY(0deg) translateY(0); }
+    50% { transform: perspective(700px) rotateY(-10deg) translateY(-2px); }
+    100% { transform: perspective(700px) rotateY(0deg) translateY(0); }
 }
 
 
