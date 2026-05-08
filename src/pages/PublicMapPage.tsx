@@ -1,135 +1,93 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  ReactFlow, MiniMap, Controls, Background,
-  type Node, type Edge,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import DeviceNode from "@/components/map/DeviceNode";
-import { Badge } from "@/components/ui/badge";
-import { Shield } from "lucide-react";
+import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import NetworkMap from '@/components/NetworkMap';
+import { showError } from '@/utils/toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { MapData, getPublicMapData } from '@/services/networkDeviceService';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-const nodeTypes = { device: DeviceNode };
-
-export default function PublicMapPage() {
+const PublicMapPage = () => {
   const { mapId } = useParams<{ mapId: string }>();
-  const [mapName, setMapName] = useState("Network Map");
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [mapData, setMapData] = useState<MapData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [mapName, setMapName] = useState('Public Network Map');
+  const [backgroundStyle, setBackgroundStyle] = useState({});
 
-  const fetchMap = useCallback(async () => {
-    if (!mapId) return;
-    setLoading(true);
-
-    // Check if map exists and is public
-    const { data: map, error: mapError } = await supabase
-      .from("maps")
-      .select("*")
-      .eq("id", mapId)
-      .eq("public_view_enabled", true)
-      .single();
-
-    if (mapError || !map) {
-      setError("Map not found or not publicly shared.");
-      setLoading(false);
+  const fetchPublicMap = useCallback(async () => {
+    if (!mapId) {
+      showError('Map ID is missing for public view.');
+      setIsLoading(false);
       return;
     }
+    setIsLoading(true);
+    try {
+      const data = await getPublicMapData(mapId);
+      setMapData({ devices: data.devices, edges: data.edges });
+      setMapName(data.map.name || 'Public Network Map');
 
-    setMapName(map.name);
+      let style: React.CSSProperties = {};
+      if (data.map.background_image_url) {
+        style = { backgroundImage: `url(${data.map.background_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+      } else if (data.map.background_color) {
+        style = { backgroundColor: data.map.background_color };
+      } else {
+        style = { backgroundColor: '#1e293b' }; // Default if nothing set
+      }
+      setBackgroundStyle(style);
 
-    // Fetch devices and edges
-    const [devRes, edgeRes] = await Promise.all([
-      supabase.from("devices").select("*").eq("map_id", mapId),
-      supabase.from("device_edges").select("*").eq("map_id", mapId),
-    ]);
-
-    const devs = devRes.data ?? [];
-    setNodes(devs.map(d => ({
-      id: d.id,
-      type: "device",
-      position: { x: d.x ?? 100, y: d.y ?? 100 },
-      data: {
-        name: d.name,
-        ip_address: d.ip_address,
-        status: d.status || "unknown",
-        icon: d.type || "server",
-        subchoice: d.subchoice,
-        icon_url: d.icon_url,
-        icon_size: d.icon_size || 40,
-        name_text_size: d.name_text_size || 12,
-        last_latency: d.last_latency,
-      },
-    })));
-
-    setEdges((edgeRes.data ?? []).map(e => ({
-      id: e.id,
-      source: e.source_id,
-      target: e.target_id,
-      label: e.connection_type || undefined,
-      style: { stroke: "hsl(var(--muted-foreground))", strokeWidth: 2 },
-      labelStyle: { fill: "hsl(var(--foreground))", fontSize: 10 },
-    })));
-
-    setLoading(false);
+    } catch (error: any) {
+      console.error('Failed to fetch public map data:', error);
+      showError(error.message || 'Failed to load public map.');
+      setMapData(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, [mapId]);
 
-  useEffect(() => { fetchMap(); }, [fetchMap]);
-
-  // Auto-refresh every 30s
   useEffect(() => {
-    const interval = setInterval(fetchMap, 30000);
-    return () => clearInterval(interval);
-  }, [fetchMap]);
+    fetchPublicMap();
+  }, [fetchPublicMap]);
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Shield className="h-10 w-10 text-primary animate-pulse" />
+      <div className="min-h-screen bg-background p-4">
+        <Skeleton className="h-8 w-64 mb-6" />
+        <Skeleton className="h-[70vh] w-full rounded-lg" />
       </div>
     );
   }
 
-  if (error) {
+  if (!mapData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-3">
-          <Shield className="h-12 w-12 text-muted-foreground mx-auto" />
-          <h1 className="text-xl font-bold text-foreground">Map Unavailable</h1>
-          <p className="text-muted-foreground">{error}</p>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Map Not Found or Not Public</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">The requested map could not be loaded or is not enabled for public viewing.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-background flex flex-col">
-      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/95">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          <span className="font-bold text-foreground">AMPNM</span>
-          <span className="text-muted-foreground text-sm">— {mapName}</span>
+    <div className="min-h-screen bg-background" style={backgroundStyle}>
+      <header className="bg-slate-800/50 backdrop-blur-lg shadow-lg py-3 px-4">
+        <div className="container mx-auto flex items-center justify-between">
+          <h1 className="text-xl font-bold text-white">Shared Map: {mapName}</h1>
+          <a href="/" className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm">
+            <i className="fas fa-home mr-2"></i>Go to Dashboard
+          </a>
         </div>
-        <Badge variant="secondary">Public View</Badge>
       </header>
-      <div className="flex-1">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          fitView
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Controls showInteractive={false} />
-          <MiniMap />
-          <Background />
-        </ReactFlow>
+      <div className="container mx-auto p-4">
+        {/* Pass fetchPublicMap as onMapUpdate to trigger refreshes */}
+        <NetworkMap devices={mapData.devices} onMapUpdate={fetchPublicMap} isPublicView={true} />
       </div>
     </div>
   );
-}
+};
+
+export default PublicMapPage;

@@ -1,9 +1,0 @@
-Package: ampnm-agent
-Version: 0.1.0
-Section: admin
-Priority: optional
-Architecture: all
-Maintainer: AMPNM <support@example.com>
-Depends: bash, curl, python3, systemd, iproute2, procps
-Description: AMPNM Linux monitoring agent
- Sends host metrics to the AMPNM agent-metrics endpoint and runs as a systemd service.

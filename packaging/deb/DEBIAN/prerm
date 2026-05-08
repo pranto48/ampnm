@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-set -e
-systemctl disable --now ampnm-agent.service || true
