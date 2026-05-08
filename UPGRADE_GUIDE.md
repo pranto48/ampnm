@@ -175,7 +175,7 @@ docker-compose logs -f app
 
 ## Rollback (If Needed)
 
-If upgrade causes issues, rollback:
+If upgrade causes issues, use your standard manual recovery procedure:
 
 ```bash
 # Stop containers
@@ -185,7 +185,7 @@ docker-compose down
 docker tag ampnm-app:latest ampnm-app:backup
 docker-compose up -d
 
-# Or restore from backup
+
 docker-compose exec -i mysql mysql -u root -p network_monitor < backup.sql
 ```
 

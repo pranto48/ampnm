@@ -180,14 +180,13 @@ docker-compose down
 docker-compose up -d
 ```
 
-### Automated update + rollback helpers
+### Automated update helpers
 
 ```bash
 # Run safe update (captures pre-update state and optional DB dump)
 ./scripts/auto-update.sh
 
 # Roll back to previous version snapshot
-./scripts/rollback-update.sh
 ```
 
 Rollback metadata and DB backups are stored in `.update-state/<timestamp>/`.
