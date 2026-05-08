@@ -1,7 +1,10 @@
 <?php
 require_once 'includes/auth_check.php';
 require_once 'includes/update_state.php';
+require_once 'includes/functions.php';
 include 'header.php';
+
+$csrfToken = ensureCsrfTokenInSession();
 
 $updateState = readUpdateStateFile();
 $dashboardUpdateAvailable = !empty($updateState['update_available']);
@@ -13,8 +16,19 @@ $dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateSt
     <div class="container mx-auto px-4 py-8">
         <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
             <h1 class="text-3xl font-bold text-white">Dashboard</h1>
-            <div id="map-selector-container" class="flex items-center gap-2">
-                <!-- Populated by JS -->
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <?php if (($_SESSION['user_role'] ?? 'viewer') === 'admin'): ?>
+                    <div id="update-status-widget" data-csrf-token="<?= htmlspecialchars($csrfToken) ?>" class="hidden rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs text-slate-200">
+                        <div class="flex items-center gap-2">
+                            <span id="update-status-pill" class="inline-flex px-2 py-0.5 rounded-full border text-[11px]"></span>
+                            <span id="update-last-checked" class="text-slate-400"></span>
+                            <button id="update-now-btn" class="hidden px-2 py-1 rounded bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium">Update now</button>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <div id="map-selector-container" class="flex items-center gap-2">
+                    <!-- Populated by JS -->
+                </div>
             </div>
         </div>
         <?php if ($dashboardUpdateAvailable): ?>

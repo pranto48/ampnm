@@ -27,6 +27,10 @@ function initDashboard() {
     const pingButton = document.getElementById('pingButton');
     const pingResultContainer = document.getElementById('pingResultContainer');
     const pingResultPre = document.getElementById('pingResultPre');
+    const updateStatusWidget = document.getElementById('update-status-widget');
+    const updateStatusPill = document.getElementById('update-status-pill');
+    const updateLastChecked = document.getElementById('update-last-checked');
+    const updateNowBtn = document.getElementById('update-now-btn');
 
     const api = {
         get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json()),
@@ -54,6 +58,78 @@ function initDashboard() {
         const parsed = new Date(value);
         return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
     };
+
+    const formatUpdateCheckedAt = (value) => {
+        if (!value) return 'Last checked: never';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return `Last checked: ${value}`;
+        return `Last checked: ${parsed.toLocaleString()}`;
+    };
+
+    const loadUpdateStatus = async () => {
+        if (!updateStatusWidget || window.userRole !== 'admin') return;
+
+        try {
+            const response = await fetch('api/update_status.php');
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Failed to load update status.');
+            }
+
+            updateStatusWidget.classList.remove('hidden');
+            const behindCount = Number(data.behind_count || 0);
+            const available = !!data.update_available || behindCount > 0;
+            updateStatusPill.textContent = available ? 'Update available' : 'Up to date';
+            updateStatusPill.className = `inline-flex px-2 py-0.5 rounded-full border text-[11px] ${available
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                : 'bg-green-500/20 text-green-300 border-green-500/40'}`;
+            updateLastChecked.textContent = formatUpdateCheckedAt(data.last_checked);
+
+            if (available) {
+                updateNowBtn.classList.remove('hidden');
+                updateNowBtn.disabled = false;
+                updateNowBtn.textContent = behindCount > 0 ? `Update now (${behindCount})` : 'Update now';
+            } else {
+                updateNowBtn.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    updateNowBtn?.addEventListener('click', async () => {
+        const csrfToken = updateStatusWidget?.dataset?.csrfToken || '';
+        if (!csrfToken) {
+            window.notyf?.error('Missing CSRF token. Refresh and try again.');
+            return;
+        }
+
+        updateNowBtn.disabled = true;
+        updateNowBtn.textContent = 'Updating...';
+
+        try {
+            const body = new URLSearchParams({ csrf_token: csrfToken });
+            const response = await fetch('api/run_update.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                const logHint = data.log_path ? ` Log: ${data.log_path}` : '';
+                throw new Error((data.error || 'Update failed.') + logHint);
+            }
+
+            window.notyf?.success(data.message || 'Update completed successfully.');
+            await loadUpdateStatus();
+        } catch (error) {
+            window.notyf?.error(error.message || 'Update failed.');
+        } finally {
+            updateNowBtn.disabled = false;
+            await loadUpdateStatus();
+        }
+    });
 
     const applyDeviceViewModeClasses = () => {
         if (!deviceInfoContainer) return;
@@ -204,6 +280,8 @@ function initDashboard() {
             dashboardLoader.classList.add('hidden');
         }
     });
+
+    loadUpdateStatus();
 
     deviceInfoGridBtn?.addEventListener('click', () => {
         deviceViewMode = 'grid';
