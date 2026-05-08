@@ -266,6 +266,33 @@ function runRestoreScript(string $repoPath, string $backupPath): array
     ];
 }
 
+function runDirectUpdateScript(string $targetDir): array
+{
+    $scriptPath = realpath(__DIR__ . '/scripts/direct_update.sh') ?: (__DIR__ . '/scripts/direct_update.sh');
+    $resultFile = '/tmp/ampnm_direct_update_result.env';
+    $envOverrides = [
+        'TARGET_DIR=' . $targetDir,
+        'RESULT_ENV_FILE=' . $resultFile,
+    ];
+    $escapedEnv = implode(' ', array_map('escapeshellarg', $envOverrides));
+    $command = 'env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+    $output = [];
+    $exitCode = 1;
+    exec($command, $output, $exitCode);
+    $parsedResult = [];
+    if (is_file($resultFile)) {
+        $lines = file($resultFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        foreach ($lines as $line) {
+            if (str_starts_with(trim($line), '#') || strpos($line, '=') === false) {
+                continue;
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $parsedResult[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+    }
+    return ['output' => implode("\n", $output), 'exitCode' => $exitCode, 'result' => $parsedResult];
+}
+
 function getClientIpAddress(): string
 {
     $keys = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
@@ -931,6 +958,20 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
     }
 }
 
+if ($action === 'direct_update') {
+    $scriptRun = runDirectUpdateScript($repoPath);
+    $updateScriptResult = $scriptRun['result'];
+    $commandOutput['Direct Update Script'] = ($scriptRun['output'] !== '' ? $scriptRun['output'] : 'No output');
+    $scriptStatus = strtolower((string) ($updateScriptResult['STATUS'] ?? ''));
+    if ($scriptRun['exitCode'] === 0 && in_array($scriptStatus, ['success', 'ok', 'passed'], true)) {
+        $statusMessage = 'Direct Docker folder update completed successfully from GitHub.';
+        $statusType = 'success';
+    } else {
+        $statusMessage = 'Direct update failed. Review command logs.';
+        $statusType = 'error';
+    }
+}
+
 foreach ($commandOutput as $title => $output) {
     $commandOutput[$title] = redactSensitiveOutput((string) $output);
 }
@@ -1127,6 +1168,17 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                             <?php endif; ?>
                         </form>
                         <?php if (!$isGitRepo && $gitAvailable): ?>
+                            <form method="POST" class="space-y-3 md:col-span-2">
+                                <input type="hidden" name="action" value="direct_update">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                                <label class="block text-sm text-slate-400">Docker App Path</label>
+                                <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                <button type="submit" class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-2">
+                                    <i class="fas fa-download"></i>
+                                    <span>⬇ Direct Update docker-ampnm</span>
+                                </button>
+                                <p class="text-xs text-slate-500">Downloads latest <code>main</code> zip from GitHub, updates only the <code>docker-ampnm/</code> folder into this path, keeps local <code>data/storage/logs</code>, and restarts services.</p>
+                            </form>
                             <form method="POST" class="space-y-3 md:col-span-2">
                                 <input type="hidden" name="action" value="clone">
                                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
