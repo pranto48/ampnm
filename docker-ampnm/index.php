@@ -1,12 +1,64 @@
 <?php
 require_once 'includes/auth_check.php';
 require_once 'includes/update_state.php';
+require_once 'includes/functions.php';
 include 'header.php';
 
 $updateState = readUpdateStateFile();
 $dashboardUpdateAvailable = !empty($updateState['update_available']);
 $dashboardBehindCount = isset($updateState['behind_count']) ? (int) $updateState['behind_count'] : null;
 $dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
+$csrfToken = ensureCsrfTokenInSession();
+$updateActionMessage = '';
+$updateActionType = '';
+
+function runScriptWithResult(string $scriptPath, array $env = []): array
+{
+    $resultFile = '/tmp/ampnm_dashboard_update_result.env';
+    $env['RESULT_ENV_FILE'] = $resultFile;
+    $envString = implode(' ', array_map(static fn($k, $v) => escapeshellarg("{$k}={$v}"), array_keys($env), $env));
+    $command = 'env ' . $envString . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+    $output = [];
+    $exitCode = 1;
+    exec($command, $output, $exitCode);
+    $parsed = [];
+    if (is_file($resultFile)) {
+        foreach ((file($resultFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []) as $line) {
+            if (strpos($line, '=') === false) continue;
+            [$k, $v] = explode('=', $line, 2);
+            $parsed[trim($k)] = trim($v);
+        }
+    }
+    return ['exitCode' => $exitCode, 'output' => implode("\n", $output), 'result' => $parsed];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_SESSION['user_role'] ?? 'viewer') === 'admin') {
+    if (!isValidCsrfToken($_POST['csrf_token'] ?? null)) {
+        $updateActionMessage = 'Invalid request token.';
+        $updateActionType = 'error';
+    } else {
+        $action = (string) ($_POST['update_action'] ?? '');
+        if ($action === 'direct_update') {
+            $run = runScriptWithResult(__DIR__ . '/scripts/direct_update.sh', ['TARGET_DIR' => __DIR__]);
+            $ok = $run['exitCode'] === 0 && strtolower((string)($run['result']['STATUS'] ?? '')) === 'success';
+            $updateActionMessage = $ok ? 'Docker app updated successfully.' : 'Update failed. Check container logs.';
+            $updateActionType = $ok ? 'success' : 'error';
+        } elseif ($action === 'restore_latest') {
+            $base = __DIR__ . '/data/code_backups';
+            $folders = glob($base . '/*', GLOB_ONLYDIR) ?: [];
+            rsort($folders);
+            if (empty($folders)) {
+                $updateActionMessage = 'No backup versions found to restore.';
+                $updateActionType = 'error';
+            } else {
+                $run = runScriptWithResult(__DIR__ . '/scripts/restore_backup.sh', ['APP_DIR' => __DIR__, 'HOST_APP_DIR' => __DIR__, 'BACKUP_PATH' => $folders[0]]);
+                $ok = $run['exitCode'] === 0 && strtolower((string)($run['result']['STATUS'] ?? '')) === 'success';
+                $updateActionMessage = $ok ? 'Restored previous version successfully.' : 'Restore failed. Check container logs.';
+                $updateActionType = $ok ? 'success' : 'error';
+            }
+        }
+    }
+}
 ?>
 
 <main id="app">
@@ -17,17 +69,27 @@ $dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateSt
                 <!-- Populated by JS -->
             </div>
         </div>
-        <?php if ($dashboardUpdateAvailable): ?>
-            <div class="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-amber-100">
-                <p class="font-semibold">
-                    Update available<?php echo $dashboardBehindCount !== null ? ': ' . $dashboardBehindCount . ' commit(s) behind upstream.' : '.'; ?>
-                </p>
-                <p class="text-sm mt-1">
-                    Last checked at <?php echo $dashboardLastCheckedAt ? htmlspecialchars($dashboardLastCheckedAt) . ' (UTC)' : 'unknown time'; ?>.
-                    Open <a href="code_updates.php" class="underline font-semibold hover:text-amber-50">Code Updates</a> to run <span class="font-semibold">↻ Check now</span> or manually apply with <span class="font-semibold">🚀 Update AmpNM</span>.
-                </p>
-            </div>
-        <?php endif; ?>
+        <div class="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-amber-100">
+            <p class="font-semibold">Docker Update Status: <?php echo $dashboardUpdateAvailable ? 'Update available' : 'No git-based update signal'; ?></p>
+            <p class="text-sm mt-1">Last checked at <?php echo $dashboardLastCheckedAt ? htmlspecialchars($dashboardLastCheckedAt) . ' (UTC)' : 'unknown time'; ?>.</p>
+            <?php if (($_SESSION['user_role'] ?? 'viewer') === 'admin'): ?>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                        <input type="hidden" name="update_action" value="direct_update">
+                        <button type="submit" class="px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-sm"><i class="fas fa-download mr-1"></i>Update Now</button>
+                    </form>
+                    <form method="POST" onsubmit="return confirm('Restore latest backup version?');">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                        <input type="hidden" name="update_action" value="restore_latest">
+                        <button type="submit" class="px-4 py-2 rounded bg-amber-600 hover:bg-amber-500 text-white text-sm"><i class="fas fa-history mr-1"></i>Restore Previous Version</button>
+                    </form>
+                </div>
+            <?php endif; ?>
+            <?php if ($updateActionMessage !== ''): ?>
+                <p class="text-sm mt-3 <?php echo $updateActionType === 'success' ? 'text-emerald-200' : 'text-red-200'; ?>"><?php echo htmlspecialchars($updateActionMessage); ?></p>
+            <?php endif; ?>
+        </div>
 
         <div id="dashboard-content">
             <div class="text-center py-16" id="dashboardLoader"><div class="loader mx-auto"></div></div>
