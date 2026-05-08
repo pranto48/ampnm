@@ -3,7 +3,7 @@ require_once 'includes/auth_check.php';
 require_once 'includes/update_state.php';
 include 'header.php';
 
-$canonicalRepoUrl = 'https://github.com/pranto48/ampnm.git';
+$canonicalRepoUrl = getenv('AMPNM_UPDATE_REPO_URL') ?: 'https://github.com/pranto48/ampnm.git';
 $canonicalBranch = getenv('AMPNM_UPDATE_BRANCH') ?: 'main';
 $targetUpstreamRef = 'origin/' . $canonicalBranch;
 $allowedRepoBase = rtrim(getenv('AMPNM_ALLOWED_REPO_BASE') ?: '/var/www/html', '/\\');
@@ -1095,7 +1095,7 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                         </div>
                         <div>
                             <dt class="text-slate-400">Sync Target</dt>
-                            <dd class="mt-1 font-mono">github.com/pranto48/ampnm.git (<?php echo htmlspecialchars($targetUpstreamRef); ?>)</dd>
+                            <dd class="mt-1 font-mono"><?php echo htmlspecialchars($canonicalRepoUrl); ?> (<?php echo htmlspecialchars($targetUpstreamRef); ?>)</dd>
                         </div>
                         <div>
                             <dt class="text-slate-400">Ahead / Behind</dt>
@@ -1264,7 +1264,7 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                     <h3 class="text-lg font-semibold text-white mb-3">How it works</h3>
                     <ul class="list-disc list-inside space-y-2 text-sm text-slate-300">
                         <li>Targets the Docker app at <code>portal.itsupport.com.bd/docker-ampnm</code> (current container path: <code><?php echo htmlspecialchars($defaultRepoPath); ?></code>). We auto-detect the nearest <code>.git</code> above this folder and use it as the default path.</li>
-                        <li>Checks out updates from the official repository: <code>https://github.com/pranto48/ampnm.git</code> on branch <code><?php echo htmlspecialchars($canonicalBranch); ?></code> (<code><?php echo htmlspecialchars($targetUpstreamRef); ?></code>).</li>
+                        <li>Checks out updates from the configured repository: <code><?php echo htmlspecialchars($canonicalRepoUrl); ?></code> on branch <code><?php echo htmlspecialchars($canonicalBranch); ?></code> (<code><?php echo htmlspecialchars($targetUpstreamRef); ?></code>).</li>
                         <li>Uses <span class="font-semibold">fetch</span> to compare and <span class="font-semibold">pull</span> to apply new versions without overwriting local, uncommitted changes.</li>
                     </ul>
                 </div>
