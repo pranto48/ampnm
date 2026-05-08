@@ -24,7 +24,7 @@ $dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateSt
                 </p>
                 <p class="text-sm mt-1">
                     Last checked at <?php echo $dashboardLastCheckedAt ? htmlspecialchars($dashboardLastCheckedAt) . ' (UTC)' : 'unknown time'; ?>.
-                    Open <a href="code_updates.php" class="underline font-semibold hover:text-amber-50">Code Updates</a> to run <span class="font-semibold">↻ Check now</span> or manually apply with <span class="font-semibold">🚀 Update AmpNM</span>.
+                    Open <a href="update_status.php" class="underline font-semibold hover:text-amber-50">Update Status</a> for one-click update and restore controls.
                 </p>
             </div>
         <?php endif; ?>
