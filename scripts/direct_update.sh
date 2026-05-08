@@ -1,10 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+#
+# TARGET_DIR is the mounted repository root receiving synced files.
+# Example mapping after restructure: host /var/www/html -> container /var/www/html.
 TARGET_DIR="${TARGET_DIR:-/var/www/html}"
 REPO_ZIP_URL="${REPO_ZIP_URL:-https://github.com/pranto48/ampnm/archive/refs/heads/main.zip}"
-SUBDIR_PATH="${SUBDIR_PATH:-docker-ampnm}"
-BACKUP_BASE="${BACKUP_BASE:-/var/www/html/docker-ampnm/data/code_backups}"
+# SUBDIR_PATH is relative to extracted zip root; "." means sync from repo root
+# (no docker-ampnm nested subdirectory expected after restructure).
+SUBDIR_PATH="${SUBDIR_PATH:-.}"
+# BACKUP_BASE stores snapshots in the root-level data path.
+BACKUP_BASE="${BACKUP_BASE:-/var/www/html/data/code_backups}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="${BACKUP_BASE}/${TIMESTAMP}"
 LOG_FILE="${LOG_FILE:-/tmp/ampnm_direct_update_${TIMESTAMP}.log}"

@@ -1,7 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/var/www/html/docker-ampnm}"
+#
+# APP_DIR is the mounted repository root inside the container where compose commands run.
+# Example mapping after restructure: host /var/www/html -> container /var/www/html.
+APP_DIR="${APP_DIR:-/var/www/html}"
+# HOST_APP_DIR is the host-synced project root to restore into (same as APP_DIR by default).
 HOST_APP_DIR="${HOST_APP_DIR:-${APP_DIR}}"
 BACKUP_PATH="${BACKUP_PATH:-}"
 LOG_FILE="${LOG_FILE:-/tmp/ampnm_restore_$(date +%Y%m%d_%H%M%S).log}"
