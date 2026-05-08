@@ -565,6 +565,53 @@ function listRecentBackupFolders(string $backupBasePath, int $limit = 5): array
     return $rows;
 }
 
+
+
+function buildBackupStatusInfo(string $backupPath): array
+{
+    $normalizedPath = rtrim($backupPath, '/\\');
+    if ($normalizedPath === '' || !is_dir($normalizedPath)) {
+        return ['is_valid' => false, 'reason' => 'Backup directory is missing.'];
+    }
+
+    $codePath = $normalizedPath . DIRECTORY_SEPARATOR . 'code';
+    if (!is_dir($codePath)) {
+        return ['is_valid' => false, 'reason' => 'Missing code/ directory in backup.'];
+    }
+
+    return ['is_valid' => true, 'reason' => 'Ready'];
+}
+
+function enrichBackupsWithAuditMetadata(array $backups, array $auditEntries): array
+{
+    $lookup = [];
+    foreach ($auditEntries as $entry) {
+        $backupPath = safeTrim((string) ($entry['backup_path'] ?? ''));
+        if ($backupPath === '') {
+            continue;
+        }
+
+        if (!isset($lookup[$backupPath])) {
+            $lookup[$backupPath] = [
+                'previous_commit' => safeTrim((string) ($entry['source_commit'] ?? $entry['old_commit'] ?? '')),
+                'updated_commit' => safeTrim((string) ($entry['target_commit'] ?? $entry['new_commit'] ?? '')),
+            ];
+        }
+    }
+
+    foreach ($backups as $index => $backup) {
+        $path = (string) ($backup['path'] ?? '');
+        $status = buildBackupStatusInfo($path);
+        $audit = $lookup[$path] ?? null;
+        $backups[$index]['previous_commit'] = $audit['previous_commit'] ?? ((string) ($backup['git_commit'] ?? ''));
+        $backups[$index]['updated_commit'] = $audit['updated_commit'] ?? '';
+        $backups[$index]['is_valid'] = $status['is_valid'];
+        $backups[$index]['invalid_reason'] = $status['is_valid'] ? '' : $status['reason'];
+    }
+
+    return $backups;
+}
+
 function resolveAllowedRepoPath(?string $path, string $allowedBase): array
 {
     $candidate = rtrim((string) ($path ?? ''), '/\\');
@@ -846,7 +893,8 @@ $workingTreeClean = $metrics['workingTreeClean'];
         $scriptSucceeded = $restoreRun['exitCode'] === 0 && in_array($scriptStatus, ['success', 'ok', 'passed'], true);
         $restartResultForAudit = $scriptSucceeded ? 'success' : 'failed';
         if ($scriptSucceeded) {
-            $statusMessage = 'Rollback completed successfully and services restarted.';
+            $restoredCommit = safeTrim((string) ($updateScriptResult['RESTORED_COMMIT'] ?? ''));
+            $statusMessage = 'Rollback completed successfully and services restarted.' . ($restoredCommit !== '' ? ' Restored commit: ' . $restoredCommit . '.' : '');
             $statusType = 'success';
         } else {
             $statusMessage = 'Rollback script reported errors. Review Command Logs for details.';
@@ -977,7 +1025,7 @@ foreach ($commandOutput as $title => $output) {
 }
 
 $latestAuditEntries = readLatestAuditEntries($auditPdo, $auditLogPath, 10, $auditStorageMode);
-$recentBackups = listRecentBackupFolders($backupBasePath, 5);
+$recentBackups = enrichBackupsWithAuditMetadata(listRecentBackupFolders($backupBasePath, 5), $latestAuditEntries);
 $rollbackBackupPath = (string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? ($recentBackups[0]['path'] ?? 'n/a'));
 $rollbackLogFilePath = (string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['LOG_FILE'] ?? $updateScriptResult['log_file_path'] ?? 'n/a');
 $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
@@ -1285,25 +1333,50 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                     <?php if (empty($recentBackups)): ?>
                         <p class="text-sm text-slate-400">No backup folders found yet.</p>
                     <?php else: ?>
-                        <ul class="space-y-3 text-sm text-slate-300">
-                            <?php foreach ($recentBackups as $backup): ?>
-                                <li class="border border-slate-700 rounded p-2 bg-slate-900/40">
-                                    <p class="font-mono text-slate-100"><?php echo htmlspecialchars((string) $backup['timestamp_folder']); ?></p>
-                                    <p class="text-xs text-slate-400 break-all"><?php echo htmlspecialchars((string) $backup['path']); ?></p>
-                                    <p class="text-xs mt-1">Commit: <span class="font-mono text-slate-200"><?php echo htmlspecialchars((string) ($backup['git_commit'] ?? 'n/a')); ?></span></p>
-                                    <form method="POST" class="mt-2" onsubmit="return confirm('Restore this backup and restart services?');">
-                                        <input type="hidden" name="action" value="rollback">
-                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
-                                        <input type="hidden" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>">
-                                        <input type="hidden" name="backup_path" value="<?php echo htmlspecialchars((string) $backup['path']); ?>">
-                                        <button type="submit" class="w-full px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs flex items-center justify-center gap-2">
-                                            <i class="fas fa-history"></i>
-                                            <span>Restore this version</span>
-                                        </button>
-                                    </form>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm text-slate-300">
+                                <thead class="text-xs uppercase text-slate-400 border-b border-slate-700">
+                                    <tr>
+                                        <th class="py-2 pr-4 text-left">Backup timestamp</th>
+                                        <th class="py-2 pr-4 text-left">Previous commit</th>
+                                        <th class="py-2 pr-4 text-left">Updated commit</th>
+                                        <th class="py-2 pr-4 text-left">Backup path</th>
+                                        <th class="py-2 pr-4 text-left">Status</th>
+                                        <th class="py-2 text-left">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recentBackups as $index => $backup): ?>
+                                        <tr class="border-b border-slate-700/60 <?php echo $index === 0 ? 'bg-emerald-500/10 ring-1 ring-emerald-400/40' : ''; ?>">
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) $backup['timestamp_folder']); ?><?php if ($index === 0): ?><div class="text-[10px] text-emerald-300">Newest</div><?php endif; ?></td>
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) ($backup['previous_commit'] !== '' ? $backup['previous_commit'] : 'n/a')); ?></td>
+                                            <td class="py-2 pr-4 font-mono"><?php echo htmlspecialchars((string) ($backup['updated_commit'] !== '' ? $backup['updated_commit'] : 'n/a')); ?></td>
+                                            <td class="py-2 pr-4 font-mono break-all"><?php echo htmlspecialchars((string) $backup['path']); ?></td>
+                                            <td class="py-2 pr-4">
+                                                <?php if (!empty($backup['is_valid'])): ?>
+                                                    <span class="text-emerald-300">Valid</span>
+                                                <?php else: ?>
+                                                    <span class="text-red-300">Invalid</span>
+                                                    <div class="text-[10px] text-red-200"><?php echo htmlspecialchars((string) ($backup['invalid_reason'] ?? 'Unavailable')); ?></div>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="py-2">
+                                                <form method="POST" onsubmit="return confirm('Restore this backup and restart services?');">
+                                                    <input type="hidden" name="action" value="rollback">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                                                    <input type="hidden" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>">
+                                                    <input type="hidden" name="backup_path" value="<?php echo htmlspecialchars((string) $backup['path']); ?>">
+                                                    <button type="submit" <?php echo empty($backup['is_valid']) ? 'disabled title="' . htmlspecialchars((string) ($backup['invalid_reason'] ?? 'Unavailable')) . '"' : ''; ?> class="px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-600 disabled:text-slate-300 text-white rounded text-xs flex items-center justify-center gap-2">
+                                                        <i class="fas fa-history"></i>
+                                                        <span>Restore this version</span>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     <?php endif; ?>
                 </div>
                 <div class="bg-slate-800 border border-slate-700 rounded-lg p-5 shadow-lg">
