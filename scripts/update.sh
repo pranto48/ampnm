@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
-REPO_URL="${REPO_URL:-https://github.com/pranto48/ampnm.git}"
+REPO_URL="${AMPNM_UPDATE_REPO_URL:-${REPO_URL:-https://github.com/pranto48/ampnm.git}}"
+UPDATE_BRANCH="${AMPNM_UPDATE_BRANCH:-main}"
+UPSTREAM_REF="origin/${UPDATE_BRANCH}"
 #
 # APP_DIR is the container path where docker compose is executed (repo root mount).
 # Example mapping after restructure: host /var/www/html -> container /var/www/html.
@@ -44,6 +46,8 @@ trap 'mark_failure "${LINENO}" "$?"' ERR
 
 echo "[$(date -Iseconds)] Starting AMPNM update"
 echo "REPO_URL=${REPO_URL}"
+echo "UPDATE_BRANCH=${UPDATE_BRANCH}"
+echo "UPSTREAM_REF=${UPSTREAM_REF}"
 echo "APP_DIR=${APP_DIR}"
 echo "HOST_APP_DIR=${HOST_APP_DIR}"
 
@@ -74,19 +78,17 @@ write_result "BACKUP_PATH" "${BACKUP_DIR}"
 echo "[$(date -Iseconds)] Step 2/4: Syncing code"
 if [ -d "${HOST_APP_DIR}/.git" ]; then
   cd "${HOST_APP_DIR}"
-  git fetch origin
+  git fetch origin --prune
 
-  if git show-ref --verify --quiet refs/remotes/origin/main; then
-    git reset --hard origin/main
-  elif git show-ref --verify --quiet refs/remotes/origin/master; then
-    git reset --hard origin/master
+  if git show-ref --verify --quiet "refs/remotes/${UPSTREAM_REF}"; then
+    git reset --hard "${UPSTREAM_REF}"
   else
-    echo "No origin/main or origin/master found after fetch"
+    echo "Configured upstream ref ${UPSTREAM_REF} not found after fetch"
     exit 1
   fi
 else
   TMP_CLONE_DIR="$(mktemp -d)"
-  git clone "${REPO_URL}" "${TMP_CLONE_DIR}"
+  git clone --branch "${UPDATE_BRANCH}" --single-branch "${REPO_URL}" "${TMP_CLONE_DIR}"
 
   mkdir -p "${HOST_APP_DIR}"
   rsync -a --delete \
