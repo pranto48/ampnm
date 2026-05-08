@@ -527,6 +527,53 @@ function listRecentBackupFolders(string $backupBasePath, int $limit = 5): array
     return $rows;
 }
 
+
+
+function buildBackupStatusInfo(string $backupPath): array
+{
+    $normalizedPath = rtrim($backupPath, '/\\');
+    if ($normalizedPath === '' || !is_dir($normalizedPath)) {
+        return ['is_valid' => false, 'reason' => 'Backup directory is missing.'];
+    }
+
+    $codePath = $normalizedPath . DIRECTORY_SEPARATOR . 'code';
+    if (!is_dir($codePath)) {
+        return ['is_valid' => false, 'reason' => 'Missing code/ directory in backup.'];
+    }
+
+    return ['is_valid' => true, 'reason' => 'Ready'];
+}
+
+function enrichBackupsWithAuditMetadata(array $backups, array $auditEntries): array
+{
+    $lookup = [];
+    foreach ($auditEntries as $entry) {
+        $backupPath = safeTrim((string) ($entry['backup_path'] ?? ''));
+        if ($backupPath === '') {
+            continue;
+        }
+
+        if (!isset($lookup[$backupPath])) {
+            $lookup[$backupPath] = [
+                'previous_commit' => safeTrim((string) ($entry['source_commit'] ?? $entry['old_commit'] ?? '')),
+                'updated_commit' => safeTrim((string) ($entry['target_commit'] ?? $entry['new_commit'] ?? '')),
+            ];
+        }
+    }
+
+    foreach ($backups as $index => $backup) {
+        $path = (string) ($backup['path'] ?? '');
+        $status = buildBackupStatusInfo($path);
+        $audit = $lookup[$path] ?? null;
+        $backups[$index]['previous_commit'] = $audit['previous_commit'] ?? ((string) ($backup['git_commit'] ?? ''));
+        $backups[$index]['updated_commit'] = $audit['updated_commit'] ?? '';
+        $backups[$index]['is_valid'] = $status['is_valid'];
+        $backups[$index]['invalid_reason'] = $status['is_valid'] ? '' : $status['reason'];
+    }
+
+    return $backups;
+}
+
 function resolveAllowedRepoPath(?string $path, string $allowedBase): array
 {
     $candidate = rtrim((string) ($path ?? ''), '/\\');
