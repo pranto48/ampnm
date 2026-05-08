@@ -92,6 +92,9 @@ $recentBackups = [];
 $rollbackBackupPath = '';
 $rollbackLogFilePath = '';
 $showRollbackFailureBanner = false;
+$directUpdateRemoteCommit = '';
+$directUpdateLocalCommit = '';
+$directUpdateAvailable = null;
 
 $updateLockPath = '/tmp/ampnm-code-update.lock';
 $updateLockHandle = null;
@@ -229,6 +232,87 @@ function runUpdateScript(string $repoPath, string $upstreamRef, bool $forceUpdat
         'exitCode' => $exitCode,
         'result' => $parsedResult,
     ];
+}
+
+function runRestoreScript(string $repoPath, string $backupPath): array
+{
+    $scriptPath = realpath(__DIR__ . '/scripts/restore_backup.sh') ?: (__DIR__ . '/scripts/restore_backup.sh');
+    $resultFile = '/tmp/ampnm_restore_result.env';
+    $envOverrides = [
+        'HOST_APP_DIR=' . $repoPath,
+        'BACKUP_PATH=' . $backupPath,
+        'RESULT_ENV_FILE=' . $resultFile,
+    ];
+    $escapedEnv = implode(' ', array_map('escapeshellarg', $envOverrides));
+    $command = 'env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+
+    $output = [];
+    $exitCode = 1;
+    exec($command, $output, $exitCode);
+
+    $parsedResult = [];
+    if (is_file($resultFile)) {
+        $lines = file($resultFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        foreach ($lines as $line) {
+            if (str_starts_with(trim($line), '#') || strpos($line, '=') === false) {
+                continue;
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $parsedResult[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+    }
+
+    return [
+        'output' => implode("\n", $output),
+        'exitCode' => $exitCode,
+        'result' => $parsedResult,
+    ];
+}
+
+function runDirectUpdateScript(string $targetDir): array
+{
+    $scriptPath = realpath(__DIR__ . '/scripts/direct_update.sh') ?: (__DIR__ . '/scripts/direct_update.sh');
+    $resultFile = '/tmp/ampnm_direct_update_result.env';
+    $envOverrides = [
+        'TARGET_DIR=' . $targetDir,
+        'RESULT_ENV_FILE=' . $resultFile,
+    ];
+    $escapedEnv = implode(' ', array_map('escapeshellarg', $envOverrides));
+    $command = 'env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+    $output = [];
+    $exitCode = 1;
+    exec($command, $output, $exitCode);
+    $parsedResult = [];
+    if (is_file($resultFile)) {
+        $lines = file($resultFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        foreach ($lines as $line) {
+            if (str_starts_with(trim($line), '#') || strpos($line, '=') === false) {
+                continue;
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $parsedResult[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+    }
+    return ['output' => implode("\n", $output), 'exitCode' => $exitCode, 'result' => $parsedResult];
+}
+
+function fetchGitHubMainCommitSha(): string
+{
+    $url = 'https://api.github.com/repos/pranto48/ampnm/commits/main';
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: AMPNM-Updater\r\nAccept: application/vnd.github+json\r\n",
+            'timeout' => 8,
+        ],
+    ]);
+    $json = @file_get_contents($url, false, $context);
+    if ($json === false) {
+        return '';
+    }
+    $data = json_decode($json, true);
+    $sha = is_array($data) ? (string) ($data['sha'] ?? '') : '';
+    return preg_match('/^[a-f0-9]{40}$/', $sha) ? $sha : '';
 }
 
 function getClientIpAddress(): string
@@ -651,7 +735,7 @@ $updateState = readUpdateStateFile($updateStatePath);
 $lastCheckedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_at'] : null;
 $scheduledUpdateAvailable = !empty($updateState['update_available']);
 
-$isUpdateAction = ($action === 'check' || $action === 'update');
+$isUpdateAction = ($action === 'check' || $action === 'update' || $action === 'rollback');
 
 if ($isGitRepo) {
     if (!$originConfigured) {
@@ -761,6 +845,53 @@ $workingTreeClean = $metrics['workingTreeClean'];
     $lastCheckedAt = gmdate('c');
             }
 
+            if ($action === 'rollback') {
+    $requestedBackupPath = isset($_POST['backup_path']) ? trim((string) $_POST['backup_path']) : '';
+    $resolvedBackupPath = realpath($requestedBackupPath);
+    $backupBaseReal = realpath($backupBasePath);
+
+    if ($requestedBackupPath === '' || $resolvedBackupPath === false || !is_dir($resolvedBackupPath)) {
+        $statusMessage = 'Rollback failed: backup path is missing or invalid.';
+        $statusType = 'error';
+    } elseif ($backupBaseReal === false || !str_starts_with($resolvedBackupPath, rtrim($backupBaseReal, '/\\') . DIRECTORY_SEPARATOR)) {
+        $statusMessage = 'Rollback rejected: backup path is outside the allowed backup directory.';
+        $statusType = 'error';
+    } else {
+        $restoreRun = runRestoreScript($repoPath, $resolvedBackupPath);
+        $updateScriptResult = $restoreRun['result'];
+        $commandOutput['Rollback Script'] = "=== Step: launch rollback script ===\n"
+            . ($restoreRun['output'] !== '' ? $restoreRun['output'] : 'No output')
+            . "\n=== Step: parse result file ===\n"
+            . (!empty($updateScriptResult) ? json_encode($updateScriptResult, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : 'No parsed result values');
+
+        $scriptStatus = strtolower((string) ($updateScriptResult['STATUS'] ?? ''));
+        $scriptSucceeded = $restoreRun['exitCode'] === 0 && in_array($scriptStatus, ['success', 'ok', 'passed'], true);
+        $restartResultForAudit = $scriptSucceeded ? 'success' : 'failed';
+        if ($scriptSucceeded) {
+            $statusMessage = 'Rollback completed successfully and services restarted.';
+            $statusType = 'success';
+        } else {
+            $statusMessage = 'Rollback script reported errors. Review Command Logs for details.';
+            $statusType = 'error';
+        }
+    }
+
+    $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
+    $localCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD'));
+    $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
+    if (str_starts_with($remoteCommit, 'fatal:')) {
+        $remoteCommit = '';
+    }
+
+    $metrics = collectSyncMetrics($repoPath, $upstreamRef);
+$workingTreeClean = $metrics['workingTreeClean'];
+    $remoteReachable = $metrics['remoteReachable'];
+    $aheadCount = $metrics['aheadCount'];
+    $behindCount = $metrics['behindCount'];
+    $updateAvailable = ($behindCount !== null && $behindCount > 0);
+    $lastCheckedAt = gmdate('c');
+            }
+
             $auditEntry = [
                 'timestamp' => date('c'),
                 'action' => $action,
@@ -774,8 +905,8 @@ $workingTreeClean = $metrics['workingTreeClean'];
                 'new_commit' => $localCommit ?: null,
                 'source_commit' => $oldCommitForAudit ?: null,
                 'target_commit' => $remoteCommit ?: null,
-                'backup_path' => $action === 'update' ? ((string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? '')) : null,
-                'update_log_file' => $action === 'update' ? ((string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['LOG_FILE'] ?? $updateScriptResult['log_file_path'] ?? '')) : null,
+                'backup_path' => ($action === 'update' || $action === 'rollback') ? ((string) ($updateScriptResult['BACKUP_PATH'] ?? $updateScriptResult['backup_path'] ?? ($_POST['backup_path'] ?? ''))) : null,
+                'update_log_file' => ($action === 'update' || $action === 'rollback') ? ((string) ($updateScriptResult['LOG_FILE_PATH'] ?? $updateScriptResult['LOG_FILE'] ?? $updateScriptResult['log_file_path'] ?? '')) : null,
                 'restart_result' => $action === 'check' ? 'not_applicable' : $restartResultForAudit,
                 'status_type' => $statusType,
             ];
@@ -849,6 +980,33 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
     }
 }
 
+if ($action === 'direct_update') {
+    $scriptRun = runDirectUpdateScript($repoPath);
+    $updateScriptResult = $scriptRun['result'];
+    $commandOutput['Direct Update Script'] = ($scriptRun['output'] !== '' ? $scriptRun['output'] : 'No output');
+    $scriptStatus = strtolower((string) ($updateScriptResult['STATUS'] ?? ''));
+    if ($scriptRun['exitCode'] === 0 && in_array($scriptStatus, ['success', 'ok', 'passed'], true)) {
+        $statusMessage = 'Direct Docker folder update completed successfully from GitHub.';
+        $statusType = 'success';
+    } else {
+        $statusMessage = 'Direct update failed. Review command logs.';
+        $statusType = 'error';
+    }
+}
+
+if (!$isGitRepo) {
+    $directUpdateRemoteCommit = fetchGitHubMainCommitSha();
+    $commitFile = rtrim($repoPath, '/\\') . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'direct_update_commit.txt';
+    if (is_file($commitFile)) {
+        $directUpdateLocalCommit = trim((string) file_get_contents($commitFile));
+    }
+    if ($directUpdateRemoteCommit !== '' && $directUpdateLocalCommit !== '') {
+        $directUpdateAvailable = $directUpdateRemoteCommit !== $directUpdateLocalCommit;
+    } elseif ($directUpdateRemoteCommit !== '') {
+        $directUpdateAvailable = true;
+    }
+}
+
 foreach ($commandOutput as $title => $output) {
     $commandOutput[$title] = redactSensitiveOutput((string) $output);
 }
@@ -882,7 +1040,12 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
         <?php elseif (!$isGitRepo): ?>
             <div class="bg-yellow-500/10 border border-yellow-500/40 text-yellow-200 rounded-lg p-4 mb-6">
                 <p class="font-semibold mb-1">Repository not detected at <code><?php echo htmlspecialchars($repoPath); ?></code>.</p>
-                <p class="text-sm">Make sure the Docker app files include the <code>.git</code> folder or adjust the path below. You can also set <code>AMPNM_REPO_PATH</code> in the container to point directly to the mounted repository (e.g., <code>/var/www/html/ampnm-project</code>) or clone the official repo into that path.</p>
+                <p class="text-sm">Git repo is optional. You can use <span class="font-semibold">⬇ Direct Update docker-ampnm</span> to download latest code directly from GitHub and update this folder.</p>
+                <?php if ($directUpdateAvailable === true): ?>
+                    <p class="text-xs mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-500/40">Update available for direct-update mode</p>
+                <?php elseif ($directUpdateAvailable === false): ?>
+                    <p class="text-xs mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-700 text-slate-200 border border-slate-600">Direct-update mode is already up to date</p>
+                <?php endif; ?>
                 <?php if (empty($autoDetectedRepoPath) && !empty($autoDetection['attempts'])): ?>
                     <p class="text-xs text-yellow-100 mt-2">
                         Checked automatically: <code><?php echo htmlspecialchars(implode(', ', $autoDetection['attempts'])); ?></code>
@@ -1046,6 +1209,18 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                         </form>
                         <?php if (!$isGitRepo && $gitAvailable): ?>
                             <form method="POST" class="space-y-3 md:col-span-2">
+                                <input type="hidden" name="action" value="direct_update">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                                <label class="block text-sm text-slate-400">Docker App Path</label>
+                                <input type="text" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                <button type="submit" class="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-2">
+                                    <i class="fas fa-download"></i>
+                                    <span>⬇ Direct Update docker-ampnm</span>
+                                </button>
+                                <p class="text-xs text-slate-500">Downloads latest <code>main</code> zip from GitHub, updates only the <code>docker-ampnm/</code> folder into this path, keeps local <code>data/storage/logs</code>, and restarts services.</p>
+                                <p class="text-xs text-slate-400">Local direct-update commit: <code><?php echo htmlspecialchars($directUpdateLocalCommit !== '' ? $directUpdateLocalCommit : 'unknown'); ?></code><br>Remote main commit: <code><?php echo htmlspecialchars($directUpdateRemoteCommit !== '' ? $directUpdateRemoteCommit : 'unknown'); ?></code></p>
+                            </form>
+                            <form method="POST" class="space-y-3 md:col-span-2">
                                 <input type="hidden" name="action" value="clone">
                                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                 <label class="block text-sm text-slate-400">Clone into Path</label>
@@ -1157,6 +1332,16 @@ $showRollbackFailureBanner = $action === 'update' && $statusType === 'error';
                                     <p class="font-mono text-slate-100"><?php echo htmlspecialchars((string) $backup['timestamp_folder']); ?></p>
                                     <p class="text-xs text-slate-400 break-all"><?php echo htmlspecialchars((string) $backup['path']); ?></p>
                                     <p class="text-xs mt-1">Commit: <span class="font-mono text-slate-200"><?php echo htmlspecialchars((string) ($backup['git_commit'] ?? 'n/a')); ?></span></p>
+                                    <form method="POST" class="mt-2" onsubmit="return confirm('Restore this backup and restart services?');">
+                                        <input type="hidden" name="action" value="rollback">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                                        <input type="hidden" name="repo_path" value="<?php echo htmlspecialchars($repoPath); ?>">
+                                        <input type="hidden" name="backup_path" value="<?php echo htmlspecialchars((string) $backup['path']); ?>">
+                                        <button type="submit" class="w-full px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs flex items-center justify-center gap-2">
+                                            <i class="fas fa-history"></i>
+                                            <span>Restore this version</span>
+                                        </button>
+                                    </form>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
