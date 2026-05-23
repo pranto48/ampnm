@@ -9,6 +9,12 @@ STATE_FILE="${AMPNM_UPDATE_STATE_FILE:-/var/www/html/storage/update_state.json}"
 
 mkdir -p "$(dirname "$STATE_FILE")"
 
+# Configure git safe directory to avoid dubious ownership issues
+if command -v git >/dev/null 2>&1; then
+  git config --global --add safe.directory "${REPO_PATH}" || true
+  git config --global --add safe.directory '*' || true
+fi
+
 now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 if ! command -v git >/dev/null 2>&1; then

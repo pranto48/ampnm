@@ -21,6 +21,12 @@ RESULT_ENV_FILE="${RESULT_ENV_FILE:-/tmp/ampnm_update_result.env}"
 mkdir -p "$(dirname "${LOG_FILE}")"
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
+# Configure git safe directory to avoid dubious ownership issues
+if command -v git >/dev/null 2>&1; then
+  git config --global --add safe.directory "${HOST_APP_DIR}" || true
+  git config --global --add safe.directory '*' || true
+fi
+
 write_result() {
   local key="$1"
   local value="$2"

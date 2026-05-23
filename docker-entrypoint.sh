@@ -42,6 +42,7 @@ echo ""
 
 # Set secure permissions
 echo "→ Setting secure file permissions..."
+git config --system --add safe.directory '*' || true
 chown -R www-data:www-data /var/www/html
 find /var/www/html -type f -name "*.php" -exec chmod 644 {} \;
 find /var/www/html -type d -exec chmod 755 {} \;

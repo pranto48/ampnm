@@ -41,6 +41,10 @@ RUN set -eux; \
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose; \
     ln -s /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose;
 
+# Configure git system-wide to avoid ownership issues in mounted folders
+RUN git config --system --add safe.directory '*'
+
+
 # Compile and enable the required PHP extensions
 RUN set -eux; \
     docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
