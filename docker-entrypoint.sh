@@ -3,6 +3,11 @@ set -euo pipefail
 
 APACHE_PORT="${APACHE_PORT:-2266}"
 
+# Ensure docker socket is writeable by non-root users (like www-data) inside the container
+if [ -S /var/run/docker.sock ]; then
+    chmod 666 /var/run/docker.sock || true
+fi
+
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║       AMPNM - Advanced Multi-Protocol Network Monitor     ║"
 echo "║              Docker Version - Starting...                  ║"
