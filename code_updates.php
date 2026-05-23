@@ -713,7 +713,7 @@ function performUpdateCheck(string $repoPath, string $upstreamRef, string $state
 }
 
 $currentBranch = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD')) : '';
-$localCommit = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD')) : '';
+$localCommit = $isGitRepo ? getFormattedVersion($repoPath, 'HEAD') : '';
 $upstreamRef = $isGitRepo ? $targetUpstreamRef : '';
 $remoteCommit = '';
 $remoteUrl = $isGitRepo ? safeTrim(runGitCommand($repoPath, 'git config --get remote.origin.url')) : '';
@@ -734,10 +734,7 @@ if ($isGitRepo) {
     }
 
     if (!$isUpdateAction) {
-        $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
-        if (str_starts_with($remoteCommit, 'fatal:')) {
-            $remoteCommit = '';
-        }
+        $remoteCommit = $isGitRepo ? getFormattedVersion($repoPath, $upstreamRef) : '';
 
         $metrics = collectSyncMetrics($repoPath, $upstreamRef);
         $workingTreeClean = $metrics['workingTreeClean'];
@@ -817,11 +814,8 @@ $workingTreeClean = $metrics['workingTreeClean'];
     }
 
     $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
-    $localCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD'));
-    $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
-    if (str_starts_with($remoteCommit, 'fatal:')) {
-        $remoteCommit = '';
-    }
+    $localCommit = getFormattedVersion($repoPath, 'HEAD');
+    $remoteCommit = getFormattedVersion($repoPath, $upstreamRef);
 
     $metrics = collectSyncMetrics($repoPath, $upstreamRef);
 $workingTreeClean = $metrics['workingTreeClean'];
@@ -886,12 +880,9 @@ if ($action === 'clone' && $gitAvailable && !$isGitRepo) {
             $remoteUrl = $canonicalRepoUrl;
             $originConfigured = true;
             $currentBranch = safeTrim(runGitCommand($repoPath, 'git rev-parse --abbrev-ref HEAD'));
-            $localCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse HEAD'));
+            $localCommit = getFormattedVersion($repoPath, 'HEAD');
             $upstreamRef = $targetUpstreamRef;
-            $remoteCommit = safeTrim(runGitCommand($repoPath, 'git rev-parse ' . escapeshellarg($upstreamRef)));
-            if (str_starts_with($remoteCommit, 'fatal:')) {
-                $remoteCommit = '';
-            }
+            $remoteCommit = getFormattedVersion($repoPath, $upstreamRef);
 
             $metrics = collectSyncMetrics($repoPath, $upstreamRef);
             $workingTreeClean = $metrics['workingTreeClean'];

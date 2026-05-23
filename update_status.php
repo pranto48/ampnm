@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 include 'header.php';
-$commitHash = trim(shell_exec('cd ' . escapeshellarg($repoPath) . ' && git rev-parse --short HEAD 2>/dev/null') ?? '');
+$versionStr = getFormattedVersion($repoPath, 'HEAD');
 $branchName = trim(shell_exec('cd ' . escapeshellarg($repoPath) . ' && git rev-parse --abbrev-ref HEAD 2>/dev/null') ?? '');
 $updateState = readUpdateStateFile();
 $restorePoints = readRestorePoints();
@@ -148,7 +148,7 @@ $checkedAt = isset($updateState['checked_at']) ? (string) $updateState['checked_
     <h1 class="text-2xl font-bold text-white mb-6">Update Status</h1>
     <?php if ($statusMessage !== ''): ?><div class="mb-4 p-3 rounded <?= $statusType === 'success' ? 'bg-green-500/20 text-green-200 border border-green-500/30' : 'bg-red-500/20 text-red-200 border border-red-500/30' ?>"><?= htmlspecialchars($statusMessage) ?></div><?php endif; ?>
     <div class="space-y-3 mb-6 text-slate-200">
-      <p><span class="text-slate-400">Current version/commit:</span> <code class="bg-slate-900 px-2 py-1 rounded"><?= htmlspecialchars($commitHash ?: 'unknown') ?></code></p>
+      <p><span class="text-slate-400">Current version/commit:</span> <code class="bg-slate-900 px-2 py-1 rounded"><?= htmlspecialchars($versionStr) ?></code></p>
       <p><span class="text-slate-400">Branch:</span> <code class="bg-slate-900 px-2 py-1 rounded"><?= htmlspecialchars($branchName ?: 'unknown') ?></code></p>
       <p><span class="text-slate-400">Update status:</span> <?php if ($updateAvailable): ?><span class="inline-flex px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-sm font-semibold">Update available<?= $behindCount !== null ? ' (' . $behindCount . ' behind)' : '' ?></span><?php else: ?><span class="inline-flex px-2.5 py-1 rounded-full bg-green-500/20 text-green-300 border border-green-500/40 text-sm font-semibold">Up to date</span><?php endif; ?></p>
       <p><span class="text-slate-400">Last checked:</span> <?= htmlspecialchars($checkedAt ?: 'Never') ?><?= $checkedAt ? ' (UTC)' : '' ?></p>
