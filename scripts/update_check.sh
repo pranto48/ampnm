@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export HOME=/tmp
+export HOME=/var/www
 
 REPO_PATH="${AMPNM_REPO_PATH:-/var/www/html}"
 BRANCH="${AMPNM_UPDATE_BRANCH:-main}"

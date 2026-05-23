@@ -25,8 +25,8 @@ function getFormattedVersion(string $repoPath, string $ref): string
 {
     $refEscaped = escapeshellarg($ref);
     $pathEscaped = escapeshellarg($repoPath);
-    $commitCount = trim(shell_exec("export HOME=/tmp && cd {$pathEscaped} && git rev-list --count {$refEscaped} 2>/dev/null") ?? '');
-    $commitHash = trim(shell_exec("export HOME=/tmp && cd {$pathEscaped} && git rev-parse --short {$refEscaped} 2>/dev/null") ?? '');
+    $commitCount = trim(shell_exec("export HOME=/var/www && cd {$pathEscaped} && git rev-list --count {$refEscaped} 2>/dev/null") ?? '');
+    $commitHash = trim(shell_exec("export HOME=/var/www && cd {$pathEscaped} && git rev-parse --short {$refEscaped} 2>/dev/null") ?? '');
     
     if (is_numeric($commitCount) && $commitCount !== '') {
         $version = 'V' . sprintf("%.2f", (int)$commitCount / 100);

@@ -82,8 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $action = $_POST['action'] ?? '';
     if ($statusType !== 'error' && $action === 'update') {
-        $previousCommit = trim(shell_exec('export HOME=/tmp && cd ' . escapeshellarg($repoPath) . ' && git rev-parse HEAD 2>/dev/null') ?? '');
-        $cmd = 'export HOME=/tmp && cd ' . escapeshellarg($repoPath) . ' && bash ' . escapeshellarg($repoPath . '/scripts/update.sh') . ' 2>&1';
+        $previousCommit = trim(shell_exec('export HOME=/var/www && cd ' . escapeshellarg($repoPath) . ' && git rev-parse HEAD 2>/dev/null') ?? '');
+        $cmd = 'export HOME=/var/www && cd ' . escapeshellarg($repoPath) . ' && bash ' . escapeshellarg($repoPath . '/scripts/update.sh') . ' 2>&1';
         exec($cmd, $out, $code);
         $statusMessage = $code === 0 ? 'Update completed successfully.' : 'Update command failed.';
         $statusType = $code === 0 ? 'success' : 'error';
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $backupPath = trim((string) substr($line, strpos($line, 'Creating backup at ') + strlen('Creating backup at ')));
                 }
             }
-            $newCommit = trim(shell_exec('export HOME=/tmp && cd ' . escapeshellarg($repoPath) . ' && git rev-parse HEAD 2>/dev/null') ?? '');
+            $newCommit = trim(shell_exec('export HOME=/var/www && cd ' . escapeshellarg($repoPath) . ' && git rev-parse HEAD 2>/dev/null') ?? '');
             appendRestorePoint([
                 'timestamp' => gmdate('c'),
                 'previous_commit' => $previousCommit,
@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 include 'header.php';
 $versionStr = getFormattedVersion($repoPath, 'HEAD');
-$branchName = trim(shell_exec('export HOME=/tmp && cd ' . escapeshellarg($repoPath) . ' && git rev-parse --abbrev-ref HEAD 2>/dev/null') ?? '');
+$branchName = trim(shell_exec('export HOME=/var/www && cd ' . escapeshellarg($repoPath) . ' && git rev-parse --abbrev-ref HEAD 2>/dev/null') ?? '');
 $updateState = readUpdateStateFile();
 $restorePoints = readRestorePoints();
 $latestRestorePoint = $restorePoints[0] ?? null;

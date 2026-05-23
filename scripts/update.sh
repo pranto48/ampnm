@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-export HOME=/tmp
+export HOME=/var/www
 
 REPO_URL="${AMPNM_UPDATE_REPO_URL:-${REPO_URL:-https://github.com/pranto48/ampnm.git}}"
 UPDATE_BRANCH="${AMPNM_UPDATE_BRANCH:-main}"
