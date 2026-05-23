@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export HOME=/tmp
+
 REPO_PATH="${AMPNM_REPO_PATH:-/var/www/html}"
 BRANCH="${AMPNM_UPDATE_BRANCH:-main}"
 REPO_URL="${AMPNM_UPDATE_REPO_URL:-https://github.com/pranto48/ampnm.git}"

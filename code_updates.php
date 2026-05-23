@@ -172,7 +172,7 @@ function releaseUpdateLock($handle, array &$commandOutput): void
 function runGitCommand(string $repoPath, string $command): string
 {
     $escapedPath = escapeshellarg($repoPath);
-    $fullCommand = "cd {$escapedPath} && {$command} 2>&1";
+    $fullCommand = "export HOME=/tmp && cd {$escapedPath} && {$command} 2>&1";
     return shell_exec($fullCommand) ?? '';
 }
 
@@ -195,15 +195,16 @@ function runShellCommandWithStatus(string $command): array
 function runUpdateScript(string $repoPath, string $upstreamRef, bool $forceUpdate): array
 {
     $scriptPath = realpath(__DIR__ . '/scripts/update.sh') ?: (__DIR__ . '/scripts/update.sh');
-    $resultFile = '/tmp/ampnm_update_result.env';
+    $resultFile = '/tmp/ampnm_update_result_' . uniqid() . '.env';
     $envOverrides = [
         'AMPNM_REPO_PATH=' . $repoPath,
         'AMPNM_UPSTREAM_REF=' . $upstreamRef,
         'AMPNM_FORCE_UPDATE=' . ($forceUpdate ? '1' : '0'),
+        'RESULT_ENV_FILE=' . $resultFile,
         'AMPNM_RESULT_FILE=' . $resultFile,
     ];
     $escapedEnv = implode(' ', array_map('escapeshellarg', $envOverrides));
-    $command = 'env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+    $command = 'export HOME=/tmp && env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
 
     $output = [];
     $exitCode = 1;
@@ -219,6 +220,7 @@ function runUpdateScript(string $repoPath, string $upstreamRef, bool $forceUpdat
             [$key, $value] = explode('=', $line, 2);
             $parsedResult[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
         }
+        @unlink($resultFile);
     }
 
     return [
@@ -231,13 +233,14 @@ function runUpdateScript(string $repoPath, string $upstreamRef, bool $forceUpdat
 function runDirectUpdateScript(string $targetDir): array
 {
     $scriptPath = realpath(__DIR__ . '/scripts/direct_update.sh') ?: (__DIR__ . '/scripts/direct_update.sh');
-    $resultFile = '/tmp/ampnm_direct_update_result.env';
+    $resultFile = '/tmp/ampnm_direct_update_result_' . uniqid() . '.env';
     $envOverrides = [
         'TARGET_DIR=' . $targetDir,
         'RESULT_ENV_FILE=' . $resultFile,
+        'AMPNM_RESULT_FILE=' . $resultFile,
     ];
     $escapedEnv = implode(' ', array_map('escapeshellarg', $envOverrides));
-    $command = 'env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
+    $command = 'export HOME=/tmp && env ' . $escapedEnv . ' bash ' . escapeshellarg($scriptPath) . ' 2>&1';
     $output = [];
     $exitCode = 1;
     exec($command, $output, $exitCode);
@@ -251,6 +254,7 @@ function runDirectUpdateScript(string $targetDir): array
             [$key, $value] = explode('=', $line, 2);
             $parsedResult[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
         }
+        @unlink($resultFile);
     }
     return ['output' => implode("\n", $output), 'exitCode' => $exitCode, 'result' => $parsedResult];
 }

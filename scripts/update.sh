@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export HOME=/tmp
+
 REPO_URL="${AMPNM_UPDATE_REPO_URL:-${REPO_URL:-https://github.com/pranto48/ampnm.git}}"
 UPDATE_BRANCH="${AMPNM_UPDATE_BRANCH:-main}"
 UPSTREAM_REF="origin/${UPDATE_BRANCH}"
@@ -16,7 +18,7 @@ BACKUP_BASE="${BACKUP_BASE:-/var/www/html/data/code_backups}"
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d_%H%M%S)}"
 BACKUP_DIR="${BACKUP_BASE}/${TIMESTAMP}"
 LOG_FILE="${LOG_FILE:-/tmp/ampnm_update_${TIMESTAMP}.log}"
-RESULT_ENV_FILE="${RESULT_ENV_FILE:-/tmp/ampnm_update_result.env}"
+RESULT_ENV_FILE="${RESULT_ENV_FILE:-${AMPNM_RESULT_FILE:-/tmp/ampnm_update_result_$(whoami).env}}"
 
 mkdir -p "$(dirname "${LOG_FILE}")"
 exec > >(tee -a "${LOG_FILE}") 2>&1
