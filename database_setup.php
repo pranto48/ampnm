@@ -650,6 +650,105 @@ try {
             `notes` TEXT NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (`floor_plan_id`) REFERENCES `floor_plans`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR AGENT ENROLLMENT TOKENS
+        "CREATE TABLE IF NOT EXISTS `agent_enrollment_tokens` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `token_hash` VARCHAR(64) UNIQUE NOT NULL,
+            `name` VARCHAR(255) NOT NULL,
+            `is_active` TINYINT(1) DEFAULT 1,
+            `expires_at` DATETIME NULL,
+            `created_by` BIGINT UNSIGNED NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `last_used_at` DATETIME NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR AGENT DEVICES
+        "CREATE TABLE IF NOT EXISTS `agent_devices` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `agent_uuid` VARCHAR(64) UNIQUE NOT NULL,
+            `agent_name` VARCHAR(255) NULL,
+            `hostname` VARCHAR(255) NOT NULL,
+            `device_name` VARCHAR(255) NULL,
+            `os_name` VARCHAR(128) NOT NULL,
+            `os_version` VARCHAR(128) NOT NULL,
+            `architecture` VARCHAR(32) NOT NULL,
+            `username` VARCHAR(255) NULL,
+            `domain` VARCHAR(255) NULL,
+            `local_ip` VARCHAR(64) NULL,
+            `public_ip` VARCHAR(64) NULL,
+            `mac_address` VARCHAR(64) NULL,
+            `cpu_model` VARCHAR(255) NULL,
+            `cpu_cores` INT UNSIGNED DEFAULT 1,
+            `total_memory_mb` INT UNSIGNED DEFAULT 0,
+            `total_disk_gb` INT UNSIGNED DEFAULT 0,
+            `app_version` VARCHAR(32) NOT NULL,
+            `server_address` VARCHAR(1024) NOT NULL,
+            `heartbeat_interval_seconds` INT UNSIGNED DEFAULT 5,
+            `status` ENUM('online', 'warning', 'offline') DEFAULT 'offline',
+            `last_seen_at` DATETIME NULL,
+            `registered_at` DATETIME NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `is_active` TINYINT(1) DEFAULT 1,
+            INDEX `idx_agent_devices_uuid` (`agent_uuid`),
+            INDEX `idx_agent_devices_hostname` (`hostname`),
+            INDEX `idx_agent_devices_last_seen` (`last_seen_at`),
+            INDEX `idx_agent_devices_status` (`status`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR AGENT DEVICE SECRETS
+        "CREATE TABLE IF NOT EXISTS `agent_device_secrets` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `agent_device_id` BIGINT UNSIGNED NOT NULL,
+            `secret_hash` VARCHAR(255) NOT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `rotated_at` DATETIME NULL,
+            `revoked_at` DATETIME NULL,
+            INDEX `idx_agent_device_secrets_device` (`agent_device_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR AGENT HEARTBEATS
+        "CREATE TABLE IF NOT EXISTS `agent_heartbeats` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `agent_device_id` BIGINT UNSIGNED NOT NULL,
+            `cpu_usage_percent` DECIMAL(5,2) DEFAULT 0.00,
+            `memory_used_mb` INT UNSIGNED DEFAULT 0,
+            `memory_total_mb` INT UNSIGNED DEFAULT 0,
+            `memory_usage_percent` DECIMAL(5,2) DEFAULT 0.00,
+            `disk_used_gb` INT UNSIGNED DEFAULT 0,
+            `disk_total_gb` INT UNSIGNED DEFAULT 0,
+            `disk_usage_percent` DECIMAL(5,2) DEFAULT 0.00,
+            `network_rx_bytes` BIGINT UNSIGNED DEFAULT 0,
+            `network_tx_bytes` BIGINT UNSIGNED DEFAULT 0,
+            `uptime_seconds` BIGINT UNSIGNED DEFAULT 0,
+            `battery_percent` TINYINT UNSIGNED NULL,
+            `battery_status` VARCHAR(32) DEFAULT 'unknown',
+            `active_user` VARCHAR(255) NULL,
+            `current_ip` VARCHAR(64) NULL,
+            `process_count` INT UNSIGNED DEFAULT 0,
+            `service_count` INT UNSIGNED DEFAULT 0,
+            `agent_version` VARCHAR(32) NOT NULL,
+            `collected_at` DATETIME NOT NULL,
+            `received_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `raw_payload_json` LONGTEXT NULL,
+            INDEX `idx_agent_heartbeats_device` (`agent_device_id`),
+            INDEX `idx_agent_heartbeats_collected` (`collected_at`),
+            INDEX `idx_agent_heartbeats_received` (`received_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // TABLE FOR AGENT EVENTS
+        "CREATE TABLE IF NOT EXISTS `agent_events` (
+            `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `agent_device_id` BIGINT UNSIGNED NOT NULL,
+            `event_type` VARCHAR(64) NOT NULL,
+            `severity` ENUM('info', 'warning', 'error', 'critical') DEFAULT 'info',
+            `message` TEXT NOT NULL,
+            `metadata_json` LONGTEXT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_agent_events_device` (`agent_device_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     ];
 
