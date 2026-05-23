@@ -21,6 +21,45 @@ Access at: http://localhost:2266
 > Stuck during download/build? See `INSTALL_TROUBLESHOOTING.md` for diagnostics and progress tips.
 > If you see `unexpected EOF` while pulling images, rerun `docker compose pull db --progress=plain` (or `docker pull mysql:8`) to resume the largest layer, then rerun the start command.
 
+## 🪟 Install AMPNM on Windows PC with Docker Desktop
+
+For a seamless setup on Windows 11, you can use our PowerShell scripts or manually run the commands below.
+
+### PowerShell Automatic Script (Recommended)
+1. Open PowerShell or Windows Terminal.
+2. Run the installer script:
+   ```powershell
+   .\scripts\windows-install.ps1
+   ```
+
+### Manual Step-by-Step Instructions
+1. **Install Docker Desktop**: Download and install Docker Desktop for Windows.
+2. **Enable WSL 2 Backend**: Ensure "Use the WSL 2 based engine" is enabled during Docker Desktop setup.
+3. **Run Docker Desktop**: Start the Docker Desktop application and wait until it indicates Docker is running.
+4. **Open PowerShell or Windows Terminal** in the cloned repository directory:
+   ```powershell
+   git clone https://github.com/pranto48/ampnm.git
+   cd ampnm
+   ```
+5. **Set Environment Variables**:
+   - Copy `.env.example` to `.env`.
+   - Customize `.env` as needed.
+6. **Start AMPNM**:
+   ```powershell
+   docker compose pull
+   docker compose up --build --progress=plain -d
+   ```
+7. **Access the App**: Open your browser at http://localhost:2266 (or the port defined in `APACHE_PORT`).
+8. **Login**:
+   - **Username**: `admin`
+   - **Password**: `password`
+9. **Change default passwords**: Immediately modify the default admin password (`ADMIN_PASSWORD`) and database passwords in your `.env` file for security, then run the installer again.
+
+### Additional Windows Command Utilities
+- **Stop services**: Run `.\scripts\windows-stop.ps1` to cleanly shut down containers.
+- **Update system**: Run `.\scripts\windows-update.ps1` to pull changes, fetch new images, and rebuild.
+- **Create database backup**: Run `.\scripts\windows-backup.ps1` to generate a timestamped SQL backup in the `backups/` folder.
+
 ## 📋 Requirements
 
 - Docker & Docker Compose
@@ -235,6 +274,86 @@ docker-compose exec app ping 8.8.8.8
 # Check internal network
 docker network inspect ampnm-network
 ```
+
+## 🛠️ Windows Docker Troubleshooting
+
+Here are typical troubleshooting steps for common issues encountered on Windows environments:
+
+### Docker Desktop not running
+- **Symptom**: Script reports Docker is not running or commands time out.
+- **Fix**: Launch Docker Desktop from the Start menu and wait until the status bar indicator turns green.
+
+### WSL 2 not enabled
+- **Symptom**: Docker Desktop fails to start, displaying a WSL 2 kernel update prompt.
+- **Fix**: Open PowerShell as Administrator and run:
+  ```powershell
+  wsl --install
+  ```
+  Restart your computer if prompted.
+
+### Port 2266 already in use
+- **Symptom**: Apache fails to start, or container exits.
+- **Fix**: Modify `APACHE_PORT` in your `.env` file to an unused port (e.g., `APACHE_PORT=8080`) and rerun the installer.
+
+### MySQL container not healthy
+- **Symptom**: Connection failures, loop redirecting back to `database_setup.php`.
+- **Fix**: Verify logs and database state. Run `docker compose ps` to inspect. If the database volume was corrupted, reset it using the commands below.
+
+### Docker pull unexpected EOF
+- **Symptom**: Connection drop on large layers.
+- **Fix**: Run `docker compose pull --progress=plain` to resume downloads.
+
+### Cannot access http://localhost:2266
+- **Symptom**: Page not found.
+- **Fix**: Ensure the containers are running:
+  ```powershell
+  docker compose ps
+  ```
+  If they are not running, check logs:
+  ```powershell
+  docker compose logs -f app
+  docker compose logs -f db
+  ```
+
+### Ping/ICMP limitations inside Docker Desktop/Windows
+- **Symptom**: Pings inside containers do not work or show 100% packet loss.
+- **Fix**: Docker Desktop on Windows routes traffic through a user-space network translation layer that does not pass through low-level ICMP ping requests directly unless running with special permissions, or using the Cloud Sync bridge mode. If ping fails, use TCP port checks as a monitor method.
+
+### How to View Logs
+- **Application logs**:
+  ```powershell
+  docker compose logs -f app
+  ```
+- **Database logs**:
+  ```powershell
+  docker compose logs -f db
+  ```
+
+### How to Restart
+```powershell
+docker compose restart
+```
+
+### How to Reset Completely
+> [!CAUTION]
+> This deletes all stored database data and configurations.
+```powershell
+docker compose down -v
+docker compose up --build -d
+```
+
+## 📋 Windows Post-Installation Testing Checklist
+
+After running the installation script, verify your AMPNM instance works correctly by checking off the following tasks:
+
+- [ ] **Docker Desktop Running**: Docker Desktop engine is active and indicating healthy status.
+- [ ] **Containers Started**: Both `app` and `db` services show as `running` under `docker compose ps`.
+- [ ] **Web UI Access**: Browser connects and renders correctly at http://localhost:2266.
+- [ ] **Admin Login**: Logging in with `admin` and `password` works and redirects to the dashboard.
+- [ ] **Device Monitor**: Adding a new device and monitoring via Ping or Port works.
+- [ ] **SMS Configuration**: The SMS settings page displays and permits updates.
+- [ ] **Test SMS Integration**: Sending a test SMS succeeds after setting the Alpha SMS API keys.
+- [ ] **SMS Alerts**: Device status modifications (Online -> Offline / Offline -> Online) trigger SMS alerts.
 
 ## 📊 Performance
 
