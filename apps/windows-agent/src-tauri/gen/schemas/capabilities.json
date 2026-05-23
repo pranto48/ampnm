@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default AMPNM Agent capabilities","local":true,"windows":["main"],"permissions":["core:default","core:event:default","core:window:default","core:app:default","core:tray:default","core:webview:default","autostart:default","http:default","notification:default","process:default","shell:default","store:default"]}}

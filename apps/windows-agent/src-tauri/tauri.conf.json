@@ -1,0 +1,61 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AMPNM Agent",
+  "version": "1.0.0",
+  "identifier": "com.ampnm.windows-agent",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AMPNM Windows Agent",
+        "width": 480,
+        "height": 620,
+        "minWidth": 440,
+        "minHeight": 540,
+        "resizable": true,
+        "visible": false,
+        "decorations": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/tray-icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false,
+      "title": "AMPNM Agent"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "languages": ["English"],
+        "installerIcon": "icons/icon.ico",
+        "installMode": "perMachine"
+      }
+    },
+    "publisher": "AMPNM Project",
+    "shortDescription": "Windows Usage Agent for AMPNM Network Monitor",
+    "longDescription": "AMPNM Windows Agent monitors CPU, memory, disk, and network usage and sends telemetry to your AMPNM Docker server. Runs silently in the system tray with full user visibility and control."
+  }
+}
