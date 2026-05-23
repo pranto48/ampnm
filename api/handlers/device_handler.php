@@ -63,6 +63,82 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
     }
 }
 
+function sendSMSNotification($pdo, $device, $oldStatus, $newStatus, $details) {
+    if (!in_array($newStatus, ['online', 'offline', 'warning', 'critical'], true)) {
+        return;
+    }
+
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+    if ($userId <= 0) {
+        error_log('SMS notification skipped: invalid session user');
+        return;
+    }
+
+    // Load SMS settings to verify if enabled and cooldown is respected
+    $stmt = $pdo->prepare("SELECT * FROM sms_settings WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $smsSettings = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // If no settings in DB, try to fallback to environment variables
+    $enabled = $smsSettings ? (bool)$smsSettings['enabled'] : (getenv('SMS_ALERTS_ENABLED') !== '0');
+    $cooldownMinutes = (int)($smsSettings ? $smsSettings['cooldown_minutes'] : (getenv('SMS_COOLDOWN_MINUTES') ?: 30));
+
+    if (!$enabled) {
+        return;
+    }
+
+    // Cooldown verification to avoid spamming SMS alerts
+    if ($cooldownMinutes > 0) {
+        // Find if there is a status log for this device and status that was logged within the cooldown period
+        $stmtCooldown = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM device_status_logs 
+            WHERE device_id = ? AND status = ? AND created_at >= NOW() - INTERVAL ? MINUTE
+        ");
+        $stmtCooldown->execute([$device['id'], $newStatus, $cooldownMinutes]);
+        // Note: logStatusChange is called before sendSMSNotification. So there will be exactly 1 log (the current one).
+        // If count > 1, it means there was another status log for this device and status within the cooldown period.
+        if ((int)$stmtCooldown->fetchColumn() > 1) {
+            error_log("SMS notification skipped: Cooldown active for device '{$device['name']}' status '{$newStatus}'.");
+            return;
+        }
+    }
+
+    // Fetch active SMS subscriptions for this device
+    $sqlSubscriptions = "SELECT recipient_phone FROM device_sms_subscriptions WHERE user_id = ? AND device_id = ?";
+    $paramsSubscriptions = [$userId, $device['id']];
+
+    if ($newStatus === 'online') {
+        $sqlSubscriptions .= " AND notify_on_online = TRUE";
+    } elseif ($newStatus === 'offline') {
+        $sqlSubscriptions .= " AND notify_on_offline = TRUE";
+    } elseif ($newStatus === 'warning') {
+        $sqlSubscriptions .= " AND notify_on_warning = TRUE";
+    } elseif ($newStatus === 'critical') {
+        $sqlSubscriptions .= " AND notify_on_critical = TRUE";
+    }
+
+    $stmtSubscriptions = $pdo->prepare($sqlSubscriptions);
+    $stmtSubscriptions->execute($paramsSubscriptions);
+    $recipients = $stmtSubscriptions->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($recipients)) {
+        return;
+    }
+
+    // Format a concise SMS body (SMS length constraints apply)
+    $smsBody = sprintf("ALERT: %s is %s. %s", $device['name'], strtoupper($newStatus), $details);
+
+    require_once __DIR__ . '/../../includes/sms_sender.php';
+    foreach ($recipients as $recipient) {
+        $smsError = null;
+        $sent = sms_send_alert($recipient, $smsBody, $smsError);
+        if (!$sent) {
+            error_log("SMS send failed for {$recipient} (device {$device['name']}, status {$newStatus}): " . ($smsError ?? 'Unknown error'));
+        }
+    }
+}
+
 
 function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details) {
     if (!$pingResult['success']) {
@@ -282,6 +358,7 @@ switch ($action) {
                 if ($old_status !== $new_status) {
                     logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
                     sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
+                    sendSMSNotification($pdo, $device, $old_status, $new_status, $details); // Trigger SMS notification
                     $status_changes++;
                 }
                 
@@ -338,6 +415,7 @@ switch ($action) {
                 
                 logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
                 sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
+                sendSMSNotification($pdo, $device, $old_status, $new_status, $details); // Trigger SMS notification
                 
                 // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
                 // This allows viewers to update the status of devices on shared maps.
@@ -409,6 +487,7 @@ switch ($action) {
             
             logStatusChange($pdo, $deviceId, $old_status, $status, $details);
             sendEmailNotification($pdo, $device, $old_status, $status, $details); // Trigger email notification
+            sendSMSNotification($pdo, $device, $old_status, $status, $details); // Trigger SMS notification
             
             // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
             // This allows viewers to update the status of devices on shared maps.
@@ -674,6 +753,7 @@ switch ($action) {
 
             logStatusChange($pdo, $device['id'], $old_status, $status, $details);
             sendEmailNotification($pdo, $device, $old_status, $status, $details);
+            sendSMSNotification($pdo, $device, $old_status, $status, $details);
 
             // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
             // This allows viewers to update the status of devices on shared maps.

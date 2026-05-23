@@ -25,6 +25,7 @@
     <script src="assets/js/users.js"></script>
     <script src="assets/js/status_logs.js"></script>
     <script src="assets/js/email_notifications.js"></script>
+    <script src="assets/js/sms_notifications.js"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -141,6 +142,8 @@
             initStatusLogs();
         } else if (page === 'email_notifications.php') {
             initEmailNotifications();
+        } else if (page === 'sms_notifications.php') {
+            initSmsNotifications();
         } else if (page === 'network_graphs.php') {
             initNetworkGraphs();
         }

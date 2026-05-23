@@ -398,6 +398,37 @@ try {
             FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
         
+        // New table for SMS settings
+        "CREATE TABLE IF NOT EXISTS `sms_settings` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `username` VARCHAR(255) NOT NULL,
+            `api_key` VARCHAR(255) NOT NULL,
+            `sender_id` VARCHAR(255) NULL,
+            `enabled` TINYINT(1) DEFAULT 1,
+            `cooldown_minutes` INT(11) DEFAULT 30,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `user_id_unique` (`user_id`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // New table for device SMS subscriptions
+        "CREATE TABLE IF NOT EXISTS `device_sms_subscriptions` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `device_id` INT(6) UNSIGNED NOT NULL,
+            `recipient_phone` VARCHAR(30) NOT NULL,
+            `notify_on_online` BOOLEAN DEFAULT TRUE,
+            `notify_on_offline` BOOLEAN DEFAULT TRUE,
+            `notify_on_warning` BOOLEAN DEFAULT TRUE,
+            `notify_on_critical` BOOLEAN DEFAULT TRUE,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `device_phone_unique` (`device_id`, `recipient_phone`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+            FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        
         // NEW TABLE FOR APPLICATION SETTINGS (LICENSE KEY, INSTALLATION ID)
         "CREATE TABLE IF NOT EXISTS `app_settings` (
             `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
