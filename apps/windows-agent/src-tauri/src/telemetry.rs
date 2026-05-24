@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sysinfo::{
-    Components, CpuRefreshKind, Disk, Disks, NetworkData, Networks, RefreshKind, System,
+    Components, CpuRefreshKind, Disk, Disks, NetworkData, Networks, RefreshKind, System, MemoryRefreshKind,
 };
 use std::net::IpAddr;
 
@@ -35,9 +35,9 @@ pub struct Telemetry {
 /// Collect full system telemetry
 pub fn collect_telemetry(collect_username: bool) -> Telemetry {
     let mut sys = System::new_with_specifics(
-        RefreshKind::new()
-            .with_cpu(CpuRefreshKind::new().with_cpu_usage())
-            .with_memory(),
+        RefreshKind::nothing()
+            .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
+            .with_memory(MemoryRefreshKind::everything()),
     );
 
     // First refresh: let CPU usage accumulate (sysinfo needs two reads)
