@@ -101,6 +101,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'backup_path' => $backupPath,
                 'new_commit' => $newCommit,
             ]);
+            
+            // Invalidate the cached update state so the UI reflects the new state immediately
+            $statePath = __DIR__ . '/storage/update_state.json';
+            if (file_exists($statePath)) {
+                unlink($statePath);
+            }
         }
     } elseif ($statusType !== 'error' && $action === 'restore') {
         $selected = trim((string) ($_POST['backup_path'] ?? ''));
@@ -125,6 +131,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ? 'Restore completed. Restored commit: ' . ($restoredCommit !== '' ? $restoredCommit : 'unknown') . '. Service restart: ' . ($restartResult ?? 'see logs') . '.'
                 : 'Restore command failed.';
             $statusType = $code === 0 ? 'success' : 'error';
+            
+            if ($code === 0) {
+                // Invalidate the cached update state so the UI reflects the new state immediately
+                $statePath = __DIR__ . '/storage/update_state.json';
+                if (file_exists($statePath)) {
+                    unlink($statePath);
+                }
+            }
         } else {
             $statusMessage = 'No valid backup selected to restore.';
             $statusType = 'error';
