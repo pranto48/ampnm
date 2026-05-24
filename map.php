@@ -416,6 +416,9 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                                 <option value="solid">Solid</option>
                                 <option value="dashed">Dashed</option>
                                 <option value="dotted">Dotted</option>
+                                <option value="data-flow">Data Flow (Packets)</option>
+                                <option value="data-stream">Data Stream</option>
+                                <option value="pulse">Pulse</option>
                             </select>
                         </div>
                         <div>

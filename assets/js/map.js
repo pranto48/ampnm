@@ -166,7 +166,7 @@ function initMap() {
             panel_text_color: panelTextColor,
             panel_muted_color: panelMutedColor,
             panel_accent_color: panelAccentColor,
-            connection_run_style: ['auto', 'solid', 'dashed', 'dotted'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
+            connection_run_style: ['auto', 'solid', 'dashed', 'dotted', 'data-flow', 'data-stream', 'pulse'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
             connection_animation_speed: Math.min(200, Math.max(0, connectionAnimationSpeed))
         };
     };

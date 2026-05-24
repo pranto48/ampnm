@@ -347,8 +347,18 @@ MapApp.ui = {
                         dashes = speedPercent === 0 ? [1, 6] : (phase % 2 === 0 ? [1, 5] : [2, 4]);
                     } else if (runStyle === 'dashed') {
                         dashes = speedPercent === 0 ? [8, 6] : (phase % 2 === 0 ? [6, 6] : [10, 4]);
+                    } else if (runStyle === 'data-flow') {
+                        // Simulates packets moving (short dash, long gap)
+                        dashes = speedPercent === 0 ? [2, 10] : [[2, 14], [4, 12], [6, 10], [8, 8]][phase % 4];
+                    } else if (runStyle === 'data-stream') {
+                        // Simulates a continuous stream moving (long dash, short gap)
+                        dashes = speedPercent === 0 ? [10, 2] : [[8, 4], [10, 2], [12, 0], [6, 6]][phase % 4];
+                    } else if (runStyle === 'pulse') {
+                        // Simulates a pulse by varying gap sizes wildly
+                        dashes = speedPercent === 0 ? [5, 5] : [[1, 9], [3, 7], [5, 5], [7, 3], [9, 1]][MapApp.state.tick % 5];
                     } else {
-                        dashes = speedPercent === 0 ? [6, 6] : [[3, 7], [5, 5], [7, 3], [5, 5]][phase];
+                        // auto
+                        dashes = speedPercent === 0 ? [6, 6] : [[3, 7], [5, 5], [7, 3], [5, 5]][phase % 4];
                     }
                 } else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
                     dashes = [5, 5];
