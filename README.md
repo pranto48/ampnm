@@ -99,18 +99,24 @@ environment:
 
 ### Check Types
 
-1. **ICMP Ping** (Default)
+1. **Windows Usage Agent** (New Desktop Client)
+   - Real-time CPU, RAM, and Disk metrics via Tauri desktop app
+   - Network interface Tx/Rx tracking
+   - Centralized status logging and process counting
+   - Silent tray icon integration with pause options
+
+2. **ICMP Ping**
    - Latency monitoring
    - Packet loss detection
    - TTL tracking
    - Thresholds: Warning & Critical
 
-2. **TCP Port Check**
+3. **TCP Port Check**
    - Port availability
    - Connection time
    - Service status
 
-3. **HTTP/HTTPS Check**
+4. **HTTP/HTTPS Check**
    - Response code
    - Response time
    - Content verification
@@ -352,6 +358,9 @@ After running the installation script, verify your AMPNM instance works correctl
 - [ ] **Admin Login**: Logging in with `admin` and `password` works and redirects to the dashboard.
 - [ ] **Device Monitor**: Adding a new device and monitoring via Ping or Port works.
 - [ ] **SMS Configuration**: The SMS settings page displays and permits updates.
+- [ ] **Windows Usage Agent UI**: Verify `agent_devices.php` loads correctly.
+- [ ] **Windows Usage Agent Build**: Run `.\scripts\build-agent-windows.ps1` and verify `.msi` installers are built successfully in `apps/windows-agent/src-tauri/target/release/bundle/`.
+- [ ] **Windows Usage Agent Registration**: Add a Windows PC agent using an enrollment token.
 - [ ] **Test SMS Integration**: Sending a test SMS succeeds after setting the Alpha SMS API keys.
 - [ ] **SMS Alerts**: Device status modifications (Online -> Offline / Offline -> Online) trigger SMS alerts.
 
