@@ -715,31 +715,40 @@ function initMap() {
             }
         });
 
-        els.mapSettingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const offlineDelay = parseInt(document.getElementById('offlineDelaySeconds').value, 10);
-            const updates = {
-                background_color: document.getElementById('mapBgColorHex').value,
-                background_image_url: document.getElementById('mapBgImageUrl').value,
-                public_view_enabled: els.publicViewToggle.checked,
-                offline_delay_seconds: (offlineDelay >= 1 && offlineDelay <= 300) ? offlineDelay : 5
-            };
-            try {
-                saveTooltipFieldsForMap(state.currentMapId, readTooltipFieldCheckboxes());
-                saveConnectionTooltipFieldsForMap(state.currentMapId, readConnectionTooltipFieldCheckboxes());
-                saveTooltipDisplayForMap(state.currentMapId, readTooltipDisplayControls());
-                await api.post('update_map', { id: state.currentMapId, updates });
-                await mapManager.loadMaps(); // Reload maps to get fresh data
-                await mapManager.switchMap(state.currentMapId); // Re-apply settings
-                refreshNodeTooltips();
-                refreshEdgeTooltips();
-                closeModal('mapSettingsModal');
-                window.notyf.success('Map settings saved.');
-            } catch (error) {
-                console.error("Failed to save map settings:", error);
-                window.notyf.error(error.message || "Could not save map settings.");
-            }
-        });
+        const mapSettingsFormEl = document.getElementById('mapSettingsForm');
+        if (mapSettingsFormEl) {
+            mapSettingsFormEl.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    const offlineDelayInput = document.getElementById('offlineDelaySeconds');
+                    const offlineDelay = offlineDelayInput ? parseInt(offlineDelayInput.value, 10) : 5;
+                    const bgColorHexInput = document.getElementById('mapBgColorHex');
+                    const bgImageUrlInput = document.getElementById('mapBgImageUrl');
+                    
+                    const updates = {
+                        background_color: bgColorHexInput ? bgColorHexInput.value : '#1e293b',
+                        background_image_url: bgImageUrlInput ? bgImageUrlInput.value : '',
+                        public_view_enabled: els.publicViewToggle ? els.publicViewToggle.checked : false,
+                        offline_delay_seconds: (!isNaN(offlineDelay) && offlineDelay >= 1 && offlineDelay <= 300) ? offlineDelay : 5
+                    };
+                    
+                    saveTooltipFieldsForMap(state.currentMapId, readTooltipFieldCheckboxes());
+                    saveConnectionTooltipFieldsForMap(state.currentMapId, readConnectionTooltipFieldCheckboxes());
+                    saveTooltipDisplayForMap(state.currentMapId, readTooltipDisplayControls());
+                    
+                    await api.post('update_map', { id: state.currentMapId, updates });
+                    await mapManager.loadMaps(); // Reload maps to get fresh data
+                    await mapManager.switchMap(state.currentMapId); // Re-apply settings
+                    if (typeof refreshNodeTooltips === 'function') refreshNodeTooltips();
+                    if (typeof refreshEdgeTooltips === 'function') refreshEdgeTooltips();
+                    closeModal('mapSettingsModal');
+                    if (window.notyf) window.notyf.success('Map settings saved.');
+                } catch (error) {
+                    console.error("Failed to save map settings:", error);
+                    if (window.notyf) window.notyf.error(error.message || "Could not save map settings.");
+                }
+            });
+        }
         els.resetMapBgBtn.addEventListener('click', async () => {
             try {
                 const updates = { background_color: null, background_image_url: null, public_view_enabled: false };
