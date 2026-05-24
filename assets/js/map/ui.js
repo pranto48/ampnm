@@ -356,6 +356,12 @@ MapApp.ui = {
                     } else if (runStyle === 'pulse') {
                         // Simulates a pulse by varying gap sizes wildly
                         dashes = speedPercent === 0 ? [5, 5] : [[1, 9], [3, 7], [5, 5], [7, 3], [9, 1]][MapApp.state.tick % 5];
+                    } else if (runStyle === 'wave') {
+                        dashes = speedPercent === 0 ? [4, 4] : [[2, 10], [4, 8], [6, 6], [8, 4], [10, 2], [8, 4], [6, 6], [4, 8]][MapApp.state.tick % 8];
+                    } else if (runStyle === 'morse') {
+                        dashes = speedPercent === 0 ? [2, 2, 6, 2] : [[2, 2, 6, 2], [6, 2, 2, 2], [2, 6, 2, 2], [2, 2, 2, 6]][phase % 4];
+                    } else if (runStyle === 'zipper') {
+                        dashes = speedPercent === 0 ? [1, 2, 3, 2] : [[1, 2, 3, 2], [2, 3, 2, 1], [3, 2, 1, 2], [2, 1, 2, 3]][phase % 4];
                     } else {
                         // auto
                         dashes = speedPercent === 0 ? [6, 6] : [[3, 7], [5, 5], [7, 3], [5, 5]][phase % 4];

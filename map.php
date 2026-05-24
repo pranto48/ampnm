@@ -419,6 +419,9 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                                 <option value="data-flow">Data Flow (Packets)</option>
                                 <option value="data-stream">Data Stream</option>
                                 <option value="pulse">Pulse</option>
+                                <option value="wave">Wave</option>
+                                <option value="morse">Morse Code</option>
+                                <option value="zipper">Zipper</option>
                             </select>
                         </div>
                         <div>

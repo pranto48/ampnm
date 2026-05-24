@@ -166,7 +166,7 @@ function initMap() {
             panel_text_color: panelTextColor,
             panel_muted_color: panelMutedColor,
             panel_accent_color: panelAccentColor,
-            connection_run_style: ['auto', 'solid', 'dashed', 'dotted', 'data-flow', 'data-stream', 'pulse'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
+            connection_run_style: ['auto', 'solid', 'dashed', 'dotted', 'data-flow', 'data-stream', 'pulse', 'wave', 'morse', 'zipper'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
             connection_animation_speed: Math.min(200, Math.max(0, connectionAnimationSpeed))
         };
     };
@@ -737,8 +737,22 @@ function initMap() {
                     saveTooltipDisplayForMap(state.currentMapId, readTooltipDisplayControls());
                     
                     await api.post('update_map', { id: state.currentMapId, updates });
-                    await mapManager.loadMaps(); // Reload maps to get fresh data
-                    await mapManager.switchMap(state.currentMapId); // Re-apply settings
+                    
+                    // Fast UI Update (avoiding full reload of all map edges/nodes)
+                    const currentMapIndex = state.maps.findIndex(m => m.id == state.currentMapId);
+                    if (currentMapIndex > -1) {
+                        state.maps[currentMapIndex] = { ...state.maps[currentMapIndex], ...updates };
+                    }
+                    const mapEl = document.getElementById('network-map');
+                    if (mapEl) {
+                        mapEl.style.backgroundColor = updates.background_color || '';
+                        mapEl.style.backgroundImage = updates.background_image_url ? `url(${updates.background_image_url})` : '';
+                    }
+                    MapApp.mapManager.updatePublicViewLink(state.currentMapId, updates.public_view_enabled);
+                    MapApp.config.offlineDelayMs = (updates.offline_delay_seconds || 5) * 1000;
+                    const delayBadge = document.getElementById('offlineDelayValue');
+                    if (delayBadge) delayBadge.textContent = updates.offline_delay_seconds || 5;
+
                     if (typeof refreshNodeTooltips === 'function') refreshNodeTooltips();
                     if (typeof refreshEdgeTooltips === 'function') refreshEdgeTooltips();
                     closeModal('mapSettingsModal');
