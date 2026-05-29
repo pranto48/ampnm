@@ -1,9 +1,13 @@
 mod agent;
 mod config;
+mod log_collector;
+mod spool;
 mod telemetry;
 
 use config::{AgentConfig, SharedConfig, load_config, save_config};
 use agent::{register_agent, send_heartbeat, sync_server_config};
+use log_collector::{collect_logs, LogCollectorConfig, LogEntry};
+use spool::{spool_push, spool_drain, SpoolKind};
 use telemetry::collect_telemetry;
 
 use std::sync::Arc;
@@ -17,8 +21,12 @@ use tauri_plugin_store::StoreExt;
 use tokio::sync::Mutex;
 use reqwest::Client;
 use serde_json::json;
+use chrono::Utc;
 
 const STORE_FILE: &str = "ampnm_agent.json";
+
+/// Shared log collector configuration (thread-safe).
+type SharedLogConfig = Arc<Mutex<LogCollectorConfig>>;
 
 // ─── Tauri Commands ───────────────────────────────────────────────────────────
 
@@ -139,6 +147,54 @@ async fn reset_agent(
     Ok(())
 }
 
+// ─── New Tauri Commands: Logs ────────────────────────────────────────────────
+
+/// Fetch recent log entries using the current log collector config.
+#[tauri::command]
+async fn get_logs(
+    state: tauri::State<'_, SharedConfig>,
+    log_cfg: tauri::State<'_, SharedLogConfig>,
+) -> Result<serde_json::Value, String> {
+    let _config = state.lock().await;
+    let lcfg = log_cfg.lock().await.clone();
+    // Collect last ~30 min worth
+    let since = Some(Utc::now() - chrono::Duration::minutes(30));
+    let entries = collect_logs(&lcfg, since);
+    let limited: Vec<&LogEntry> = entries.iter().take(100).collect();
+    Ok(serde_json::to_value(limited).map_err(|e| e.to_string())?)
+}
+
+/// Get the current log collector configuration.
+#[tauri::command]
+async fn get_log_config(
+    log_cfg: tauri::State<'_, SharedLogConfig>,
+) -> Result<serde_json::Value, String> {
+    let cfg = log_cfg.lock().await;
+    Ok(serde_json::to_value(&*cfg).map_err(|e| e.to_string())?)
+}
+
+/// Update log collector configuration (channels, file paths, min level).
+#[tauri::command]
+async fn update_log_config(
+    log_cfg: tauri::State<'_, SharedLogConfig>,
+    channels: Vec<String>,
+    file_paths: Vec<String>,
+    min_level: String,
+) -> Result<(), String> {
+    let mut cfg = log_cfg.lock().await;
+    cfg.event_channels = channels;
+    cfg.file_paths = file_paths;
+    cfg.min_level = match min_level.as_str() {
+        "debug"    => log_collector::LogLevel::Debug,
+        "info"     => log_collector::LogLevel::Info,
+        "warning"  => log_collector::LogLevel::Warning,
+        "error"    => log_collector::LogLevel::Error,
+        "critical" => log_collector::LogLevel::Critical,
+        _          => log_collector::LogLevel::Warning,
+    };
+    Ok(())
+}
+
 // ─── Heartbeat Loop ───────────────────────────────────────────────────────────
 
 fn start_heartbeat_loop(app: AppHandle, shared_config: SharedConfig, http_client: Client) {
@@ -165,10 +221,22 @@ fn start_heartbeat_loop(app: AppHandle, shared_config: SharedConfig, http_client
                 match send_heartbeat(&config_snapshot, &http_client).await {
                     Ok(_) => {
                         let _ = app.emit("agent-status", json!({ "online": true, "error": null }));
+                        // Drain any spooled items now that server is reachable
+                        let drained = spool_drain(&http_client).await;
+                        if drained > 0 {
+                            log::info!("Spool: drained {} queued items", drained);
+                        }
                     }
                     Err(e) => {
-                        log::warn!("Heartbeat failed: {}", e);
+                        log::warn!("Heartbeat failed (spooling): {}", e);
                         let _ = app.emit("agent-status", json!({ "online": false, "error": e }));
+                        // Spool the failed heartbeat payload for later retry
+                        let hb_payload = serde_json::to_value(&json!({
+                            "agent_id": config_snapshot.agent_id,
+                            "agent_uuid": config_snapshot.agent_uuid,
+                        })).unwrap_or_default();
+                        let endpoint = format!("{}/api/agent/windows-metrics/heartbeat", config_snapshot.server_url);
+                        let _ = spool_push(SpoolKind::Heartbeat, &endpoint, hb_payload);
                     }
                 }
 
@@ -181,6 +249,84 @@ fn start_heartbeat_loop(app: AppHandle, shared_config: SharedConfig, http_client
             }
 
             tokio::time::sleep(Duration::from_secs(interval_secs.max(5) as u64)).await;
+        }
+    });
+}
+
+// ─── Log Sync Loop ────────────────────────────────────────────────────────────
+
+fn start_log_sync_loop(
+    app: AppHandle,
+    shared_config: SharedConfig,
+    log_config: SharedLogConfig,
+    http_client: Client,
+) {
+    tokio::spawn(async move {
+        let mut last_sync = Utc::now() - chrono::Duration::seconds(65);
+
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+
+            let (is_registered, is_paused, server_url, agent_id, agent_secret) = {
+                let cfg = shared_config.lock().await;
+                (
+                    cfg.is_registered,
+                    cfg.is_paused,
+                    cfg.server_url.clone(),
+                    cfg.agent_id,
+                    cfg.agent_secret.clone(),
+                )
+            };
+
+            if !is_registered || is_paused {
+                continue;
+            }
+
+            let since = Some(last_sync);
+            let lcfg = log_config.lock().await.clone();
+            let entries = collect_logs(&lcfg, since);
+
+            if entries.is_empty() {
+                last_sync = Utc::now();
+                continue;
+            }
+
+            let endpoint = format!("{}/api/agent/logs", server_url);
+            let payload = json!({
+                "agent_id": agent_id,
+                "entries": entries,
+            });
+
+            let mut headers = reqwest::header::HeaderMap::new();
+            if let Some(ref secret) = agent_secret {
+                if let Ok(v) = reqwest::header::HeaderValue::from_str(secret) {
+                    headers.insert("X-Agent-Secret", v);
+                }
+            }
+
+            match http_client
+                .post(&endpoint)
+                .headers(headers)
+                .json(&payload)
+                .timeout(Duration::from_secs(15))
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    log::info!("Log sync: sent {} entries", entries.len());
+                    let _ = app.emit("log-sync-status", json!({ "ok": true, "count": entries.len() }));
+                    last_sync = Utc::now();
+                }
+                Ok(resp) => {
+                    log::warn!("Log sync: server rejected with status {}", resp.status());
+                    let _ = spool_push(SpoolKind::LogBatch, &endpoint, payload);
+                }
+                Err(e) => {
+                    log::warn!("Log sync: failed to send (spooling): {}", e);
+                    let _ = spool_push(SpoolKind::LogBatch, &endpoint, payload);
+                    let _ = app.emit("log-sync-status", json!({ "ok": false, "error": e.to_string() }));
+                }
+            }
         }
     });
 }
@@ -219,9 +365,16 @@ pub fn run() {
             // System tray
             setup_tray(app)?;
 
+            // Log collector config
+            let log_config: SharedLogConfig = Arc::new(Mutex::new(LogCollectorConfig::default()));
+            app.manage(log_config.clone());
+
             // Start background heartbeat loop
             let app_handle = app.handle().clone();
-            start_heartbeat_loop(app_handle, shared_config, http_client);
+            start_heartbeat_loop(app_handle.clone(), shared_config.clone(), http_client.clone());
+
+            // Start background log-sync loop (every 60 seconds)
+            start_log_sync_loop(app_handle, shared_config, log_config, http_client);
 
             Ok(())
         })
@@ -234,6 +387,9 @@ pub fn run() {
             update_settings,
             set_paused,
             reset_agent,
+            get_logs,
+            get_log_config,
+            update_log_config,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running AMPNM agent");

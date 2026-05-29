@@ -8,6 +8,7 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'POST') {
     // 1. Agent Authenticate (similar to heartbeat)
+    // Accept both Bearer token and X-Agent-Secret header (new Rust agent format)
     $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
     $agent_id = null;
     $agent_secret = null;
@@ -21,9 +22,17 @@ if ($method === 'POST') {
         }
     }
 
+    // X-Agent-Secret header (new Tauri agent format)
     if ($agent_id === null || $agent_secret === null) {
         $agent_id = isset($_SERVER['HTTP_X_AGENT_ID']) ? (int)$_SERVER['HTTP_X_AGENT_ID'] : null;
         $agent_secret = $_SERVER['HTTP_X_AGENT_SECRET'] ?? null;
+    }
+
+    // Also try to read agent_id from JSON body (Tauri agent sends it there)
+    $raw_payload_pre = file_get_contents('php://input');
+    $payload_pre = json_decode($raw_payload_pre, true);
+    if ($agent_id === null && isset($payload_pre['agent_id'])) {
+        $agent_id = (int)$payload_pre['agent_id'];
     }
 
     if (!$agent_id || !$agent_secret) {
@@ -31,6 +40,7 @@ if ($method === 'POST') {
         echo json_encode(['error' => 'Unauthorized: Missing agent credentials']);
         exit;
     }
+
 
     try {
         $pdo = getDbConnection();
@@ -70,9 +80,9 @@ if ($method === 'POST') {
             exit;
         }
         
-        // Parse logs payload
-        $raw_payload = file_get_contents('php://input');
-        $payload = json_decode($raw_payload, true);
+        // Parse logs payload — use already-read body if available
+        $raw_payload = isset($raw_payload_pre) ? $raw_payload_pre : file_get_contents('php://input');
+        $payload = isset($payload_pre) ? $payload_pre : json_decode($raw_payload, true);
         
         if (!is_array($payload)) {
             http_response_code(400);
@@ -80,19 +90,28 @@ if ($method === 'POST') {
             exit;
         }
         
-        $logs = $payload['logs'] ?? [];
+        // Accept both 'logs' (old format) and 'entries' (new Tauri Rust format)
+        $logs = $payload['entries'] ?? $payload['logs'] ?? [];
         if (!is_array($logs)) {
-            $logs = [$payload]; // Fallback to single log object
+            $logs = [$payload];
         }
         
         $stmt_event = $pdo->prepare("INSERT INTO agent_events (agent_device_id, event_type, severity, message, metadata_json) VALUES (?, ?, ?, ?, ?)");
         $count = 0;
         
         foreach ($logs as $log) {
-            $event_type = trim((string)($log['event_type'] ?? 'client_log'));
-            $severity = trim((string)($log['severity'] ?? 'info'));
-            $message = trim((string)($log['message'] ?? ''));
-            $metadata = isset($log['metadata_json']) ? json_encode($log['metadata_json']) : null;
+            // Support both old format and new LogEntry format from Rust
+            $event_type = trim((string)($log['event_type'] ?? $log['channel'] ?? 'windows_event'));
+            $severity    = trim((string)($log['severity']   ?? $log['level']   ?? 'info'));
+            $message     = trim((string)($log['message']    ?? ''));
+            
+            // Build metadata from extra LogEntry fields
+            $meta = [];
+            if (isset($log['event_id']))  $meta['event_id']  = $log['event_id'];
+            if (isset($log['source']))    $meta['source']    = $log['source'];
+            if (isset($log['timestamp'])) $meta['timestamp'] = $log['timestamp'];
+            if (isset($log['metadata_json'])) $meta = array_merge($meta, (array)$log['metadata_json']);
+            $metadata = !empty($meta) ? json_encode($meta) : null;
             
             if (!empty($message)) {
                 $stmt_event->execute([$agent_id, $event_type, $severity, $message, $metadata]);

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { AgentConfig } from "../App";
 
 interface Props {
@@ -24,7 +25,17 @@ interface Telemetry {
   architecture: string;
 }
 
-type View = "status" | "settings" | "about";
+interface LogEntry {
+  id: string;
+  timestamp: string;
+  level: "info" | "warning" | "error" | "critical" | "debug";
+  source: string;
+  channel: string;
+  message: string;
+  event_id: number | null;
+}
+
+type View = "status" | "logs" | "settings" | "about";
 
 export default function StatusDashboard({ config, agentOnline, onConfigChange }: Props) {
   const [view, setView] = useState<View>("status");
@@ -32,6 +43,10 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
   const [isPaused, setIsPaused] = useState(config.is_paused);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [lastLogSync, setLastLogSync] = useState<string | null>(null);
+  const [logFilter, setLogFilter] = useState<string>("all");
 
   // Settings form state
   const [interval, setInterval] = useState(config.heartbeat_interval_seconds);
@@ -48,11 +63,41 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
     }
   }, []);
 
+  const refreshLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const entries = await invoke<LogEntry[]>("get_logs");
+      setLogs(entries);
+    } catch (e) {
+      console.warn("Log fetch failed:", e);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     refreshTelemetry();
     const timer = setInterval(refreshTelemetry, 3000);
     return () => clearInterval(timer);
   }, [refreshTelemetry]);
+
+  // Refresh logs when Logs tab is active
+  useEffect(() => {
+    if (view !== "logs") return;
+    refreshLogs();
+    const timer = setInterval(refreshLogs, 10000);
+    return () => clearInterval(timer);
+  }, [view, refreshLogs]);
+
+  // Listen for log sync status events from Rust
+  useEffect(() => {
+    const unlisten = listen<{ ok: boolean; count?: number; error?: string }>("log-sync-status", (event) => {
+      if (event.payload.ok) {
+        setLastLogSync(new Date().toLocaleTimeString());
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
 
   async function togglePause() {
     const next = !isPaused;
@@ -133,14 +178,14 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
           </span>
         </div>
         <nav className="dash-nav">
-          {(["status", "settings", "about"] as View[]).map((v) => (
+          {(["status", "logs", "settings", "about"] as View[]).map((v) => (
             <button
               key={v}
               id={`nav-${v}`}
               className={`nav-btn ${view === v ? "active" : ""}`}
               onClick={() => setView(v)}
             >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
+              {v === "logs" ? "📋 Logs" : v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
         </nav>
@@ -210,7 +255,79 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
         </div>
       )}
 
-      {/* ── Settings View ── */}
+      {/* ── Logs View ── */}
+      {view === "logs" && (
+        <div className="dash-content">
+          {/* Header row */}
+          <div className="logs-header">
+            <div>
+              <h2 className="section-title" style={{ borderBottom: "none", paddingBottom: 0 }}>
+                Event Logs
+              </h2>
+              {lastLogSync && (
+                <p className="field-hint" style={{ marginTop: 2 }}>
+                  Last synced to server: {lastLogSync}
+                </p>
+              )}
+            </div>
+            <div className="logs-filter-row">
+              {(["all", "error", "warning", "info"] as const).map((f) => (
+                <button
+                  key={f}
+                  id={`log-filter-${f}`}
+                  className={`log-filter-btn ${logFilter === f ? "active" : ""} log-level-${f}`}
+                  onClick={() => setLogFilter(f)}
+                >
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+              <button
+                className="nav-btn"
+                onClick={refreshLogs}
+                disabled={logsLoading}
+                style={{ marginLeft: "auto" }}
+              >
+                {logsLoading ? "⟳" : "↻ Refresh"}
+              </button>
+            </div>
+          </div>
+
+          {/* Log list */}
+          {logsLoading && logs.length === 0 ? (
+            <div className="logs-empty">
+              <div className="spinner" style={{ width: 24, height: 24, borderWidth: 2 }} />
+              <span>Loading logs…</span>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="logs-empty">
+              <span>📭</span>
+              <span>No log entries in the last 30 minutes.</span>
+            </div>
+          ) : (
+            <div className="log-table-wrap">
+              {logs
+                .filter((e) => logFilter === "all" || e.level === logFilter)
+                .map((entry) => (
+                  <div key={entry.id} className={`log-row log-level-${entry.level}`}>
+                    <span className={`log-badge log-badge-${entry.level}`}>
+                      {entry.level.toUpperCase()}
+                    </span>
+                    <span className="log-time">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="log-source" title={entry.channel}>
+                      {entry.source}
+                    </span>
+                    <span className="log-msg" title={entry.message}>
+                      {entry.message}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {view === "settings" && (
         <div className="dash-content">
           <h2 className="section-title">Agent Settings</h2>

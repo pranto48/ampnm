@@ -29,9 +29,9 @@ services:
       - SMS_COOLDOWN_MINUTES=${SMS_COOLDOWN_MINUTES:-30}
       - APACHE_PORT=${APACHE_PORT:-2266}
       # Cloud Monitoring Bridge - connect Docker ICMP pings to Lovable Cloud
-      - CLOUD_SYNC_URL=https://ynjuvlzvzvnqhvvfdjdc.supabase.co/functions/v1/cloud-monitor
-      - CLOUD_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluanV2bHp2enZucWh2dmZkamRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0NTg2MzksImV4cCI6MjA4MjAzNDYzOX0.IiKXzf4GD20GCkkpmh5e0URrUOeDFtyzrQfuRcHeZmY
-      - CLOUD_POLL_INTERVAL=15
+      - CLOUD_SYNC_URL=${CLOUD_SYNC_URL:-}
+      - CLOUD_ANON_KEY=${CLOUD_ANON_KEY:-}
+      - CLOUD_POLL_INTERVAL=${CLOUD_POLL_INTERVAL:-15}
       # Non-disruptive update awareness scheduler (fetch + behind count only).
       - AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER=1
       - AMPNM_UPDATE_CHECK_INTERVAL_SECONDS=3600

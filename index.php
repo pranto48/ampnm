@@ -59,7 +59,7 @@ $dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateSt
                         </div>
                     </div>
                     <!-- Status Counters -->
-                    <div class="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg p-6 text-center">
                             <h3 class="text-sm font-medium text-slate-400">Online</h3>
                             <div id="onlineCount" class="text-4xl font-bold text-green-400 mt-2">--</div>

@@ -114,7 +114,10 @@ button:hover, a.hoverable:hover {
     font-size: 0.8rem;
 }
 .nav-group {
-    position: relative;
+    position: static;
+}
+@media (min-width: 768px) {
+    .nav-group { position: relative; }
 }
 .nav-group-toggle .nav-group-caret {
     margin-left: 0.5rem;
@@ -141,8 +144,10 @@ button:hover, a.hoverable:hover {
         border-radius: 0.75rem;
         padding: 0.35rem;
         min-width: 13rem;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
-        z-index: 30;
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+        z-index: 100;
     }
     .nav-group-items .nav-link {
         margin: 0.1rem 0;
@@ -191,8 +196,9 @@ button:hover, a.hoverable:hover {
 
 @media (max-width: 767px) {
     #network-map {
-        height: calc(100dvh - 260px);
-        min-height: 360px;
+        /* Use safe-area-inset to account for notches/home-bar on modern phones */
+        height: calc(100dvh - 260px - env(safe-area-inset-bottom, 0px));
+        min-height: 320px;
     }
 }
 
@@ -267,4 +273,50 @@ button:hover, a.hoverable:hover {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
+}
+
+/* ── Mobile-Specific Fixes ─────────────────────────────────────── */
+
+/* Ping form: stack vertically on very small screens */
+@media (max-width: 480px) {
+    #pingForm {
+        flex-direction: column;
+    }
+    #pingForm input,
+    #pingForm button {
+        width: 100%;
+    }
+
+    /* Device filter bar: allow wrapping */
+    .flex.flex-wrap.items-center.gap-2 {
+        flex-wrap: wrap;
+        gap: 0.375rem;
+    }
+
+    /* Device status counters: ensure equal min-width */
+    .grid-cols-2 > div {
+        min-width: 0;
+        word-break: break-word;
+    }
+}
+
+/* Tablet (640–767px landscape): slightly wider sidebar */
+@media (min-width: 640px) and (max-width: 767px) {
+    #main-nav-wrapper {
+        width: 18rem;
+    }
+}
+
+/* Mobile nav tap-outside overlay */
+#mobile-nav-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    z-index: 40;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+#mobile-nav-overlay.active {
+    display: block;
 }
