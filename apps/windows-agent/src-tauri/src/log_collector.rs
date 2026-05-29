@@ -103,13 +103,18 @@ fn collect_windows_event_logs(
     since: Option<DateTime<Utc>>,
     min_level: &LogLevel,
 ) -> Result<Vec<LogEntry>, String> {
-    use std::collections::VecDeque;
     use windows::core::PCWSTR;
+
     use windows::Win32::System::EventLog::{
         CloseEventLog, OpenEventLogW, ReadEventLogW,
         EVENTLOGRECORD, EVENTLOG_BACKWARDS_READ, EVENTLOG_SEQUENTIAL_READ,
-        EVENTLOG_ERROR_TYPE, EVENTLOG_WARNING_TYPE, EVENTLOG_INFORMATION_TYPE,
     };
+
+    // Win32 EVENTLOG event type constants (raw u16 values)
+    const EVENTLOG_ERROR: u16       = 0x0001;
+    const EVENTLOG_WARNING: u16     = 0x0002;
+    const EVENTLOG_INFORMATION: u16 = 0x0004;
+    const EVENTLOG_SUCCESS: u16     = 0x0000;
 
     let channel_wide: Vec<u16> = channel.encode_utf16().chain(std::iter::once(0)).collect();
     let log_handle = unsafe {
@@ -170,10 +175,11 @@ fn collect_windows_event_logs(
 
             // Map event type to level
             let level = match record.EventType {
-                x if x == EVENTLOG_ERROR_TYPE.0 as u16 => LogLevel::Error,
-                x if x == EVENTLOG_WARNING_TYPE.0 as u16 => LogLevel::Warning,
-                x if x == EVENTLOG_INFORMATION_TYPE.0 as u16 => LogLevel::Info,
-                _ => LogLevel::Info,
+                EVENTLOG_ERROR       => LogLevel::Error,
+                EVENTLOG_WARNING     => LogLevel::Warning,
+                EVENTLOG_INFORMATION => LogLevel::Info,
+                EVENTLOG_SUCCESS     => LogLevel::Info,
+                _                    => LogLevel::Info,
             };
 
             // Filter by min_level
@@ -262,7 +268,8 @@ fn tail_log_file(
     since: Option<DateTime<Utc>>,
 ) -> Result<Vec<LogEntry>, String> {
     use std::fs::File;
-    use std::io::{BufRead, BufReader, Seek, SeekFrom};
+    use std::io::{BufRead, BufReader};
+
     use uuid::Uuid;
 
     let file = File::open(path).map_err(|e| e.to_string())?;

@@ -152,14 +152,15 @@ async fn reset_agent(
 /// Fetch recent log entries using the current log collector config.
 #[tauri::command]
 async fn get_logs(
-    state: tauri::State<'_, SharedConfig>,
     log_cfg: tauri::State<'_, SharedLogConfig>,
 ) -> Result<serde_json::Value, String> {
-    let _config = state.lock().await;
     let lcfg = log_cfg.lock().await.clone();
+    drop(log_cfg); // release lock before blocking I/O
     // Collect last ~30 min worth
     let since = Some(Utc::now() - chrono::Duration::minutes(30));
-    let entries = collect_logs(&lcfg, since);
+    let entries = tokio::task::spawn_blocking(move || collect_logs(&lcfg, since))
+        .await
+        .map_err(|e| e.to_string())?;
     let limited: Vec<&LogEntry> = entries.iter().take(100).collect();
     Ok(serde_json::to_value(limited).map_err(|e| e.to_string())?)
 }
@@ -284,7 +285,10 @@ fn start_log_sync_loop(
 
             let since = Some(last_sync);
             let lcfg = log_config.lock().await.clone();
-            let entries = collect_logs(&lcfg, since);
+            let entries = match tokio::task::spawn_blocking(move || collect_logs(&lcfg, since)).await {
+                Ok(e) => e,
+                Err(e) => { log::warn!("Log collect task panicked: {}", e); continue; }
+            };
 
             if entries.is_empty() {
                 last_sync = Utc::now();

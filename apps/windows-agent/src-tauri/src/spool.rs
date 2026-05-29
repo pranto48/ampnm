@@ -29,7 +29,7 @@ pub enum SpoolKind {
 
 /// Return the spool directory path, creating it if needed.
 pub fn spool_dir() -> PathBuf {
-    let base = dirs_sys::data_dir()
+    let base = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("ampnm-agent")
         .join("spool");

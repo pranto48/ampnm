@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .dyad/
+
+# Secrets — never commit these
+.env
+*.env.local
+*.env.production
+
+# Rust build artifacts
+apps/windows-agent/src-tauri/target/
