@@ -428,6 +428,66 @@ try {
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // New table for Telegram settings
+        "CREATE TABLE IF NOT EXISTS `telegram_settings` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `bot_token` VARCHAR(255) NOT NULL,
+            `enabled` TINYINT(1) DEFAULT 1,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `user_id_unique` (`user_id`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // New table for device Telegram subscriptions
+        "CREATE TABLE IF NOT EXISTS `device_telegram_subscriptions` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `device_id` INT(6) UNSIGNED NOT NULL,
+            `chat_id` VARCHAR(50) NOT NULL,
+            `notify_on_online` BOOLEAN DEFAULT TRUE,
+            `notify_on_offline` BOOLEAN DEFAULT TRUE,
+            `notify_on_warning` BOOLEAN DEFAULT TRUE,
+            `notify_on_critical` BOOLEAN DEFAULT TRUE,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `device_chat_unique` (`device_id`, `chat_id`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+            FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // New table for WhatsApp settings
+        "CREATE TABLE IF NOT EXISTS `whatsapp_settings` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `provider` VARCHAR(50) NOT NULL DEFAULT 'twilio',
+            `api_url` VARCHAR(255) NULL,
+            `token` VARCHAR(255) NOT NULL,
+            `phone_number` VARCHAR(50) NOT NULL,
+            `enabled` TINYINT(1) DEFAULT 1,
+            `cooldown_minutes` INT(11) DEFAULT 30,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `user_id_unique` (`user_id`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        // New table for device WhatsApp subscriptions
+        "CREATE TABLE IF NOT EXISTS `device_whatsapp_subscriptions` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `device_id` INT(6) UNSIGNED NOT NULL,
+            `recipient_phone` VARCHAR(30) NOT NULL,
+            `notify_on_online` BOOLEAN DEFAULT TRUE,
+            `notify_on_offline` BOOLEAN DEFAULT TRUE,
+            `notify_on_warning` BOOLEAN DEFAULT TRUE,
+            `notify_on_critical` BOOLEAN DEFAULT TRUE,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `device_phone_whatsapp_unique` (`device_id`, `recipient_phone`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+            FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
         
         // NEW TABLE FOR APPLICATION SETTINGS (LICENSE KEY, INSTALLATION ID)
         "CREATE TABLE IF NOT EXISTS `app_settings` (

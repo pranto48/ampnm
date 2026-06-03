@@ -26,6 +26,8 @@
     <script src="assets/js/status_logs.js"></script>
     <script src="assets/js/email_notifications.js"></script>
     <script src="assets/js/sms_notifications.js"></script>
+    <script src="assets/js/telegram_notifications.js"></script>
+    <script src="assets/js/whatsapp_notifications.js"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -144,6 +146,10 @@
             initEmailNotifications();
         } else if (page === 'sms_notifications.php') {
             initSmsNotifications();
+        } else if (page === 'telegram_notifications.php') {
+            initTelegramNotifications();
+        } else if (page === 'whatsapp_notifications.php') {
+            initWhatsappNotifications();
         } else if (page === 'network_graphs.php') {
             initNetworkGraphs();
         }

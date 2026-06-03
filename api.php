@@ -101,6 +101,18 @@ try {
     }
 
 
+    if ($action === 'telegram_webhook') {
+        require_once __DIR__ . '/includes/telegram_bot.php';
+        handleTelegramWebhook($pdo);
+        exit;
+    }
+
+    if ($action === 'whatsapp_webhook') {
+        require_once __DIR__ . '/includes/whatsapp_bot.php';
+        handleWhatsappWebhook($pdo);
+        exit;
+    }
+
     // --- Authenticated Actions (AUTH REQUIRED) ---
     require_once 'includes/auth_check.php'; // This will now only run if the above public action didn't exit.
 
@@ -156,7 +168,7 @@ try {
     $dashboardActions = ['get_dashboard_data'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'save_log_backup_schedule', 'delete_log_backup_schedule', 'run_log_backup_now', 'run_due_log_backups'];
-    $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'send_test_email', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions', 'get_sms_settings', 'save_sms_settings', 'send_test_sms', 'get_device_sms_subscriptions', 'save_device_sms_subscription', 'delete_device_sms_subscription'];
+    $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'send_test_email', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions', 'get_sms_settings', 'save_sms_settings', 'send_test_sms', 'get_device_sms_subscriptions', 'save_device_sms_subscription', 'delete_device_sms_subscription', 'get_telegram_settings', 'save_telegram_settings', 'send_test_telegram', 'get_device_telegram_subscriptions', 'save_device_telegram_subscription', 'delete_device_telegram_subscription', 'get_whatsapp_settings', 'save_whatsapp_settings', 'send_test_whatsapp', 'get_device_whatsapp_subscriptions', 'save_device_whatsapp_subscription', 'delete_device_whatsapp_subscription', 'register_telegram_webhook'];
     $licenseActions = ['get_current_license_info', 'update_app_license_key', 'force_license_recheck']; // Added license actions
     $metricsActions = [
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',

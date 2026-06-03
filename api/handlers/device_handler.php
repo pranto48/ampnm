@@ -139,6 +139,168 @@ function sendSMSNotification($pdo, $device, $oldStatus, $newStatus, $details) {
     }
 }
 
+function sendTelegramNotification($pdo, $device, $oldStatus, $newStatus, $details) {
+    if (!in_array($newStatus, ['online', 'offline', 'warning', 'critical'], true)) {
+        return;
+    }
+
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+    if ($userId <= 0) {
+        error_log('Telegram notification skipped: invalid session user');
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT bot_token, enabled FROM telegram_settings WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$settings || empty($settings['bot_token']) || !$settings['enabled']) {
+        return;
+    }
+
+    $sqlSubscriptions = "SELECT chat_id FROM device_telegram_subscriptions WHERE user_id = ? AND device_id = ?";
+    $paramsSubscriptions = [$userId, $device['id']];
+
+    if ($newStatus === 'online') {
+        $sqlSubscriptions .= " AND notify_on_online = TRUE";
+    } elseif ($newStatus === 'offline') {
+        $sqlSubscriptions .= " AND notify_on_offline = TRUE";
+    } elseif ($newStatus === 'warning') {
+        $sqlSubscriptions .= " AND notify_on_warning = TRUE";
+    } elseif ($newStatus === 'critical') {
+        $sqlSubscriptions .= " AND notify_on_critical = TRUE";
+    }
+
+    $stmtSubscriptions = $pdo->prepare($sqlSubscriptions);
+    $stmtSubscriptions->execute($paramsSubscriptions);
+    $recipients = $stmtSubscriptions->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($recipients)) {
+        return;
+    }
+
+    $emoji = '⚪';
+    switch ($newStatus) {
+        case 'online': $emoji = '🟢'; break;
+        case 'offline': $emoji = '🔴'; break;
+        case 'warning': $emoji = '🟡'; break;
+        case 'critical': $emoji = '🚨'; break;
+    }
+
+    $body = sprintf("⚠️ <b>ALERT: %s is %s</b>\n\n"
+        . "Device: %s\n"
+        . "IP: %s\n"
+        . "Previous Status: %s\n"
+        . "Current Status: %s %s\n"
+        . "Details: %s\n"
+        . "Time (UTC): %s",
+        htmlspecialchars($device['name']),
+        strtoupper($newStatus),
+        htmlspecialchars($device['name']),
+        htmlspecialchars($device['ip'] ?? 'N/A'),
+        htmlspecialchars($oldStatus),
+        $emoji,
+        htmlspecialchars($newStatus),
+        htmlspecialchars($details),
+        gmdate('Y-m-d H:i:s')
+    );
+
+    require_once __DIR__ . '/../../includes/telegram_bot.php';
+    foreach ($recipients as $recipient) {
+        $err = null;
+        $sent = telegram_send_alert($recipient, $body, $settings['bot_token'], $err);
+        if (!$sent) {
+            error_log("Telegram send failed for chat {$recipient} (device {$device['name']}): " . ($err ?? 'Unknown error'));
+        }
+    }
+}
+
+function sendWhatsappNotification($pdo, $device, $oldStatus, $newStatus, $details) {
+    if (!in_array($newStatus, ['online', 'offline', 'warning', 'critical'], true)) {
+        return;
+    }
+
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+    if ($userId <= 0) {
+        error_log('WhatsApp notification skipped: invalid session user');
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT * FROM whatsapp_settings WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$settings || empty($settings['token']) || !$settings['enabled']) {
+        return;
+    }
+
+    $cooldownMinutes = (int)($settings['cooldown_minutes'] ?? 30);
+    if ($cooldownMinutes > 0) {
+        $stmtCooldown = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM device_status_logs 
+            WHERE device_id = ? AND status = ? AND created_at >= NOW() - INTERVAL ? MINUTE
+        ");
+        $stmtCooldown->execute([$device['id'], $newStatus, $cooldownMinutes]);
+        if ((int)$stmtCooldown->fetchColumn() > 1) {
+            error_log("WhatsApp notification skipped: Cooldown active for device '{$device['name']}' status '{$newStatus}'.");
+            return;
+        }
+    }
+
+    $sqlSubscriptions = "SELECT recipient_phone FROM device_whatsapp_subscriptions WHERE user_id = ? AND device_id = ?";
+    $paramsSubscriptions = [$userId, $device['id']];
+
+    if ($newStatus === 'online') {
+        $sqlSubscriptions .= " AND notify_on_online = TRUE";
+    } elseif ($newStatus === 'offline') {
+        $sqlSubscriptions .= " AND notify_on_offline = TRUE";
+    } elseif ($newStatus === 'warning') {
+        $sqlSubscriptions .= " AND notify_on_warning = TRUE";
+    } elseif ($newStatus === 'critical') {
+        $sqlSubscriptions .= " AND notify_on_critical = TRUE";
+    }
+
+    $stmtSubscriptions = $pdo->prepare($sqlSubscriptions);
+    $stmtSubscriptions->execute($paramsSubscriptions);
+    $recipients = $stmtSubscriptions->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($recipients)) {
+        return;
+    }
+
+    $emoji = '⚪';
+    switch ($newStatus) {
+        case 'online': $emoji = '🟢'; break;
+        case 'offline': $emoji = '🔴'; break;
+        case 'warning': $emoji = '🟡'; break;
+        case 'critical': $emoji = '🚨'; break;
+    }
+
+    $body = sprintf("*ALERT: %s is %s*\n\n"
+        . "Device: %s\n"
+        . "IP: %s\n"
+        . "Status: %s %s\n"
+        . "Details: %s",
+        $device['name'],
+        strtoupper($newStatus),
+        $device['name'],
+        $device['ip'] ?? 'N/A',
+        $emoji,
+        $newStatus,
+        $details
+    );
+
+    require_once __DIR__ . '/../../includes/whatsapp_bot.php';
+    foreach ($recipients as $recipient) {
+        $err = null;
+        $sent = whatsapp_send_alert($recipient, $body, $settings, $err);
+        if (!$sent) {
+            error_log("WhatsApp send failed for phone {$recipient} (device {$device['name']}): " . ($err ?? 'Unknown error'));
+        }
+    }
+}
+
 
 function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details) {
     if (!$pingResult['success']) {
@@ -359,6 +521,8 @@ switch ($action) {
                     logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
                     sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
                     sendSMSNotification($pdo, $device, $old_status, $new_status, $details); // Trigger SMS notification
+                    sendTelegramNotification($pdo, $device, $old_status, $new_status, $details); // Trigger Telegram
+                    sendWhatsappNotification($pdo, $device, $old_status, $new_status, $details); // Trigger WhatsApp
                     $status_changes++;
                 }
                 
@@ -416,6 +580,8 @@ switch ($action) {
                 logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
                 sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
                 sendSMSNotification($pdo, $device, $old_status, $new_status, $details); // Trigger SMS notification
+                sendTelegramNotification($pdo, $device, $old_status, $new_status, $details); // Trigger Telegram
+                sendWhatsappNotification($pdo, $device, $old_status, $new_status, $details); // Trigger WhatsApp
                 
                 // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
                 // This allows viewers to update the status of devices on shared maps.
@@ -488,6 +654,8 @@ switch ($action) {
             logStatusChange($pdo, $deviceId, $old_status, $status, $details);
             sendEmailNotification($pdo, $device, $old_status, $status, $details); // Trigger email notification
             sendSMSNotification($pdo, $device, $old_status, $status, $details); // Trigger SMS notification
+            sendTelegramNotification($pdo, $device, $old_status, $status, $details); // Trigger Telegram
+            sendWhatsappNotification($pdo, $device, $old_status, $status, $details); // Trigger WhatsApp
             
             // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
             // This allows viewers to update the status of devices on shared maps.
@@ -754,6 +922,8 @@ switch ($action) {
             logStatusChange($pdo, $device['id'], $old_status, $status, $details);
             sendEmailNotification($pdo, $device, $old_status, $status, $details);
             sendSMSNotification($pdo, $device, $old_status, $status, $details);
+            sendTelegramNotification($pdo, $device, $old_status, $status, $details);
+            sendWhatsappNotification($pdo, $device, $old_status, $status, $details);
 
             // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
             // This allows viewers to update the status of devices on shared maps.

@@ -399,5 +399,347 @@ switch ($action) {
             echo json_encode(['success' => true, 'message' => 'SMS subscription deleted successfully.']);
         }
         break;
+
+    case 'get_telegram_settings':
+        $stmt = $pdo->prepare("SELECT bot_token, enabled FROM telegram_settings WHERE user_id = ?");
+        $stmt->execute([$current_user_id]);
+        $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($settings && isset($settings['bot_token'])) {
+            $settings['bot_token'] = '********';
+        }
+        echo json_encode($settings ?: ['bot_token' => '', 'enabled' => 0]);
+        break;
+
+    case 'save_telegram_settings':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $bot_token = trim((string)($input['bot_token'] ?? ''));
+            $enabled = !empty($input['enabled']) ? 1 : 0;
+
+            if (empty($bot_token)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Bot Token is required.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("SELECT id, bot_token FROM telegram_settings WHERE user_id = ?");
+            $stmt->execute([$current_user_id]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                if ($bot_token === '********') {
+                    $bot_token = $existing['bot_token'];
+                }
+                $stmt = $pdo->prepare("UPDATE telegram_settings SET bot_token = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?");
+                $stmt->execute([$bot_token, $enabled, $current_user_id]);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO telegram_settings (user_id, bot_token, enabled) VALUES (?, ?, ?)");
+                $stmt->execute([$current_user_id, $bot_token, $enabled]);
+            }
+            echo json_encode(['success' => true, 'message' => 'Telegram settings saved successfully.']);
+        }
+        break;
+
+    case 'send_test_telegram':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed.']);
+            exit;
+        }
+        $chat_id = trim((string)($input['chat_id'] ?? ''));
+        if ($chat_id === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Chat ID is required.']);
+            exit;
+        }
+
+        require_once __DIR__ . '/../../includes/telegram_bot.php';
+        $body = "🔔 <b>AMPNM Test Notification</b>\n\nYour Telegram alerts are configured correctly! \nTime: " . date('Y-m-d H:i:s');
+        $error = null;
+        $sent = telegram_send_alert($chat_id, $body, null, $error);
+
+        if (!$sent) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Test Telegram failed to send.', 'details' => $error ?? 'Unknown error']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'message' => "Test message sent to {$chat_id}."]);
+        break;
+
+    case 'get_device_telegram_subscriptions':
+        $device_id = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+        if ($device_id <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Device ID is required.']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT id, chat_id, notify_on_online, notify_on_offline, notify_on_warning, notify_on_critical FROM device_telegram_subscriptions WHERE user_id = ? AND device_id = ? ORDER BY chat_id ASC");
+        $stmt->execute([$current_user_id, $device_id]);
+        $subscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($subscriptions);
+        break;
+
+    case 'save_device_telegram_subscription':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = isset($input['id']) && $input['id'] !== '' ? (int)$input['id'] : null;
+            $device_id = isset($input['device_id']) ? (int)$input['device_id'] : 0;
+            $chat_id = trim((string)($input['chat_id'] ?? ''));
+            $notify_on_online = !empty($input['notify_on_online']) ? 1 : 0;
+            $notify_on_offline = !empty($input['notify_on_offline']) ? 1 : 0;
+            $notify_on_warning = !empty($input['notify_on_warning']) ? 1 : 0;
+            $notify_on_critical = !empty($input['notify_on_critical']) ? 1 : 0;
+
+            if ($device_id <= 0 || $chat_id === '') {
+                http_response_code(400);
+                echo json_encode(['error' => 'Device ID and Chat ID are required.']);
+                exit;
+            }
+
+            if (!$notify_on_online && !$notify_on_offline && !$notify_on_warning && !$notify_on_critical) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Enable at least one notification type.']);
+                exit;
+            }
+
+            $deviceStmt = $pdo->prepare("SELECT id FROM devices WHERE id = ? AND user_id = ? LIMIT 1");
+            $deviceStmt->execute([$device_id, $current_user_id]);
+            if (!$deviceStmt->fetchColumn()) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Device not found.']);
+                exit;
+            }
+
+            if ($id) {
+                $sql = "UPDATE device_telegram_subscriptions
+                        SET chat_id = ?, notify_on_online = ?, notify_on_offline = ?, notify_on_warning = ?, notify_on_critical = ?
+                        WHERE id = ? AND user_id = ? AND device_id = ?";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$chat_id, $notify_on_online, $notify_on_offline, $notify_on_warning, $notify_on_critical, $id, $current_user_id, $device_id]);
+                echo json_encode(['success' => true, 'message' => 'Telegram subscription updated successfully.']);
+                break;
+            }
+
+            $sql = "INSERT INTO device_telegram_subscriptions (user_id, device_id, chat_id, notify_on_online, notify_on_offline, notify_on_warning, notify_on_critical)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        notify_on_online = VALUES(notify_on_online),
+                        notify_on_offline = VALUES(notify_on_offline),
+                        notify_on_warning = VALUES(notify_on_warning),
+                        notify_on_critical = VALUES(notify_on_critical)";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$current_user_id, $device_id, $chat_id, $notify_on_online, $notify_on_offline, $notify_on_warning, $notify_on_critical]);
+            echo json_encode(['success' => true, 'message' => 'Telegram subscription saved successfully.']);
+        }
+        break;
+
+    case 'delete_device_telegram_subscription':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = $input['id'] ?? null;
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Subscription ID is required.']);
+                exit;
+            }
+            $stmt = $pdo->prepare("DELETE FROM device_telegram_subscriptions WHERE id = ? AND user_id = ?");
+            $stmt->execute([$id, $current_user_id]);
+            echo json_encode(['success' => true, 'message' => 'Telegram subscription deleted successfully.']);
+        }
+        break;
+
+    case 'get_whatsapp_settings':
+        $stmt = $pdo->prepare("SELECT provider, api_url, token, phone_number, enabled, cooldown_minutes FROM whatsapp_settings WHERE user_id = ?");
+        $stmt->execute([$current_user_id]);
+        $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($settings && isset($settings['token'])) {
+            $settings['token'] = '********';
+        }
+        echo json_encode($settings ?: ['provider' => 'twilio', 'api_url' => '', 'token' => '', 'phone_number' => '', 'enabled' => 0, 'cooldown_minutes' => 30]);
+        break;
+
+    case 'save_whatsapp_settings':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $provider = trim((string)($input['provider'] ?? 'twilio'));
+            $api_url = trim((string)($input['api_url'] ?? ''));
+            $token = trim((string)($input['token'] ?? ''));
+            $phone_number = trim((string)($input['phone_number'] ?? ''));
+            $enabled = !empty($input['enabled']) ? 1 : 0;
+            $cooldown_minutes = isset($input['cooldown_minutes']) ? (int)$input['cooldown_minutes'] : 30;
+
+            if (empty($token) || empty($phone_number)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Token/API Key and Sender Phone Number are required.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("SELECT id, token FROM whatsapp_settings WHERE user_id = ?");
+            $stmt->execute([$current_user_id]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                if ($token === '********') {
+                    $token = $existing['token'];
+                }
+                $stmt = $pdo->prepare("UPDATE whatsapp_settings SET provider = ?, api_url = ?, token = ?, phone_number = ?, enabled = ?, cooldown_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?");
+                $stmt->execute([$provider, $api_url, $token, $phone_number, $enabled, $cooldown_minutes, $current_user_id]);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO whatsapp_settings (user_id, provider, api_url, token, phone_number, enabled, cooldown_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$current_user_id, $provider, $api_url, $token, $phone_number, $enabled, $cooldown_minutes]);
+            }
+            echo json_encode(['success' => true, 'message' => 'WhatsApp settings saved successfully.']);
+        }
+        break;
+
+    case 'send_test_whatsapp':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed.']);
+            exit;
+        }
+        $recipient_phone = trim((string)($input['recipient_phone'] ?? ''));
+        if ($recipient_phone === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Recipient phone number is required.']);
+            exit;
+        }
+
+        require_once __DIR__ . '/../../includes/whatsapp_bot.php';
+        
+        $body = "🔔 *AMPNM Test Notification*\n\nYour WhatsApp alerts are configured correctly! \nTime: " . date('Y-m-d H:i:s');
+        $error = null;
+        $sent = whatsapp_send_alert($recipient_phone, $body, null, $error);
+
+        if (!$sent) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Test WhatsApp failed to send.', 'details' => $error ?? 'Unknown error']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'message' => "Test WhatsApp sent to {$recipient_phone}."]);
+        break;
+
+    case 'get_device_whatsapp_subscriptions':
+        $device_id = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+        if ($device_id <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Device ID is required.']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT id, recipient_phone, notify_on_online, notify_on_offline, notify_on_warning, notify_on_critical FROM device_whatsapp_subscriptions WHERE user_id = ? AND device_id = ? ORDER BY recipient_phone ASC");
+        $stmt->execute([$current_user_id, $device_id]);
+        $subscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($subscriptions);
+        break;
+
+    case 'save_device_whatsapp_subscription':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = isset($input['id']) && $input['id'] !== '' ? (int)$input['id'] : null;
+            $device_id = isset($input['device_id']) ? (int)$input['device_id'] : 0;
+            $recipient_phone = trim((string)($input['recipient_phone'] ?? ''));
+            $notify_on_online = !empty($input['notify_on_online']) ? 1 : 0;
+            $notify_on_offline = !empty($input['notify_on_offline']) ? 1 : 0;
+            $notify_on_warning = !empty($input['notify_on_warning']) ? 1 : 0;
+            $notify_on_critical = !empty($input['notify_on_critical']) ? 1 : 0;
+
+            if ($device_id <= 0 || $recipient_phone === '') {
+                http_response_code(400);
+                echo json_encode(['error' => 'Device ID and Recipient Phone are required.']);
+                exit;
+            }
+
+            if (!$notify_on_online && !$notify_on_offline && !$notify_on_warning && !$notify_on_critical) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Enable at least one notification type.']);
+                exit;
+            }
+
+            $deviceStmt = $pdo->prepare("SELECT id FROM devices WHERE id = ? AND user_id = ? LIMIT 1");
+            $deviceStmt->execute([$device_id, $current_user_id]);
+            if (!$deviceStmt->fetchColumn()) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Device not found.']);
+                exit;
+            }
+
+            if ($id) {
+                $sql = "UPDATE device_whatsapp_subscriptions
+                        SET recipient_phone = ?, notify_on_online = ?, notify_on_offline = ?, notify_on_warning = ?, notify_on_critical = ?
+                        WHERE id = ? AND user_id = ? AND device_id = ?";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$recipient_phone, $notify_on_online, $notify_on_offline, $notify_on_warning, $notify_on_critical, $id, $current_user_id, $device_id]);
+                echo json_encode(['success' => true, 'message' => 'WhatsApp subscription updated successfully.']);
+                break;
+            }
+
+            $sql = "INSERT INTO device_whatsapp_subscriptions (user_id, device_id, recipient_phone, notify_on_online, notify_on_offline, notify_on_warning, notify_on_critical)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        notify_on_online = VALUES(notify_on_online),
+                        notify_on_offline = VALUES(notify_on_offline),
+                        notify_on_warning = VALUES(notify_on_warning),
+                        notify_on_critical = VALUES(notify_on_critical)";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$current_user_id, $device_id, $recipient_phone, $notify_on_online, $notify_on_offline, $notify_on_warning, $notify_on_critical]);
+            echo json_encode(['success' => true, 'message' => 'WhatsApp subscription saved successfully.']);
+        }
+        break;
+
+    case 'delete_device_whatsapp_subscription':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = $input['id'] ?? null;
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Subscription ID is required.']);
+                exit;
+            }
+            $stmt = $pdo->prepare("DELETE FROM device_whatsapp_subscriptions WHERE id = ? AND user_id = ?");
+            $stmt->execute([$id, $current_user_id]);
+            echo json_encode(['success' => true, 'message' => 'WhatsApp subscription deleted successfully.']);
+        }
+        break;
+
+    case 'register_telegram_webhook':
+        $stmt = $pdo->prepare("SELECT bot_token FROM telegram_settings WHERE user_id = ? LIMIT 1");
+        $stmt->execute([$current_user_id]);
+        $bot_token = $stmt->fetchColumn();
+
+        if (empty($bot_token) || $bot_token === '********') {
+            $bot_token = trim((string)($input['bot_token'] ?? ''));
+            if ($bot_token === '********' || empty($bot_token)) {
+                $stmtAct = $pdo->prepare("SELECT bot_token FROM telegram_settings WHERE user_id = ? LIMIT 1");
+                $stmtAct->execute([$current_user_id]);
+                $bot_token = $stmtAct->fetchColumn();
+            }
+        }
+
+        if (empty($bot_token)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Telegram Bot Token is not configured. Please save it first.']);
+            exit;
+        }
+
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+        $host = $_SERVER['HTTP_HOST'];
+        $webhookUrl = $protocol . "://" . $host . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . "/api.php?action=telegram_webhook";
+
+        $url = "https://api.telegram.org/bot" . $bot_token . "/setWebhook?url=" . urlencode($webhookUrl);
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $resDecoded = json_decode($response, true);
+        if ($httpCode >= 400 || !($resDecoded['ok'] ?? false)) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Telegram Webhook registration failed.',
+                'details' => $resDecoded['description'] ?? 'HTTP Code ' . $httpCode
+            ]);
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Webhook registered successfully with Telegram!', 'webhook_url' => $webhookUrl]);
+        break;
 }
 ?>
