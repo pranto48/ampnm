@@ -298,6 +298,12 @@ MapApp.mapManager = {
         }
         
         MapApp.state.currentMapId = mapId; 
+        
+        // Reset timeline slider state when switching maps
+        if (MapApp.network.timeline && typeof MapApp.network.timeline.reset === 'function') {
+            MapApp.network.timeline.reset();
+        }
+
         const currentMap = MapApp.state.maps.find(m => m.id == mapId);
         if (currentMap) {
             MapApp.ui.els.currentMapName.textContent = currentMap.name;

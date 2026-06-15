@@ -12,8 +12,8 @@ MapApp.config = {
         cloud: '\uf0c2', database: '\uf1c0', box: '\uf0fe'
     },
     statusColorMap: {
-        online: '#22c55e', warning: '#f59e0b', critical: '#ef4444',
-        offline: '#64748b', unknown: '#94a3b8'
+        online: '#2ECC71', warning: '#F1C40F', critical: '#E74C3C',
+        offline: '#95A5A6', unknown: '#95A5A6'
     },
     edgeColorMap: {
         cat6: '#a78bfa',              // Purple - CAT6 Cable

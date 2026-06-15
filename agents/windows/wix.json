@@ -1,0 +1,13 @@
+{
+  "product": "AMPNM Agent",
+  "company": "IT Support BD",
+  "version": "1.0.0",
+  "license": "LICENSE.rtf",
+  "upgrade-code": "84F66C26-8D65-42E1-94CC-B56149216C2E",
+  "service": {
+    "name": "AMPNMAgent",
+    "display-name": "AMPNM Monitoring Agent",
+    "description": "Sends system metrics to AMPNM network monitor",
+    "start": "auto"
+  }
+}

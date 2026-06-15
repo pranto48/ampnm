@@ -540,5 +540,289 @@ MapApp.network = {
                 }
             }
         });
+
+        // Initialize WebSocket and Timeline
+        if (MapApp.network.websocket) {
+            MapApp.network.websocket.connect();
+        }
+        if (MapApp.network.timeline) {
+            MapApp.network.timeline.init();
+        }
+    }
+};
+
+// --- central websocket client ---
+MapApp.network.websocket = {
+    socket: null,
+    reconnectTimeout: null,
+    connect: function() {
+        if (this.socket) {
+            try { this.socket.close(); } catch(e) {}
+        }
+        
+        // Connect to ws relative to current window location host
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws';
+        const wsPort = '8080'; // central websocket notification port
+        const wsUrl = `${wsProtocol}://${window.location.hostname}:${wsPort}/ws`;
+        
+        console.log(`Connecting to WebSocket: ${wsUrl}`);
+        this.socket = new WebSocket(wsUrl);
+        
+        this.socket.onopen = () => {
+            console.log("WebSocket connected.");
+        };
+        
+        this.socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+            } catch (e) {
+                console.error("Failed to parse WebSocket message:", e);
+            }
+        };
+        
+        this.socket.onclose = () => {
+            console.log("WebSocket disconnected. Retrying in 5s...");
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = setTimeout(() => this.connect(), 5000);
+        };
+        
+        this.socket.onerror = (err) => {
+            console.error("WebSocket error:", err);
+            this.socket.close();
+        };
+    },
+    
+    handleMessage: function(data) {
+        // Only update if in Live view
+        const slider = document.getElementById('timelineSlider');
+        if (slider && parseInt(slider.value, 10) !== 24) {
+            // Historical view active - ignore live updates
+            return;
+        }
+        
+        if (data && data.device_id && data.status) {
+            const nodeId = Number(data.device_id);
+            const node = MapApp.state.nodes.get(nodeId);
+            if (node && node.deviceData) {
+                const oldStatus = node.deviceData.status;
+                const newStatus = data.status;
+                
+                node.deviceData.status = newStatus;
+                if (data.last_avg_time !== undefined) node.deviceData.last_avg_time = data.last_avg_time;
+                if (data.last_ttl !== undefined) node.deviceData.last_ttl = data.last_ttl;
+                if (data.last_seen !== undefined) node.deviceData.last_seen = data.last_seen;
+                
+                let label = node.deviceData.name;
+                if (node.deviceData.show_live_ping && newStatus === 'online' && node.deviceData.last_avg_time !== null) {
+                    label += `\n${node.deviceData.last_avg_time}ms | TTL:${node.deviceData.last_ttl || 'N/A'}`;
+                }
+                
+                const updatedProps = {
+                    id: nodeId,
+                    deviceData: node.deviceData,
+                    title: MapApp.utils.buildNodeTitle(node.deviceData),
+                    label: label
+                };
+                
+                if (node.shape === 'icon') {
+                    updatedProps.icon = {
+                        ...node.icon,
+                        color: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown
+                    };
+                } else if (node.shape === 'image') {
+                    updatedProps.color = {
+                        border: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown,
+                        background: 'transparent'
+                    };
+                } else if (node.shape === 'box') {
+                    const style = MapApp.utils.getBoxStyleFromDevice(node.deviceData);
+                    updatedProps.color = {
+                        background: style.fillColor,
+                        border: style.borderColor
+                    };
+                }
+                
+                MapApp.state.nodes.update(updatedProps);
+                
+                if (window.SoundManager && oldStatus !== newStatus) {
+                    window.SoundManager.playForStatus(newStatus);
+                }
+            }
+        }
+    }
+};
+
+// --- timeline slider & playback management ---
+MapApp.network.timeline = {
+    playInterval: null,
+    isPlaying: false,
+    
+    init: function() {
+        const slider = document.getElementById('timelineSlider');
+        const playBtn = document.getElementById('timelinePlayBtn');
+        const statusText = document.getElementById('timelineStatusText');
+        const playIcon = document.getElementById('timelinePlayIcon');
+        
+        if (!slider || !playBtn) return;
+        
+        slider.addEventListener('input', () => {
+            const val = parseInt(slider.value, 10);
+            if (val === 24) {
+                statusText.innerHTML = `<span class="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></span>Live View`;
+                statusText.className = "text-cyan-400 font-semibold bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded-full flex items-center gap-1.5";
+            } else {
+                const hoursAgo = 24 - val;
+                statusText.innerHTML = `<i class="fas fa-history mr-1"></i>${hoursAgo} Hour${hoursAgo > 1 ? 's' : ''} Ago`;
+                statusText.className = "text-amber-400 font-semibold bg-amber-950/40 border border-amber-800/30 px-2 py-0.5 rounded-full flex items-center gap-1.5";
+            }
+        });
+        
+        slider.addEventListener('change', async () => {
+            const val = parseInt(slider.value, 10);
+            if (val === 24) {
+                this.stopPlay();
+                const currentMapId = MapApp.state.currentMapId;
+                if (currentMapId) {
+                    try {
+                        const deviceResponse = await MapApp.api.get('get_devices', { map_id: currentMapId });
+                        const devices = deviceResponse.devices || [];
+                        devices.forEach(d => {
+                            const node = MapApp.state.nodes.get(d.id);
+                            if (node && node.deviceData) {
+                                node.deviceData = d;
+                                let label = d.name;
+                                if (d.show_live_ping && d.status === 'online' && d.last_avg_time !== null) {
+                                    label += `\n${d.last_avg_time}ms | TTL:${d.last_ttl || 'N/A'}`;
+                                }
+                                const updatedProps = { id: d.id, deviceData: d, title: MapApp.utils.buildNodeTitle(d), label };
+                                if (node.shape === 'icon') {
+                                    updatedProps.icon = { ...node.icon, color: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown };
+                                } else if (node.shape === 'image') {
+                                    updatedProps.color = { border: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' };
+                                }
+                                MapApp.state.nodes.update(updatedProps);
+                            }
+                        });
+                        MapApp.deviceManager.setupAutoPing(devices);
+                    } catch (e) {
+                        console.error("Error restoring live view:", e);
+                    }
+                }
+            } else {
+                Object.values(MapApp.state.pingIntervals).forEach(clearInterval);
+                MapApp.state.pingIntervals = {};
+                
+                const hoursAgo = 24 - val;
+                const currentMapId = MapApp.state.currentMapId;
+                if (currentMapId) {
+                    try {
+                        const res = await fetch(`api.php?action=get_historical_map_state&map_id=${currentMapId}&hours_ago=${hoursAgo}`);
+                        const historicalStates = await res.json();
+                        
+                        if (Array.isArray(historicalStates)) {
+                            historicalStates.forEach(state => {
+                                const node = MapApp.state.nodes.get(state.id);
+                                if (node && node.deviceData) {
+                                    const updatedData = { ...node.deviceData, status: state.status };
+                                    let label = updatedData.name;
+                                    const updatedProps = {
+                                        id: state.id,
+                                        deviceData: updatedData,
+                                        title: MapApp.utils.buildNodeTitle(updatedData),
+                                        label: label
+                                    };
+                                    
+                                    if (node.shape === 'icon') {
+                                        updatedProps.icon = {
+                                            ...node.icon,
+                                            color: MapApp.config.statusColorMap[state.status] || MapApp.config.statusColorMap.unknown
+                                        };
+                                    } else if (node.shape === 'image') {
+                                        updatedProps.color = {
+                                            border: MapApp.config.statusColorMap[state.status] || MapApp.config.statusColorMap.unknown,
+                                            background: 'transparent'
+                                        };
+                                    } else if (node.shape === 'box') {
+                                        const style = MapApp.utils.getBoxStyleFromDevice(updatedData);
+                                        updatedProps.color = {
+                                            background: style.fillColor,
+                                            border: style.borderColor
+                                        };
+                                    }
+                                    
+                                    MapApp.state.nodes.update(updatedProps);
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Failed to load historical states:", e);
+                    }
+                }
+            }
+        });
+        
+        playBtn.addEventListener('click', () => {
+            if (this.isPlaying) {
+                this.stopPlay();
+            } else {
+                this.startPlay();
+            }
+        });
+    },
+    
+    startPlay: function() {
+        const playBtn = document.getElementById('timelinePlayBtn');
+        const playIcon = document.getElementById('timelinePlayIcon');
+        const slider = document.getElementById('timelineSlider');
+        
+        if (!playBtn || !slider) return;
+        
+        this.isPlaying = true;
+        playIcon.className = 'fas fa-pause';
+        playBtn.classList.remove('from-cyan-600', 'to-blue-600');
+        playBtn.classList.add('from-amber-600', 'to-orange-600');
+        
+        if (parseInt(slider.value, 10) === 24) {
+            slider.value = 0;
+            slider.dispatchEvent(new Event('input'));
+            slider.dispatchEvent(new Event('change'));
+        }
+        
+        this.playInterval = setInterval(() => {
+            let nextVal = parseInt(slider.value, 10) + 1;
+            if (nextVal > 24) {
+                nextVal = 0;
+            }
+            slider.value = nextVal;
+            slider.dispatchEvent(new Event('input'));
+            slider.dispatchEvent(new Event('change'));
+        }, 1500);
+    },
+    
+    stopPlay: function() {
+        const playBtn = document.getElementById('timelinePlayBtn');
+        const playIcon = document.getElementById('timelinePlayIcon');
+        
+        if (!playBtn) return;
+        
+        this.isPlaying = false;
+        playIcon.className = 'fas fa-play';
+        playBtn.classList.remove('from-amber-600', 'to-orange-600');
+        playBtn.classList.add('from-cyan-600', 'to-blue-600');
+        
+        if (this.playInterval) {
+            clearInterval(this.playInterval);
+            this.playInterval = null;
+        }
+    },
+    
+    reset: function() {
+        this.stopPlay();
+        const slider = document.getElementById('timelineSlider');
+        if (slider) {
+            slider.value = 24;
+            slider.dispatchEvent(new Event('input'));
+        }
     }
 };

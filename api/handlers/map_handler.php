@@ -443,4 +443,48 @@ switch ($action) {
             echo json_encode(['ports' => []]);
         }
         break;
+
+    case 'get_historical_map_state':
+        $map_id = $_GET['map_id'] ?? null;
+        $hours_ago = isset($_GET['hours_ago']) ? (int)$_GET['hours_ago'] : 0;
+        if (!$map_id) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Map ID is required']);
+            exit;
+        }
+
+        // Check ownership if not viewer
+        if ($user_role !== 'viewer') {
+            $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id = ?");
+            $stmt->execute([$map_id, $current_user_id]);
+            if (!$stmt->fetch()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Access denied to this map']);
+                exit;
+            }
+        }
+
+        // Fetch the historical state of devices in the map
+        $stmt = $pdo->prepare("
+            SELECT 
+                d.id,
+                d.name,
+                d.ip,
+                COALESCE(
+                    (
+                        SELECT status 
+                        FROM device_status_logs 
+                        WHERE device_id = d.id AND created_at <= (NOW() - INTERVAL ? HOUR)
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                    ),
+                    d.status
+                ) as status
+            FROM devices d
+            WHERE d.map_id = ?
+        ");
+        $stmt->execute([$hours_ago, $map_id]);
+        $device_states = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($device_states);
+        break;
 }

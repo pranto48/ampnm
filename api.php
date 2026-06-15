@@ -121,7 +121,7 @@ try {
         'get_maps', 'get_devices', 'get_edges', 'get_dashboard_data', 'get_ping_history',
         'get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'get_device_details', 'get_device_uptime',
         'get_smtp_settings', 'get_all_devices_for_subscriptions', 'get_device_subscriptions',
-        'health', 'get_current_license_info',
+        'health', 'get_current_license_info', 'get_historical_map_state',
         // Host metrics viewing
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts',
         // Floor plan viewing
@@ -164,7 +164,7 @@ try {
     // Group actions by handler
     $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
     $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip']; // ping_all_devices removed
-    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports'];
+    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'save_log_backup_schedule', 'delete_log_backup_schedule', 'run_log_backup_now', 'run_due_log_backups'];

@@ -79,6 +79,11 @@ if [ "${AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER:-1}" = "1" ]; then
     echo ""
 fi
 
+echo "→ Starting Active Telemetry Trapper Server..."
+php /var/www/html/api/workers/trapper_server.php > /var/log/trapper_server.log 2>&1 &
+echo "✓ Trapper Server started"
+echo ""
+
 echo "════════════════════════════════════════════════════════════"
 echo "  AMPNM is starting on port ${APACHE_PORT}"
 echo "  Access at: http://localhost:${APACHE_PORT}"

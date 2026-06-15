@@ -37,6 +37,10 @@ services:
       - AMPNM_UPDATE_CHECK_INTERVAL_SECONDS=3600
     restart: unless-stopped
     # network_mode: host is required for the ping command to work correctly.
+    # This automatically exposes:
+    #   - Apache Web Server: port 2266 (or APACHE_PORT)
+    #   - Passive Polling Agent: port 10050
+    #   - Active Telemetry Trapper: port 10051
     network_mode: "host"
 
   db:

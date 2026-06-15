@@ -110,6 +110,38 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                 </div>
             </div>
+
+            <!-- Timeline History Slider & Controls -->
+            <div id="timeline-panel" class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 mb-6 transition-all duration-300">
+                <div class="flex flex-col md:flex-row items-center gap-4">
+                    <!-- Play/Pause Controls -->
+                    <div class="flex items-center gap-3">
+                        <button id="timelinePlayBtn" class="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-full transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105" title="Auto-play Timeline">
+                            <i id="timelinePlayIcon" class="fas fa-play"></i>
+                        </button>
+                        <div class="flex flex-col">
+                            <span class="text-sm font-semibold text-white select-none">History Slider</span>
+                            <span class="text-[10px] text-slate-400 select-none">Slice by hour</span>
+                        </div>
+                    </div>
+
+                    <!-- Slider Container -->
+                    <div class="flex-grow w-full space-y-1">
+                        <div class="flex justify-between items-center text-xs text-slate-400 font-medium select-none px-1">
+                            <span>24 Hours Ago</span>
+                            <span id="timelineStatusText" class="text-cyan-400 font-semibold bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded-full flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></span>
+                                Live View
+                            </span>
+                            <span>Live</span>
+                        </div>
+                        <div class="relative flex items-center">
+                            <input type="range" id="timelineSlider" min="0" max="24" value="24" class="w-full h-2 bg-slate-900 border border-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="network-map-wrapper">
                 <div id="network-map"></div>
                 <div id="context-menu" class="context-menu"></div>
