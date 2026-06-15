@@ -99,7 +99,13 @@ if ($MsiAvailable -and $GoAvailable) {
     $MsiPath = Join-Path $BuildDir "ampnm-agent-setup.msi"
     
     # Generate the installer
-    go-msi make --path wix.json --binary build/ampnm-agent.exe --output $MsiPath
+    $TmpDir = Join-Path $BuildDir "tmp"
+    if (-not (Test-Path $TmpDir)) {
+        New-Item -ItemType Directory -Path $TmpDir | Out-Null
+    }
+    Copy-Item -Path $RtfPath -Destination $TmpDir -Force
+    Copy-Item -Path $RtfPath -Destination $BuildDir -Force
+    go-msi make --path wix.json --msi $MsiPath --out $TmpDir
     
     if (Test-Path $MsiPath) {
         Write-Host "  [ok] MSI package generated successfully: $MsiPath" -ForegroundColor Green

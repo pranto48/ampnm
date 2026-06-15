@@ -352,7 +352,7 @@ func runService(name string, isDebug bool) {
 	if isDebug {
 		elog = debug.New(name)
 	} else {
-		elog, err = eventlog.Register(name)
+		elog, err = eventlog.Open(name)
 		if err != nil {
 			elog = debug.New(name)
 		}

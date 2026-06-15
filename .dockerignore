@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.env.example
+node_modules/
+**/node_modules/
+**/target/
+**/build/
+*.zip
+*.tar.gz
+.lovable/
+agents/windows/build/
+agents/windows/ampnm-agent.exe
+agents/windows/ampnm-agent-setup.msi
+agents/windows/LICENSE.rtf

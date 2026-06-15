@@ -9,5 +9,17 @@
     "display-name": "AMPNM Monitoring Agent",
     "description": "Sends system metrics to AMPNM network monitor",
     "start": "auto"
-  }
+  },
+  "files": {
+    "guid": "41488f3f-174a-4226-9771-e7e7700905a3",
+    "items": [
+      "build/ampnm-agent.exe"
+    ]
+  },
+  "env": {
+    "guid": "",
+    "vars": null
+  },
+  "shortcuts": {},
+  "choco": {}
 }
