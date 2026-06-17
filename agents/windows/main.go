@@ -102,6 +102,17 @@ func loadConfig() Config {
 }
 
 func getLocalIP() string {
+	// The most reliable way to get the primary local IP address on a system
+	// with multiple virtual adapters (WSL, Docker, VMware) is to let the OS
+	// routing table decide which interface would be used to reach the internet.
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err == nil {
+		defer conn.Close()
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+		return localAddr.IP.String()
+	}
+
+	// Fallback to iterating interfaces if no internet route exists
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "127.0.0.1"
@@ -116,16 +127,9 @@ func getLocalIP() string {
 				if ip4[0] == 169 && ip4[1] == 254 {
 					continue
 				}
+				// Optionally skip known Docker/WSL ranges if needed, but 
+				// UDP dial usually handles this. If UDP failed, we just return the first.
 				return ip4.String()
-			}
-		}
-	}
-
-	// Fallback pass: if only APIPA exists, use it
-	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
 			}
 		}
 	}
