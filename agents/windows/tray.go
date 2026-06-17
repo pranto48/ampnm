@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"os/exec"
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -91,6 +91,7 @@ type MSG struct {
 }
 
 var (
+	user32               = syscall.NewLazyDLL("user32.dll")
 	shell32              = syscall.NewLazyDLL("shell32.dll")
 	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
 
@@ -169,7 +170,7 @@ func trayWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		setTrayIcon(hwnd, NIM_DELETE, "", "", "", "")
 		procPostQuitMessage.Call(0)
 	default:
-		ret, _, _ := procDefWindowProcW.Call(hwnd, msg, wParam, lParam)
+		ret, _, _ := procDefWindowProcW.Call(hwnd, uintptr(msg), wParam, lParam)
 		return ret
 	}
 	return 0
@@ -219,4 +220,11 @@ func ShowGUI() {
 		procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
 		procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
 	}
+}
+
+func showMessageBox(title, text string) {
+	titlePtr, _ := syscall.UTF16PtrFromString(title)
+	textPtr, _ := syscall.UTF16PtrFromString(text)
+	procMessageBoxW := user32.NewProc("MessageBoxW")
+	procMessageBoxW.Call(0, uintptr(unsafe.Pointer(textPtr)), uintptr(unsafe.Pointer(titlePtr)), 0x00000030)
 }

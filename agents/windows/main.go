@@ -12,9 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
-	"unsafe"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -262,7 +260,8 @@ func handlePassiveConnection(conn net.Conn) {
 	if strings.Contains(query, "agent.ping") {
 		response = []byte("1")
 	} else if strings.Contains(query, "metrics") || query == "" {
-		metrics, err := collectMetrics()
+		cfg := loadConfig()
+		metrics, err := collectMetrics(cfg)
 		if err == nil {
 			jsonData, _ := json.Marshal(metrics)
 			response = createTrapperPacket(jsonData)
@@ -330,7 +329,7 @@ func (m *agentService) Execute(args []string, r <-chan svc.ChangeRequest, change
 		for {
 			select {
 			case <-ticker.C:
-				metrics, err := collectMetrics()
+				metrics, err := collectMetrics(cfg)
 				if err == nil {
 					// Local alerting logic
 					if metrics.CPUPercent >= 98.0 {

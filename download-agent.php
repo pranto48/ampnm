@@ -8,6 +8,7 @@ $file = $_GET['file'] ?? 'AMPNM-Agent-Installer.ps1';
 $allowedFiles = [
     'AMPNM-Agent-Installer.ps1',
     'AMPNM-Agent-Simple.bat',
+    'ampnm-agent-setup.msi',
     'install.sh',
     'ampnm-agent.sh',
     'ampnm-agent.service'
@@ -74,6 +75,7 @@ $ext = pathinfo($file, PATHINFO_EXTENSION);
 $mimeTypes = [
     'ps1' => 'application/octet-stream',
     'bat' => 'application/octet-stream',
+    'msi' => 'application/octet-stream',
     'sh' => 'text/x-shellscript',
     'service' => 'text/plain'
 ];

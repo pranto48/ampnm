@@ -78,14 +78,33 @@ $linuxServiceDownload = $serverUrl . '/download-agent.php?file=ampnm-agent.servi
         </div>
 
         <div id="platform-panel-windows" class="platform-panel space-y-4">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="bg-slate-900/40 border border-slate-700 rounded-lg p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-white font-medium flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30">New</span>
+                                Compiled Agent (Modern UI)
+                            </p>
+                            <p class="text-slate-400 text-xs mt-1">High-performance executable with system tray icon, local web dashboard, real-time log terminal, and LAN adapter selector.</p>
+                        </div>
+                        <a class="px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded text-xs font-medium shadow-md transition-all shrink-0" href="download-agent.php?file=ampnm-agent-setup.msi">
+                            <i class="fas fa-download mr-1"></i>Download MSI
+                        </a>
+                    </div>
+                    <div class="mt-4 border-t border-slate-800 pt-3 space-y-2 text-xs text-slate-400">
+                        <div class="flex items-center gap-1.5"><i class="fas fa-check text-green-400"></i> Double-click tray icon to open log/settings UI</div>
+                        <div class="flex items-center gap-1.5"><i class="fas fa-check text-green-400"></i> Choose active LAN network interface in UI</div>
+                        <div class="flex items-center gap-1.5"><i class="fas fa-check text-green-400"></i> Automatic startup integration</div>
+                    </div>
+                </div>
                 <div class="bg-slate-900/40 border border-slate-700 rounded-lg p-4">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="text-white font-medium">PowerShell Installer</p>
                             <p class="text-slate-400 text-xs mt-1">Recommended for long-running Windows service installs.</p>
                         </div>
-                        <a class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-medium" href="<?php echo htmlspecialchars($windowsInstallerDownload); ?>">
+                        <a class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-medium shrink-0" href="<?php echo htmlspecialchars($windowsInstallerDownload); ?>">
                             <i class="fas fa-download mr-1"></i>Download
                         </a>
                     </div>
@@ -100,7 +119,7 @@ $linuxServiceDownload = $serverUrl . '/download-agent.php?file=ampnm-agent.servi
                             <p class="text-white font-medium">Simple BAT</p>
                             <p class="text-slate-400 text-xs mt-1">Useful for quick validation or Task Scheduler runs.</p>
                         </div>
-                        <a class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-medium" href="<?php echo htmlspecialchars($windowsBatDownload); ?>">
+                        <a class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-medium shrink-0" href="<?php echo htmlspecialchars($windowsBatDownload); ?>">
                             <i class="fas fa-download mr-1"></i>Download
                         </a>
                     </div>

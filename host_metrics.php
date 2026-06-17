@@ -97,6 +97,20 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'] . ($basePath === '/' ? '' : $base
         </div>
     </div>
     
+    <!-- View Mode controls -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-4 bg-slate-800/40 rounded-xl border border-slate-700 p-3">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-eye text-cyan-400"></i>
+            <span class="text-white font-medium text-sm">Host View Mode</span>
+        </div>
+        <div class="flex items-center gap-1.5 bg-slate-900/60 border border-slate-700 rounded-lg p-1 text-xs">
+            <button onclick="changeHostViewMode('all')" id="btn-view-all" class="px-3 py-1.5 rounded-md text-white bg-cyan-600 font-medium transition-all">All Options</button>
+            <button onclick="changeHostViewMode('ram')" id="btn-view-ram" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition-all">RAM Only</button>
+            <button onclick="changeHostViewMode('cpu-ram')" id="btn-view-cpu-ram" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition-all">CPU & RAM</button>
+            <button onclick="changeHostViewMode('lan')" id="btn-view-lan" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition-all">LAN Only</button>
+        </div>
+    </div>
+    
     <!-- Monitored Hosts Grid -->
     <div id="hosts-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
         <div class="col-span-full flex items-center justify-center py-12 text-slate-500">
@@ -590,6 +604,29 @@ const notyf = new Notyf({
     ]
 });
 
+let hostViewMode = localStorage.getItem('ampnm_host_view_mode') || 'all';
+
+function changeHostViewMode(mode) {
+    hostViewMode = mode;
+    localStorage.setItem('ampnm_host_view_mode', mode);
+    
+    const modes = ['all', 'ram', 'cpu-ram', 'lan'];
+    modes.forEach(m => {
+        const btn = document.getElementById('btn-view-' + m);
+        if (btn) {
+            if (m === mode) {
+                btn.className = 'px-3 py-1.5 rounded-md text-white bg-cyan-600 font-medium transition-all';
+            } else {
+                btn.className = 'px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition-all';
+            }
+        }
+    });
+    
+    if (typeof loadHosts === 'function' && !isFirstLoad) {
+        loadHosts();
+    }
+}
+
 // Optional deep-link: host_metrics.php?modal=tokens
 window.addEventListener('load', () => {
     try {
@@ -600,6 +637,7 @@ window.addEventListener('load', () => {
     } catch (e) {
         // ignore
     }
+    changeHostViewMode(hostViewMode);
 });
 let selectedHostIp = null;
 let charts = {};
@@ -760,7 +798,111 @@ function createHostCard(host) {
     
     const firstSeen = host.first_seen_at ? new Date(host.first_seen_at) : null;
     const firstSeenDisplay = firstSeen ? getTimeAgo(firstSeen) : 'Unknown';
-    
+
+    let metricsHtml = '';
+    if (hostViewMode === 'ram') {
+        metricsHtml = `
+            <div class="bg-slate-900/50 rounded-lg p-3 w-full col-span-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs font-semibold">Memory (RAM)</span>
+                    <span class="text-purple-400 font-bold text-sm">${host.memory_percent !== null ? host.memory_percent + '%' : 'N/A'}</span>
+                </div>
+                <div class="h-1.5 bg-slate-700 rounded mt-1.5">
+                    <div class="h-1.5 bg-purple-500 rounded" style="width: ${host.memory_percent || 0}%"></div>
+                </div>
+            </div>
+        `;
+    } else if (hostViewMode === 'cpu-ram') {
+        metricsHtml = `
+            <div class="bg-slate-900/50 rounded-lg p-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs">CPU</span>
+                    <span class="text-cyan-400 font-medium">${host.cpu_percent !== null ? host.cpu_percent + '%' : 'N/A'}</span>
+                </div>
+                <div class="h-1 bg-slate-700 rounded mt-1">
+                    <div class="h-1 bg-cyan-500 rounded" style="width: ${host.cpu_percent || 0}%"></div>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 rounded-lg p-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs">Memory</span>
+                    <span class="text-purple-400 font-medium">${host.memory_percent !== null ? host.memory_percent + '%' : 'N/A'}</span>
+                </div>
+                <div class="h-1 bg-slate-700 rounded mt-1">
+                    <div class="h-1 bg-purple-500 rounded" style="width: ${host.memory_percent || 0}%"></div>
+                </div>
+            </div>
+        `;
+    } else if (hostViewMode === 'lan') {
+        metricsHtml = `
+            <div class="bg-slate-900/50 rounded-lg p-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs"><i class="fas fa-arrow-down text-emerald-400 mr-1"></i>LAN In</span>
+                    <span class="text-emerald-400 font-medium font-mono">${host.network_in_mbps !== null && host.network_in_mbps !== undefined ? parseFloat(host.network_in_mbps).toFixed(2) + ' Mbps' : 'N/A'}</span>
+                </div>
+                <div class="text-[10px] text-slate-500 mt-1">Incoming traffic rate</div>
+            </div>
+            <div class="bg-slate-900/50 rounded-lg p-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs"><i class="fas fa-arrow-up text-blue-400 mr-1"></i>LAN Out</span>
+                    <span class="text-blue-400 font-medium font-mono">${host.network_out_mbps !== null && host.network_out_mbps !== undefined ? parseFloat(host.network_out_mbps).toFixed(2) + ' Mbps' : 'N/A'}</span>
+                </div>
+                <div class="text-[10px] text-slate-500 mt-1">Outgoing traffic rate</div>
+            </div>
+        `;
+    } else {
+        metricsHtml = `
+            <div class="bg-slate-900/50 rounded-lg p-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs">CPU</span>
+                    <span class="text-cyan-400 font-medium">${host.cpu_percent !== null ? host.cpu_percent + '%' : 'N/A'}</span>
+                </div>
+                <div class="h-1 bg-slate-700 rounded mt-1">
+                    <div class="h-1 bg-cyan-500 rounded" style="width: ${host.cpu_percent || 0}%"></div>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 rounded-lg p-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs">Memory</span>
+                    <span class="text-purple-400 font-medium">${host.memory_percent !== null ? host.memory_percent + '%' : 'N/A'}</span>
+                </div>
+                <div class="h-1 bg-slate-700 rounded mt-1">
+                    <div class="h-1 bg-purple-500 rounded" style="width: ${host.memory_percent || 0}%"></div>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 rounded-lg p-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs">Disk</span>
+                    <span class="text-green-400 font-medium">${host.disk_percent !== null ? host.disk_percent + '%' : 'N/A'}</span>
+                </div>
+                <div class="h-1 bg-slate-700 rounded mt-1">
+                    <div class="h-1 bg-green-500 rounded" style="width: ${host.disk_percent || 0}%"></div>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 rounded-lg p-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400 text-xs">GPU</span>
+                    <span class="text-orange-400 font-medium">${host.gpu_percent !== null ? host.gpu_percent + '%' : 'N/A'}</span>
+                </div>
+                <div class="h-1 bg-slate-700 rounded mt-1">
+                    <div class="h-1 bg-orange-500 rounded" style="width: ${host.gpu_percent || 0}%"></div>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 rounded-lg p-2 col-span-2 flex justify-between items-center text-xs mt-1 border border-slate-700/40">
+                <div class="flex items-center gap-1">
+                    <i class="fas fa-arrow-down text-emerald-400"></i>
+                    <span class="text-slate-400">In:</span>
+                    <span class="text-slate-200 font-mono font-medium">${host.network_in_mbps !== null && host.network_in_mbps !== undefined ? parseFloat(host.network_in_mbps).toFixed(2) + ' Mbps' : 'N/A'}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <i class="fas fa-arrow-up text-blue-400"></i>
+                    <span class="text-slate-400">Out:</span>
+                    <span class="text-slate-200 font-mono font-medium">${host.network_out_mbps !== null && host.network_out_mbps !== undefined ? parseFloat(host.network_out_mbps).toFixed(2) + ' Mbps' : 'N/A'}</span>
+                </div>
+            </div>
+        `;
+    }
+
     return `
         <div class="host-card bg-slate-800/50 rounded-xl border border-slate-700 hover:border-cyan-500/50 transition-all p-4">
             <div class="flex justify-between items-start mb-4">
@@ -824,42 +966,7 @@ function createHostCard(host) {
             ` : ''}
             
             <div class="grid grid-cols-2 gap-3 text-sm cursor-pointer" onclick="selectHost('${host.host_ip}', '${host.host_name || host.host_ip}')">
-                <div class="bg-slate-900/50 rounded-lg p-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-400 text-xs">CPU</span>
-                        <span class="text-cyan-400 font-medium">${host.cpu_percent !== null ? host.cpu_percent + '%' : 'N/A'}</span>
-                    </div>
-                    <div class="h-1 bg-slate-700 rounded mt-1">
-                        <div class="h-1 bg-cyan-500 rounded" style="width: ${host.cpu_percent || 0}%"></div>
-                    </div>
-                </div>
-                <div class="bg-slate-900/50 rounded-lg p-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-400 text-xs">Memory</span>
-                        <span class="text-purple-400 font-medium">${host.memory_percent !== null ? host.memory_percent + '%' : 'N/A'}</span>
-                    </div>
-                    <div class="h-1 bg-slate-700 rounded mt-1">
-                        <div class="h-1 bg-purple-500 rounded" style="width: ${host.memory_percent || 0}%"></div>
-                    </div>
-                </div>
-                <div class="bg-slate-900/50 rounded-lg p-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-400 text-xs">Disk</span>
-                        <span class="text-green-400 font-medium">${host.disk_percent !== null ? host.disk_percent + '%' : 'N/A'}</span>
-                    </div>
-                    <div class="h-1 bg-slate-700 rounded mt-1">
-                        <div class="h-1 bg-green-500 rounded" style="width: ${host.disk_percent || 0}%"></div>
-                    </div>
-                </div>
-                <div class="bg-slate-900/50 rounded-lg p-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-400 text-xs">GPU</span>
-                        <span class="text-orange-400 font-medium">${host.gpu_percent !== null ? host.gpu_percent + '%' : 'N/A'}</span>
-                    </div>
-                    <div class="h-1 bg-slate-700 rounded mt-1">
-                        <div class="h-1 bg-orange-500 rounded" style="width: ${host.gpu_percent || 0}%"></div>
-                    </div>
-                </div>
+                ${metricsHtml}
             </div>
             
             <div class="flex justify-between items-center mt-3 text-xs">
