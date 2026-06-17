@@ -20,6 +20,8 @@ if ($CandleFile) {
         $env:PATH = "$wixPath;$env:PATH"
         Write-Host "[info] Auto-detected WiX Toolset and added to PATH: $wixPath" -ForegroundColor Green
     }
+    # Also set WIX env variable so go-msi subprocess can find it
+    $env:WIX = Split-Path $wixPath -Parent
     $WixFound = $true
 }
 
@@ -122,14 +124,21 @@ if ($MsiAvailable -and $GoAvailable) {
     Write-Host "[info] Compiling MSI package using go-msi make..." -ForegroundColor Yellow
     $MsiPath = Join-Path $BuildDir "ampnm-agent-setup.msi"
     
-    # Generate the installer
+    # Generate the installer — pass WiX bin path explicitly to avoid PATH inheritance issues
     $TmpDir = Join-Path $BuildDir "tmp"
     if (-not (Test-Path $TmpDir)) {
         New-Item -ItemType Directory -Path $TmpDir | Out-Null
     }
     Copy-Item -Path $RtfPath -Destination $TmpDir -Force
     Copy-Item -Path $RtfPath -Destination $BuildDir -Force
-    go-msi make --path wix.json --msi $MsiPath --out $TmpDir
+
+    # Build the go-msi command; include -wix flag only if we found the path
+    if ($CandleFile) {
+        $wixBin = $CandleFile.DirectoryName
+        go-msi make --path wix.json --msi $MsiPath --out $TmpDir --wix "$wixBin"
+    } else {
+        go-msi make --path wix.json --msi $MsiPath --out $TmpDir
+    }
     
     if (Test-Path $MsiPath) {
         Write-Host "  [ok] MSI package generated successfully: $MsiPath" -ForegroundColor Green
