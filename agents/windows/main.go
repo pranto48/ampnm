@@ -32,8 +32,6 @@ const (
 
 var (
 	elog             debug.Log
-	user32           = syscall.NewLazyDLL("user32.dll")
-	procMessageBoxW  = user32.NewProc("MessageBoxW")
 	cpuWarningCount  = 0
 )
 
@@ -43,6 +41,7 @@ type Config struct {
 	Interval      int    `json:"Interval"`
 	TrapperServer string `json:"TrapperServer"`
 	PassivePort   int    `json:"PassivePort"`
+	LANInterface  string `json:"LANInterface"`
 }
 
 type MetricsPayload struct {
@@ -62,17 +61,7 @@ type MetricsPayload struct {
 	UptimeSeconds uint64  `json:"uptime_seconds"`
 }
 
-func showMessageBox(title, text string) {
-	// MB_SERVICE_NOTIFICATION = 0x00200000, MB_ICONWARNING = 0x00000030
-	titlePtr, _ := syscall.UTF16PtrFromString(title)
-	textPtr, _ := syscall.UTF16PtrFromString(text)
-	procMessageBoxW.Call(
-		0,
-		uintptr(unsafe.Pointer(textPtr)),
-		uintptr(unsafe.Pointer(titlePtr)),
-		uintptr(0x00200000|0x00000030),
-	)
-}
+
 
 func loadConfig() Config {
 	configPath := filepath.Join(os.Getenv("ProgramData"), "AMPNM-Agent", "config.json")
@@ -101,7 +90,21 @@ func loadConfig() Config {
 	return cfg
 }
 
-func getLocalIP() string {
+func getLocalIP(cfg Config) string {
+	// If a specific LAN Interface IP is configured and valid, use it
+	if cfg.LANInterface != "" && cfg.LANInterface != "auto" {
+		addrs, err := net.InterfaceAddrs()
+		if err == nil {
+			for _, address := range addrs {
+				if ipnet, ok := address.(*net.IPNet); ok {
+					if ipnet.IP.String() == cfg.LANInterface {
+						return cfg.LANInterface
+					}
+				}
+			}
+		}
+	}
+
 	// The most reliable way to get the primary local IP address on a system
 	// with multiple virtual adapters (WSL, Docker, VMware) is to let the OS
 	// routing table decide which interface would be used to reach the internet.
@@ -137,20 +140,18 @@ func getLocalIP() string {
 	return "127.0.0.1"
 }
 
-func collectMetrics() (MetricsPayload, error) {
-	payload := MetricsPayload{
-		Platform: "windows",
-	}
+func collectMetrics(cfg Config) (MetricsPayload, error) {
+	var payload MetricsPayload
 
 	// Hostname
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = "unknown-windows"
+		hostname = "Unknown"
 	}
 	payload.HostName = hostname
 
 	// IP Address
-	payload.HostIP = getLocalIP()
+	payload.HostIP = getLocalIP(cfg)
 
 	// CPU
 	cpuPercents, err := cpu.Percent(time.Second, false)
@@ -398,9 +399,9 @@ func runService(name string, isDebug bool) {
 }
 
 // TestConnection tests the agent configuration connection to the server
-func TestConnection(serverUrl, token string) error {
+func TestConnection(serverUrl, token string, cfg Config) error {
 	// Collect metrics payload
-	payload, err := collectMetrics()
+	payload, err := collectMetrics(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to collect system metrics: %v", err)
 	}
@@ -467,7 +468,7 @@ func main() {
 
 	// Perform immediate collection on startup in interactive mode
 	fmt.Println("Performing initial collection...")
-	metrics, err := collectMetrics()
+	metrics, err := collectMetrics(cfg)
 	if err == nil {
 		fmt.Printf("Collected stats: CPU:%.2f%%, RAM:%.2f%%, Disk:%.2f%%, NetIn:%.2fMbps, NetOut:%.2fMbps\n",
 			metrics.CPUPercent, metrics.MemoryPercent, metrics.DiskPercent, metrics.NetworkIn, metrics.NetworkOut)
@@ -480,7 +481,7 @@ func main() {
 		select {
 		case <-ticker.C:
 			fmt.Println("Collecting periodic metrics...")
-			metrics, err := collectMetrics()
+			metrics, err := collectMetrics(cfg)
 			if err == nil {
 				fmt.Printf("Collected stats: CPU:%.2f%%, RAM:%.2f%%, Disk:%.2f%%, NetIn:%.2fMbps, NetOut:%.2fMbps\n",
 					metrics.CPUPercent, metrics.MemoryPercent, metrics.DiskPercent, metrics.NetworkIn, metrics.NetworkOut)
