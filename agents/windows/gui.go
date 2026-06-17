@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -115,8 +116,8 @@ var (
 	procGetCursorPos        = moduser32.NewProc("GetCursorPos")
 	procSetForegroundWindow = moduser32.NewProc("SetForegroundWindow")
 	procLoadIconW           = moduser32.NewProc("LoadIconW")
-	procCreateFontIndirectW = modgdi32.NewProc("CreateFontIndirectW")
-	procGetWindowRect       = moduser32.NewProc("GetWindowRect")
+	procCreateFontIndirectW  = modgdi32.NewProc("CreateFontIndirectW")
+	procInvalidateRect       = moduser32.NewProc("InvalidateRect")
 
 	// GDI color/brush procs
 	procSetTextColor    = modgdi32.NewProc("SetTextColor")
@@ -238,11 +239,9 @@ var (
 	boldFontHwnd    uintptr
 	trayIconHwnd    uintptr
 
-	// Brushes for status color painting
-	brushConnected uintptr
-	brushFailed    uintptr
-	brushTesting   uintptr
-	brushBg        uintptr
+	// guiStateMu protects all shared-state variables written by background
+	// goroutines and read by the GUI thread in WM_TIMER.
+	guiStateMu sync.Mutex
 
 	minToTrayEnabled = true
 	isTestingConn    = false
@@ -253,8 +252,8 @@ var (
 
 	agentTickTicker *time.Ticker
 
-	guiStopChan     chan struct{}
-	guiStopOnce     sync.Once  // prevents double-close panics
+	guiStopChan chan struct{}
+	guiStopOnce sync.Once // prevents double-close panics
 )
 
 // Menu Command IDs
@@ -433,18 +432,23 @@ func runGuiActivePolling(cfg Config) {
 	// Immediate initial check
 	go func() {
 		err := TestConnection(cfg.ServerUrl, cfg.AgentToken)
+		guiStateMu.Lock()
 		if err == nil {
 			connectionStatus = "Connected"
 			lastSuccessTime = time.Now().Format("2006-01-02 15:04:05")
 			errorMessage = ""
+			guiStateMu.Unlock()
 			metrics, errCollect := collectMetrics()
 			if errCollect == nil {
+				guiStateMu.Lock()
 				lastMetrics = metrics
+				guiStateMu.Unlock()
 				transmitActiveTelemetry(cfg, metrics)
 			}
 		} else {
 			connectionStatus = "Failed"
 			errorMessage = err.Error()
+			guiStateMu.Unlock()
 		}
 		triggerGuiStatusUpdate()
 	}()
@@ -457,21 +461,27 @@ func runGuiActivePolling(cfg Config) {
 			case <-agentTickTicker.C:
 				cfgData := loadConfig()
 				metrics, err := collectMetrics()
+				guiStateMu.Lock()
 				if err == nil {
 					lastMetrics = metrics
+					guiStateMu.Unlock()
 					err = TestConnection(cfgData.ServerUrl, cfgData.AgentToken)
+					guiStateMu.Lock()
 					if err == nil {
 						connectionStatus = "Connected"
 						lastSuccessTime = time.Now().Format("2006-01-02 15:04:05")
 						errorMessage = ""
+						guiStateMu.Unlock()
 						transmitActiveTelemetry(cfgData, metrics)
 					} else {
 						connectionStatus = "Failed"
 						errorMessage = err.Error()
+						guiStateMu.Unlock()
 					}
 				} else {
 					connectionStatus = "Failed"
 					errorMessage = err.Error()
+					guiStateMu.Unlock()
 				}
 				triggerGuiStatusUpdate()
 			case <-localStop:
@@ -580,24 +590,31 @@ func doExit(hwnd uintptr) {
 // Test telemetry from GUI
 // ─────────────────────────────────────────────────────────────────────────────
 func sendTestTelemetryFromGui() {
+	guiStateMu.Lock()
 	if isTestingConn {
+		guiStateMu.Unlock()
 		return
 	}
 	isTestingConn = true
 	connectionStatus = "Testing..."
+	guiStateMu.Unlock()
 	triggerGuiStatusUpdate()
 
 	go func() {
 		cfg := loadConfig()
 		err := TestConnection(cfg.ServerUrl, cfg.AgentToken)
+		guiStateMu.Lock()
 		isTestingConn = false
 		if err == nil {
 			connectionStatus = "Connected"
 			lastSuccessTime = time.Now().Format("2006-01-02 15:04:05")
 			errorMessage = ""
+			guiStateMu.Unlock()
 			metrics, errCollect := collectMetrics()
 			if errCollect == nil {
+				guiStateMu.Lock()
 				lastMetrics = metrics
+				guiStateMu.Unlock()
 				transmitActiveTelemetry(cfg, metrics)
 			}
 			setTrayIcon(hwndMain, NIM_MODIFY, "AMPNM Telemetry Agent", "Connection Successful",
@@ -605,6 +622,7 @@ func sendTestTelemetryFromGui() {
 		} else {
 			connectionStatus = "Failed"
 			errorMessage = err.Error()
+			guiStateMu.Unlock()
 			setTrayIcon(hwndMain, NIM_MODIFY, "AMPNM Telemetry Agent", "Connection Failed",
 				"Error: "+err.Error(), NIIF_ERROR)
 		}
@@ -721,40 +739,49 @@ func wndProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) uintptr {
 
 	// ── Periodic UI Refresh ───────────────────────────────────────────────────
 	case WM_TIMER:
+		// Snapshot shared state under lock (goroutines write these)
+		guiStateMu.Lock()
+		status := connectionStatus
+		errMsg := errorMessage
+		testing := isTestingConn
+		lastSent := lastSuccessTime
+		snap := lastMetrics
+		guiStateMu.Unlock()
+
 		var statusText string
-		if isTestingConn {
-			statusText = "⏳  Status: Testing Connection..."
+		if testing {
+			statusText = "Status: Testing Connection..."
 		} else {
-			switch connectionStatus {
+			switch status {
 			case "Connected":
-				statusText = "✅  Status: Connected"
+				statusText = "Status: Connected"
 			case "Failed":
-				statusText = "❌  Status: Failed"
-				if errorMessage != "" {
-					short := errorMessage
-					if len(short) > 70 {
-						short = short[:70] + "..."
+				statusText = "Status: Failed"
+				if errMsg != "" {
+					short := errMsg
+					if len(short) > 60 {
+						short = short[:60] + "..."
 					}
 					statusText += "  (" + short + ")"
 				}
 			default:
-				statusText = "⚠️  Status: " + connectionStatus
+				statusText = "Status: " + status
 			}
 		}
 		setWindowText(hwndStatusLabel, statusText)
-		setWindowText(hwndLastSentLabel, "Last Update Pushed: "+lastSuccessTime)
+		setWindowText(hwndLastSentLabel, "Last Update Pushed: "+lastSent)
 
-		// Update metric labels if we have data
-		if lastMetrics.HostName != "" {
-			setWindowText(hwndHostLabel, "Host: "+lastMetrics.HostName)
-			setWindowText(hwndIPLabel, "IP: "+lastMetrics.HostIP)
-			setWindowText(hwndCPULabel, fmt.Sprintf("CPU: %.1f%%", lastMetrics.CPUPercent))
-			setWindowText(hwndRAMLabel, fmt.Sprintf("RAM: %.1f%%", lastMetrics.MemoryPercent))
+		// Update metric labels if we have live data
+		if snap.HostName != "" {
+			setWindowText(hwndHostLabel, "Host: "+snap.HostName)
+			setWindowText(hwndIPLabel, "IP: "+snap.HostIP)
+			setWindowText(hwndCPULabel, fmt.Sprintf("CPU: %.1f%%", snap.CPUPercent))
+			setWindowText(hwndRAMLabel, fmt.Sprintf("RAM: %.1f%%", snap.MemoryPercent))
 		}
 
-		// Force status label repaint so WM_CTLCOLORSTATIC is resent
+		// Invalidate status label so WM_CTLCOLORSTATIC fires and repaints color
 		if hwndStatusLabel != 0 {
-			procPostMessageW.Call(hwndStatusLabel, WM_PAINT, 0, 0)
+			procInvalidateRect.Call(hwndStatusLabel, 0, 1) // 0=whole rect, 1=erase bg
 		}
 
 	// ── Color the status label ────────────────────────────────────────────────
@@ -931,9 +958,16 @@ func initGuiFonts() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ShowGUI — main GUI entry point (called from main.go)
-// ─────────────────────────────────────────────────────────────────────────────
+// ShowGUI — main GUI entry point (called from main.go).
+// MUST be called from the main goroutine or any goroutine that has been
+// locked to an OS thread. LockOSThread() ensures Win32's single-threaded
+// apartment model is satisfied for the entire lifetime of the window.
 func ShowGUI() {
+	// Lock this goroutine permanently to its OS thread.
+	// Win32 requires that a window is created and pumped on the SAME OS thread.
+	// Without this, Go's scheduler may move the goroutine to a different OS
+	// thread between GetMessageW calls, causing "Not Responding" hangs.
+	runtime.LockOSThread()
 	// Single-instance mutex guard
 	hMutex, _, _ := procCreateMutexW.Call(0, 1, uintptr(unsafe.Pointer(stringToUTF16Ptr("AMPNMAgentGUI-Mutex"))))
 	errCode, _, _ := procGetLastError.Call()
