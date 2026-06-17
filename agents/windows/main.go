@@ -92,6 +92,12 @@ func loadConfig() Config {
 
 	decoder := json.NewDecoder(file)
 	_ = decoder.Decode(&cfg)
+
+	// Normalize ServerUrl (ensures trailing slash if not pointing to a file)
+	cfg.ServerUrl = strings.TrimSpace(cfg.ServerUrl)
+	if cfg.ServerUrl != "" && !strings.HasSuffix(cfg.ServerUrl, "/") && !strings.HasSuffix(cfg.ServerUrl, ".php") {
+		cfg.ServerUrl += "/"
+	}
 	return cfg
 }
 

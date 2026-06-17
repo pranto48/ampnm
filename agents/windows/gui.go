@@ -620,7 +620,12 @@ func wndProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) uintptr {
 		switch controlID {
 		case ID_BTN_SAVE:
 			cfg := loadConfig()
-			cfg.ServerUrl = getWindowText(urlEditHwnd())
+			serverUrl := getWindowText(urlEditHwnd())
+			if serverUrl != "" && !strings.HasSuffix(serverUrl, "/") && !strings.HasSuffix(serverUrl, ".php") {
+				serverUrl += "/"
+			}
+			setWindowText(urlEditHwnd(), serverUrl)
+			cfg.ServerUrl = serverUrl
 			cfg.AgentToken = getWindowText(tokenEditHwnd())
 			intervalInt, err := strconv.Atoi(getWindowText(intervalEditHwnd()))
 			if err == nil && intervalInt > 0 {
