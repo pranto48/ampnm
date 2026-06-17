@@ -106,6 +106,22 @@ func getLocalIP() string {
 	if err != nil {
 		return "127.0.0.1"
 	}
+
+	// First pass: look for a proper non-APIPA IPv4 address
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			ip4 := ipnet.IP.To4()
+			if ip4 != nil {
+				// Skip APIPA (169.254.x.x)
+				if ip4[0] == 169 && ip4[1] == 254 {
+					continue
+				}
+				return ip4.String()
+			}
+		}
+	}
+
+	// Fallback pass: if only APIPA exists, use it
 	for _, address := range addrs {
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
@@ -113,6 +129,7 @@ func getLocalIP() string {
 			}
 		}
 	}
+
 	return "127.0.0.1"
 }
 
