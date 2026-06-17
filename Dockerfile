@@ -61,6 +61,9 @@ RUN set -eux; \
 # Enable Apache's mod_rewrite for pretty URLs
 RUN a2enmod rewrite
 
+# Update Apache default configuration to allow .htaccess overrides
+RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+
 WORKDIR /var/www/html
 
 # Copy application source
