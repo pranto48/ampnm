@@ -11,6 +11,30 @@ Write-Host "|   AMPNM Windows Telemetry Agent - Build & Package    |"
 Write-Host "+------------------------------------------------------+"
 Write-Host ""
 
+# Auto-detect and add WiX Toolset to PATH if needed
+$WixFound = $false
+$CandleFile = Get-ChildItem -Path "C:\Program Files*" -Filter "candle.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($CandleFile) {
+    $wixPath = $CandleFile.DirectoryName
+    if ($env:PATH -notlike "*$wixPath*") {
+        $env:PATH = "$wixPath;$env:PATH"
+        Write-Host "[info] Auto-detected WiX Toolset and added to PATH: $wixPath" -ForegroundColor Green
+    }
+    $WixFound = $true
+}
+
+if (-not $WixFound) {
+    # Check if candle.exe is already on the PATH
+    try {
+        $null = Get-Command candle -ErrorAction Stop
+        $WixFound = $true
+    } catch {
+        # Not found on PATH
+    }
+}
+
+
+
 # 1. Create build directory
 $BuildDir = Join-Path $PSScriptRoot "build"
 if (-not (Test-Path $BuildDir)) {
