@@ -11,28 +11,45 @@ Write-Host "|   AMPNM Windows Telemetry Agent - Build & Package    |"
 Write-Host "+------------------------------------------------------+"
 Write-Host ""
 
-# Auto-detect and add WiX Toolset to PATH if needed
+# Locate WiX Toolset — prefer local bundled binaries, fall back to system install
 $WixFound = $false
-$CandleFile = Get-ChildItem -Path "C:\Program Files*" -Filter "candle.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($CandleFile) {
-    $wixPath = $CandleFile.DirectoryName
+
+# 1. Check for bundled WiX binaries next to this script (build\wix\candle.exe)
+$LocalWix = Join-Path $PSScriptRoot "build\wix\candle.exe"
+if (Test-Path $LocalWix) {
+    $wixPath = Split-Path $LocalWix -Parent
     if ($env:PATH -notlike "*$wixPath*") {
         $env:PATH = "$wixPath;$env:PATH"
-        Write-Host "[info] Auto-detected WiX Toolset and added to PATH: $wixPath" -ForegroundColor Green
     }
-    # Also set WIX env variable so go-msi subprocess can find it
-    $env:WIX = Split-Path $wixPath -Parent
+    $CandleFile = Get-Item $LocalWix
     $WixFound = $true
+    Write-Host "[info] Using bundled WiX binaries: $wixPath" -ForegroundColor Green
+}
+
+# 2. Fall back: scan Program Files
+if (-not $WixFound) {
+    $CandleFile = Get-ChildItem -Path "C:\Program Files*" -Filter "candle.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($CandleFile) {
+        $wixPath = $CandleFile.DirectoryName
+        if ($env:PATH -notlike "*$wixPath*") {
+            $env:PATH = "$wixPath;$env:PATH"
+        }
+        $WixFound = $true
+        Write-Host "[info] Auto-detected WiX Toolset: $wixPath" -ForegroundColor Green
+    }
+}
+
+# 3. Fall back: already on PATH
+if (-not $WixFound) {
+    try {
+        $null = Get-Command candle -ErrorAction Stop
+        $CandleFile = $null
+        $WixFound = $true
+    } catch { }
 }
 
 if (-not $WixFound) {
-    # Check if candle.exe is already on the PATH
-    try {
-        $null = Get-Command candle -ErrorAction Stop
-        $WixFound = $true
-    } catch {
-        # Not found on PATH
-    }
+    Write-Host "[warning] WiX Toolset not found. MSI packaging will be skipped." -ForegroundColor Yellow
 }
 
 
