@@ -94,8 +94,8 @@ if ($GoAvailable) {
     $env:GOARCH = "amd64"
     $ExePath = Join-Path $BuildDir "ampnm-agent.exe"
     
-    # Run optimized compilation
-    go build -ldflags="-w -s" -o $ExePath main.go
+    # Run optimized compilation (with windowsgui subsystem to prevent console window popup)
+    go build -ldflags="-w -s -H=windowsgui" -o $ExePath .
     
     if (Test-Path $ExePath) {
         Write-Host "  [ok] Go agent compiled successfully: $ExePath" -ForegroundColor Green

@@ -45,6 +45,29 @@
          
 
          
+         <Directory Id="ProgramMenuFolder">
+            <Directory Id="ProgramMenuSubfolder" Name="AMPNM Agent">
+               <Component Id="ApplicationShortcuts" Guid="C7257F26-38AF-4809-B4A4-EC28C545E3B3">
+               
+                  <Shortcut Id="ApplicationShortcut0"
+                        Name="AMPNM Agent Control Panel"
+                        Description="Control panel for the AMPNM Telemetry Agent"
+                        Target="[INSTALLDIR]\ampnm-agent.exe"
+                        WorkingDirectory="INSTALLDIR"
+                        
+                        >
+                        
+                  </Shortcut>
+                  <RegistryValue Root="HKCU"
+                    Key="Software\IT Support BD\AMPNM Agent"
+                    Name="installed0"
+                    Type="integer" Value="1" KeyPath="yes"/>
+                
+                <RemoveFolder Id="ProgramMenuSubfolder" On="uninstall"/>
+               </Component>
+            </Directory>
+         </Directory>
+         
 
       </Directory>
 
@@ -61,6 +84,8 @@
          
          <ComponentRef Id="ApplicationFiles"/>
          
+         
+         <ComponentRef Id="ApplicationShortcuts"/>
          
          
       </Feature>

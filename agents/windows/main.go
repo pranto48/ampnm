@@ -370,6 +370,40 @@ func runService(name string, isDebug bool) {
 	}
 }
 
+// TestConnection tests the agent configuration connection to the server
+func TestConnection(serverUrl, token string) error {
+	// Collect metrics payload
+	payload, err := collectMetrics()
+	if err != nil {
+		return fmt.Errorf("failed to collect system metrics: %v", err)
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", serverUrl, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Agent-Token", token)
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("server unreachable: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("server error (HTTP %s)", resp.Status)
+	}
+
+	return nil
+}
+
 func main() {
 	var err error
 	debugFlag := flag.Bool("debug", false, "Run in debug mode (interactive console)")
@@ -385,7 +419,13 @@ func main() {
 		return
 	}
 
-	// Interactive Mode (debug/console run)
+	// GUI Mode (standard interactive run)
+	if !*debugFlag {
+		ShowGUI()
+		return
+	}
+
+	// Interactive Console Mode (if -debug flag is passed)
 	fmt.Printf("Starting AMPNM Agent in interactive console mode...\n")
 	cfg := loadConfig()
 	fmt.Printf("Configured Server: %s\n", cfg.ServerUrl)

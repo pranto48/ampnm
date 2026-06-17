@@ -20,6 +20,16 @@
     "guid": "",
     "vars": null
   },
-  "shortcuts": {},
+  "shortcuts": {
+    "guid": "C7257F26-38AF-4809-B4A4-EC28C545E3B3",
+    "items": [
+      {
+        "name": "AMPNM Agent Control Panel",
+        "description": "Control panel for the AMPNM Telemetry Agent",
+        "target": "[INSTALLDIR]\\ampnm-agent.exe",
+        "wdir": "INSTALLDIR"
+      }
+    ]
+  },
   "choco": {}
 }
