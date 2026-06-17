@@ -7,110 +7,138 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode/utf16"
 	"unsafe"
 )
 
-// Win32 API Definitions and Constants
+// ─────────────────────────────────────────────────────────────────────────────
+// Win32 API Constants
+// ─────────────────────────────────────────────────────────────────────────────
 const (
-	WM_CREATE             = 0x0001
-	WM_DESTROY            = 0x0002
-	WM_SIZE               = 0x0005
-	WM_COMMAND            = 0x0111
-	WM_CLOSE              = 0x0010
-	WM_TIMER              = 0x0113
-	WM_SETFONT            = 0x0030
-	WM_TRAY               = 0x8001 // Custom message for tray icon
+	WM_CREATE           = 0x0001
+	WM_DESTROY          = 0x0002
+	WM_SIZE             = 0x0005
+	WM_PAINT            = 0x000F
+	WM_COMMAND          = 0x0111
+	WM_CLOSE            = 0x0010
+	WM_TIMER            = 0x0113
+	WM_SETFONT          = 0x0030
+	WM_CTLCOLORSTATIC   = 0x0138 // Sent before painting a STATIC control
+	WM_TRAY             = 0x8001 // Custom tray callback
 
-	WS_OVERLAPPEDWINDOW   = 0x00CF0000
-	WS_OVERLAPPED         = 0x00000000
-	WS_CAPTION            = 0x00C00000
-	WS_SYSMENU            = 0x00080000
-	WS_MINIMIZEBOX        = 0x00020000
-	WS_CHILD              = 0x40000000
-	WS_VISIBLE            = 0x10000000
-	WS_BORDER             = 0x00800000
+	WS_OVERLAPPEDWINDOW = 0x00CF0000
+	WS_OVERLAPPED       = 0x00000000
+	WS_CAPTION          = 0x00C00000
+	WS_SYSMENU          = 0x00080000
+	WS_MINIMIZEBOX      = 0x00020000
+	WS_CHILD            = 0x40000000
+	WS_VISIBLE          = 0x10000000
+	WS_BORDER           = 0x00800000
+	WS_GROUP            = 0x00020000
 
-	SS_LEFT               = 0x00000000
-	ES_LEFT               = 0x0000
-	ES_AUTOHSCROLL        = 0x0080
-	BS_PUSHBUTTON         = 0x00000000
-	BS_AUTOCHECKBOX       = 0x00000003
+	SS_LEFT             = 0x00000000
+	ES_LEFT             = 0x0000
+	ES_AUTOHSCROLL      = 0x0080
+	BS_PUSHBUTTON       = 0x00000000
+	BS_AUTOCHECKBOX     = 0x00000003
+	BS_GROUPBOX         = 0x00000007 // Group box style
 
-	SW_SHOW               = 5
-	SW_HIDE               = 0
-	SW_RESTORE            = 9
+	SW_SHOW             = 5
+	SW_HIDE             = 0
+	SW_RESTORE          = 9
 
-	COLOR_3DFACE          = 15
+	COLOR_3DFACE        = 15
 
-	NIM_ADD               = 0x00000000
-	NIM_MODIFY            = 0x00000001
-	NIM_DELETE            = 0x00000002
-	NIF_MESSAGE           = 0x00000001
-	NIF_ICON              = 0x00000002
-	NIF_TIP               = 0x00000004
-	NIF_INFO              = 0x00000010
+	NIM_ADD             = 0x00000000
+	NIM_MODIFY          = 0x00000001
+	NIM_DELETE          = 0x00000002
+	NIF_MESSAGE         = 0x00000001
+	NIF_ICON            = 0x00000002
+	NIF_TIP             = 0x00000004
+	NIF_INFO            = 0x00000010
 
-	NIIF_INFO             = 0x00000001
-	NIIF_WARNING          = 0x00000002
-	NIIF_ERROR            = 0x00000003
+	NIIF_INFO           = 0x00000001
+	NIIF_WARNING        = 0x00000002
+	NIIF_ERROR          = 0x00000003
 
-	WM_LBUTTONDBLCLK      = 0x0203
-	WM_RBUTTONUP          = 0x0205
+	WM_LBUTTONDBLCLK    = 0x0203
+	WM_RBUTTONUP        = 0x0205
 
-	MF_STRING             = 0x00000000
-	MF_CHECKED            = 0x00000008
-	MF_UNCHECKED          = 0x00000000
-	TPM_RETURNCMD         = 0x0100
+	MF_STRING           = 0x00000000
+	MF_CHECKED          = 0x00000008
+	MF_UNCHECKED        = 0x00000000
+	TPM_RETURNCMD       = 0x0100
 
-	BST_CHECKED           = 1
-	BM_GETCHECK           = 0x00F0
-	BM_SETCHECK           = 0x00F1
+	BST_CHECKED         = 1
+	BM_GETCHECK         = 0x00F0
+	BM_SETCHECK         = 0x00F1
+
+	// GDI text alignment / background mode
+	TRANSPARENT_MODE    = 1 // SetBkMode TRANSPARENT
 )
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Win32 DLL & Proc bindings
+// ─────────────────────────────────────────────────────────────────────────────
 var (
-	moduser32      = syscall.NewLazyDLL("user32.dll")
-	modkernel32    = syscall.NewLazyDLL("kernel32.dll")
-	modgdi32       = syscall.NewLazyDLL("gdi32.dll")
-	modshell32     = syscall.NewLazyDLL("shell32.dll")
-	modadvapi32    = syscall.NewLazyDLL("advapi32.dll")
+	moduser32   = syscall.NewLazyDLL("user32.dll")
+	modkernel32 = syscall.NewLazyDLL("kernel32.dll")
+	modgdi32    = syscall.NewLazyDLL("gdi32.dll")
+	modshell32  = syscall.NewLazyDLL("shell32.dll")
+	modadvapi32 = syscall.NewLazyDLL("advapi32.dll")
 
-	procRegisterClassExW     = moduser32.NewProc("RegisterClassExW")
-	procCreateWindowExW      = moduser32.NewProc("CreateWindowExW")
-	procShowWindow           = moduser32.NewProc("ShowWindow")
-	procUpdateWindow         = moduser32.NewProc("UpdateWindow")
-	procGetMessageW          = moduser32.NewProc("GetMessageW")
-	procTranslateMessage     = moduser32.NewProc("TranslateMessage")
-	procDispatchMessageW     = moduser32.NewProc("DispatchMessageW")
-	procPostQuitMessage      = moduser32.NewProc("PostQuitMessage")
-	procDefWindowProcW       = moduser32.NewProc("DefWindowProcW")
-	procSendMessageW         = moduser32.NewProc("SendMessageW")
-	procSetWindowTextW       = moduser32.NewProc("SetWindowTextW")
-	procGetWindowTextW       = moduser32.NewProc("GetWindowTextW")
-	procDestroyWindow        = moduser32.NewProc("DestroyWindow")
-	procSetTimer             = moduser32.NewProc("SetTimer")
-	procKillTimer            = moduser32.NewProc("KillTimer")
-	procCreateMutexW         = modkernel32.NewProc("CreateMutexW")
-	procGetLastError         = modkernel32.NewProc("GetLastError")
-	procGetModuleHandleW     = modkernel32.NewProc("GetModuleHandleW")
-	procShellNotifyIconW     = modshell32.NewProc("Shell_NotifyIconW")
-	procCreatePopupMenu      = moduser32.NewProc("CreatePopupMenu")
-	procAppendMenuW          = moduser32.NewProc("AppendMenuW")
-	procTrackPopupMenu       = moduser32.NewProc("TrackPopupMenu")
-	procGetCursorPos         = moduser32.NewProc("GetCursorPos")
-	procSetForegroundWindow  = moduser32.NewProc("SetForegroundWindow")
-	procLoadIconW            = moduser32.NewProc("LoadIconW")
-	procCreateFontIndirectW  = modgdi32.NewProc("CreateFontIndirectW")
+	procRegisterClassExW    = moduser32.NewProc("RegisterClassExW")
+	procCreateWindowExW     = moduser32.NewProc("CreateWindowExW")
+	procShowWindow          = moduser32.NewProc("ShowWindow")
+	procUpdateWindow        = moduser32.NewProc("UpdateWindow")
+	procGetMessageW         = moduser32.NewProc("GetMessageW")
+	procTranslateMessage    = moduser32.NewProc("TranslateMessage")
+	procDispatchMessageW    = moduser32.NewProc("DispatchMessageW")
+	procPostQuitMessage     = moduser32.NewProc("PostQuitMessage")
+	procDefWindowProcW      = moduser32.NewProc("DefWindowProcW")
+	procSendMessageW        = moduser32.NewProc("SendMessageW")
+	procPostMessageW        = moduser32.NewProc("PostMessageW") // NON-BLOCKING post
+	procSetWindowTextW      = moduser32.NewProc("SetWindowTextW")
+	procGetWindowTextW      = moduser32.NewProc("GetWindowTextW")
+	procDestroyWindow       = moduser32.NewProc("DestroyWindow")
+	procSetTimer            = moduser32.NewProc("SetTimer")
+	procCreateMutexW        = modkernel32.NewProc("CreateMutexW")
+	procGetLastError        = modkernel32.NewProc("GetLastError")
+	procGetModuleHandleW    = modkernel32.NewProc("GetModuleHandleW")
+	procShellNotifyIconW    = modshell32.NewProc("Shell_NotifyIconW")
+	procCreatePopupMenu     = moduser32.NewProc("CreatePopupMenu")
+	procAppendMenuW         = moduser32.NewProc("AppendMenuW")
+	procTrackPopupMenu      = moduser32.NewProc("TrackPopupMenu")
+	procGetCursorPos        = moduser32.NewProc("GetCursorPos")
+	procSetForegroundWindow = moduser32.NewProc("SetForegroundWindow")
+	procLoadIconW           = moduser32.NewProc("LoadIconW")
+	procCreateFontIndirectW = modgdi32.NewProc("CreateFontIndirectW")
+	procGetWindowRect       = moduser32.NewProc("GetWindowRect")
 
-	procRegOpenKeyExW        = modadvapi32.NewProc("RegOpenKeyExW")
-	procRegSetValueExW       = modadvapi32.NewProc("RegSetValueExW")
-	procRegDeleteValueW      = modadvapi32.NewProc("RegDeleteValueW")
-	procRegQueryValueExW     = modadvapi32.NewProc("RegQueryValueExW")
-	procRegCloseKey          = modadvapi32.NewProc("RegCloseKey")
+	// GDI color/brush procs
+	procSetTextColor    = modgdi32.NewProc("SetTextColor")
+	procSetBkMode       = modgdi32.NewProc("SetBkMode")
+	procGetSysColorBrush = moduser32.NewProc("GetSysColorBrush")
+	procCreateSolidBrush = modgdi32.NewProc("CreateSolidBrush")
+
+	procRegOpenKeyExW   = modadvapi32.NewProc("RegOpenKeyExW")
+	procRegSetValueExW  = modadvapi32.NewProc("RegSetValueExW")
+	procRegDeleteValueW = modadvapi32.NewProc("RegDeleteValueW")
+	procRegQueryValueExW = modadvapi32.NewProc("RegQueryValueExW")
+	procRegCloseKey     = modadvapi32.NewProc("RegCloseKey")
 )
 
+// RGB helper — returns a COLORREF (0x00BBGGRR)
+func rgb(r, g, b uint32) uintptr {
+	return uintptr(r | (g << 8) | (b << 16))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Win32 Structs
+// ─────────────────────────────────────────────────────────────────────────────
 type WNDCLASSEXW struct {
 	CbSize        uint32
 	Style         uint32
@@ -138,6 +166,13 @@ type MSG struct {
 type POINT struct {
 	X int32
 	Y int32
+}
+
+type RECT struct {
+	Left   int32
+	Top    int32
+	Right  int32
+	Bottom int32
 }
 
 type NOTIFYICONDATAW struct {
@@ -182,28 +217,44 @@ type LOGFONT struct {
 	FaceName       [32]uint16
 }
 
-// GUI Element Handles
+// ─────────────────────────────────────────────────────────────────────────────
+// GUI state
+// ─────────────────────────────────────────────────────────────────────────────
 var (
-	hwndMain           uintptr
-	hwndUrlEdit        uintptr
-	hwndTokenEdit      uintptr
-	hwndIntervalEdit   uintptr
-	hwndStartupCheck   uintptr
-	hwndTrayCheck      uintptr
-	hwndStatusLabel    uintptr
-	hwndLastSentLabel  uintptr
+	hwndMain          uintptr
+	hwndUrlEdit       uintptr
+	hwndTokenEdit     uintptr
+	hwndIntervalEdit  uintptr
+	hwndStartupCheck  uintptr
+	hwndTrayCheck     uintptr
+	hwndStatusLabel   uintptr
+	hwndLastSentLabel uintptr
+	hwndIPLabel       uintptr
+	hwndHostLabel     uintptr
+	hwndCPULabel      uintptr
+	hwndRAMLabel      uintptr
 
-	defaultFontHwnd    uintptr
-	boldFontHwnd       uintptr
-	trayIconHwnd       uintptr
+	defaultFontHwnd uintptr
+	boldFontHwnd    uintptr
+	trayIconHwnd    uintptr
 
-	minToTrayEnabled   = true
-	isTestingConn      = false
-	lastSuccessTime    = "Never"
-	connectionStatus   = "Unknown"
-	errorMessage       = ""
-	agentTickTicker    *time.Ticker
-	guiStopChan        chan struct{}
+	// Brushes for status color painting
+	brushConnected uintptr
+	brushFailed    uintptr
+	brushTesting   uintptr
+	brushBg        uintptr
+
+	minToTrayEnabled = true
+	isTestingConn    = false
+	lastSuccessTime  = "Never"
+	connectionStatus = "Unknown"
+	errorMessage     = ""
+	lastMetrics      MetricsPayload
+
+	agentTickTicker *time.Ticker
+
+	guiStopChan     chan struct{}
+	guiStopOnce     sync.Once  // prevents double-close panics
 )
 
 // Menu Command IDs
@@ -213,11 +264,14 @@ const (
 	ID_TRAY_STARTUP_TOGGLE = 1003
 	ID_TRAY_EXIT           = 1004
 
-	ID_BTN_SAVE            = 2001
-	ID_BTN_SEND_TEST       = 2002
-	ID_BTN_HIDE            = 2003
+	ID_BTN_SAVE      = 2001
+	ID_BTN_SEND_TEST = 2002
+	ID_BTN_HIDE      = 2003
 )
 
+// ─────────────────────────────────────────────────────────────────────────────
+// String helpers
+// ─────────────────────────────────────────────────────────────────────────────
 func stringToUTF16Ptr(s string) *uint16 {
 	return &utf16.Encode([]rune(s + "\x00"))[0]
 }
@@ -245,7 +299,9 @@ func setCheckState(hwnd uintptr, checked bool) {
 	procSendMessageW.Call(hwnd, BM_SETCHECK, state, 0)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 // Registry helpers for startup
+// ─────────────────────────────────────────────────────────────────────────────
 const RunKeyPath = `Software\Microsoft\Windows\CurrentVersion\Run`
 const StartupValueName = "AMPNMAgent"
 
@@ -260,10 +316,10 @@ func getExecutablePath() string {
 func GetStartupRegistry() bool {
 	var hKey uintptr
 	status, _, _ := procRegOpenKeyExW.Call(
-		0x80000001, // HKEY_CURRENT_USER
+		0x80000001,
 		uintptr(unsafe.Pointer(stringToUTF16Ptr(RunKeyPath))),
 		0,
-		0x20019, // KEY_READ
+		0x20019,
 		uintptr(unsafe.Pointer(&hKey)),
 	)
 	if status != 0 {
@@ -287,10 +343,10 @@ func GetStartupRegistry() bool {
 func SetStartupRegistry(enable bool) error {
 	var hKey uintptr
 	status, _, _ := procRegOpenKeyExW.Call(
-		0x80000001, // HKEY_CURRENT_USER
+		0x80000001,
 		uintptr(unsafe.Pointer(stringToUTF16Ptr(RunKeyPath))),
 		0,
-		0x20006, // KEY_WRITE
+		0x20006,
 		uintptr(unsafe.Pointer(&hKey)),
 	)
 	if status != 0 {
@@ -303,7 +359,6 @@ func SetStartupRegistry(enable bool) error {
 		if exePath == "" {
 			return fmt.Errorf("could not get current executable path")
 		}
-		// Register to start in minimized GUI tray mode by default
 		cmdStr := `"` + exePath + `"`
 		utf16Val := utf16.Encode([]rune(cmdStr + "\x00"))
 		status, _, _ = procRegSetValueExW.Call(
@@ -326,7 +381,9 @@ func SetStartupRegistry(enable bool) error {
 	return nil
 }
 
-// saveConfig saves GUI modified config to ProgramData or fallback
+// ─────────────────────────────────────────────────────────────────────────────
+// Config I/O
+// ─────────────────────────────────────────────────────────────────────────────
 func saveConfig(cfg Config) error {
 	configDir := filepath.Join(os.Getenv("ProgramData"), "AMPNM-Agent")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -350,24 +407,39 @@ func saveConfig(cfg Config) error {
 	return encoder.Encode(cfg)
 }
 
-// runGuiActivePolling starts active polling in GUI thread background if service is not running
+// ─────────────────────────────────────────────────────────────────────────────
+// Safe channel close (prevents double-close panics)
+// ─────────────────────────────────────────────────────────────────────────────
+func safeCloseGuiStop() {
+	guiStopOnce.Do(func() {
+		if guiStopChan != nil {
+			close(guiStopChan)
+		}
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Background polling loop
+// ─────────────────────────────────────────────────────────────────────────────
 func runGuiActivePolling(cfg Config) {
 	if agentTickTicker != nil {
 		agentTickTicker.Stop()
 	}
+	// Reset stop channel for the new polling goroutine
 	guiStopChan = make(chan struct{})
+	guiStopOnce = sync.Once{} // reset once-guard for new channel
 	agentTickTicker = time.NewTicker(time.Duration(cfg.Interval) * time.Second)
 
-	// Send initial metrics asynchronously
+	// Immediate initial check
 	go func() {
 		err := TestConnection(cfg.ServerUrl, cfg.AgentToken)
 		if err == nil {
 			connectionStatus = "Connected"
 			lastSuccessTime = time.Now().Format("2006-01-02 15:04:05")
 			errorMessage = ""
-			// Push initial telemetry metrics immediately
 			metrics, errCollect := collectMetrics()
 			if errCollect == nil {
+				lastMetrics = metrics
 				transmitActiveTelemetry(cfg, metrics)
 			}
 		} else {
@@ -377,13 +449,16 @@ func runGuiActivePolling(cfg Config) {
 		triggerGuiStatusUpdate()
 	}()
 
+	// Periodic polling loop
 	go func() {
+		localStop := guiStopChan
 		for {
 			select {
 			case <-agentTickTicker.C:
 				cfgData := loadConfig()
 				metrics, err := collectMetrics()
 				if err == nil {
+					lastMetrics = metrics
 					err = TestConnection(cfgData.ServerUrl, cfgData.AgentToken)
 					if err == nil {
 						connectionStatus = "Connected"
@@ -399,21 +474,24 @@ func runGuiActivePolling(cfg Config) {
 					errorMessage = err.Error()
 				}
 				triggerGuiStatusUpdate()
-			case <-guiStopChan:
+			case <-localStop:
 				return
 			}
 		}
 	}()
 }
 
+// triggerGuiStatusUpdate uses PostMessage (non-blocking) to avoid UI thread deadlock / hang
 func triggerGuiStatusUpdate() {
 	if hwndMain != 0 {
-		// Post WM_TIMER command to main thread to trigger UI label updates
-		procSendMessageW.Call(hwndMain, WM_TIMER, 1, 0)
+		// PostMessageW is fire-and-forget — never blocks the calling goroutine
+		procPostMessageW.Call(hwndMain, WM_TIMER, 1, 0)
 	}
 }
 
-// System Tray Notification Icon Management
+// ─────────────────────────────────────────────────────────────────────────────
+// System Tray helpers
+// ─────────────────────────────────────────────────────────────────────────────
 func setTrayIcon(hwnd uintptr, action uint32, tip string, infoTitle string, infoText string, infoFlags uint32) {
 	var nid NOTIFYICONDATAW
 	nid.CbSize = uint32(unsafe.Sizeof(nid))
@@ -423,7 +501,6 @@ func setTrayIcon(hwnd uintptr, action uint32, tip string, infoTitle string, info
 	nid.UCallbackMessage = WM_TRAY
 	nid.HIcon = trayIconHwnd
 
-	// Tip text (hover tooltip)
 	tipUTF16 := utf16.Encode([]rune(tip + "\x00"))
 	copy(nid.SzTip[:], tipUTF16)
 
@@ -445,11 +522,9 @@ func showTrayContextMenu(hwnd uintptr) {
 		return
 	}
 
-	// Open Option
 	procAppendMenuW.Call(hMenu, MF_STRING, ID_TRAY_OPEN, uintptr(unsafe.Pointer(stringToUTF16Ptr("Open Control Panel"))))
 	procAppendMenuW.Call(hMenu, MF_STRING, ID_TRAY_SEND_TEST, uintptr(unsafe.Pointer(stringToUTF16Ptr("Send Test Telemetry Now"))))
 
-	// Startup Toggle option check status
 	startupChecked := GetStartupRegistry()
 	flag := uintptr(MF_STRING)
 	if startupChecked {
@@ -457,16 +532,13 @@ func showTrayContextMenu(hwnd uintptr) {
 	}
 	procAppendMenuW.Call(hMenu, flag, ID_TRAY_STARTUP_TOGGLE, uintptr(unsafe.Pointer(stringToUTF16Ptr("Run on Windows Startup"))))
 
-	// separator
 	procAppendMenuW.Call(hMenu, 0x0800, 0, 0) // MF_SEPARATOR
 
-	// Exit Option
 	procAppendMenuW.Call(hMenu, MF_STRING, ID_TRAY_EXIT, uintptr(unsafe.Pointer(stringToUTF16Ptr("Exit"))))
 
 	var pt POINT
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
 
-	// Track Menu
 	procSetForegroundWindow.Call(hwnd)
 	cmd, _, _ := procTrackPopupMenu.Call(hMenu, TPM_RETURNCMD, uintptr(pt.X), uintptr(pt.Y), 0, hwnd, 0)
 
@@ -487,17 +559,26 @@ func showTrayContextMenu(hwnd uintptr) {
 		}
 		setTrayIcon(hwnd, NIM_MODIFY, "AMPNM Telemetry Agent", "Startup Modified", msg, NIIF_INFO)
 	case ID_TRAY_EXIT:
-		procShellNotifyIconW.Call(NIM_DELETE, uintptr(unsafe.Pointer(&NOTIFYICONDATAW{CbSize: uint32(unsafe.Sizeof(NOTIFYICONDATAW{})), Hwnd: hwnd, UID: 1})))
-		if agentTickTicker != nil {
-			agentTickTicker.Stop()
-		}
-		if guiStopChan != nil {
-			close(guiStopChan)
-		}
-		procDestroyWindow.Call(hwnd)
+		doExit(hwnd)
 	}
 }
 
+func doExit(hwnd uintptr) {
+	var nid NOTIFYICONDATAW
+	nid.CbSize = uint32(unsafe.Sizeof(nid))
+	nid.Hwnd = hwnd
+	nid.UID = 1
+	procShellNotifyIconW.Call(NIM_DELETE, uintptr(unsafe.Pointer(&nid)))
+	if agentTickTicker != nil {
+		agentTickTicker.Stop()
+	}
+	safeCloseGuiStop()
+	procDestroyWindow.Call(hwnd)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test telemetry from GUI
+// ─────────────────────────────────────────────────────────────────────────────
 func sendTestTelemetryFromGui() {
 	if isTestingConn {
 		return
@@ -514,134 +595,208 @@ func sendTestTelemetryFromGui() {
 			connectionStatus = "Connected"
 			lastSuccessTime = time.Now().Format("2006-01-02 15:04:05")
 			errorMessage = ""
-			// Trigger a real telemetry push to ensure it matches
 			metrics, errCollect := collectMetrics()
 			if errCollect == nil {
+				lastMetrics = metrics
 				transmitActiveTelemetry(cfg, metrics)
 			}
-			setTrayIcon(hwndMain, NIM_MODIFY, "AMPNM Telemetry Agent", "Connection Successful", "Successfully connected and pushed telemetry data to AMPNM server.", NIIF_INFO)
+			setTrayIcon(hwndMain, NIM_MODIFY, "AMPNM Telemetry Agent", "Connection Successful",
+				"Successfully connected and pushed telemetry data to AMPNM server.", NIIF_INFO)
 		} else {
 			connectionStatus = "Failed"
 			errorMessage = err.Error()
-			setTrayIcon(hwndMain, NIM_MODIFY, "AMPNM Telemetry Agent", "Connection Failed", "Error: "+err.Error(), NIIF_ERROR)
+			setTrayIcon(hwndMain, NIM_MODIFY, "AMPNM Telemetry Agent", "Connection Failed",
+				"Error: "+err.Error(), NIIF_ERROR)
 		}
 		triggerGuiStatusUpdate()
 	}()
 }
 
-// Window Procedure
+// ─────────────────────────────────────────────────────────────────────────────
+// WM_CTLCOLORSTATIC handler — returns appropriate text color based on status
+// ─────────────────────────────────────────────────────────────────────────────
+func handleCtlColorStatic(hdc uintptr, hwndCtrl uintptr) uintptr {
+	if hwndCtrl == hwndStatusLabel {
+		switch {
+		case connectionStatus == "Connected":
+			procSetTextColor.Call(hdc, rgb(34, 197, 94))   // green
+		case connectionStatus == "Failed":
+			procSetTextColor.Call(hdc, rgb(239, 68, 68))   // red
+		default:
+			procSetTextColor.Call(hdc, rgb(217, 119, 6))   // orange (Testing / Unknown)
+		}
+		procSetBkMode.Call(hdc, TRANSPARENT_MODE)
+		bg, _, _ := procGetSysColorBrush.Call(COLOR_3DFACE)
+		return bg
+	}
+	return 0
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Window procedure — must never block!
+// ─────────────────────────────────────────────────────────────────────────────
 func wndProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) uintptr {
 	switch msg {
+
+	// ── Window Created ────────────────────────────────────────────────────────
 	case WM_CREATE:
 		hwndMain = hwnd
 
-		// Set default system icon as Tray icon
+		// Default system icon for tray
 		hIcon, _, _ := procLoadIconW.Call(0, 32512) // IDI_APPLICATION
 		if hIcon != 0 {
 			trayIconHwnd = hIcon
 		}
 
-		// Title Banner
-		hwndTitle := createLabel(hwnd, "AMPNM Telemetry Agent Control Panel", 20, 15, 410, 25)
+		// ── Title Banner ──────────────────────────────────────────────────────
+		hwndTitle := createLabel(hwnd, "AMPNM Telemetry Agent", 20, 12, 420, 26)
 		procSendMessageW.Call(hwndTitle, WM_SETFONT, boldFontHwnd, 1)
+		createLabel(hwnd, "Windows Network Monitor Agent Control Panel", 20, 36, 420, 16)
 
-		// Server URL
-		createLabel(hwnd, "AMPMN Docker Server URL:", 20, 50, 410, 18)
-		hwndUrlEdit = createEdit(hwnd, "", 20, 70, 410, 24)
+		// ── GROUP: Connection Settings ────────────────────────────────────────
+		createGroupBox(hwnd, "Connection Settings", 10, 58, 440, 120)
 
-		// Agent Token
-		createLabel(hwnd, "Agent Enrollment Token:", 20, 100, 410, 18)
-		hwndTokenEdit = createEdit(hwnd, "", 20, 120, 410, 24)
+		createLabel(hwnd, "AMPNM Server URL:", 22, 76, 180, 16)
+		hwndUrlEdit = createEdit(hwnd, "", 22, 92, 415, 24)
 
-		// Interval
-		createLabel(hwnd, "Polling Interval (seconds):", 20, 150, 200, 18)
-		hwndIntervalEdit = createEdit(hwnd, "", 20, 170, 100, 24)
+		createLabel(hwnd, "Agent Enrollment Token:", 22, 120, 200, 16)
+		hwndTokenEdit = createEdit(hwnd, "", 22, 136, 415, 24)
 
-		// Startup Checkbox
-		hwndStartupCheck = createCheckbox(hwnd, "Start agent automatically on Windows boot", 20, 205, 410, 20)
+		createLabel(hwnd, "Polling Interval (seconds):", 22, 164, 200, 16)
+		hwndIntervalEdit = createEdit(hwnd, "", 22, 180, 80, 22)
+
+		// ── GROUP: Application Options ────────────────────────────────────────
+		createGroupBox(hwnd, "Application Options", 10, 192, 440, 64)
+
+		hwndStartupCheck = createCheckbox(hwnd, "Start automatically on Windows boot", 22, 208, 300, 20)
 		setCheckState(hwndStartupCheck, GetStartupRegistry())
 
-		// Minimize to Tray Checkbox
-		hwndTrayCheck = createCheckbox(hwnd, "Minimize to System Tray on close/minimize", 20, 230, 410, 20)
+		hwndTrayCheck = createCheckbox(hwnd, "Minimize to System Tray on close", 22, 230, 300, 20)
 		setCheckState(hwndTrayCheck, minToTrayEnabled)
 
-		// Status Displays
-		hwndStatusLabel = createLabel(hwnd, "Status: Loading...", 20, 260, 410, 18)
-		hwndLastSentLabel = createLabel(hwnd, "Last Update Pushed: Never", 20, 280, 410, 18)
+		// ── GROUP: Status ─────────────────────────────────────────────────────
+		createGroupBox(hwnd, "Status", 10, 268, 440, 110)
 
-		// Buttons
-		btnSave := createButton(hwnd, "Save Settings", 20, 315, 120, 28, ID_BTN_SAVE)
-		btnTest := createButton(hwnd, "Send Test Now", 150, 315, 120, 28, ID_BTN_SEND_TEST)
-		btnHide := createButton(hwnd, "Minimize to Tray", 280, 315, 140, 28, ID_BTN_HIDE)
+		hwndStatusLabel   = createLabel(hwnd, "Status: Loading...", 22, 284, 415, 20)
+		hwndLastSentLabel = createLabel(hwnd, "Last Update Pushed: Never", 22, 308, 415, 16)
+		hwndHostLabel     = createLabel(hwnd, "Host: —", 22, 328, 210, 16)
+		hwndIPLabel       = createLabel(hwnd, "IP: —", 240, 328, 200, 16)
+		hwndCPULabel      = createLabel(hwnd, "CPU: —", 22, 348, 130, 16)
+		hwndRAMLabel      = createLabel(hwnd, "RAM: —", 160, 348, 130, 16)
 
-		// Apply normal fonts
-		procSendMessageW.Call(hwndUrlEdit, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(hwndTokenEdit, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(hwndIntervalEdit, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(hwndStartupCheck, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(hwndTrayCheck, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(hwndStatusLabel, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(hwndLastSentLabel, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(btnSave, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(btnTest, WM_SETFONT, defaultFontHwnd, 1)
-		procSendMessageW.Call(btnHide, WM_SETFONT, defaultFontHwnd, 1)
+		// ── Buttons ───────────────────────────────────────────────────────────
+		btnSave := createButton(hwnd, "💾  Save Settings",    16, 392, 130, 30, ID_BTN_SAVE)
+		btnTest := createButton(hwnd, "🔗  Send Test Now",   154, 392, 130, 30, ID_BTN_SEND_TEST)
+		btnHide := createButton(hwnd, "▼  Minimize to Tray", 292, 392, 158, 30, ID_BTN_HIDE)
 
-		// Load Initial configuration
+		// Apply fonts to all controls
+		for _, h := range []uintptr{
+			hwndUrlEdit, hwndTokenEdit, hwndIntervalEdit,
+			hwndStartupCheck, hwndTrayCheck,
+			hwndStatusLabel, hwndLastSentLabel,
+			hwndHostLabel, hwndIPLabel, hwndCPULabel, hwndRAMLabel,
+			btnSave, btnTest, btnHide,
+		} {
+			procSendMessageW.Call(h, WM_SETFONT, defaultFontHwnd, 1)
+		}
+		procSendMessageW.Call(hwndTitle, WM_SETFONT, boldFontHwnd, 1)
+
+		// Load initial config values into controls
 		cfg := loadConfig()
 		setWindowText(hwndUrlEdit, cfg.ServerUrl)
 		setWindowText(hwndTokenEdit, cfg.AgentToken)
 		setWindowText(hwndIntervalEdit, strconv.Itoa(cfg.Interval))
 
-		// Set System Tray Icon
-		setTrayIcon(hwnd, NIM_ADD, "AMPNM Telemetry Agent", "AMPNM Telemetry Agent Running", "Double-click tray icon to open configuration.", NIIF_INFO)
+		// Tray icon setup
+		setTrayIcon(hwnd, NIM_ADD, "AMPNM Telemetry Agent",
+			"AMPNM Telemetry Agent Running",
+			"Double-click the tray icon to open configuration.",
+			NIIF_INFO)
 
-		// Start GUI status loop ticker
+		// 1-second UI refresh timer (safe — just redraws labels)
 		procSetTimer.Call(hwnd, 1, 1000, 0)
 
-		// Launch active polling in GUI thread
+		// Start background polling (fully async, no GUI-thread blocking)
 		runGuiActivePolling(cfg)
 
+	// ── Periodic UI Refresh ───────────────────────────────────────────────────
 	case WM_TIMER:
-		// Periodic UI label updates
 		var statusText string
 		if isTestingConn {
-			statusText = "Status: Testing Connection..."
+			statusText = "⏳  Status: Testing Connection..."
 		} else {
-			statusText = "Status: " + connectionStatus
-			if connectionStatus == "Failed" && errorMessage != "" {
-				statusText += " (" + errorMessage + ")"
+			switch connectionStatus {
+			case "Connected":
+				statusText = "✅  Status: Connected"
+			case "Failed":
+				statusText = "❌  Status: Failed"
+				if errorMessage != "" {
+					short := errorMessage
+					if len(short) > 70 {
+						short = short[:70] + "..."
+					}
+					statusText += "  (" + short + ")"
+				}
+			default:
+				statusText = "⚠️  Status: " + connectionStatus
 			}
 		}
 		setWindowText(hwndStatusLabel, statusText)
 		setWindowText(hwndLastSentLabel, "Last Update Pushed: "+lastSuccessTime)
 
+		// Update metric labels if we have data
+		if lastMetrics.HostName != "" {
+			setWindowText(hwndHostLabel, "Host: "+lastMetrics.HostName)
+			setWindowText(hwndIPLabel, "IP: "+lastMetrics.HostIP)
+			setWindowText(hwndCPULabel, fmt.Sprintf("CPU: %.1f%%", lastMetrics.CPUPercent))
+			setWindowText(hwndRAMLabel, fmt.Sprintf("RAM: %.1f%%", lastMetrics.MemoryPercent))
+		}
+
+		// Force status label repaint so WM_CTLCOLORSTATIC is resent
+		if hwndStatusLabel != 0 {
+			procPostMessageW.Call(hwndStatusLabel, WM_PAINT, 0, 0)
+		}
+
+	// ── Color the status label ────────────────────────────────────────────────
+	case WM_CTLCOLORSTATIC:
+		result := handleCtlColorStatic(wparam, lparam)
+		if result != 0 {
+			return result
+		}
+		// Fall through to DefWindowProc for other statics
+		res, _, _ := procDefWindowProcW.Call(hwnd, uintptr(msg), wparam, lparam)
+		return res
+
+	// ── Button Commands ───────────────────────────────────────────────────────
 	case WM_COMMAND:
 		controlID := wparam & 0xFFFF
 		switch controlID {
+
 		case ID_BTN_SAVE:
 			cfg := loadConfig()
-			serverUrl := getWindowText(urlEditHwnd())
+			serverUrl := getWindowText(hwndUrlEdit)
 			if serverUrl != "" && !strings.HasSuffix(serverUrl, "/") && !strings.HasSuffix(serverUrl, ".php") {
 				serverUrl += "/"
 			}
-			setWindowText(urlEditHwnd(), serverUrl)
+			setWindowText(hwndUrlEdit, serverUrl)
 			cfg.ServerUrl = serverUrl
-			cfg.AgentToken = getWindowText(tokenEditHwnd())
-			intervalInt, err := strconv.Atoi(getWindowText(intervalEditHwnd()))
+			cfg.AgentToken = getWindowText(hwndTokenEdit)
+			intervalInt, err := strconv.Atoi(getWindowText(hwndIntervalEdit))
 			if err == nil && intervalInt > 0 {
 				cfg.Interval = intervalInt
 			}
-
-			// Apply checkboxes
 			minToTrayEnabled = getCheckState(hwndTrayCheck)
 			SetStartupRegistry(getCheckState(hwndStartupCheck))
 
 			errSave := saveConfig(cfg)
 			if errSave != nil {
-				showMessageBox("Error Saving Settings", "Could not write config.json: "+errSave.Error())
+				// Show message in a goroutine to never block the GUI thread
+				go showMessageBox("Error Saving Settings", "Could not write config.json: "+errSave.Error())
 			} else {
-				setTrayIcon(hwnd, NIM_MODIFY, "AMPNM Telemetry Agent", "Settings Saved", "Agent configuration updated successfully.", NIIF_INFO)
-				// Restart the polling with the new interval
+				setTrayIcon(hwnd, NIM_MODIFY, "AMPNM Telemetry Agent",
+					"Settings Saved", "Agent configuration updated successfully.", NIIF_INFO)
+				// Restart polling with new settings
+				safeCloseGuiStop()
 				runGuiActivePolling(cfg)
 			}
 
@@ -652,14 +807,15 @@ func wndProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) uintptr {
 			procShowWindow.Call(hwnd, SW_HIDE)
 		}
 
+	// ── Minimize to Tray ──────────────────────────────────────────────────────
 	case WM_SIZE:
-		// If minimized and minimize to tray is enabled, hide the window
 		if wparam == 1 { // SIZE_MINIMIZED
 			if minToTrayEnabled {
 				procShowWindow.Call(hwnd, SW_HIDE)
 			}
 		}
 
+	// ── Tray icon events ──────────────────────────────────────────────────────
 	case WM_TRAY:
 		event := lparam & 0xFFFF
 		if event == WM_LBUTTONDBLCLK {
@@ -669,20 +825,15 @@ func wndProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) uintptr {
 			showTrayContextMenu(hwnd)
 		}
 
+	// ── Close button ──────────────────────────────────────────────────────────
 	case WM_CLOSE:
 		if minToTrayEnabled {
 			procShowWindow.Call(hwnd, SW_HIDE)
 		} else {
-			procShellNotifyIconW.Call(NIM_DELETE, uintptr(unsafe.Pointer(&NOTIFYICONDATAW{CbSize: uint32(unsafe.Sizeof(NOTIFYICONDATAW{})), Hwnd: hwnd, UID: 1})))
-			if agentTickTicker != nil {
-				agentTickTicker.Stop()
-			}
-			if guiStopChan != nil {
-				close(guiStopChan)
-			}
-			procDestroyWindow.Call(hwnd)
+			doExit(hwnd)
 		}
 
+	// ── Window Destroyed ──────────────────────────────────────────────────────
 	case WM_DESTROY:
 		procPostQuitMessage.Call(0)
 
@@ -693,12 +844,9 @@ func wndProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) uintptr {
 	return 0
 }
 
-// GUI Element Getters to decouple variables from window callback scopes
-func urlEditHwnd() uintptr      { return hwndUrlEdit }
-func tokenEditHwnd() uintptr    { return hwndTokenEdit }
-func intervalEditHwnd() uintptr { return hwndIntervalEdit }
-
-// Helper wrappers to create child controls
+// ─────────────────────────────────────────────────────────────────────────────
+// Control creation helpers
+// ─────────────────────────────────────────────────────────────────────────────
 func createLabel(parent uintptr, text string, x, y, w, h int) uintptr {
 	hwnd, _, _ := procCreateWindowExW.Call(
 		0,
@@ -747,29 +895,51 @@ func createButton(parent uintptr, text string, x, y, w, h int, id uintptr) uintp
 	return hwnd
 }
 
+// createGroupBox draws a labeled border section (Win32 BUTTON + BS_GROUPBOX)
+func createGroupBox(parent uintptr, text string, x, y, w, h int) uintptr {
+	hwnd, _, _ := procCreateWindowExW.Call(
+		0,
+		uintptr(unsafe.Pointer(stringToUTF16Ptr("BUTTON"))),
+		uintptr(unsafe.Pointer(stringToUTF16Ptr(text))),
+		WS_CHILD|WS_VISIBLE|BS_GROUPBOX,
+		uintptr(x), uintptr(y), uintptr(w), uintptr(h),
+		parent, 0, 0, 0,
+	)
+	if hwnd != 0 {
+		procSendMessageW.Call(hwnd, WM_SETFONT, defaultFontHwnd, 1)
+	}
+	return hwnd
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Font initialisation
+// ─────────────────────────────────────────────────────────────────────────────
 func initGuiFonts() {
 	var lf LOGFONT
 	copy(lf.FaceName[:], utf16.Encode([]rune("Segoe UI\x00")))
-	lf.Height = -12 // ~9pt
+	lf.Height = -13 // ~10pt
 	lf.Weight = 400 // FW_NORMAL
 	f, _, _ := procCreateFontIndirectW.Call(uintptr(unsafe.Pointer(&lf)))
 	defaultFontHwnd = f
 
 	var lfBold LOGFONT
 	copy(lfBold.FaceName[:], utf16.Encode([]rune("Segoe UI\x00")))
-	lfBold.Height = -16 // ~12pt
+	lfBold.Height = -18 // ~14pt
 	lfBold.Weight = 700 // FW_BOLD
 	fb, _, _ := procCreateFontIndirectW.Call(uintptr(unsafe.Pointer(&lfBold)))
 	boldFontHwnd = fb
 }
 
-// ShowGUI initialises and enters the main UI thread window loop
+// ─────────────────────────────────────────────────────────────────────────────
+// ShowGUI — main GUI entry point (called from main.go)
+// ─────────────────────────────────────────────────────────────────────────────
 func ShowGUI() {
-	// Prevent duplicate GUI instances using a Named Mutex
+	// Single-instance mutex guard
 	hMutex, _, _ := procCreateMutexW.Call(0, 1, uintptr(unsafe.Pointer(stringToUTF16Ptr("AMPNMAgentGUI-Mutex"))))
 	errCode, _, _ := procGetLastError.Call()
-	if hMutex != 0 && errCode == 183 { // ERROR_ALREADY_EXISTS = 183
-		showMessageBox("AMPNM Agent", "Control Panel is already running. Look for the agent icon in your system tray.")
+	if hMutex != 0 && errCode == 183 { // ERROR_ALREADY_EXISTS
+		go showMessageBox("AMPNM Agent",
+			"Control Panel is already running.\nLook for the agent icon in your system tray.")
 		return
 	}
 
@@ -790,13 +960,13 @@ func ShowGUI() {
 		return
 	}
 
-	// Calculate center screen coordinates
-	screenWidth := uintptr(1920) // defaults
-	screenHeight := uintptr(1080)
+	// Centre window on screen
 	procGetSystemMetrics := moduser32.NewProc("GetSystemMetrics")
+	screenWidth := uintptr(1920)
+	screenHeight := uintptr(1080)
 	if procGetSystemMetrics.Find() == nil {
-		w, _, _ := procGetSystemMetrics.Call(0) // SM_CXSCREEN = 0
-		h, _, _ := procGetSystemMetrics.Call(1) // SM_CYSCREEN = 1
+		w, _, _ := procGetSystemMetrics.Call(0)
+		h, _, _ := procGetSystemMetrics.Call(1)
 		if w > 0 {
 			screenWidth = w
 		}
@@ -805,8 +975,8 @@ func ShowGUI() {
 		}
 	}
 
-	winW := uintptr(460)
-	winH := uintptr(400)
+	winW := uintptr(468)
+	winH := uintptr(470)
 	posX := (screenWidth - winW) / 2
 	posY := (screenHeight - winH) / 2
 
@@ -826,6 +996,8 @@ func ShowGUI() {
 	procShowWindow.Call(hwnd, SW_SHOW)
 	procUpdateWindow.Call(hwnd)
 
+	// Standard Win32 message pump — this is the ONLY code that should
+	// touch GUI objects; background goroutines communicate via PostMessage only.
 	var msg MSG
 	for {
 		r, _, _ := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
