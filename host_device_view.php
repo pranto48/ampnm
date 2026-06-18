@@ -41,7 +41,7 @@ $delay = $delay ? (int)$delay : 300; // default 300s
 
 $isOnline = false;
 if (!empty($d['last_seen'])) {
-    $lastSeenTime = strtotime($d['last_seen']);
+    $lastSeenTime = strtotime($d['last_seen'] . ' UTC');
     if ((time() - $lastSeenTime) < $delay) {
         $isOnline = true;
     }
@@ -195,9 +195,9 @@ $chart_tx = array_column($chart_rows, 'avg_tx_mb');
             <dl class="space-y-2 text-sm">
                 <?php
                 $times = [
-                    'First Registered' => $d['first_seen'] ? date('M d, Y H:i', strtotime($d['first_seen'])) : '—',
-                    'Last Seen' => $d['last_seen'] ? date('M d, Y H:i:s', strtotime($d['last_seen'])) : 'Never',
-                    'Boot Time' => $d['boot_time'] ? date('M d, Y H:i:s', strtotime($d['boot_time'])) : '—',
+                    'First Registered' => $d['first_seen'] ? date('M d, Y H:i', strtotime($d['first_seen'] . ' UTC')) : '—',
+                    'Last Seen' => $d['last_seen'] ? date('M d, Y H:i:s', strtotime($d['last_seen'] . ' UTC')) : 'Never',
+                    'Boot Time' => $d['boot_time'] ? date('M d, Y H:i:s', strtotime($d['boot_time'] . ' UTC')) : '—',
                     'Status Check Delay' => $delay . 's',
                 ];
                 foreach ($times as $k => $v): ?>

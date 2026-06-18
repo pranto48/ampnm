@@ -8,7 +8,7 @@
  * @param string|null &$smsError Output parameter containing any error message.
  * @return bool True on success, false on failure.
  */
-function sms_send_alert($recipient_phone, $message, &$smsError = null) {
+function sms_send_alert($recipient_phone, $message, &$settingsOrError = null, &$smsError = null) {
     try {
         // Ensure database connection helper is loaded
         if (!function_exists('getDbConnection')) {
@@ -17,24 +17,42 @@ function sms_send_alert($recipient_phone, $message, &$smsError = null) {
 
         $pdo = getDbConnection();
         
+        $settings = null;
+        $actualErrorRef = null;
+        if (is_array($settingsOrError)) {
+            $settings = $settingsOrError;
+            $actualErrorRef = &$smsError;
+        } else {
+            $actualErrorRef = &$settingsOrError;
+        }
+
         // Try to fetch settings from the database
         $username = null;
         $apiKey = null;
         $senderId = null;
         $enabled = true;
 
-        try {
-            $stmt = $pdo->query("SELECT username, api_key, sender_id, enabled FROM sms_settings ORDER BY id ASC LIMIT 1");
-            $dbSettings = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($dbSettings) {
-                $username = $dbSettings['username'] ?? null;
-                $apiKey = $dbSettings['api_key'] ?? null;
-                $senderId = $dbSettings['sender_id'] ?? null;
-                $enabled = isset($dbSettings['enabled']) ? (bool)$dbSettings['enabled'] : true;
+        if ($settings !== null) {
+            $username = $settings['username'] ?? null;
+            $apiKey = $settings['api_key'] ?? null;
+            $senderId = $settings['sender_id'] ?? null;
+            $enabled = isset($settings['enabled']) ? (bool)$settings['enabled'] : true;
+            $dbSettings = $settings;
+        } else {
+            try {
+                $stmt = $pdo->query("SELECT username, api_key, sender_id, enabled FROM sms_settings ORDER BY id ASC LIMIT 1");
+                $dbSettings = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($dbSettings) {
+                    $username = $dbSettings['username'] ?? null;
+                    $apiKey = $dbSettings['api_key'] ?? null;
+                    $senderId = $dbSettings['sender_id'] ?? null;
+                    $enabled = isset($dbSettings['enabled']) ? (bool)$dbSettings['enabled'] : true;
+                }
+            } catch (PDOException $e) {
+                // Table might not exist yet if setup hasn't run, fallback silently to env
+                error_log("sms_settings query failed (setup may not have run): " . $e->getMessage());
+                $dbSettings = null;
             }
-        } catch (PDOException $e) {
-            // Table might not exist yet if setup hasn't run, fallback silently to env
-            error_log("sms_settings query failed (setup may not have run): " . $e->getMessage());
         }
         
         // Fallback to environment variables if not set in DB
@@ -56,12 +74,12 @@ function sms_send_alert($recipient_phone, $message, &$smsError = null) {
         }
 
         if (!$smsEnabled) {
-            $smsError = "SMS alerts are disabled in configuration.";
+            $actualErrorRef = "SMS alerts are disabled in configuration.";
             return false;
         }
 
         if (empty($username) || empty($apiKey)) {
-            $smsError = "Alpha SMS API credentials (username and API key/hash) are not configured.";
+            $actualErrorRef = "Alpha SMS API credentials (username and API key/hash) are not configured.";
             return false;
         }
 
@@ -104,25 +122,25 @@ function sms_send_alert($recipient_phone, $message, &$smsError = null) {
         curl_close($ch);
 
         if ($response === false) {
-            $smsError = "cURL error: " . $curlErr;
+            $actualErrorRef = "cURL error: " . $curlErr;
             return false;
         }
 
         if ($httpCode >= 400) {
-            $smsError = "HTTP error code: " . $httpCode . ", Response: " . $response;
+            $actualErrorRef = "HTTP error code: " . $httpCode . ", Response: " . $response;
             return false;
         }
 
         // If it starts with "ERR" or "Error", it's a failure.
         $trimmedResponse = trim($response);
         if (empty($trimmedResponse) || stripos($trimmedResponse, 'ERR') !== false || stripos($trimmedResponse, 'ERROR') !== false) {
-            $smsError = "Gateway response: " . $response;
+            $actualErrorRef = "Gateway response: " . $response;
             return false;
         }
 
         return true;
     } catch (Exception $e) {
-        $smsError = "Exception: " . $e->getMessage();
+        $actualErrorRef = "Exception: " . $e->getMessage();
         return false;
     }
 }

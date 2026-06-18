@@ -786,7 +786,7 @@ function showNewAgentNotification(host) {
 
 // Host card template
 function createHostCard(host) {
-    const lastUpdate = host.created_at ? new Date(host.created_at).toLocaleString() : 'Never';
+    const lastUpdate = host.created_at ? parseUTCDate(host.created_at).toLocaleString() : 'Never';
     const isOnline = isHostOnline(host);
     const statusClass = isOnline ? 'bg-green-500' : 'bg-red-500';
     const statusText = isOnline ? 'Online' : 'Offline';
@@ -796,7 +796,7 @@ function createHostCard(host) {
         ? parseInt(host.status_delay_seconds, 10)
         : 300;
     
-    const firstSeen = host.first_seen_at ? new Date(host.first_seen_at) : null;
+    const firstSeen = host.first_seen_at ? parseUTCDate(host.first_seen_at) : null;
     const firstSeenDisplay = firstSeen ? getTimeAgo(firstSeen) : 'Unknown';
 
     let metricsHtml = '';
@@ -1098,6 +1098,12 @@ async function saveHostStatusDelay(hostIp, hostName, statusDelaySeconds) {
     return data;
 }
 
+function parseUTCDate(dateStr) {
+    if (!dateStr) return null;
+    if (dateStr.includes('T') || dateStr.includes('Z')) return new Date(dateStr);
+    return new Date(dateStr.replace(' ', 'T') + 'Z');
+}
+
 function getTimeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
     
@@ -1130,7 +1136,9 @@ function getHostStatusDelaySeconds(host) {
 function isHostOnline(host) {
     if (!host.created_at) return false;
     const maxAgeMs = getHostStatusDelaySeconds(host);
-    return (Date.now() - new Date(host.created_at).getTime()) < maxAgeMs;
+    const parsed = parseUTCDate(host.created_at);
+    if (!parsed) return false;
+    return (Date.now() - parsed.getTime()) < maxAgeMs;
 }
 
 // Quick dev verification: ensure the agent REST endpoint is reachable.
@@ -1217,7 +1225,9 @@ function updateAgentStatusSummary(hosts) {
     
     const recentHosts = hosts.filter(h => {
         if (!h.first_seen_at) return false;
-        return (Date.now() - new Date(h.first_seen_at).getTime()) < 86400000;
+        const parsed = parseUTCDate(h.first_seen_at);
+        if (!parsed) return false;
+        return (Date.now() - parsed.getTime()) < 86400000;
     });
     
     const recentContainer = document.getElementById('recent-registrations');
@@ -1229,7 +1239,7 @@ function updateAgentStatusSummary(hosts) {
             <span class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-800 rounded-lg border border-slate-600 text-xs">
                 <i class="fas fa-desktop text-cyan-400"></i>
                 <span class="text-white">${host.host_name || host.host_ip}</span>
-                <span class="text-slate-400">- ${getTimeAgo(new Date(host.first_seen_at))}</span>
+                <span class="text-slate-400">- ${getTimeAgo(parseUTCDate(host.first_seen_at))}</span>
             </span>
         `).join('');
     } else {
@@ -1269,7 +1279,7 @@ async function loadCharts() {
             return;
         }
         
-        const labels = data.map(d => new Date(d.created_at));
+        const labels = data.map(d => parseUTCDate(d.created_at));
         
         updateChart('chart-cpu', labels, data.map(d => d.cpu_percent), 'CPU %', '#22d3ee');
         updateChart('chart-memory', labels, data.map(d => d.memory_percent), 'Memory %', '#a855f7');
