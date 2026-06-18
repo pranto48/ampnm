@@ -326,11 +326,11 @@ MapApp.ui = {
         const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
         const allEdges = MapApp.state.edges.get();
         if (MapApp.state.nodes.length > 0 && allEdges.length > 0) {
-            const deviceStatusMap = new Map(MapApp.state.nodes.get({ fields: ['id', 'deviceData'] }).map(d => [d.id, d.deviceData.status]));
+            const deviceStatusMap = new Map(MapApp.state.nodes.get({ fields: ['id', 'deviceData'] }).map(d => [String(d.id), d.deviceData.status]));
             const updates = [];
             allEdges.forEach(edge => {
-                const sourceStatus = deviceStatusMap.get(edge.from);
-                const targetStatus = deviceStatusMap.get(edge.to);
+                const sourceStatus = deviceStatusMap.get(String(edge.from));
+                const targetStatus = deviceStatusMap.get(String(edge.to));
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
                 
