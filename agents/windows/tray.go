@@ -235,6 +235,36 @@ func ShowGUI() {
 	// Start local web server
 	go startWebServer()
 
+	// Start background telemetry collection loop
+	go func() {
+		cfg := loadConfig()
+		addLog(fmt.Sprintf("Starting telemetry loop: interval = %d seconds", cfg.Interval))
+		
+		// Run initial telemetry immediately on startup
+		metrics, err := collectMetrics(cfg)
+		if err == nil {
+			transmitActiveTelemetry(cfg, metrics)
+			addLog("Initial telemetry metrics transmitted successfully.")
+		} else {
+			addLog(fmt.Sprintf("Failed to collect initial metrics: %v", err))
+		}
+		
+		ticker := time.NewTicker(time.Duration(cfg.Interval) * time.Second)
+		defer ticker.Stop()
+		
+		for range ticker.C {
+			// Reload config in case settings were changed via local web panel
+			cfg = loadConfig()
+			metrics, err := collectMetrics(cfg)
+			if err == nil {
+				transmitActiveTelemetry(cfg, metrics)
+				addLog("Periodic telemetry metrics transmitted successfully.")
+			} else {
+				addLog(fmt.Sprintf("Failed to collect periodic metrics: %v", err))
+			}
+		}
+	}()
+
 	// Automatically open dashboard in default browser on launch
 	go func() {
 		time.Sleep(500 * time.Millisecond)

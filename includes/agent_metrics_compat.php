@@ -124,9 +124,21 @@ function agentCompatSaveMetrics($pdo, $payload, $tokenUserId) {
     }
     if (!empty($insertCols)) {
         $placeholders = implode(', ', array_fill(0, count($insertCols), '?'));
-        $sql = "INSERT INTO host_metrics (" . implode(', ', $insertCols) . ") VALUES (" . $placeholders . ")";
+        
+        $updateParts = array();
+        $updateVals = array();
+        foreach ($row as $k => $v) {
+            if (agentCompatHasColumn($hostCols, $k) && $k !== 'hostname' && $k !== 'created_at' && $k !== 'id') {
+                $updateParts[] = "`" . $k . "` = ?";
+                $updateVals[] = $v;
+            }
+        }
+        
+        $sql = "INSERT INTO host_metrics (" . implode(', ', $insertCols) . ") VALUES (" . $placeholders . ") " .
+               "ON DUPLICATE KEY UPDATE " . implode(', ', $updateParts);
+               
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($insertVals);
+        $stmt->execute(array_merge($insertVals, $updateVals));
     }
 
     $historyCols = agentCompatGetTableColumns($pdo, 'host_metrics_history');
