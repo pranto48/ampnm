@@ -60,7 +60,11 @@ MapApp.network = {
                         return;
                     }
                     const newEdge = await MapApp.api.post('create_edge', { source_id: edgeData.from, target_id: edgeData.to, map_id: MapApp.state.currentMapId, connection_type: 'cat6' }); 
-                    edgeData.id = newEdge.id; edgeData.label = 'cat6'; callback(edgeData); 
+                    edgeData.id = newEdge.id; 
+                    edgeData.connection_type = 'cat6';
+                    edgeData.label = 'cat6'; 
+                    callback(edgeData); 
+                    MapApp.ui.updateStaticEdgeColors();
                     window.notyf.success('Connection added.');
                 }
             } 
@@ -88,6 +92,10 @@ MapApp.network = {
 
                 const sourceStatus = deviceStatuses[edge.from.id];
                 const targetStatus = deviceStatuses[edge.to.id];
+                
+                // Skip if nodes are deleted/not in statuses map
+                if (!sourceStatus || !targetStatus) continue;
+
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
 
                 if (isOffline) continue;
@@ -545,6 +553,13 @@ MapApp.network = {
                             try {
                                 await MapApp.api.post('delete_device', { id });
                                 window.notyf.success('Device deleted.');
+                                // Remove associated edges from DataSet first to avoid visual/logical orphans
+                                const edgesToRemove = MapApp.state.edges.get({
+                                    filter: (edge) => String(edge.from) === String(id) || String(edge.to) === String(id)
+                                }).map(edge => edge.id);
+                                if (edgesToRemove.length > 0) {
+                                    MapApp.state.edges.remove(edgesToRemove);
+                                }
                                 MapApp.state.nodes.remove(id);
                             } catch (error) {
                                 window.notyf.error(error.message || 'Failed to delete device.');

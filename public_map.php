@@ -55,6 +55,6 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         window.deviceIconsLibrary = <?= json_encode($deviceIconsLibrary) ?>;
     </script>
     <script src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
-    <script type="module" src="assets/js/public-map.js"></script>
+    <script type="module" src="assets/js/public-map.js?v=<?= time() ?>"></script>
 </body>
 </html>

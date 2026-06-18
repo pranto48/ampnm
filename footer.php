@@ -10,16 +10,16 @@
     <script src="assets/js/history.js"></script>
     
     <!-- Modular Map Scripts -->
-    <script src="assets/js/map/config.js"></script>
-    <script src="assets/js/map/state.js"></script>
-    <script src="assets/js/map/api.js"></script>
-    <script src="assets/js/map/utils.js"></script>
-    <script src="assets/js/map/ui.js"></script>
-    <script src="assets/js/soundManager.js"></script>
-    <script src="assets/js/map/deviceManager.js"></script>
-    <script src="assets/js/map/mapManager.js"></script>
-    <script src="assets/js/map/network.js"></script>
-    <script src="assets/js/map.js"></script>
+    <script src="assets/js/map/config.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map/state.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map/api.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map/utils.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map/ui.js?v=<?= time() ?>"></script>
+    <script src="assets/js/soundManager.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map/deviceManager.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map/mapManager.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map/network.js?v=<?= time() ?>"></script>
+    <script src="assets/js/map.js?v=<?= time() ?>"></script>
 
     <script src="assets/js/network_graphs.js"></script>
     <script src="assets/js/users.js"></script>

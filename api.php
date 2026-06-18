@@ -122,6 +122,11 @@ try {
     // --- Authenticated Actions (AUTH REQUIRED) ---
     require_once 'includes/auth_check.php'; // This will now only run if the above public action didn't exit.
 
+    // Release session write lock early for concurrent API performance, except for session-modifying actions
+    if ($action !== 'force_license_recheck') {
+        session_write_close();
+    }
+
     // Define actions that 'viewer' role can perform (mostly GET requests for viewing)
     $viewer_allowed_get_actions = [
         'get_maps', 'get_devices', 'get_edges', 'get_dashboard_data', 'get_ping_history',
