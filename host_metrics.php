@@ -931,6 +931,11 @@ function createHostCard(host) {
                             title="Custom alert thresholds">
                         <i class="fas fa-sliders text-xs"></i>
                     </button>
+                    <a href="host_device_view.php?id=${host.id}" 
+                            class="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/20 rounded transition-colors flex items-center justify-center" 
+                            title="View Detailed Dashboard">
+                        <i class="fas fa-chart-line text-xs"></i>
+                    </a>
                     <span class="px-2 py-1 text-xs rounded ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${statusText}</span>
                 </div>
             </div>

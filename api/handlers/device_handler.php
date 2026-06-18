@@ -739,7 +739,8 @@ switch ($action) {
                 d.last_avg_time, d.last_ttl, d.show_live_ping, d.status, d.last_seen,
                 d.port_config,
                 m.name as map_name,
-                p.output as last_ping_output
+                p.output as last_ping_output,
+                hm.cpu_usage, hm.memory_usage, hm.disk_usage, hm.network_in, hm.network_out, hm.last_seen AS agent_last_seen
             FROM 
                 devices d
             LEFT JOIN 
@@ -751,6 +752,11 @@ switch ($action) {
                     WHERE host = d.ip 
                     ORDER BY created_at DESC 
                     LIMIT 1
+                )
+            LEFT JOIN 
+                host_metrics hm ON (
+                    (d.ip IS NOT NULL AND d.ip != '' AND hm.ip_address = d.ip) OR 
+                    (d.name IS NOT NULL AND d.name != '' AND hm.hostname = d.name)
                 )
             WHERE 1=1
         ";

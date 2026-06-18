@@ -254,6 +254,62 @@ MapApp.utils = {
 
         title += `</div>`;
 
+        // Live Host Telemetry Box
+        if (deviceData.cpu_usage !== undefined && deviceData.cpu_usage !== null) {
+            const cpuVal = parseFloat(deviceData.cpu_usage) || 0;
+            const memVal = parseFloat(deviceData.memory_usage) || 0;
+            const diskVal = parseFloat(deviceData.disk_usage) || 0;
+            const netInVal = parseFloat(deviceData.network_in || 0).toFixed(2);
+            const netOutVal = parseFloat(deviceData.network_out || 0).toFixed(2);
+            
+            const getMetricColor = (v) => {
+                if (v >= 90) return '#ef4444';
+                if (v >= 70) return '#eab308';
+                return '#22d3ee';
+            };
+
+            title += `
+            <div style="margin-top:${sectionMargin}px; padding:8px; background:rgba(30,41,59,0.4); border:1px solid rgba(148,163,184,0.2); border-radius:6px; display:flex; flex-direction:column; gap:6px;">
+                <div style="font-weight:600; color:${panelAccentColor}; font-size:${baseFont}px; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-gauge-high"></i> Live Host Metrics
+                </div>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:${baseFont - 1}px; color:${panelTextColor}; margin-bottom:2px;">
+                            <span>CPU Usage</span>
+                            <span>${cpuVal.toFixed(1)}%</span>
+                        </div>
+                        <div style="height:4px; background:#334155; border-radius:2px; overflow:hidden;">
+                            <div style="height:100%; width:${cpuVal}%; background:${getMetricColor(cpuVal)}; border-radius:2px;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:${baseFont - 1}px; color:${panelTextColor}; margin-bottom:2px;">
+                            <span>RAM Usage</span>
+                            <span>${memVal.toFixed(1)}%</span>
+                        </div>
+                        <div style="height:4px; background:#334155; border-radius:2px; overflow:hidden;">
+                            <div style="height:100%; width:${memVal}%; background:${getMetricColor(memVal)}; border-radius:2px;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size:${baseFont - 1}px; color:${panelTextColor}; margin-bottom:2px;">
+                            <span>HDD Usage</span>
+                            <span>${diskVal.toFixed(1)}%</span>
+                        </div>
+                        <div style="height:4px; background:#334155; border-radius:2px; overflow:hidden;">
+                            <div style="height:100%; width:${diskVal}%; background:${getMetricColor(diskVal)}; border-radius:2px;"></div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:${baseFont - 2}px; color:${panelMutedColor}; border-top:1px solid rgba(148,163,184,0.15); padding-top:4px; margin-top:2px;">
+                        <span><i class="fas fa-arrow-down" style="color:#22c55e; margin-right:2px;"></i>In: <b style="color:${panelTextColor}; font-family:monospace;">${netInVal} Mbps</b></span>
+                        <span><i class="fas fa-arrow-up" style="color:#f97316; margin-right:2px;"></i>Out: <b style="color:${panelTextColor}; font-family:monospace;">${netOutVal} Mbps</b></span>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
         // Offline reason
         if (status === 'offline' && deviceData.last_ping_output) {
             const lines = deviceData.last_ping_output.split('\n');

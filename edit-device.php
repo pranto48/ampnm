@@ -32,6 +32,13 @@ $stmt_device = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?
 $stmt_device->execute([$device_id, $current_user_id]);
 $device = $stmt_device->fetch(PDO::FETCH_ASSOC);
 
+$host_metric_id = null;
+if ($device) {
+    $stmt_metrics = $pdo->prepare("SELECT id FROM host_metrics WHERE ip_address = ? OR hostname = ? LIMIT 1");
+    $stmt_metrics->execute([$device['ip'] ?? '', $device['name'] ?? '']);
+    $host_metric_id = $stmt_metrics->fetchColumn();
+}
+
 if (!$device) {
     $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Device not found or you do not have permission to edit it.</div>';
     // Optionally redirect back to devices list if device not found
@@ -134,6 +141,12 @@ $form_data = $device ?? [];
         <div class="flex items-center justify-between mb-6">
             <h1 class="text-3xl font-bold text-white">Edit Device: <?= htmlspecialchars($form_data['name'] ?? 'N/A') ?></h1>
             <div class="flex items-center gap-3">
+                <?php if ($host_metric_id): ?>
+                    <a href="host_device_view.php?id=<?= urlencode($host_metric_id) ?>" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg flex items-center gap-2">
+                        <i class="fas fa-microchip"></i>
+                        <span>Host Metrics Dashboard</span>
+                    </a>
+                <?php endif; ?>
                 <?php if (!empty($form_data['map_id'])): ?>
                     <a href="map.php?map_id=<?= urlencode($form_data['map_id']) ?>" class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
                         <i class="fas fa-map mr-2"></i>Return to Map
