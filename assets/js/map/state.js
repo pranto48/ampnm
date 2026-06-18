@@ -9,6 +9,7 @@ MapApp.state = {
     pingIntervals: {},
     animationFrameId: null,
     tick: 0,
+    edgeAnimProgress: 0,
     globalRefreshIntervalId: null,
     // Time-based failure tracking per device: { deviceId: timestamp }
     deviceFirstFailTime: {},

@@ -220,6 +220,21 @@ function initMap() {
             if (connectionAnimationSpeedValue) {
                 connectionAnimationSpeedValue.textContent = `${connectionAnimationSpeedInput.value || 100}%`;
             }
+            if (state.currentMapId) {
+                state.tooltipDisplaySettingsByMap[state.currentMapId] = state.tooltipDisplaySettingsByMap[state.currentMapId] || {};
+                state.tooltipDisplaySettingsByMap[state.currentMapId].connection_animation_speed = Number(connectionAnimationSpeedInput.value);
+            }
+        });
+    }
+
+    const connectionRunStyleSelect = document.getElementById('connectionRunStyle');
+    if (connectionRunStyleSelect) {
+        connectionRunStyleSelect.addEventListener('change', () => {
+            if (state.currentMapId) {
+                state.tooltipDisplaySettingsByMap[state.currentMapId] = state.tooltipDisplaySettingsByMap[state.currentMapId] || {};
+                state.tooltipDisplaySettingsByMap[state.currentMapId].connection_run_style = connectionRunStyleSelect.value;
+                MapApp.ui.updateStaticEdgeColors();
+            }
         });
     }
 
@@ -755,6 +770,7 @@ function initMap() {
 
                     if (typeof refreshNodeTooltips === 'function') refreshNodeTooltips();
                     if (typeof refreshEdgeTooltips === 'function') refreshEdgeTooltips();
+                    MapApp.ui.updateStaticEdgeColors();
                     closeModal('mapSettingsModal');
                     if (window.notyf) window.notyf.success('Map settings saved.');
                 } catch (error) {

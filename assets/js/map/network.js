@@ -67,6 +67,50 @@ MapApp.network = {
         };
         MapApp.state.network = new vis.Network(container, data, options);
         MapApp.network.restoreSavedView();
+
+        MapApp.state.network.on("afterDrawing", (ctx) => {
+            if (!MapApp.state.network) return;
+            const edges = MapApp.state.network.body.edges;
+            
+            // Build a lookup map of node statuses
+            const deviceStatuses = {};
+            MapApp.state.nodes.forEach(node => {
+                if (node.deviceData) {
+                    deviceStatuses[node.id] = node.deviceData.status;
+                }
+            });
+
+            ctx.save();
+            
+            for (const edgeId in edges) {
+                const edge = edges[edgeId];
+                if (!edge.from || !edge.to) continue;
+
+                const sourceStatus = deviceStatuses[edge.from.id];
+                const targetStatus = deviceStatuses[edge.to.id];
+                const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
+
+                if (isOffline) continue;
+
+                // Render 3 distinct glowing pulses spaced out by an offset (t + i/3) % 1.0 traveling from source to target
+                for (let i = 0; i < 3; i++) {
+                    const t = (MapApp.state.edgeAnimProgress + i / 3) % 1.0;
+                    try {
+                        const point = edge.getPoint(t);
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#00F2FE';
+                        ctx.shadowColor = '#00F2FE';
+                        ctx.shadowBlur = 8;
+                        ctx.fill();
+                    } catch (e) {
+                        // getPoint can fail during initialization or node dragging
+                    }
+                }
+            }
+
+            ctx.restore();
+        });
         
         // Event Handlers
         let boxResizeState = null;
@@ -548,6 +592,7 @@ MapApp.network = {
         if (MapApp.network.timeline) {
             MapApp.network.timeline.init();
         }
+        MapApp.ui.startCanvasAnimationLoop();
     }
 };
 

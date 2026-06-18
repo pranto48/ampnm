@@ -54,6 +54,7 @@ MapApp.deviceManager = {
             }
             
             MapApp.state.nodes.update({ id: deviceId, deviceData: updatedDeviceData, icon: { ...node.icon, color: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown }, title: MapApp.utils.buildNodeTitle(updatedDeviceData), label: label });
+            MapApp.ui.updateStaticEdgeColors();
         } catch (error) {
             console.error("Failed to ping device:", error);
             // Silent – no error toast for transient network issues
@@ -136,6 +137,7 @@ MapApp.deviceManager = {
 
             if (nodeUpdates.length > 0) {
                 MapApp.state.nodes.update(nodeUpdates);
+                MapApp.ui.updateStaticEdgeColors();
             }
 
             // Removed "All device statuses are stable" toast to reduce notification noise

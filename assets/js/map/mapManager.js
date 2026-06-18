@@ -408,7 +408,8 @@ MapApp.mapManager = {
         MapApp.deviceManager.setupAutoPing(deviceData);
         if (!MapApp.state.network) MapApp.network.initializeMap();
         else MapApp.network.restoreSavedView();
-        if (!MapApp.state.animationFrameId) MapApp.ui.updateAndAnimateEdges();
+        MapApp.ui.updateStaticEdgeColors();
+        MapApp.ui.startCanvasAnimationLoop();
     },
 
     copyDevice: async (deviceId) => {

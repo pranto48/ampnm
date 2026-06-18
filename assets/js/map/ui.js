@@ -322,57 +322,63 @@ MapApp.ui = {
         }
     },
 
-    updateAndAnimateEdges: () => {
+    updateStaticEdgeColors: () => {
         const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
-        const runStyle = displaySettings.connection_run_style || 'auto';
-        const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) || 100));
-        const animationStep = speedPercent === 0 ? 0 : Math.max(1, Math.round(speedPercent / 20));
-        MapApp.state.tick += animationStep;
-        const phase = MapApp.state.tick % 4;
-        const updates = [];
         const allEdges = MapApp.state.edges.get();
         if (MapApp.state.nodes.length > 0 && allEdges.length > 0) {
             const deviceStatusMap = new Map(MapApp.state.nodes.get({ fields: ['id', 'deviceData'] }).map(d => [d.id, d.deviceData.status]));
+            const updates = [];
             allEdges.forEach(edge => {
                 const sourceStatus = deviceStatusMap.get(edge.from);
                 const targetStatus = deviceStatusMap.get(edge.to);
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
-                const isRunning = !isOffline;
                 const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
+                
+                // Static dashed representation for wireless/logical-tunneling, solid for others
                 let dashes = false;
-                if (isRunning) {
-                    if (runStyle === 'solid') {
-                        dashes = false;
-                    } else if (runStyle === 'dotted') {
-                        dashes = speedPercent === 0 ? [1, 6] : (phase % 2 === 0 ? [1, 5] : [2, 4]);
-                    } else if (runStyle === 'dashed') {
-                        dashes = speedPercent === 0 ? [8, 6] : (phase % 2 === 0 ? [6, 6] : [10, 4]);
-                    } else if (runStyle === 'data-flow') {
-                        // Simulates packets moving (short dash, long gap)
-                        dashes = speedPercent === 0 ? [2, 10] : [[2, 14], [4, 12], [6, 10], [8, 8]][phase % 4];
-                    } else if (runStyle === 'data-stream') {
-                        // Simulates a continuous stream moving (long dash, short gap)
-                        dashes = speedPercent === 0 ? [10, 2] : [[8, 4], [10, 2], [12, 0], [6, 6]][phase % 4];
-                    } else if (runStyle === 'pulse') {
-                        // Simulates a pulse by varying gap sizes wildly
-                        dashes = speedPercent === 0 ? [5, 5] : [[1, 9], [3, 7], [5, 5], [7, 3], [9, 1]][MapApp.state.tick % 5];
-                    } else if (runStyle === 'wave') {
-                        dashes = speedPercent === 0 ? [4, 4] : [[2, 10], [4, 8], [6, 6], [8, 4], [10, 2], [8, 4], [6, 6], [4, 8]][MapApp.state.tick % 8];
-                    } else if (runStyle === 'morse') {
-                        dashes = speedPercent === 0 ? [2, 2, 6, 2] : [[2, 2, 6, 2], [6, 2, 2, 2], [2, 6, 2, 2], [2, 2, 2, 6]][phase % 4];
-                    } else if (runStyle === 'zipper') {
-                        dashes = speedPercent === 0 ? [1, 2, 3, 2] : [[1, 2, 3, 2], [2, 3, 2, 1], [3, 2, 1, 2], [2, 1, 2, 3]][phase % 4];
-                    } else {
-                        // auto
-                        dashes = speedPercent === 0 ? [6, 6] : [[3, 7], [5, 5], [7, 3], [5, 5]][phase % 4];
-                    }
-                } else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
+                if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
                     dashes = [5, 5];
                 }
+                
                 updates.push({ id: edge.id, color, dashes });
             });
+            if (updates.length > 0) {
+                MapApp.state.edges.update(updates);
+            }
         }
-        if (updates.length > 0) MapApp.state.edges.update(updates);
-        MapApp.state.animationFrameId = requestAnimationFrame(MapApp.ui.updateAndAnimateEdges);
+    },
+
+    startCanvasAnimationLoop: () => {
+        const loop = () => {
+            if (!MapApp.state.network) {
+                MapApp.state.animationFrameId = requestAnimationFrame(loop);
+                return;
+            }
+
+            const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
+            const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) ?? 100));
+            
+            const timelineSlider = document.getElementById('timelineSlider');
+            const isLive = timelineSlider ? parseInt(timelineSlider.value, 10) === 24 : true;
+            
+            const speedMultiplier = (speedPercent / 100) * (isLive ? 1 : 0);
+
+            if (speedMultiplier > 0) {
+                MapApp.state.edgeAnimProgress = (MapApp.state.edgeAnimProgress + 0.003 * speedMultiplier) % 1.0;
+                MapApp.state.network.redraw();
+            }
+
+            MapApp.state.animationFrameId = requestAnimationFrame(loop);
+        };
+
+        if (MapApp.state.animationFrameId) {
+            cancelAnimationFrame(MapApp.state.animationFrameId);
+        }
+        MapApp.state.animationFrameId = requestAnimationFrame(loop);
+    },
+
+    updateAndAnimateEdges: () => {
+        MapApp.ui.updateStaticEdgeColors();
+        MapApp.ui.startCanvasAnimationLoop();
     }
 };
