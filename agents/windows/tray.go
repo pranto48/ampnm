@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os/exec"
 	"syscall"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 )
@@ -110,15 +112,30 @@ var (
 	procTrackPopupMenu   = user32.NewProc("TrackPopupMenu")
 	procGetCursorPos     = user32.NewProc("GetCursorPos")
 	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
+	procDestroyMenu      = user32.NewProc("DestroyMenu")
 
 	kernel32         = syscall.NewLazyDLL("kernel32.dll")
 	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
+	procCreateMutexW = kernel32.NewProc("CreateMutexW")
+
+	procShellExecuteW    = shell32.NewProc("ShellExecuteW")
 )
 
 var (
 	trayHwnd uintptr
 	trayIcon uintptr
 )
+
+func openBrowser(url string) {
+	verbPtr, _ := syscall.UTF16PtrFromString("open")
+	urlPtr, _ := syscall.UTF16PtrFromString(url)
+	ret, _, _ := procShellExecuteW.Call(0, uintptr(unsafe.Pointer(verbPtr)), uintptr(unsafe.Pointer(urlPtr)), 0, 0, 1) // 1 = SW_SHOWNORMAL
+	if ret > 32 {
+		return
+	}
+	// Fallback to command line
+	exec.Command("cmd", "/c", "start", url).Start()
+}
 
 func setTrayIcon(hwnd uintptr, action uint32, title, text, infoTitle, infoText string) {
 	var nid NOTIFYICONDATAW
@@ -146,8 +163,7 @@ func trayWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 	case WM_TRAY:
 		switch lParam {
 		case WM_LBUTTONDBLCLK:
-			// Open dashboard in default browser
-			exec.Command("cmd", "/c", "start", "http://127.0.0.1:22660").Start()
+			openBrowser("http://127.0.0.1:22660")
 		case WM_RBUTTONUP:
 			var pt POINT
 			procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
@@ -158,11 +174,12 @@ func trayWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			procInsertMenuW.Call(hMenu, 1, MF_STRING, 2, uintptr(unsafe.Pointer(stringToUTF16Ptr("Exit"))))
 
 			procTrackPopupMenu.Call(hMenu, TPM_BOTTOMALIGN|TPM_LEFTALIGN, uintptr(pt.X), uintptr(pt.Y), 0, hwnd, 0)
+			procDestroyMenu.Call(hMenu)
 		}
 	case WM_COMMAND:
 		cmd := wParam & 0xFFFF
 		if cmd == 1 {
-			exec.Command("cmd", "/c", "start", "http://127.0.0.1:22660").Start()
+			openBrowser("http://127.0.0.1:22660")
 		} else if cmd == 2 {
 			procPostQuitMessage.Call(0)
 		}
@@ -177,10 +194,18 @@ func trayWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 }
 
 func ShowGUI() {
+	// Single instance check
+	_, err := checkSingleInstance()
+	if err != nil {
+		// Another instance is already running! Open dashboard and exit.
+		openBrowser("http://127.0.0.1:22660")
+		return
+	}
+
 	hInstance, _, _ := procGetModuleHandleW.Call(0)
 
-	// Try to load icon resource bundled by go-winres, fallback to default app icon
-	hIcon, _, _ := procLoadIconW.Call(hInstance, 1) // 1 is usually the main ID for go-winres
+	// Try to load icon resource bundled by go-winres (resource string name "APP"), fallback to default app icon
+	hIcon, _, _ := procLoadIconW.Call(hInstance, uintptr(unsafe.Pointer(stringToUTF16Ptr("APP"))))
 	if hIcon == 0 {
 		hIcon, _, _ = procLoadIconW.Call(0, IDI_APPLICATION)
 	}
@@ -210,6 +235,12 @@ func ShowGUI() {
 	// Start local web server
 	go startWebServer()
 
+	// Automatically open dashboard in default browser on launch
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		openBrowser("http://127.0.0.1:22660")
+	}()
+
 	// Message Loop
 	var msg MSG
 	for {
@@ -227,4 +258,22 @@ func showMessageBox(title, text string) {
 	textPtr, _ := syscall.UTF16PtrFromString(text)
 	procMessageBoxW := user32.NewProc("MessageBoxW")
 	procMessageBoxW.Call(0, uintptr(unsafe.Pointer(textPtr)), uintptr(unsafe.Pointer(titlePtr)), 0x00000030)
+}
+
+func checkSingleInstance() (uintptr, error) {
+	// Use Local mutex to avoid ERROR_ACCESS_DENIED for standard users
+	namePtr, err := syscall.UTF16PtrFromString("Local\\AMPNMAgentMutex")
+	if err != nil {
+		return 0, err
+	}
+	ret, _, err := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(namePtr)))
+	if ret == 0 {
+		// If CreateMutexW fails (returns 0), we return 0, nil to let the app run (non-fatal bypass)
+		return 0, nil
+	}
+	const ERROR_ALREADY_EXISTS = 183
+	if err != nil && err.(syscall.Errno) == ERROR_ALREADY_EXISTS {
+		return ret, fmt.Errorf("already running")
+	}
+	return ret, nil
 }
