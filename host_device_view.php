@@ -177,8 +177,8 @@ $chart_tx = array_column($chart_rows, 'avg_tx_mb');
                 $net = [
                     'Hostname' => $hostname,
                     'IP Address' => $ip,
-                    'Current Network In' => ($d['network_in'] !== null) ? parseFloat($d['network_in']) . ' Mbps' : '—',
-                    'Current Network Out' => ($d['network_out'] !== null) ? parseFloat($d['network_out']) . ' Mbps' : '—',
+                    'Current Network In' => ($d['network_in'] !== null) ? floatval($d['network_in']) . ' Mbps' : '—',
+                    'Current Network Out' => ($d['network_out'] !== null) ? floatval($d['network_out']) . ' Mbps' : '—',
                 ];
                 foreach ($net as $k => $v): ?>
                     <div class="flex justify-between gap-2">
