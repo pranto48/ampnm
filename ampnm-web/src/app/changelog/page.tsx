@@ -1,0 +1,123 @@
+"use client";
+
+import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
+
+export default function ChangelogPage() {
+  const versions = [
+    {
+      version: "v1.1.0",
+      date: "June 2026",
+      badge: "Feature Release",
+      badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+      highlights: [
+        {
+          title: "Administrative Payment Operations Console",
+          description: "Created an admin settings dashboard at `/dashboard/admin` to manage gateway parameters and customize cash-out account numbers."
+        },
+        {
+          title: "Dynamic Checkout Payments Integrations",
+          description: "Products checkout overlay updated to pull configs from Zustand/Firestore. MFS terminology adjusts dynamically for Personal Send Money or Merchant Cash Out options."
+        },
+        {
+          title: "Resend Transactional Mail Dispatcher",
+          description: "Implemented serverless `/api/send-email` using Resend REST API to trigger verification emails, system notifications, or license key summaries."
+        },
+        {
+          title: "Client Email Verification Pending badging",
+          description: "Added warning triggers to client directory, blocking or whitelisting subscription products activations based on verification status."
+        }
+      ]
+    },
+    {
+      version: "v1.0.0",
+      date: "January 2026",
+      badge: "Initial Launch",
+      badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      highlights: [
+        {
+          title: "SaaS Licensing Portal Scaffolding",
+          description: "Bootstrap Next.js App Router, Tailwind design systems, and client-side Zustand store allocations."
+        },
+        {
+          title: "Cryptographic 256-bit Key Generator",
+          description: "Generate cryptographically secure 32-byte license keys using `window.crypto.getRandomValues` inside the admin console."
+        },
+        {
+          title: "Rest licensing verify routes",
+          description: "Created serverless dynamic API routes at `/api/license/verify` for Docker client handshakes."
+        },
+        {
+          title: "Firebase database whitelists",
+          description: "Configured Cloud Firestore security rules, client fallbacks for offline errors, and authentication paths."
+        }
+      ]
+    }
+  ];
+
+  return (
+    <div className="py-20 bg-zinc-950 relative overflow-hidden flex-1">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/15 via-zinc-950 to-zinc-950 pointer-events-none -z-10" />
+
+      <div className="max-w-4xl mx-auto px-6 space-y-16">
+        
+        {/* Title */}
+        <div className="text-center space-y-4">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            Release Changelog & <br />
+            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              Version Histories
+            </span>
+          </h1>
+          <p className="text-zinc-400 text-sm font-medium">
+            Track technical features, updates, patch logs and releases on the AMPNM platform.
+          </p>
+        </div>
+
+        {/* Timeline list */}
+        <div className="space-y-12 relative before:absolute before:inset-0 before:left-3.5 before:w-px before:bg-zinc-900">
+          {versions.map((ver, idx) => (
+            <div key={idx} className="relative pl-10 space-y-6">
+              
+              {/* Commit Dot */}
+              <div className="absolute left-1.5 top-1.5 p-1 bg-zinc-950 border-2 border-zinc-800 text-blue-500 rounded-full">
+                <GitCommit size={14} />
+              </div>
+
+              {/* Version Header details */}
+              <div className="flex flex-wrap items-center gap-3">
+                <h3 className="text-lg font-extrabold text-white">{ver.version}</h3>
+                <span className="text-xs text-zinc-500 flex items-center gap-1">
+                  <Calendar size={12} />
+                  {ver.date}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${ver.badgeColor}`}>
+                  {ver.badge}
+                </span>
+              </div>
+
+              {/* Highlights cards */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {ver.highlights.map((hl, hlIdx) => (
+                  <div 
+                    key={hlIdx}
+                    className="p-5 border border-zinc-900 bg-zinc-900/10 rounded-2xl space-y-1.5 text-left"
+                  >
+                    <h4 className="font-bold text-xs text-zinc-200 flex items-center gap-1.5 uppercase tracking-wide">
+                      <Sparkles size={11} className="text-blue-400" />
+                      {hl.title}
+                    </h4>
+                    <p className="text-xs text-zinc-500 leading-relaxed font-medium">
+                      {hl.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </div>
+  );
+}
