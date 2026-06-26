@@ -28,26 +28,38 @@ export default function LoginPage() {
       const db = getFirestore(app);
       
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Fetch user profile from firestore
-      const userRef = doc(db, "users", userCredential.user.uid);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        const profileData = userSnap.data() as UserProfile;
-        if (email === "mail@arifmahmud.com") {
-          profileData.role = "admin";
+      // Fetch user profile from firestore with offline fallback
+      let userProfile: UserProfile;
+      try {
+        const userRef = doc(db, "users", userCredential.user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          userProfile = userSnap.data() as UserProfile;
+          if (email === "mail@arifmahmud.com") {
+            userProfile.role = "admin";
+          }
+        } else {
+          userProfile = {
+            uid: userCredential.user.uid,
+            name: userCredential.user.displayName || "Administrator",
+            email: userCredential.user.email || email,
+            role: email === "mail@arifmahmud.com" ? "admin" : "member",
+            orgId: "org-default",
+            createdAt: new Date().toISOString(),
+          };
         }
-        setProfile(profileData);
-      } else {
-        // Fallback profile if Firestore entry is missing
-        setProfile({
+      } catch (firestoreError) {
+        console.warn("Firestore fetch failed, falling back to local client auth:", firestoreError);
+        userProfile = {
           uid: userCredential.user.uid,
           name: userCredential.user.displayName || "Administrator",
           email: userCredential.user.email || email,
           role: email === "mail@arifmahmud.com" ? "admin" : "member",
           orgId: "org-default",
           createdAt: new Date().toISOString(),
-        });
+        };
       }
+      setProfile(userProfile);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Invalid email or password.");
@@ -66,18 +78,29 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // Fetch or create profile if not present
-      const userRef = doc(db, "users", result.user.uid);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        const profileData = userSnap.data() as UserProfile;
-        if (result.user.email === "mail@arifmahmud.com") {
-          profileData.role = "admin";
+      // Fetch or create profile if not present with offline fallback
+      let userProfile: UserProfile;
+      try {
+        const userRef = doc(db, "users", result.user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          userProfile = userSnap.data() as UserProfile;
+          if (result.user.email === "mail@arifmahmud.com") {
+            userProfile.role = "admin";
+          }
+        } else {
+          userProfile = {
+            uid: result.user.uid,
+            name: result.user.displayName || "Google Operator",
+            email: result.user.email || "",
+            role: result.user.email === "mail@arifmahmud.com" ? "admin" : "owner",
+            orgId: "org-google-default",
+            createdAt: new Date().toISOString(),
+          };
         }
-        setProfile(profileData);
-      } else {
-        // Mock profile initialization for fresh sign-up via Google
-        const mockProfile: UserProfile = {
+      } catch (firestoreError) {
+        console.warn("Firestore fetch failed, falling back to local client auth:", firestoreError);
+        userProfile = {
           uid: result.user.uid,
           name: result.user.displayName || "Google Operator",
           email: result.user.email || "",
@@ -85,8 +108,8 @@ export default function LoginPage() {
           orgId: "org-google-default",
           createdAt: new Date().toISOString(),
         };
-        setProfile(mockProfile);
       }
+      setProfile(userProfile);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Google authentication failed.");
