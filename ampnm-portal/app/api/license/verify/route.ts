@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin";
 
 // Handle POST request verification (Docker Application Payload verification)
 export async function POST(request: Request) {
@@ -49,6 +49,7 @@ export async function GET(request: Request) {
 
 // Helper core verification logic querying Firestore
 async function verifyLicenseKey(key: string) {
+  const adminDb = getAdminDb();
   const licensesRef = adminDb.collection("licenses");
   const snapshot = await licensesRef.where("key", "==", key).limit(1).get();
 
