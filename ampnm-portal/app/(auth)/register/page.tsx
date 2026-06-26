@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, collection, writeBatch } from "firebase/firestore";
+import { app } from "@/lib/firebase";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, collection, writeBatch } from "firebase/firestore";
 import { useMonitorStore } from "@/store/use-monitor-store";
 import { Activity, ShieldAlert, Key, Mail, User, Building, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { UserProfile, Organization } from "@/types";
@@ -26,6 +26,9 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
     try {
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
 
@@ -40,7 +43,8 @@ export default function RegisterPage() {
         id: orgId,
         name: orgName,
         createdAt: new Date().toISOString(),
-        ownerUid: uid,
+        clientEmail: email,
+        licenseCount: 0,
       };
 
       const userProfile: UserProfile = {

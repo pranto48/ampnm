@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { auth, db } from "@/lib/firebase";
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { app } from "@/lib/firebase";
+import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { useMonitorStore } from "@/store/use-monitor-store";
 import { Activity, ShieldAlert, Key, Mail, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { UserProfile } from "@/types";
@@ -24,6 +24,9 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       // Fetch user profile from firestore
       const userRef = doc(db, "users", userCredential.user.uid);
@@ -53,6 +56,9 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       

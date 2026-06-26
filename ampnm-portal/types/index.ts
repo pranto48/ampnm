@@ -2,7 +2,8 @@ export interface Organization {
   id: string;
   name: string;
   createdAt: string | Date;
-  ownerUid: string;
+  clientEmail: string;
+  licenseCount: number;
 }
 
 export interface UserProfile {
@@ -14,28 +15,20 @@ export interface UserProfile {
   createdAt: string | Date;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  billingPeriod: "monthly" | "yearly" | "one-time";
+  features: string[];
+}
+
 export interface License {
   id: string;
   key: string;
   orgId: string;
+  productId: string;
   status: "active" | "revoked" | "expired";
-  nodeId?: string;
   createdAt: string | Date;
   expiresAt: string | Date;
-}
-
-export interface NetworkMetric {
-  cpuUsage: number;
-  memoryUsage: number;
-  bandwidthIn: number;
-  bandwidthOut: number;
-}
-
-export interface Device {
-  id: string;
-  name: string;
-  ip: string;
-  status: "online" | "offline" | "warning";
-  lastActive: string;
-  responseTime: number;
 }

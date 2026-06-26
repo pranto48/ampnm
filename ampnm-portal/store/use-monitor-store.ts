@@ -1,20 +1,20 @@
 import { create } from "zustand";
-import { Device, License, NetworkMetric, UserProfile } from "@/types";
+import { Organization, Product, License, UserProfile } from "@/types";
 
 interface MonitorState {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
 
-  devices: Device[];
+  organizations: Organization[];
+  products: Product[];
   licenses: License[];
-  metrics: NetworkMetric;
   profile: UserProfile | null;
 
   setProfile: (profile: UserProfile | null) => void;
+  addOrganization: (org: Organization) => void;
   addLicense: (license: License) => void;
   revokeLicense: (id: string) => void;
-  setMetrics: (metrics: NetworkMetric) => void;
 }
 
 export const useMonitorStore = create<MonitorState>((set) => ({
@@ -22,39 +22,82 @@ export const useMonitorStore = create<MonitorState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 
-  devices: [
-    { id: "1", name: "Core Backbone Switch 01", ip: "10.0.0.1", status: "online", lastActive: "Just now", responseTime: 2 },
-    { id: "2", name: "Primary Database Cluster", ip: "10.0.2.10", status: "warning", lastActive: "2m ago", responseTime: 124 },
-    { id: "3", name: "Frontend Web Server Pool", ip: "10.0.1.5", status: "online", lastActive: "Just now", responseTime: 14 },
-    { id: "4", name: "HQ VPN Gateway Tunnel", ip: "10.10.0.1", status: "offline", lastActive: "15m ago", responseTime: 0 },
-    { id: "5", name: "Border Edge Gateway Router", ip: "192.168.1.1", status: "online", lastActive: "Just now", responseTime: 4 },
+  // Seeded client accounts list (Client Management)
+  organizations: [
+    { id: "org-bb", name: "Bangladesh Bank NOC", createdAt: "2026-01-10", clientEmail: "noc-admin@bb.org.bd", licenseCount: 15 },
+    { id: "org-gp", name: "Grameenphone Infrastructure", createdAt: "2026-02-15", clientEmail: "ops@grameenphone.com", licenseCount: 42 },
+    { id: "org-it", name: "IT Support BD Operations", createdAt: "2026-01-01", clientEmail: "arif@itsupport.com.bd", licenseCount: 5 },
+    { id: "org-dfn", name: "Dhaka Fiber Net Node", createdAt: "2025-05-12", clientEmail: "support@dhakafibernet.com", licenseCount: 0 },
   ],
+
+  // Seeded product pricing packages (Product Management)
+  products: [
+    {
+      id: "prod-std",
+      name: "Standard Agent License",
+      price: 15,
+      billingPeriod: "monthly",
+      features: ["Single host CPU/RAM tracking", "Email incident warnings", "24/7 client portal support", "Up to 5 custom dashboard widgets"],
+    },
+    {
+      id: "prod-cluster",
+      name: "Docker Cluster Pack",
+      price: 99,
+      billingPeriod: "monthly",
+      features: ["Up to 10 cluster nodes monitoring", "SMS + Telegram alert integrations", "14-day history metrics graphs", "Dedicated support line access"],
+    },
+    {
+      id: "prod-enterprise",
+      name: "Enterprise Core Unlimited",
+      price: 499,
+      billingPeriod: "monthly",
+      features: ["Unlimited server host allocations", "Custom Webhook endpoints reporting", "Full REST API access", "99.9% SLA support contract"],
+    },
+  ],
+
+  // Seeded issued license key details (Licensing Management)
   licenses: [
-    { id: "l1", key: "AMPNM-DEVC-8F2B-9A4E-4321", orgId: "org1", status: "active", nodeId: "node-srv-db", createdAt: "2026-01-10", expiresAt: "2027-01-10" },
-    { id: "l2", key: "AMPNM-DEVC-3C5D-8E1A-7654", orgId: "org1", status: "active", nodeId: "node-srv-web", createdAt: "2026-03-15", expiresAt: "2027-03-15" },
-    { id: "l3", key: "AMPNM-DEVC-5D4E-1C2A-9876", orgId: "org1", status: "expired", nodeId: "node-srv-vpn", createdAt: "2025-05-01", expiresAt: "2026-05-01" },
+    { id: "l1", key: "AMPNM-DEVC-8F2B-9A4E-4321", orgId: "org-bb", productId: "prod-cluster", status: "active", createdAt: "2026-01-10", expiresAt: "2027-01-10" },
+    { id: "l2", key: "AMPNM-DEVC-3C5D-8E1A-7654", orgId: "org-gp", productId: "prod-enterprise", status: "active", createdAt: "2026-02-15", expiresAt: "2027-02-15" },
+    { id: "l3", key: "AMPNM-DEVC-5D4E-1C2A-9876", orgId: "org-dfn", productId: "prod-std", status: "expired", createdAt: "2025-05-12", expiresAt: "2026-05-12" },
+    { id: "l4", key: "AMPNM-DEVC-1B2C-3D4E-5F6A", orgId: "org-it", productId: "prod-cluster", status: "active", createdAt: "2026-01-01", expiresAt: "2027-01-01" },
   ],
-  metrics: {
-    cpuUsage: 48.7,
-    memoryUsage: 64.2,
-    bandwidthIn: 124.5,
-    bandwidthOut: 98.2,
-  },
+
   profile: {
     uid: "u1",
     name: "Sayed Arif",
     email: "arif@itsupport.com.bd",
     role: "owner",
-    orgId: "org1",
+    orgId: "org-it",
     createdAt: "2026-01-01",
   },
 
   setProfile: (profile) => set({ profile }),
-  addLicense: (license) => set((state) => ({ licenses: [license, ...state.licenses] })),
-  revokeLicense: (id) => set((state) => ({
-    licenses: state.licenses.map((lic) =>
-      lic.id === id ? { ...lic, status: "revoked" } : lic
-    )
-  })),
-  setMetrics: (metrics) => set({ metrics }),
+  addOrganization: (org) => set((state) => ({ organizations: [org, ...state.organizations] })),
+  addLicense: (license) => set((state) => {
+    // Increment licenseCount for the target organization
+    const updatedOrgs = state.organizations.map((org) =>
+      org.id === license.orgId ? { ...org, licenseCount: org.licenseCount + 1 } : org
+    );
+    return {
+      licenses: [license, ...state.licenses],
+      organizations: updatedOrgs,
+    };
+  }),
+  revokeLicense: (id) => set((state) => {
+    const targetLic = state.licenses.find((l) => l.id === id);
+    if (!targetLic) return {};
+    
+    // Decrement licenseCount for the organization
+    const updatedOrgs = state.organizations.map((org) =>
+      org.id === targetLic.orgId ? { ...org, licenseCount: Math.max(0, org.licenseCount - 1) } : org
+    );
+
+    return {
+      licenses: state.licenses.map((lic) =>
+        lic.id === id ? { ...lic, status: "revoked" as const } : lic
+      ),
+      organizations: updatedOrgs,
+    };
+  }),
 }));

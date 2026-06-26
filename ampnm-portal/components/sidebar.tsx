@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  Package,
   LogOut,
 } from "lucide-react";
 
@@ -21,8 +22,9 @@ export function Sidebar() {
   const { sidebarOpen, toggleSidebar } = useMonitorStore();
 
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Node Licenses", href: "/dashboard/licenses", icon: FileText },
+    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Product Tiers", href: "/dashboard/products", icon: Package },
+    { name: "Issued Licenses", href: "/dashboard/licenses", icon: FileText },
   ];
 
   const handleSignOut = async () => {
