@@ -198,6 +198,10 @@ export default function RegisterPage() {
               Sign In
             </Link>
           </p>
+
+          <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800/80 text-center text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider select-none">
+            Developed by IT Support BD
+          </div>
         </div>
       </div>
     </div>

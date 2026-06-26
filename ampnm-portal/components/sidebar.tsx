@@ -107,6 +107,11 @@ export function Sidebar() {
       </nav>
 
       <div className="p-2 border-t border-zinc-200 dark:border-zinc-800 space-y-1">
+        {sidebarOpen && (
+          <div className="px-3 py-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-wider uppercase text-center select-none">
+            Made by IT Support BD
+          </div>
+        )}
         <button
           onClick={handleSignOut}
           className={cn(
