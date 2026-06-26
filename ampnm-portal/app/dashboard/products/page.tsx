@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { License } from "@/types";
 
 export default function ProductsPage() {
-  const { products, organizations, addLicense } = useMonitorStore();
+  const { products, organizations, addLicense, paymentSettings, profile } = useMonitorStore();
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"bkash" | "nagad" | "rocket" | "coffee" | null>(null);
   const [bkashStep, setBkashStep] = useState<1 | 2 | 3 | 4>(1);
@@ -18,6 +18,10 @@ export default function ProductsPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [successKey, setSuccessKey] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const clientOrg = organizations.find((o) => o.id === profile?.orgId);
+  const isVerified = clientOrg ? (clientOrg.verified ?? true) : true;
+
 
   const USD_TO_BDT = 120;
 
@@ -128,6 +132,59 @@ export default function ProductsPage() {
         </p>
       </div>
 
+      {/* Verification Banners */}
+      {!isVerified && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg">
+              <ShieldAlert size={20} />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">Organization Account Verification Pending</h4>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Your workspace organization <strong className="text-zinc-700 dark:text-zinc-300">{clientOrg?.name}</strong> is currently unverified. Some features may be restricted until verified.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              if (!clientOrg) return;
+              setIsVerifying(true);
+              try {
+                const verificationLink = `https://portal.itsupport.com.bd/verify-email?orgId=${clientOrg.id}`;
+                const emailHtml = `
+                  <div style="font-family: Arial; max-width: 600px; padding: 24px; border: 1px solid #e4e4e7; border-radius: 12px;">
+                    <h2>Verify Organization Registration</h2>
+                    <p>Click below to verify organization account for ${clientOrg.name}:</p>
+                    <a href="${verificationLink}" style="background-color: #2563eb; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Verify Account</a>
+                  </div>
+                `;
+                
+                await fetch("/api/send-email", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    recipient: clientOrg.clientEmail,
+                    subject: `Verify Organization Account - ${clientOrg.name}`,
+                    emailHtml,
+                  })
+                });
+                alert("Verification request sent successfully to " + clientOrg.clientEmail);
+              } catch (e) {
+                console.error(e);
+              } finally {
+                setIsVerifying(false);
+              }
+            }}
+            disabled={isVerifying}
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 disabled:opacity-55 transition-colors cursor-pointer"
+          >
+            {isVerifying ? "Requesting..." : "Request Verification Resend"}
+          </button>
+        </div>
+      )}
+
+
       {/* Products Grid */}
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         {products.map((product) => {
@@ -235,31 +292,43 @@ export default function ProductsPage() {
                   
                   <div className="grid gap-3 sm:grid-cols-2">
                     {/* bKash */}
-                    <button
-                      onClick={() => setPaymentMethod("bkash")}
-                      className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-pink-500 dark:hover:border-pink-500 hover:bg-pink-50/10 text-left transition-all flex flex-col justify-between h-28 cursor-pointer group"
-                    >
-                      <span className="text-xs font-bold text-pink-600 tracking-wide uppercase">bKash Checkout</span>
-                      <span className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-pink-600 transition-colors">Instant Pay</span>
-                    </button>
+                    {paymentSettings.bkash.enabled && (
+                      <button
+                        onClick={() => setPaymentMethod("bkash")}
+                        className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-pink-500 dark:hover:border-pink-500 hover:bg-pink-50/10 text-left transition-all flex flex-col justify-between h-28 cursor-pointer group"
+                      >
+                        <span className="text-xs font-bold text-pink-600 tracking-wide uppercase">bKash Checkout</span>
+                        <span className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-pink-600 transition-colors">
+                          {paymentSettings.bkash.type === "personal" ? "Send Money" : "Instant Pay"}
+                        </span>
+                      </button>
+                    )}
 
                     {/* Nagad */}
-                    <button
-                      onClick={() => setPaymentMethod("nagad")}
-                      className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-50/10 text-left transition-all flex flex-col justify-between h-28 cursor-pointer group"
-                    >
-                      <span className="text-xs font-bold text-orange-600 tracking-wide uppercase">Nagad wallet</span>
-                      <span className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-orange-600 transition-colors">Manual Txn</span>
-                    </button>
+                    {paymentSettings.nagad.enabled && (
+                      <button
+                        onClick={() => setPaymentMethod("nagad")}
+                        className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-50/10 text-left transition-all flex flex-col justify-between h-28 cursor-pointer group"
+                      >
+                        <span className="text-xs font-bold text-orange-600 tracking-wide uppercase">Nagad wallet</span>
+                        <span className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-orange-600 transition-colors">
+                          {paymentSettings.nagad.type === "personal" ? "Send Money" : "Manual Txn"}
+                        </span>
+                      </button>
+                    )}
 
                     {/* Rocket */}
-                    <button
-                      onClick={() => setPaymentMethod("rocket")}
-                      className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-purple-500 dark:hover:border-purple-500 hover:bg-purple-50/10 text-left transition-all flex flex-col justify-between h-28 cursor-pointer group"
-                    >
-                      <span className="text-xs font-bold text-purple-600 tracking-wide uppercase">DBBL Rocket</span>
-                      <span className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-purple-600 transition-colors">Manual Txn</span>
-                    </button>
+                    {paymentSettings.rocket.enabled && (
+                      <button
+                        onClick={() => setPaymentMethod("rocket")}
+                        className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-purple-500 dark:hover:border-purple-500 hover:bg-purple-50/10 text-left transition-all flex flex-col justify-between h-28 cursor-pointer group"
+                      >
+                        <span className="text-xs font-bold text-purple-600 tracking-wide uppercase">DBBL Rocket</span>
+                        <span className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-purple-600 transition-colors">
+                          {paymentSettings.rocket.type === "personal" ? "Send Money" : "Manual Txn"}
+                        </span>
+                      </button>
+                    )}
 
                     {/* Buy Me a Coffee */}
                     <a
@@ -301,7 +370,9 @@ export default function ProductsPage() {
                     </div>
                     
                     <div className="text-center">
-                      <p className="text-xs text-pink-100 uppercase tracking-widest font-semibold">Amount to Pay</p>
+                      <p className="text-xs text-pink-100 uppercase tracking-widest font-semibold">
+                        Amount to Pay ({paymentSettings.bkash.type === "personal" ? "Send Money" : "Merchant Pay"})
+                      </p>
                       <p className="text-xl font-extrabold">৳ {(selectedProduct.price * USD_TO_BDT).toLocaleString()}</p>
                     </div>
 
@@ -481,7 +552,14 @@ export default function ProductsPage() {
                         <p className="font-bold uppercase tracking-wider text-[10px] text-zinc-400">Instructions:</p>
                         <ol className="list-decimal pl-4 space-y-1">
                           <li>Go to your {paymentMethod === "nagad" ? "Nagad" : "Rocket"} wallet app.</li>
-                          <li>Cash out <strong className="text-zinc-900 dark:text-zinc-50">৳ {(selectedProduct.price * USD_TO_BDT).toLocaleString()}</strong> to the merchant number: <strong className="text-zinc-900 dark:text-zinc-50">01700000000</strong>.</li>
+                          <li>
+                            {paymentMethod && paymentSettings[paymentMethod as keyof typeof paymentSettings]?.type === "personal" 
+                              ? "Send Money" 
+                              : "Cash Out"
+                            } <strong className="text-zinc-900 dark:text-zinc-50">৳ {(selectedProduct.price * USD_TO_BDT).toLocaleString()}</strong> to the {paymentMethod && paymentSettings[paymentMethod as keyof typeof paymentSettings]?.type} account number: <strong className="text-zinc-900 dark:text-zinc-50">
+                              {paymentMethod && paymentSettings[paymentMethod as keyof typeof paymentSettings]?.number}
+                            </strong>.
+                          </li>
                           <li>Once the transfer completes, enter the Transaction ID below for verification.</li>
                         </ol>
                       </div>

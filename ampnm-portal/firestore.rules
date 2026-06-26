@@ -137,5 +137,10 @@ service cloud.firestore {
       allow update: if isAuthenticated() && isOrgMember(resource.data.orgId) && isOrgAdmin() && isValidLicense(request.resource.data) && request.resource.data.orgId == resource.data.orgId;
       allow delete: if isAuthenticated() && isOrgMember(resource.data.orgId) && getUserRole() == 'owner';
     }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (getUserRole() == 'admin' || request.auth.token.email == 'mail@arifmahmud.com');
+    }
   }
 }

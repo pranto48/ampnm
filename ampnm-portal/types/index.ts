@@ -4,6 +4,7 @@ export interface Organization {
   createdAt: string | Date;
   clientEmail: string;
   licenseCount: number;
+  verified?: boolean;
 }
 
 export interface UserProfile {
@@ -32,3 +33,31 @@ export interface License {
   createdAt: string | Date;
   expiresAt: string | Date;
 }
+
+export interface PaymentOption {
+  enabled: boolean;
+  number: string;
+  type: "personal" | "merchant";
+}
+
+export interface PaymentSettings {
+  bkash: PaymentOption;
+  rocket: PaymentOption;
+  nagad: PaymentOption;
+}
+
+export interface MailSettings {
+  resendApiKey: string;
+  fromEmail: string;
+}
+
+export interface EmailLog {
+  id: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  timestamp: string;
+  status: "sent" | "failed" | "simulated";
+  type: "verification" | "license" | "custom";
+}
+

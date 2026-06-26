@@ -14,12 +14,13 @@ import {
   FileText,
   Package,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { sidebarOpen, toggleSidebar } = useMonitorStore();
+  const { sidebarOpen, toggleSidebar, profile } = useMonitorStore();
   const auth = getAuth(app);
 
   const navItems = [
@@ -27,6 +28,11 @@ export function Sidebar() {
     { name: "Products (GMEN)", href: "/dashboard/products", icon: Package },
     { name: "Licenses", href: "/dashboard/licenses", icon: FileText },
   ];
+
+  if (profile?.role === "admin") {
+    navItems.push({ name: "Admin Panel", href: "/dashboard/admin", icon: ShieldCheck });
+  }
+
 
   const handleSignOut = async () => {
     try {

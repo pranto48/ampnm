@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Organization, Product, License, UserProfile } from "@/types";
+import { Organization, Product, License, UserProfile, PaymentSettings, MailSettings, EmailLog } from "@/types";
 
 interface MonitorState {
   sidebarOpen: boolean;
@@ -10,11 +10,18 @@ interface MonitorState {
   products: Product[];
   licenses: License[];
   profile: UserProfile | null;
+  paymentSettings: PaymentSettings;
+  mailSettings: MailSettings;
+  emailLogs: EmailLog[];
 
   setProfile: (profile: UserProfile | null) => void;
   addOrganization: (org: Organization) => void;
   addLicense: (license: License) => void;
   revokeLicense: (id: string) => void;
+  updatePaymentSettings: (settings: PaymentSettings) => void;
+  updateMailSettings: (settings: MailSettings) => void;
+  addEmailLog: (log: EmailLog) => void;
+  toggleOrgVerification: (orgId: string, verified: boolean) => void;
 }
 
 export const useMonitorStore = create<MonitorState>((set) => ({
@@ -24,10 +31,10 @@ export const useMonitorStore = create<MonitorState>((set) => ({
 
   // Seeded client accounts list (Client Management)
   organizations: [
-    { id: "org-bb", name: "Bangladesh Bank IT", createdAt: "2026-01-10", clientEmail: "it-admin@bb.org.bd", licenseCount: 15 },
-    { id: "org-gp", name: "Grameenphone Infrastructure", createdAt: "2026-02-15", clientEmail: "ops@grameenphone.com", licenseCount: 42 },
-    { id: "org-it", name: "IT Support BD Operations", createdAt: "2026-01-01", clientEmail: "arif@itsupport.com.bd", licenseCount: 5 },
-    { id: "org-dfn", name: "Dhaka Fiber Net Node", createdAt: "2025-05-12", clientEmail: "support@dhakafibernet.com", licenseCount: 0 },
+    { id: "org-bb", name: "Bangladesh Bank IT", createdAt: "2026-01-10", clientEmail: "it-admin@bb.org.bd", licenseCount: 15, verified: true },
+    { id: "org-gp", name: "Grameenphone Infrastructure", createdAt: "2026-02-15", clientEmail: "ops@grameenphone.com", licenseCount: 42, verified: true },
+    { id: "org-it", name: "IT Support BD Operations", createdAt: "2026-01-01", clientEmail: "arif@itsupport.com.bd", licenseCount: 5, verified: true },
+    { id: "org-dfn", name: "Dhaka Fiber Net Node", createdAt: "2025-05-12", clientEmail: "support@dhakafibernet.com", licenseCount: 0, verified: false },
   ],
 
   // Seeded product pricing packages (Product Management)
@@ -72,6 +79,32 @@ export const useMonitorStore = create<MonitorState>((set) => ({
     createdAt: "2026-01-01",
   },
 
+  // Default Admin Settings (Payments)
+  paymentSettings: {
+    bkash: { enabled: true, number: "01915822266", type: "personal" },
+    rocket: { enabled: true, number: "019158222660", type: "personal" },
+    nagad: { enabled: true, number: "01915822266", type: "personal" },
+  },
+
+  // Default Email Settings (Resend configuration)
+  mailSettings: {
+    resendApiKey: "",
+    fromEmail: "licensing@itsupport.com.bd",
+  },
+
+  // Outgoing communications log
+  emailLogs: [
+    {
+      id: "log-1",
+      recipient: "ops@grameenphone.com",
+      subject: "Welcome to AMPNM Licensing Portal",
+      body: "Welcome! Your organization has been verified and registered by IT Support BD. Your profile role is 'owner'.",
+      timestamp: "2026-06-25T10:00:00Z",
+      status: "simulated",
+      type: "verification"
+    }
+  ],
+
   setProfile: (profile) => set({ profile }),
   addOrganization: (org) => set((state) => ({ organizations: [org, ...state.organizations] })),
   addLicense: (license) => set((state) => {
@@ -100,4 +133,13 @@ export const useMonitorStore = create<MonitorState>((set) => ({
       organizations: updatedOrgs,
     };
   }),
+  updatePaymentSettings: (settings) => set({ paymentSettings: settings }),
+  updateMailSettings: (settings) => set({ mailSettings: settings }),
+  addEmailLog: (log) => set((state) => ({ emailLogs: [log, ...state.emailLogs] })),
+  toggleOrgVerification: (orgId, verified) => set((state) => ({
+    organizations: state.organizations.map((org) =>
+      org.id === orgId ? { ...org, verified } : org
+    )
+  })),
 }));
+
