@@ -12,7 +12,7 @@ export default function ProductsPage() {
       {/* Product Catalog Header */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50">
-          Product Pricing Packages
+          Products Catalog (GMEN)
         </h2>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm">
           Overview of software license products, feature boundaries, and monthly subscription tiers.

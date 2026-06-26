@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import { app } from "@/lib/firebase";
 import { getAuth, signOut } from "firebase/auth";
 import {
-  Activity,
-  LayoutDashboard,
+  Key,
+  Users,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -23,9 +23,9 @@ export function Sidebar() {
   const auth = getAuth(app);
 
   const navItems = [
-    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Product Tiers", href: "/dashboard/products", icon: Package },
-    { name: "Issued Licenses", href: "/dashboard/licenses", icon: FileText },
+    { name: "Clients", href: "/dashboard/clients", icon: Users },
+    { name: "Products (GMEN)", href: "/dashboard/products", icon: Package },
+    { name: "Licenses", href: "/dashboard/licenses", icon: FileText },
   ];
 
   const handleSignOut = async () => {
@@ -48,7 +48,7 @@ export function Sidebar() {
       <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-200 dark:border-zinc-800">
         <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg">
           <div className="p-1.5 bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg flex-shrink-0">
-            <Activity className="h-5 w-5" />
+            <Key className="h-5 w-5" />
           </div>
           <span
             className={cn(
@@ -56,7 +56,7 @@ export function Sidebar() {
               sidebarOpen ? "opacity-100" : "opacity-0 w-0 pointer-events-none"
             )}
           >
-            AMPNM SaaS
+            AMPNM Portal
           </span>
         </Link>
 

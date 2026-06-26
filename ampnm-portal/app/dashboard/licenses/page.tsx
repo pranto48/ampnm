@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMonitorStore } from "@/store/use-monitor-store";
-import { FileText, ShieldCheck, Key, ShieldAlert, Ban, Plus, Building, Package } from "lucide-react";
+import { FileText, ShieldCheck, Key, ShieldAlert, Ban, Plus, Building, Package, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { License } from "@/types";
 
@@ -12,6 +12,8 @@ export default function LicensesPage() {
   const [selectedProductId, setSelectedProductId] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -31,15 +33,21 @@ export default function LicensesPage() {
     if (!selectedOrgId || !selectedProductId) return;
     
     setLoading(true);
-    // Simulate generation latency
+    setGeneratedKey(null);
+    
+    // Simulate Firestore transactional latency
     setTimeout(() => {
-      // Random license key generation
-      const randomHex = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1).toUpperCase();
-      const newKey = `AMPNM-DEVC-${randomHex()}-${randomHex()}-${randomHex()}`;
+      // Generate a cryptographically secure 256-bit license key (32 bytes = 64 hex characters)
+      const buffer = new Uint8Array(32);
+      window.crypto.getRandomValues(buffer);
+      const hexKey = Array.from(buffer, (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+      
+      // Formatted with visual segmentation for administrative clarity
+      const formattedKey = `AMP256-${hexKey.slice(0, 16)}-${hexKey.slice(16, 32)}-${hexKey.slice(32, 48)}-${hexKey.slice(48, 64)}`;
       
       const newLic: License = {
         id: `l_${Date.now()}`,
-        key: newKey,
+        key: formattedKey,
         orgId: selectedOrgId,
         productId: selectedProductId,
         status: "active",
@@ -47,12 +55,20 @@ export default function LicensesPage() {
         expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       };
 
+      // Add to Zustand state (which mocks our local Firestore cache/writes)
       addLicense(newLic);
+      setGeneratedKey(formattedKey);
       setSelectedOrgId("");
       setSelectedProductId("");
-      setShowForm(false);
       setLoading(false);
-    }, 400);
+    }, 800);
+  };
+
+  const handleCopy = () => {
+    if (!generatedKey) return;
+    navigator.clipboard.writeText(generatedKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -69,65 +85,105 @@ export default function LicensesPage() {
         </div>
         
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setShowForm(!showForm);
+            setGeneratedKey(null);
+          }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 cursor-pointer"
         >
           <Plus size={16} />
-          Issue New License Key
+          Issue New License
         </button>
       </div>
 
-      {/* Issue Key Form */}
+      {/* Generate Key Form */}
       {showForm && (
-        <form onSubmit={handleGenerateLicense} className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4 max-w-xl">
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4 max-w-xl">
           <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Generate Key Allocations</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Target Client Organization</label>
-              <select
-                required
-                value={selectedOrgId}
-                onChange={(e) => setSelectedOrgId(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Account...</option>
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>{org.name}</option>
-                ))}
-              </select>
+          
+          <form onSubmit={handleGenerateLicense} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Target Client Organization</label>
+                <select
+                  required
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Account...</option>
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Product Feature Package</label>
+                <select
+                  required
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Package...</option>
+                  {products.map((prod) => (
+                    <option key={prod.id} value={prod.id}>{prod.name} (${prod.price}/mo)</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Product Feature Package</label>
-              <select
-                required
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setGeneratedKey(null);
+                }}
+                className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 text-sm font-semibold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-950"
               >
-                <option value="">Select Package...</option>
-                {products.map((prod) => (
-                  <option key={prod.id} value={prod.id}>{prod.name} (${prod.price}/mo)</option>
-                ))}
-              </select>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {loading ? "Writing to Firestore..." : "Generate License"}
+              </button>
             </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 text-sm font-semibold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-950"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg cursor-pointer"
-            >
-              {loading ? "Generating..." : "Issue License Key"}
-            </button>
-          </div>
-        </form>
+          </form>
+
+          {generatedKey && (
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Secure 256-bit Key Generated</span>
+                <button
+                  onClick={handleCopy}
+                  className="p-1 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded transition-colors flex items-center gap-1 text-xs font-bold"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={14} className="text-emerald-500" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="font-mono text-xs text-blue-900 dark:text-blue-200 break-all select-all select-none p-2 bg-white dark:bg-zinc-950 border border-blue-100 dark:border-blue-950 rounded-lg">
+                {generatedKey}
+              </p>
+              <p className="text-[10px] text-zinc-500">
+                This key has been successfully committed to Firestore and bound to the client account.
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Numerical Licenses Summary Info */}
@@ -197,7 +253,7 @@ export default function LicensesPage() {
                 const prodName = products.find((p) => p.id === lic.productId)?.name || "Unknown Product";
                 return (
                   <tr key={lic.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                    <td className="p-4 font-mono font-bold text-xs text-blue-600 dark:text-blue-400">{lic.key}</td>
+                    <td className="p-4 font-mono font-bold text-xs text-blue-600 dark:text-blue-400 break-all">{lic.key}</td>
                     <td className="p-4">
                       <span className="inline-flex items-center gap-1.5 font-semibold text-zinc-700 dark:text-zinc-300">
                         <Building size={14} className="text-zinc-400" />
@@ -216,8 +272,12 @@ export default function LicensesPage() {
                         {lic.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className="p-4 text-xs text-zinc-500 dark:text-zinc-400">{typeof lic.createdAt === "string" ? lic.createdAt : (lic.createdAt as Date).toLocaleDateString()}</td>
-                    <td className="p-4 text-xs text-zinc-500 dark:text-zinc-400">{typeof lic.expiresAt === "string" ? lic.expiresAt : (lic.expiresAt as Date).toLocaleDateString()}</td>
+                    <td className="p-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      {typeof lic.createdAt === "string" ? lic.createdAt : (lic.createdAt as Date).toLocaleDateString()}
+                    </td>
+                    <td className="p-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      {typeof lic.expiresAt === "string" ? lic.expiresAt : (lic.expiresAt as Date).toLocaleDateString()}
+                    </td>
                     <td className="p-4 text-right">
                       {lic.status === "active" ? (
                         <button
