@@ -9,7 +9,22 @@ node_modules/
 *.zip
 *.tar.gz
 .lovable/
+
+# Exclude Next.js portal and web app (separate deployments on Vercel)
+ampnm-portal/
+ampnm-web/
+ampnm-app-source/
+
+# Exclude agent build artifacts
 agents/windows/build/
 agents/windows/ampnm-agent.exe
 agents/windows/ampnm-agent-setup.msi
 agents/windows/LICENSE.rtf
+
+# Exclude pnpm/npm locks (not needed in PHP image)
+pnpm-lock.yaml
+package-lock.json
+package.json
+
+# Exclude markdown docs
+*.md
