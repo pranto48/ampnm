@@ -32,14 +32,18 @@ export default function LoginPage() {
       const userRef = doc(db, "users", userCredential.user.uid);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
-        setProfile(userSnap.data() as UserProfile);
+        const profileData = userSnap.data() as UserProfile;
+        if (email === "mail@arifmahmud.com") {
+          profileData.role = "admin";
+        }
+        setProfile(profileData);
       } else {
         // Fallback profile if Firestore entry is missing
         setProfile({
           uid: userCredential.user.uid,
-          name: userCredential.user.displayName || "Operator",
+          name: userCredential.user.displayName || "Administrator",
           email: userCredential.user.email || email,
-          role: "member",
+          role: email === "mail@arifmahmud.com" ? "admin" : "member",
           orgId: "org-default",
           createdAt: new Date().toISOString(),
         });
@@ -66,14 +70,18 @@ export default function LoginPage() {
       const userRef = doc(db, "users", result.user.uid);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
-        setProfile(userSnap.data() as UserProfile);
+        const profileData = userSnap.data() as UserProfile;
+        if (result.user.email === "mail@arifmahmud.com") {
+          profileData.role = "admin";
+        }
+        setProfile(profileData);
       } else {
         // Mock profile initialization for fresh sign-up via Google
         const mockProfile: UserProfile = {
           uid: result.user.uid,
           name: result.user.displayName || "Google Operator",
           email: result.user.email || "",
-          role: "owner",
+          role: result.user.email === "mail@arifmahmud.com" ? "admin" : "owner",
           orgId: "org-google-default",
           createdAt: new Date().toISOString(),
         };
