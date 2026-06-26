@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMonitorStore } from "@/store/use-monitor-store";
 import { cn } from "@/lib/utils";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+import { app } from "@/lib/firebase";
+import { getAuth, signOut } from "firebase/auth";
 import {
   Activity,
   LayoutDashboard,
@@ -20,6 +20,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { sidebarOpen, toggleSidebar } = useMonitorStore();
+  const auth = getAuth(app);
 
   const navItems = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
