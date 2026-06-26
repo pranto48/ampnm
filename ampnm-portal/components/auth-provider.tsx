@@ -32,8 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setUser(null);
-        // Clear session cookie
-        document.cookie = "session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; Secure";
+        // Clear session cookie unless auth bypass is active
+        if (!document.cookie.includes("bypass-auth=true")) {
+          document.cookie = "session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; Secure";
+        }
       }
       setLoading(false);
     });
