@@ -213,7 +213,7 @@ export default function DashboardHome() {
                   <td className="p-4 text-right text-xs text-zinc-500 dark:text-zinc-400">
                     <span className="inline-flex items-center gap-1 justify-end w-full">
                       <Calendar size={12} />
-                      {org.createdAt}
+                      {typeof org.createdAt === "string" ? org.createdAt : org.createdAt.toLocaleDateString()}
                     </span>
                   </td>
                 </tr>
