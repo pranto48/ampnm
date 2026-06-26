@@ -18,19 +18,19 @@ export default function DocsPage() {
 }`;
 
   return (
-    <div className="py-20 bg-zinc-950 relative overflow-hidden flex-1">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/15 via-zinc-950 to-zinc-950 pointer-events-none -z-10" />
+    <div className="py-20 bg-white dark:bg-zinc-950 transition-colors duration-300 relative overflow-hidden flex-1">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/40 via-transparent to-transparent dark:from-blue-900/15 dark:via-zinc-950 dark:to-zinc-950 pointer-events-none -z-10" />
 
       <div className="max-w-5xl mx-auto px-6 space-y-12">
         {/* Title */}
         <div className="text-center space-y-4">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight transition-all hover:-translate-y-1 hover:shadow-lg">
             Integration Guides & <br />
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
               API Documentation
             </span>
           </h1>
-          <p className="text-zinc-400 text-sm font-medium">
+          <p className="text-zinc-500 dark:text-zinc-400 transition-colors text-sm font-medium">
             Learn how to verify licensing states programmatically and whitelists daemon network protocols.
           </p>
         </div>
@@ -80,7 +80,7 @@ export default function DocsPage() {
               <div className="space-y-2">
                 <p className="font-bold text-zinc-300">HTTP Request specifications:</p>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Method: <strong className="text-white">POST</strong></li>
+                  <li>Method: <strong className="text-zinc-900 dark:text-white transition-colors">POST</strong></li>
                   <li>Path: <code className="text-blue-400 bg-zinc-900 px-1.5 py-0.5 rounded font-mono text-xs">https://portal.itsupport.com.bd/api/license/verify</code></li>
                   <li>Content-Type: <code className="text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded font-mono text-xs">application/json</code></li>
                 </ul>
@@ -89,7 +89,7 @@ export default function DocsPage() {
               {/* Request code block */}
               <div className="space-y-2">
                 <span className="block text-[10px] uppercase font-bold text-zinc-500">Request curl template:</span>
-                <div className="p-4 rounded-xl border border-zinc-900 bg-zinc-950 font-mono text-[11px] text-zinc-350 text-left overflow-x-auto select-all">
+                <div className="p-4 rounded-xl border border-zinc-900 bg-white dark:bg-zinc-950 transition-colors duration-300 font-mono text-[11px] text-zinc-350 text-left overflow-x-auto select-all">
                   <pre>{sampleRequest}</pre>
                 </div>
               </div>
@@ -97,7 +97,7 @@ export default function DocsPage() {
               {/* Response code block */}
               <div className="space-y-2">
                 <span className="block text-[10px] uppercase font-bold text-zinc-500">JSON Success Response (200 OK):</span>
-                <div className="p-4 rounded-xl border border-zinc-900 bg-zinc-950 font-mono text-[11px] text-emerald-400 text-left overflow-x-auto">
+                <div className="p-4 rounded-xl border border-zinc-900 bg-white dark:bg-zinc-950 transition-colors duration-300 font-mono text-[11px] text-emerald-400 text-left overflow-x-auto">
                   <pre>{sampleResponse}</pre>
                 </div>
               </div>

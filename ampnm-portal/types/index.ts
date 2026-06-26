@@ -32,6 +32,8 @@ export interface License {
   status: "active" | "revoked" | "expired";
   createdAt: string | Date;
   expiresAt: string | Date;
+  lastIp?: string;
+  lastVerifiedAt?: string;
 }
 
 export interface PaymentOption {

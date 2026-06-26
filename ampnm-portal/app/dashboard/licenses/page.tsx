@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMonitorStore } from "@/store/use-monitor-store";
-import { FileText, ShieldCheck, Key, ShieldAlert, Ban, Plus, Building, Package, Copy, Check } from "lucide-react";
+import { FileText, ShieldCheck, Key, ShieldAlert, Ban, Plus, Building, Package, Copy, Check, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { License } from "@/types";
 
@@ -242,6 +242,8 @@ export default function LicensesPage() {
                 <th className="p-4">Client/Organization</th>
                 <th className="p-4">Bound Product</th>
                 <th className="p-4">Status</th>
+                <th className="p-4">Last Server IP</th>
+                <th className="p-4">Last Verified</th>
                 <th className="p-4">Created Date</th>
                 <th className="p-4">Expiration Date</th>
                 <th className="p-4 text-right">Actions</th>
@@ -271,6 +273,19 @@ export default function LicensesPage() {
                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
                         {lic.status.toUpperCase()}
                       </span>
+                    </td>
+                    <td className="p-4">
+                      {lic.lastIp ? (
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                          <Globe size={13} className="text-blue-400" />
+                          {lic.lastIp}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-400 italic">No verification</span>
+                      )}
+                    </td>
+                    <td className="p-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      {lic.lastVerifiedAt ? new Date(lic.lastVerifiedAt).toLocaleString() : "—"}
                     </td>
                     <td className="p-4 text-xs text-zinc-500 dark:text-zinc-400">
                       {typeof lic.createdAt === "string" ? lic.createdAt : (lic.createdAt as Date).toLocaleDateString()}

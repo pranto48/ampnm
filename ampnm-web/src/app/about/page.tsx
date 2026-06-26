@@ -4,19 +4,19 @@ import { Activity, ShieldCheck, Mail, Building, Phone } from "lucide-react";
 
 export default function AboutPage() {
   return (
-    <div className="py-20 bg-zinc-950 relative overflow-hidden flex-1">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/15 via-zinc-950 to-zinc-950 pointer-events-none -z-10" />
+    <div className="py-20 bg-white dark:bg-zinc-950 transition-colors duration-300 relative overflow-hidden flex-1">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/40 via-transparent to-transparent dark:from-blue-900/15 dark:via-zinc-950 dark:to-zinc-950 pointer-events-none -z-10" />
 
       <div className="max-w-4xl mx-auto px-6 space-y-12">
         {/* Title */}
         <div className="text-center space-y-4">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight transition-all hover:-translate-y-1 hover:shadow-lg">
             Platform Mission & <br />
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
               Engineering Excellence
             </span>
           </h1>
-          <p className="text-zinc-400 text-sm font-medium">
+          <p className="text-zinc-500 dark:text-zinc-400 transition-colors text-sm font-medium">
             Discover the technology vision and corporate support background of the AMPNM licensing suite.
           </p>
         </div>
@@ -31,7 +31,7 @@ export default function AboutPage() {
             Developed and verified by **IT Support BD**, our platform runs secure 256-bit cryptographic verification checks protecting node licenses across hybrid cloud endpoints.
           </p>
 
-          <div className="h-px bg-zinc-800 my-6" />
+          <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-6" />
 
           <h3 className="font-extrabold text-white text-base">Our Core Philosophy</h3>
           <div className="grid gap-6 sm:grid-cols-2 pt-2">

@@ -1,6 +1,31 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 
+/**
+ * Extracts client IP from request headers.
+ * Handles reverse-proxy chains (Vercel, Cloudflare, etc.)
+ */
+function getClientIp(request: Request): string {
+  const headers = new Headers(request.headers);
+  
+  // x-forwarded-for can contain comma-separated list; first entry is client
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    const firstIp = forwarded.split(",")[0].trim();
+    if (firstIp) return firstIp;
+  }
+
+  // x-real-ip is set by some proxies (nginx, etc.)
+  const realIp = headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+
+  // cf-connecting-ip is Cloudflare-specific
+  const cfIp = headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
+
+  return "unknown";
+}
+
 // Handle POST request verification (Docker Application Payload verification)
 export async function POST(request: Request) {
   try {
@@ -14,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return await verifyLicenseKey(key);
+    return await verifyLicenseKey(key, request);
   } catch (error: any) {
     console.error("API error during POST license verification:", error);
     return NextResponse.json(
@@ -37,7 +62,7 @@ export async function GET(request: Request) {
       );
     }
 
-    return await verifyLicenseKey(key);
+    return await verifyLicenseKey(key, request);
   } catch (error: any) {
     console.error("API error during GET license verification:", error);
     return NextResponse.json(
@@ -48,7 +73,7 @@ export async function GET(request: Request) {
 }
 
 // Helper core verification logic querying Firestore
-async function verifyLicenseKey(key: string) {
+async function verifyLicenseKey(key: string, request: Request) {
   const adminDb = getAdminDb();
   const licensesRef = adminDb.collection("licenses");
   const snapshot = await licensesRef.where("key", "==", key).limit(1).get();
@@ -73,6 +98,21 @@ async function verifyLicenseKey(key: string) {
     licenseData.status = "expired";
   }
 
+  // Extract caller IP for tracking (regardless of license validity)
+  const clientIp = getClientIp(request);
+  const verifiedAt = new Date().toISOString();
+
+  // Update license document with caller IP and verification timestamp
+  try {
+    await doc.ref.update({
+      lastIp: clientIp,
+      lastVerifiedAt: verifiedAt,
+    });
+  } catch (e) {
+    // Non-critical: log but don't fail verification
+    console.warn("Failed to update license IP tracking:", e);
+  }
+
   if (licenseData.status !== "active") {
     return NextResponse.json({
       valid: false,
@@ -93,5 +133,7 @@ async function verifyLicenseKey(key: string) {
     orgId: licenseData.orgId,
     orgName: orgName,
     productId: licenseData.productId,
+    lastIp: clientIp,
+    lastVerifiedAt: verifiedAt,
   });
 }

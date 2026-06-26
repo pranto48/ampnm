@@ -55,20 +55,20 @@ export default function ChangelogPage() {
   ];
 
   return (
-    <div className="py-20 bg-zinc-950 relative overflow-hidden flex-1">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/15 via-zinc-950 to-zinc-950 pointer-events-none -z-10" />
+    <div className="py-20 bg-white dark:bg-zinc-950 transition-colors duration-300 relative overflow-hidden flex-1">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/40 via-transparent to-transparent dark:from-blue-900/15 dark:via-zinc-950 dark:to-zinc-950 pointer-events-none -z-10" />
 
       <div className="max-w-4xl mx-auto px-6 space-y-16">
         
         {/* Title */}
         <div className="text-center space-y-4">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight transition-all hover:-translate-y-1 hover:shadow-lg">
             Release Changelog & <br />
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
               Version Histories
             </span>
           </h1>
-          <p className="text-zinc-400 text-sm font-medium">
+          <p className="text-zinc-500 dark:text-zinc-400 transition-colors text-sm font-medium">
             Track technical features, updates, patch logs and releases on the AMPNM platform.
           </p>
         </div>
@@ -79,13 +79,13 @@ export default function ChangelogPage() {
             <div key={idx} className="relative pl-10 space-y-6">
               
               {/* Commit Dot */}
-              <div className="absolute left-1.5 top-1.5 p-1 bg-zinc-950 border-2 border-zinc-800 text-blue-500 rounded-full">
+              <div className="absolute left-1.5 top-1.5 p-1 bg-white dark:bg-zinc-950 transition-colors duration-300 border-2 border-zinc-800 text-blue-500 rounded-full">
                 <GitCommit size={14} />
               </div>
 
               {/* Version Header details */}
               <div className="flex flex-wrap items-center gap-3">
-                <h3 className="text-lg font-extrabold text-white">{ver.version}</h3>
+                <h3 className="text-lg font-extrabold text-zinc-900 dark:text-white transition-colors">{ver.version}</h3>
                 <span className="text-xs text-zinc-500 flex items-center gap-1">
                   <Calendar size={12} />
                   {ver.date}
@@ -100,7 +100,7 @@ export default function ChangelogPage() {
                 {ver.highlights.map((hl, hlIdx) => (
                   <div 
                     key={hlIdx}
-                    className="p-5 border border-zinc-900 bg-zinc-900/10 rounded-2xl space-y-1.5 text-left"
+                    className="p-5 border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/10 rounded-2xl space-y-1.5 text-left"
                   >
                     <h4 className="font-bold text-xs text-zinc-200 flex items-center gap-1.5 uppercase tracking-wide">
                       <Sparkles size={11} className="text-blue-400" />
