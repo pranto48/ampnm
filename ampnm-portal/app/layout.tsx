@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AMPNM Portal - Multi-Tenant NOC SaaS",
-  description: "Enterprise licensing console and node telemetry system.",
+  title: "AMPNM Portal - Client & Licensing SaaS",
+  description: "Enterprise administrative console for client accounts, licensing, and products.",
   metadataBase: new URL("https://portal.itsupport.com.bd"),
 };
 

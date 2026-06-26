@@ -96,7 +96,7 @@ export default function LoginPage() {
           </div>
         </div>
         <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-          NOC SaaS Portal
+          SaaS Licensing Portal
         </h2>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Access portal.itsupport.com.bd dashboard

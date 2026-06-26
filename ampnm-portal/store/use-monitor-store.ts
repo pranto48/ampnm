@@ -24,7 +24,7 @@ export const useMonitorStore = create<MonitorState>((set) => ({
 
   // Seeded client accounts list (Client Management)
   organizations: [
-    { id: "org-bb", name: "Bangladesh Bank NOC", createdAt: "2026-01-10", clientEmail: "noc-admin@bb.org.bd", licenseCount: 15 },
+    { id: "org-bb", name: "Bangladesh Bank IT", createdAt: "2026-01-10", clientEmail: "it-admin@bb.org.bd", licenseCount: 15 },
     { id: "org-gp", name: "Grameenphone Infrastructure", createdAt: "2026-02-15", clientEmail: "ops@grameenphone.com", licenseCount: 42 },
     { id: "org-it", name: "IT Support BD Operations", createdAt: "2026-01-01", clientEmail: "arif@itsupport.com.bd", licenseCount: 5 },
     { id: "org-dfn", name: "Dhaka Fiber Net Node", createdAt: "2025-05-12", clientEmail: "support@dhakafibernet.com", licenseCount: 0 },
