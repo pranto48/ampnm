@@ -1,0 +1,17 @@
+[Unit]
+Description=AMPNM Linux Monitoring Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/ampnm-agent/config.env
+ExecStart=/opt/ampnm-agent/ampnm-agent.sh
+Restart=always
+RestartSec=15
+User=root
+Group=root
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
