@@ -15,8 +15,53 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AMPNM - Advanced Node Monitoring Platform",
+  title: {
+    default: "AMPNM - Advanced Node Monitoring Platform",
+    template: "%s | AMPNM - Advanced Node Monitoring Platform",
+  },
   description: "Secure multi-tenant software licensing agent, Docker cluster monitor, and active telemetry analytics systems developed by IT Support BD.",
+  metadataBase: new URL("https://ampnm.itsupport.com.bd"),
+  keywords: [
+    "AMPNM",
+    "Node Monitoring",
+    "Docker Agent",
+    "SaaS Licensing",
+    "IT Support BD",
+    "Sayed Arif",
+    "Telemetry Dashboard",
+    "Software License Guard",
+    "Bangladeshi Telemetry Platform"
+  ],
+  authors: [{ name: "IT Support BD", url: "https://itsupport.com.bd" }],
+  creator: "IT Support BD",
+  publisher: "IT Support BD",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "AMPNM - Advanced Node Monitoring Platform",
+    description: "Secure multi-tenant software licensing agent, Docker cluster monitor, and active telemetry analytics systems developed by IT Support BD.",
+    url: "https://ampnm.itsupport.com.bd",
+    siteName: "AMPNM",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AMPNM - Advanced Node Monitoring Platform",
+    description: "Secure multi-tenant software licensing agent, Docker cluster monitor, and active telemetry analytics systems developed by IT Support BD.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
     icon: "/favicon.ico",
   }

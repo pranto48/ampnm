@@ -15,9 +15,39 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AMPNM Portal - Client & Licensing SaaS",
-  description: "Enterprise administrative console for client accounts, licensing, and products.",
+  title: {
+    default: "AMPNM Portal - Client & Licensing SaaS",
+    template: "%s | AMPNM Portal",
+  },
+  description: "Enterprise administrative console for client accounts, licensing node keys management, and dynamic payment configurations.",
   metadataBase: new URL("https://portal.itsupport.com.bd"),
+  keywords: [
+    "AMPNM Portal",
+    "AMPNM Logins",
+    "IT Support BD Portal",
+    "SaaS Administrative Console",
+    "Client Licensing Directory"
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "AMPNM Portal - Client & Licensing SaaS",
+    description: "Enterprise administrative console for client accounts, licensing node keys management, and dynamic payment configurations.",
+    url: "https://portal.itsupport.com.bd",
+    siteName: "AMPNM Portal",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "AMPNM Portal - Client & Licensing SaaS",
+    description: "Enterprise administrative console for client accounts, licensing node keys management, and dynamic payment configurations.",
+  },
+  robots: {
+    index: false, // Disallow search engines from index-crawling the administrative authentication gates globally
+    follow: true,
+  }
 };
 
 export default function RootLayout({
