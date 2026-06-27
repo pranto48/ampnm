@@ -2,6 +2,8 @@
 // Include bootstrap to ensure DB connection is available
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../license_guard.php';
+require_once __DIR__ . '/license_manager.php';
 
 $current_page = basename($_SERVER['PHP_SELF']);
 
@@ -20,16 +22,26 @@ if ($data === false || strlen($data) < 16) {
 $iv = substr($data, 0, 16);
 $ciphertext = substr($data, 16);
 
-// Retrieve the core decryption key from the database (saved upon successful license verification)
+// Retrieve the core decryption key from the database
 $enc_key = getAppSetting('core_key');
 $raw_key = '';
-
 if (!empty($enc_key)) {
     $raw_key = decryptSensitiveValue($enc_key);
 }
 
+// If core_key is missing AND we have a license key already configured,
+// attempt a forced re-verification to repopulate the core_key.
+// This prevents the redirect loop on fresh container restarts.
+if (empty($raw_key) && !empty(getAppLicenseKey())) {
+    verifyLicenseWithPortal(true); // Force re-verify to get core_key from portal
+    $enc_key = getAppSetting('core_key');
+    if (!empty($enc_key)) {
+        $raw_key = decryptSensitiveValue($enc_key);
+    }
+}
+
 if (empty($raw_key)) {
-    // If not activated yet, only allow setup pages to run
+    // No license key configured at all - redirect to setup (but only from non-setup pages)
     if ($current_page !== 'license_setup.php' && $current_page !== 'license_expired.php') {
         header('Location: license_setup.php');
         exit;
@@ -41,10 +53,26 @@ $key_buf = hash('sha256', $raw_key, true);
 $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_buf, OPENSSL_RAW_DATA, $iv);
 
 if ($decrypted === false) {
-    // Key is wrong or modified
-    error_log("LICENSE_SECURITY: Failed to decrypt auth_check.enc. Invalid key or tampered file.");
-    if ($current_page !== 'license_setup.php' && $current_page !== 'license_expired.php') {
-        header('Location: license_setup.php');
+    // Key mismatch or tampered file - fall back to executing core logic directly
+    error_log("LICENSE_SECURITY: Failed to decrypt auth_check.enc. Falling back to inline logic.");
+    // Fallback: run core auth logic inline without encryption
+    require_once __DIR__ . '/license_manager.php';
+
+    if (!isset($_SESSION['user_id'])) {
+        if ($current_page !== 'login.php') {
+            header('Location: login.php');
+            exit;
+        }
+        return;
+    }
+
+    if ($current_page !== 'license_setup.php') {
+        enforceLicenseValidation();
+    }
+
+    $license_status_code = $_SESSION['license_status_code'] ?? 'unknown';
+    if (in_array($license_status_code, ['disabled', 'offline_expired']) && $current_page !== 'license_expired.php') {
+        header('Location: license_expired.php');
         exit;
     }
     return;
@@ -52,4 +80,3 @@ if ($decrypted === false) {
 
 // Execute decrypted core logic in memory
 eval($decrypted);
-
