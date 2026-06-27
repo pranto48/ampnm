@@ -111,6 +111,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     class="w-full px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
                 Activate License
             </button>
+            <div class="text-center text-xs text-slate-400 select-none">
+                Don't have a license key? Get a <strong>Free & Open Source</strong> license key by registering at our <a href="https://portal.itsupport.com.bd" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline font-bold">Client Portal</a>.
+            </div>
         </form>
     </div>
 </body>

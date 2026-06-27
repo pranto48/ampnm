@@ -8,6 +8,21 @@ export default function PricingPage() {
 
   const tiers = [
     {
+      id: "prod-ampnm-free",
+      name: "AMPNM Core (Free & Open Source)",
+      price: 0,
+      description: "Self-host the AMPNM Docker monitoring agent. Clean, lightweight, and completely open source.",
+      features: [
+        "Free & Open Source codebase",
+        "Unlimited host CPU/RAM tracking",
+        "Self-hosted Docker dashboard",
+        "Host-locked license key security",
+        "Community support & updates"
+      ],
+      popular: true,
+      free: true,
+    },
+    {
       id: "prod-std",
       name: "Standard Agent License",
       price: 15,
@@ -20,6 +35,7 @@ export default function PricingPage() {
         "Daily log metrics retention"
       ],
       popular: false,
+      free: false,
     },
     {
       id: "prod-cluster",
@@ -34,7 +50,8 @@ export default function PricingPage() {
         "Hourly API license security sweeps",
         "Custom node tagging options"
       ],
-      popular: true,
+      popular: false,
+      free: false,
     },
     {
       id: "prod-enterprise",
@@ -51,6 +68,7 @@ export default function PricingPage() {
         "Quarterly system engineering reviews"
       ],
       popular: false,
+      free: false,
     }
   ];
 
@@ -98,11 +116,15 @@ export default function PricingPage() {
 
                 <div className="pt-2">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white transition-colors">${tier.price}</span>
-                    <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wide">/ Month</span>
+                    <span className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white transition-colors">
+                      {tier.free ? "Free" : `$${tier.price}`}
+                    </span>
+                    {!tier.free && (
+                      <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wide">/ Month</span>
+                    )}
                   </div>
                   <p className="text-[10px] text-zinc-400 font-bold mt-1 uppercase tracking-wider">
-                    ≈ {(tier.price * USD_TO_BDT).toLocaleString()} BDT
+                    {tier.free ? "No credit card or payment required" : `≈ ${(tier.price * USD_TO_BDT).toLocaleString()} BDT`}
                   </p>
                 </div>
 
@@ -129,7 +151,7 @@ export default function PricingPage() {
                       : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/60"
                   }`}
                 >
-                  Buy License Key
+                  {tier.free ? "Get Free Key" : "Buy License Key"}
                   <ArrowRight size={13} />
                 </a>
                 <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-400 dark:text-zinc-500 tracking-wider uppercase select-none">

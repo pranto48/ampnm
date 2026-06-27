@@ -65,7 +65,7 @@ export default function LandingPage() {
           <div className="lg:col-span-7 space-y-6 text-left">
             <div className="animate-fade-in-up inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-500/10 border border-blue-300/50 dark:border-blue-500/20 text-xs font-bold text-blue-600 dark:text-blue-400 select-none w-fit tracking-wider uppercase transition-colors">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping" />
-              SaaS licensing & Telemetry Guard
+              Free & Open Source Telemetry Guard
             </div>
 
             <h1 className="animate-fade-in-up delay-100 text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight transition-colors">
@@ -76,7 +76,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="animate-fade-in-up delay-200 text-zinc-500 dark:text-zinc-400 text-sm sm:text-base max-w-xl font-medium leading-relaxed transition-colors">
-              AMPNM provides secure multi-tenant cryptographic licensing validations and real-time container metrics tracking. Built for mission-critical IT infrastructures.
+              AMPNM is a free and open-source Docker telemetry platform. It provides real-time container metrics tracking, system alerts, and custom dashboard layouts. Completely self-hosted and free to deploy.
             </p>
 
             {/* Quick install box */}
@@ -110,7 +110,7 @@ export default function LandingPage() {
                 href="/pricing"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
               >
-                View Solutions Pricing
+                Get Free License Key
               </Link>
             </div>
           </div>

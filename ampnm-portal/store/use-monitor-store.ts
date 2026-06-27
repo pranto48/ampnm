@@ -40,6 +40,13 @@ export const useMonitorStore = create<MonitorState>((set) => ({
   // Seeded product pricing packages (Product Management)
   products: [
     {
+      id: "prod-ampnm-free",
+      name: "AMPNM Core (Free & Open Source)",
+      price: 0,
+      billingPeriod: "lifetime",
+      features: ["Free & Open Source License", "Unlimited server host allocations", "Self-hosted Docker dashboard", "Host-locked security key verification"],
+    },
+    {
       id: "prod-std",
       name: "Standard Agent License",
       price: 15,
