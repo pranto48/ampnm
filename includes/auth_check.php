@@ -1,64 +1,55 @@
 <?php
-// Include the main bootstrap file which handles DB checks and starts the session.
+// Include bootstrap to ensure DB connection is available
 require_once __DIR__ . '/bootstrap.php';
-// Include config.php to make license-related functions available
 require_once __DIR__ . '/../config.php';
-// Include license guard - CRITICAL SECURITY COMPONENT
-require_once __DIR__ . '/../license_guard.php';
-// Include license_manager.php for license verification logic
-require_once __DIR__ . '/license_manager.php';
 
-// If the user is not logged in, redirect to the login page.
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
-
-// Ensure user_role is set in session. If not, fetch it from DB (e.g., after an upgrade)
-if (!isset($_SESSION['user_role'])) {
-    $pdo = getDbConnection();
-    $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    $_SESSION['user_role'] = (isset($user_data['role']) && $user_data['role'] !== '') ? $user_data['role'] : 'viewer'; // Default to viewer if not found
-}
-
-// --- Role-based page access control ---
 $current_page = basename($_SERVER['PHP_SELF']);
-$admin_only_pages = ['users.php', 'email_notifications.php', 'create-device.php', 'edit-device.php', 'license_management.php', 'code_updates.php']; // Add license_management.php here
 
-if ($_SESSION['user_role'] !== 'admin' && in_array($current_page, $admin_only_pages)) {
-    header('Location: index.php'); // Redirect non-admins from admin-only pages
-    exit;
+// Load the encrypted core logic
+$enc_file = __DIR__ . '/auth_check.enc';
+if (!file_exists($enc_file)) {
+    die("Core system file missing. Please reinstall the application.");
 }
 
-// --- External License Validation ---
-// The verifyLicenseWithPortal() function is now called in license_manager.php
-// which is included above. It populates $_SESSION with license status.
-
-// Check license status and redirect if necessary
-$license_status_code = isset($_SESSION['license_status_code']) ? $_SESSION['license_status_code'] : 'unknown';
-$app_license_key = getAppLicenseKey();
-
-// If license key is not configured, redirect to setup page
-// BUT: Allow access to license_setup.php without validation
-if (empty($app_license_key) && $current_page !== 'license_setup.php') {
-    header('Location: license_setup.php');
-    exit;
+$encrypted_data = file_get_contents($enc_file);
+$data = base64_decode($encrypted_data);
+if ($data === false || strlen($data) < 16) {
+    die("System integrity compromised. Execution blocked.");
 }
 
-// ENFORCE LICENSE VALIDATION - NO BYPASS POSSIBLE
-// But only if we're not on the setup page
-if ($current_page !== 'license_setup.php') {
-    enforceLicenseValidation();
+$iv = substr($data, 0, 16);
+$ciphertext = substr($data, 16);
+
+// Retrieve the core decryption key from the database (saved upon successful license verification)
+$enc_key = getAppSetting('core_key');
+$raw_key = '';
+
+if (!empty($enc_key)) {
+    $raw_key = decryptSensitiveValue($enc_key);
 }
 
-// If license is disabled (grace period over, revoked, offline expired, etc.), redirect to license_expired.php
-if (in_array($license_status_code, ['disabled', 'offline_expired']) && $current_page !== 'license_expired.php') {
-    header('Location: license_expired.php');
-    exit;
+if (empty($raw_key)) {
+    // If not activated yet, only allow setup pages to run
+    if ($current_page !== 'license_setup.php' && $current_page !== 'license_expired.php') {
+        header('Location: license_setup.php');
+        exit;
+    }
+    return;
 }
 
-// For other statuses (active, grace_period, expired, invalid, portal_unreachable),
-// the application remains accessible, and the header will display the appropriate message.
-?>
+$key_buf = hash('sha256', $raw_key, true);
+$decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_buf, OPENSSL_RAW_DATA, $iv);
+
+if ($decrypted === false) {
+    // Key is wrong or modified
+    error_log("LICENSE_SECURITY: Failed to decrypt auth_check.enc. Invalid key or tampered file.");
+    if ($current_page !== 'license_setup.php' && $current_page !== 'license_expired.php') {
+        header('Location: license_setup.php');
+        exit;
+    }
+    return;
+}
+
+// Execute decrypted core logic in memory
+eval($decrypted);
+
