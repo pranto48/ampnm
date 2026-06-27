@@ -65,6 +65,19 @@ sed -ri "s/<VirtualHost \*:80>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/sit
 echo "✓ Apache configured"
 echo ""
 
+# Export env variables to Apache so they are accessible in PHP scripts
+echo "→ Exporting environment variables to Apache..."
+for var in DB_HOST DB_NAME DB_USER DB_PASSWORD MYSQL_ROOT_PASSWORD ADMIN_PASSWORD APP_LICENSE_KEY ALPHA_SMS_USERNAME ALPHA_SMS_API_KEY ALPHA_SMS_SENDER_ID SMS_ALERTS_ENABLED SMS_COOLDOWN_MINUTES APACHE_PORT CLOUD_SYNC_URL CLOUD_ANON_KEY CLOUD_POLL_INTERVAL AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER AMPNM_UPDATE_CHECK_INTERVAL_SECONDS; do
+    if [ -n "${!var+x}" ]; then
+        val="${!var}"
+        # Escape single quotes for safe shell evaluation
+        escaped_val="${val//\'/\'\\\'\'}"
+        echo "export $var='$escaped_val'" >> /etc/apache2/envvars
+    fi
+done
+echo "✓ Environment variables exported"
+echo ""
+
 UPDATE_CHECK_INTERVAL_SECONDS="${AMPNM_UPDATE_CHECK_INTERVAL_SECONDS:-3600}"
 if [ "${AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER:-1}" = "1" ]; then
     echo "→ Starting update check scheduler (${UPDATE_CHECK_INTERVAL_SECONDS}s interval)..."
