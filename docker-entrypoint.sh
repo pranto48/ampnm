@@ -45,17 +45,25 @@ done
 echo "✓ All critical files present"
 echo ""
 
-# Set secure permissions
+# Set secure permissions (optimized to skip full recursive walk on mounted volumes)
 echo "→ Setting secure file permissions..."
 git config --system --add safe.directory '*' || true
-chown www-data:www-data /var/www
-chown -R www-data:www-data /var/www/html
-find /var/www/html -type f -name "*.php" -exec chmod 644 {} \;
-find /var/www/html -type d -exec chmod 755 {} \;
+chown www-data:www-data /var/www || true
+chown www-data:www-data /var/www/html || true
 
-# Make license files read-only for www-data
-chmod 444 /var/www/html/license_guard.php
-chmod 444 /var/www/html/includes/license_manager.php
+# Only apply recursive permissions to directories that require write access
+if [ -d /var/www/html/uploads ]; then
+    chown -R www-data:www-data /var/www/html/uploads || true
+    chmod -R 775 /var/www/html/uploads || true
+fi
+if [ -d /var/www/html/storage ]; then
+    chown -R www-data:www-data /var/www/html/storage || true
+    chmod -R 775 /var/www/html/storage || true
+fi
+
+# Make license files read-only for www-data if they exist
+[ -f /var/www/html/license_guard.php ] && chmod 444 /var/www/html/license_guard.php || true
+[ -f /var/www/html/includes/license_manager.php ] && chmod 444 /var/www/html/includes/license_manager.php || true
 echo "✓ Permissions configured"
 echo ""
 
