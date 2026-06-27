@@ -8,7 +8,7 @@ define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
 define('DB_NAME', getenv('DB_NAME') ?: 'network_monitor');
 
 // License System Configuration
-define('LICENSE_API_URL', getenv('LICENSE_API_URL') ?: 'https://abcytwvuntyicdknpzju.supabase.co/functions/v1/verify-license');
+define('LICENSE_API_URL', getenv('LICENSE_API_URL') ?: 'https://portal.itsupport.com.bd/api/license/verify');
 define('APP_LICENSE_KEY_ENV', getenv('APP_LICENSE_KEY') ?: '');
 define('LICENSE_DATA_KEY', getenv('LICENSE_DATA_KEY') ?: '');
 

@@ -274,7 +274,7 @@ function getDockerfileContent() {
 }
 
 function getDockerComposeContent($license_key) {
-    $license_api_url = 'https://abcytwvuntyicdknpzju.supabase.co/functions/v1/verify-license'; 
+    $license_api_url = 'https://portal.itsupport.com.bd/api/license/verify'; 
 
     $docker_compose_content = <<<EOT
 version: '3.8'

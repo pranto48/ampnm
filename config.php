@@ -7,7 +7,7 @@ define('DB_NAME', getenv('DB_NAME') ?: 'network_monitor');
 
 // License System Configuration
 // IMPORTANT: Changed fallback to the correct public HTTPS URL.
-define('LICENSE_API_URL', getenv('LICENSE_API_URL') ?: 'https://abcytwvuntyicdknpzju.supabase.co/functions/v1/verify-license');
+define('LICENSE_API_URL', getenv('LICENSE_API_URL') ?: 'https://portal.itsupport.com.bd/api/license/verify');
 define('APP_LICENSE_KEY_ENV', getenv('APP_LICENSE_KEY') ?: ''); // This is the key from docker-compose.yml, might be empty
 define('LICENSE_DATA_KEY', getenv('LICENSE_DATA_KEY') ?: ''); // Optional stronger key for encrypting license data at rest
 

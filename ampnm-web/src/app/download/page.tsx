@@ -5,13 +5,59 @@ import { Terminal, Copy, Check, FileCode, Cpu, ShieldCheck, Download, Monitor, S
 
 export default function DownloadPage() {
   const [copiedScript, setCopiedScript] = useState(false);
-  const [copiedCompose, setCopiedCompose] = useState(false);
+  const [copiedServerCompose, setCopiedServerCompose] = useState(false);
+  const [copiedAgentCompose, setCopiedAgentCompose] = useState(false);
   const [copiedConfig, setCopiedConfig] = useState(false);
   const [activeTab, setActiveTab] = useState<"windows" | "linux" | "docker">("windows");
 
   const installScript = "curl -sSL https://ampnm.itsupport.com.bd/install.sh | bash";
   
-  const dockerComposeCode = `version: "3.8"
+  const dockerServerComposeCode = `version: "3.8"
+services:
+  ampnm-app:
+    image: pranto48/ampnm:latest
+    container_name: ampnm-app
+    restart: unless-stopped
+    ports:
+      - "2266:2266"
+      - "10051:10051"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=network_monitor
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - ADMIN_PASSWORD=password
+      - APP_LICENSE_KEY=your_license_key_here
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    container_name: ampnm-db
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: network_monitor
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 300s
+
+volumes:
+  db_data:`;
+
+  const dockerAgentComposeCode = `version: "3.8"
 services:
   ampnm-agent:
     image: pranto48/ampnm-agent:latest
@@ -36,14 +82,17 @@ services:
   "LANInterface": "auto"
 }`;
 
-  const copyToClipboard = (text: string, type: "script" | "compose" | "config") => {
+  const copyToClipboard = (text: string, type: "script" | "server-compose" | "agent-compose" | "config") => {
     navigator.clipboard.writeText(text);
     if (type === "script") {
       setCopiedScript(true);
       setTimeout(() => setCopiedScript(false), 2000);
-    } else if (type === "compose") {
-      setCopiedCompose(true);
-      setTimeout(() => setCopiedCompose(false), 2000);
+    } else if (type === "server-compose") {
+      setCopiedServerCompose(true);
+      setTimeout(() => setCopiedServerCompose(false), 2000);
+    } else if (type === "agent-compose") {
+      setCopiedAgentCompose(true);
+      setTimeout(() => setCopiedAgentCompose(false), 2000);
     } else {
       setCopiedConfig(true);
       setTimeout(() => setCopiedConfig(false), 2000);
@@ -281,7 +330,34 @@ services:
         {/* Docker Tab */}
         {activeTab === "docker" && (
           <div className="animate-fade-in space-y-8">
-            {/* Docker Compose */}
+            {/* Docker Compose Server */}
+            <div className="p-6 sm:p-8 border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/20 rounded-3xl space-y-6 transition-colors">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 rounded-xl">
+                    <FileCode size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-900 dark:text-white transition-colors">AMPNM Server Installation</h3>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider">Web Console & Database Setup</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(dockerServerComposeCode, "server-compose")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-bold rounded-lg cursor-pointer transition-colors"
+                >
+                  {copiedServerCompose ? <><Check size={12} className="text-emerald-500" /><span>Copied!</span></> : <><Copy size={12} /><span>Copy Server Config</span></>}
+                </button>
+              </div>
+              <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 p-4 font-mono text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300 text-left overflow-x-auto select-all max-h-72 transition-colors">
+                <pre>{dockerServerComposeCode}</pre>
+              </div>
+              <div className="text-[10px] text-zinc-500 leading-relaxed font-semibold">
+                Note: Deploy the server config to pull the official `pranto48/ampnm:latest` image. Access the web installer at `http://localhost:2266` to activate your license key.
+              </div>
+            </div>
+
+            {/* Docker Compose Agent */}
             <div className="p-6 sm:p-8 border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/20 rounded-3xl space-y-6 transition-colors">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
@@ -289,19 +365,19 @@ services:
                     <FileCode size={20} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-900 dark:text-white transition-colors">Docker Compose Configuration</h3>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider">Container daemon setup</p>
+                    <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-900 dark:text-white transition-colors">AMPNM Agent Installation</h3>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider">Host Telemetry Daemon Setup</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => copyToClipboard(dockerComposeCode, "compose")}
+                  onClick={() => copyToClipboard(dockerAgentComposeCode, "agent-compose")}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-bold rounded-lg cursor-pointer transition-colors"
                 >
-                  {copiedCompose ? <><Check size={12} className="text-emerald-500" /><span>Copied!</span></> : <><Copy size={12} /><span>Copy Config</span></>}
+                  {copiedAgentCompose ? <><Check size={12} className="text-emerald-500" /><span>Copied!</span></> : <><Copy size={12} /><span>Copy Agent Config</span></>}
                 </button>
               </div>
               <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 p-4 font-mono text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300 text-left overflow-x-auto select-all max-h-72 transition-colors">
-                <pre>{dockerComposeCode}</pre>
+                <pre>{dockerAgentComposeCode}</pre>
               </div>
               <div className="text-[10px] text-zinc-500 leading-relaxed font-semibold">
                 Note: Mount host filesystems <code className="bg-zinc-100 dark:bg-zinc-900 px-1 rounded">/proc</code> and <code className="bg-zinc-100 dark:bg-zinc-900 px-1 rounded">/sys</code> to allow docker telemetry agents to retrieve bare-metal load metrics. Update licensing variables with keys issued by the admin panel console.
