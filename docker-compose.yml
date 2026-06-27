@@ -13,9 +13,9 @@ services:
       db:
         condition: service_healthy
     environment:
-      # We use 127.0.0.1 because network_mode: host connects the app container
-      # directly to the host's network, so it sees the database on localhost.
-      - DB_HOST=127.0.0.1
+      # We use db because bridge networking connects the app container
+      # to the database container over the docker network.
+      - DB_HOST=db
       - DB_NAME=${MYSQL_DATABASE:-network_monitor}
       - DB_USER=${DB_USER:-user}
       - DB_PASSWORD=${DB_PASSWORD:-password}
@@ -36,12 +36,11 @@ services:
       - AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER=1
       - AMPNM_UPDATE_CHECK_INTERVAL_SECONDS=3600
     restart: unless-stopped
-    # network_mode: host is required for the ping command to work correctly.
-    # This automatically exposes:
-    #   - Apache Web Server: port 2266 (or APACHE_PORT)
-    #   - Passive Polling Agent: port 10050
-    #   - Active Telemetry Trapper: port 10051
-    network_mode: "host"
+    # Standard bridge mode with port mapping so the app works on Windows.
+    # We expose the Apache port and the telemetry port.
+    ports:
+      - "${APACHE_PORT:-2266}:${APACHE_PORT:-2266}"
+      - "10051:10051"
 
   db:
     image: mysql:8.0
@@ -61,7 +60,8 @@ services:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 60
+      start_period: 300s
 
 volumes:
   db_data:

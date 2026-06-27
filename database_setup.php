@@ -1,6 +1,6 @@
 <?php
 // Database configuration using environment variables for Docker compatibility
-$servername = '127.0.0.1'; // Forcing 127.0.0.1 to resolve connection issues in Docker
+$servername = getenv('DB_HOST') ?: '127.0.0.1'; // Use environment variable if present
 $username = 'root'; // Setup script needs root privileges to create DB and tables
 $password = getenv('MYSQL_ROOT_PASSWORD') ?: ''; // Get root password from Docker env
 $dbname = getenv('DB_NAME') ?: 'network_monitor';
