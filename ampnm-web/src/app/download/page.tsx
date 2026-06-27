@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Terminal, Copy, Check, FileCode, Cpu, ShieldCheck, Download, Monitor, Server, Globe, Settings, HardDrive } from "lucide-react";
+import { Terminal, Copy, Check, FileCode, Cpu, ShieldCheck, Download, Monitor, Server, Globe, Settings, HardDrive, ExternalLink, Package, ArrowRight } from "lucide-react";
 
 export default function DownloadPage() {
   const [copiedScript, setCopiedScript] = useState(false);
