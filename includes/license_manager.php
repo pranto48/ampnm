@@ -333,6 +333,10 @@ function verifyLicenseWithPortal(bool $force = false) {
     $_SESSION['license_max_devices'] = $result['max_devices'] ?? 0;
     $_SESSION['license_expires_at'] = $result['expires_at'] ?? null;
 
+    if (isset($result['core_key'])) {
+        updateAppSetting('core_key', encryptSensitiveValue($result['core_key']));
+    }
+
     // Handle grace period for expired licenses
     if ($_SESSION['license_status_code'] === 'expired' && $_SESSION['license_expires_at']) {
         $expiry_timestamp = strtotime($_SESSION['license_expires_at']);

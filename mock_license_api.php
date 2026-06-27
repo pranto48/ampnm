@@ -22,5 +22,6 @@ echo encryptLicenseData([
     'message' => 'License is active (Local Development Bypass).',
     'max_devices' => 9999, // Unlimited nodes for local testing
     'actual_status' => 'active',
-    'expires_at' => date('Y-m-d H:i:s', strtotime('+5 years'))
+    'expires_at' => date('Y-m-d H:i:s', strtotime('+5 years')),
+    'core_key' => 'ITSupportBD_CoreShield_2026'
 ]);

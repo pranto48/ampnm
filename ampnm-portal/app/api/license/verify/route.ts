@@ -200,7 +200,8 @@ async function verifyCore(
         message: "License is active.",
         max_devices: maxDevices,
         actual_status: licenseData.status,
-        expiresAt: licenseData.expiresAt
+        expiresAt: licenseData.expiresAt,
+        core_key: "ITSupportBD_CoreShield_2026"
       }),
       { headers: { "Content-Type": "text/plain" } }
     );
