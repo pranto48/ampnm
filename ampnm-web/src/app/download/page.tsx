@@ -8,7 +8,10 @@ export default function DownloadPage() {
   const [copiedServerCompose, setCopiedServerCompose] = useState(false);
   const [copiedAgentCompose, setCopiedAgentCompose] = useState(false);
   const [copiedConfig, setCopiedConfig] = useState(false);
+  const [copiedPull, setCopiedPull] = useState(false);
   const [activeTab, setActiveTab] = useState<"windows" | "linux" | "docker">("windows");
+
+  const dockerPullCmd = "docker pull pranto48/ampnm";
 
   const installScript = "curl -sSL https://ampnm.itsupport.com.bd/install.sh | bash";
   
@@ -82,7 +85,7 @@ services:
   "LANInterface": "auto"
 }`;
 
-  const copyToClipboard = (text: string, type: "script" | "server-compose" | "agent-compose" | "config") => {
+  const copyToClipboard = (text: string, type: "script" | "server-compose" | "agent-compose" | "config" | "pull") => {
     navigator.clipboard.writeText(text);
     if (type === "script") {
       setCopiedScript(true);
@@ -93,6 +96,9 @@ services:
     } else if (type === "agent-compose") {
       setCopiedAgentCompose(true);
       setTimeout(() => setCopiedAgentCompose(false), 2000);
+    } else if (type === "pull") {
+      setCopiedPull(true);
+      setTimeout(() => setCopiedPull(false), 2000);
     } else {
       setCopiedConfig(true);
       setTimeout(() => setCopiedConfig(false), 2000);
@@ -330,6 +336,109 @@ services:
         {/* Docker Tab */}
         {activeTab === "docker" && (
           <div className="animate-fade-in space-y-8">
+
+            {/* ── Docker Hub Banner ───────────────────────────────────────────── */}
+            <div className="relative overflow-hidden rounded-3xl border border-blue-200 dark:border-blue-500/30 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 p-6 sm:p-8 space-y-6">
+              {/* Background glow */}
+              <div className="absolute -right-12 -top-12 w-48 h-48 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Header row */}
+              <div className="flex flex-wrap items-start justify-between gap-4 relative">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-500 rounded-2xl shadow-lg shadow-blue-500/30">
+                    <Package size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-base text-zinc-900 dark:text-white">AMPNM on Docker Hub</h3>
+                      <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full">OFFICIAL</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-0.5">
+                      pranto48/ampnm &nbsp;·&nbsp; Latest Release
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="https://hub.docker.com/r/pranto48/ampnm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 shrink-0"
+                >
+                  <ExternalLink size={13} />
+                  View on Docker Hub
+                  <ArrowRight size={13} />
+                </a>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex flex-wrap gap-3 relative">
+                {[
+                  { label: "Image", value: "pranto48/ampnm" },
+                  { label: "Tag", value: "latest" },
+                  { label: "Base", value: "PHP 8.2 · Apache" },
+                  { label: "Port", value: "2266" },
+                ].map((s) => (
+                  <div key={s.label} className="px-3 py-1.5 bg-white/60 dark:bg-white/5 border border-blue-200 dark:border-blue-500/20 rounded-lg">
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{s.label}: </span>
+                    <span className="text-xs text-zinc-900 dark:text-white font-bold font-mono">{s.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* docker pull command */}
+              <div className="relative">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Pull Command</p>
+                <div className="flex items-center gap-2 bg-zinc-950 rounded-xl px-4 py-3 border border-zinc-800 shadow-inner">
+                  <Terminal size={14} className="text-blue-400 shrink-0" />
+                  <code className="flex-1 text-sm font-mono font-bold text-green-400 select-all">
+                    {dockerPullCmd}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(dockerPullCmd, "pull")}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-bold rounded-lg border border-zinc-700 transition-all"
+                  >
+                    {copiedPull ? (
+                      <><Check size={12} className="text-emerald-400" /><span className="text-emerald-400">Copied!</span></>
+                    ) : (
+                      <><Copy size={12} /><span>Copy</span></>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick links */}
+              <div className="flex flex-wrap gap-3 relative">
+                <a
+                  href="https://hub.docker.com/r/pranto48/ampnm/tags"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 font-semibold transition-colors"
+                >
+                  <ExternalLink size={11} /> All Tags & Versions
+                </a>
+                <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                <a
+                  href="https://hub.docker.com/r/pranto48/ampnm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 font-semibold transition-colors"
+                >
+                  <ExternalLink size={11} /> Hub Overview Page
+                </a>
+                <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                <a
+                  href="https://github.com/pranto48/ampnm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 font-semibold transition-colors"
+                >
+                  <ExternalLink size={11} /> GitHub Source
+                </a>
+              </div>
+            </div>
+            {/* ───────────────────────────────────────────────────────────────── */}
+
             {/* Docker Compose Server */}
             <div className="p-6 sm:p-8 border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-900/20 rounded-3xl space-y-6 transition-colors">
               <div className="flex items-center justify-between flex-wrap gap-4">
