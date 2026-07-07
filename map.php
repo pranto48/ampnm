@@ -139,6 +139,17 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <input type="range" id="timelineSlider" min="0" max="24" value="24" class="w-full h-2 bg-slate-900 border border-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
                         </div>
                     </div>
+
+                    <!-- Speed Controller -->
+                    <div class="w-full md:w-48 space-y-1 pl-0 md:pl-4 border-t md:border-t-0 md:border-l border-slate-700 pt-3 md:pt-0">
+                        <div class="flex justify-between items-center text-xs text-slate-400 font-medium select-none px-1">
+                            <span>Pulse Speed</span>
+                            <span id="speedValueDisplay" class="text-cyan-400 font-semibold">1.0x</span>
+                        </div>
+                        <div class="relative flex items-center">
+                            <input type="range" id="animationSpeedSelector" min="0.1" max="5.0" step="0.1" value="1.0" class="w-full h-2 bg-slate-900 border border-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -533,6 +544,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
 
     // Sync UI with SoundManager prefs
     function syncUI() {
+        if (!window.SoundManager) return;
         const p = SoundManager.prefs;
         masterToggle.checked = p.enabled;
         masterIcon.className = p.enabled ? 'fas fa-volume-up' : 'fas fa-volume-mute text-slate-500';
@@ -541,7 +553,11 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             t.disabled = !p.enabled;
         });
     }
-    syncUI();
+    if (window.SoundManager) {
+        syncUI();
+    } else {
+        window.addEventListener('load', syncUI);
+    }
 
     btn.addEventListener('click', (e) => {
         e.stopPropagation();

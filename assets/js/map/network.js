@@ -1,5 +1,44 @@
 window.MapApp = window.MapApp || {};
 
+let edgeAnimFrameId = null;
+let globalProgress = 0.0;
+let globalSpeedMultiplier = 1.0; // Dynamic speed bound to slider
+
+function startEdgeAnimation() {
+    if (edgeAnimFrameId) {
+        cancelAnimationFrame(edgeAnimFrameId);
+    }
+    const loop = () => {
+        const timelineSlider = document.getElementById('timelineSlider');
+        const isLive = timelineSlider ? parseInt(timelineSlider.value, 10) === 24 : true;
+
+        if (isLive) {
+            globalProgress = (globalProgress + 0.003 * globalSpeedMultiplier) % 1.0;
+            if (MapApp.state.network) {
+                MapApp.state.network.redraw();
+            }
+            edgeAnimFrameId = requestAnimationFrame(loop);
+        } else {
+            edgeAnimFrameId = null;
+        }
+    };
+    edgeAnimFrameId = requestAnimationFrame(loop);
+}
+
+function stopEdgeAnimation() {
+    if (edgeAnimFrameId) {
+        cancelAnimationFrame(edgeAnimFrameId);
+        edgeAnimFrameId = null;
+    }
+}
+
+// Override MapApp.ui.startCanvasAnimationLoop to use our high-frequency loop
+if (MapApp.ui) {
+    MapApp.ui.startCanvasAnimationLoop = function() {
+        startEdgeAnimation();
+    };
+}
+
 MapApp.network = {
     getUserStorageId: () => (window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest'),
     getViewStorageKey: () => `ampnm_map_view:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
@@ -90,6 +129,10 @@ MapApp.network = {
                 const edge = edges[edgeId];
                 if (!edge.from || !edge.to) continue;
 
+                // Ensure invisible or hidden edges (e.g., collapsed cluster nodes) are ignored to maintain performance
+                if (edge.options?.hidden === true || edge.hidden === true) continue;
+                if (edge.from?.options?.hidden === true || edge.to?.options?.hidden === true) continue;
+
                 const sourceStatus = deviceStatuses[edge.from.id];
                 const targetStatus = deviceStatuses[edge.to.id];
                 
@@ -97,20 +140,27 @@ MapApp.network = {
                 if (!sourceStatus || !targetStatus) continue;
 
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
-
                 if (isOffline) continue;
 
-                // Render 3 distinct glowing pulses spaced out by an offset (t + i/3) % 1.0 traveling from source to target
+                // Draw 3 glowing circles along each edge
                 for (let i = 0; i < 3; i++) {
-                    const t = (MapApp.state.edgeAnimProgress + i / 3) % 1.0;
+                    const offset = i / 3;
+                    const t = (globalProgress + offset) % 1.0;
                     try {
-                        const point = edge.getPoint(t);
-                        ctx.beginPath();
-                        ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
-                        ctx.fillStyle = '#00F2FE';
-                        ctx.shadowColor = '#00F2FE';
-                        ctx.shadowBlur = 8;
-                        ctx.fill();
+                        let point = null;
+                        if (edge.edgeType && typeof edge.edgeType.getPoint === 'function') {
+                            point = edge.edgeType.getPoint(t);
+                        } else if (typeof edge.getPoint === 'function') {
+                            point = edge.getPoint(t);
+                        }
+                        if (point) {
+                            ctx.beginPath();
+                            ctx.arc(point.x, point.y, 4.5, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#00F2FE';
+                            ctx.shadowColor = '#00F2FE';
+                            ctx.shadowBlur = 10;
+                            ctx.fill();
+                        }
                     } catch (e) {
                         // getPoint can fail during initialization or node dragging
                     }
@@ -604,6 +654,23 @@ MapApp.network = {
         if (MapApp.network.websocket) {
             MapApp.network.websocket.connect();
         }
+        
+        // Bind pulse speed controller
+        const speedSelector = document.getElementById('animationSpeedSelector');
+        if (speedSelector) {
+            globalSpeedMultiplier = parseFloat(speedSelector.value);
+            const display = document.getElementById('speedValueDisplay');
+            if (display) {
+                display.textContent = globalSpeedMultiplier.toFixed(1) + 'x';
+            }
+            speedSelector.addEventListener('input', (e) => {
+                globalSpeedMultiplier = parseFloat(e.target.value);
+                if (display) {
+                    display.textContent = globalSpeedMultiplier.toFixed(1) + 'x';
+                }
+            });
+        }
+
         if (MapApp.network.timeline) {
             MapApp.network.timeline.init();
         }
@@ -729,9 +796,11 @@ MapApp.network.timeline = {
         slider.addEventListener('input', () => {
             const val = parseInt(slider.value, 10);
             if (val === 24) {
+                if (typeof startEdgeAnimation === 'function') startEdgeAnimation();
                 statusText.innerHTML = `<span class="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></span>Live View`;
                 statusText.className = "text-cyan-400 font-semibold bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded-full flex items-center gap-1.5";
             } else {
+                if (typeof stopEdgeAnimation === 'function') stopEdgeAnimation();
                 const hoursAgo = 24 - val;
                 statusText.innerHTML = `<i class="fas fa-history mr-1"></i>${hoursAgo} Hour${hoursAgo > 1 ? 's' : ''} Ago`;
                 statusText.className = "text-amber-400 font-semibold bg-amber-950/40 border border-amber-800/30 px-2 py-0.5 rounded-full flex items-center gap-1.5";
