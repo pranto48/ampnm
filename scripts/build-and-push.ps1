@@ -17,8 +17,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ Local image built successfully." -ForegroundColor Green
 
 # 2. Tag image
-Write-Host "→ Tagging image as pranto48/ampnm:latest..." -ForegroundColor White
-docker tag ampnm-app:latest pranto48/ampnm:latest
+Write-Host "→ Tagging image as arifmahmudpranto/ampnm:latest..." -ForegroundColor White
+docker tag ampnm-app:latest arifmahmudpranto/ampnm:latest
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Error: Failed to tag image." -ForegroundColor Red
     exit 1
@@ -26,8 +26,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ Image tagged successfully." -ForegroundColor Green
 
 # 3. Push to Docker Hub
-Write-Host "→ Pushing image pranto48/ampnm:latest to Docker Hub..." -ForegroundColor White
-docker push pranto48/ampnm:latest
+Write-Host "→ Pushing image arifmahmudpranto/ampnm:latest to Docker Hub..." -ForegroundColor White
+docker push arifmahmudpranto/ampnm:latest
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Error: Failed to push to Docker Hub. Make sure you are logged in via 'docker login'." -ForegroundColor Red
     exit 1
@@ -35,6 +35,6 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "=========================================================" -ForegroundColor Green
-Write-Host "🎉 SUCCESS: Image pushed to pranto48/ampnm:latest" -ForegroundColor Green
+Write-Host "🎉 SUCCESS: Image pushed to arifmahmudpranto/ampnm:latest" -ForegroundColor Green
 Write-Host "=========================================================" -ForegroundColor Green
 Write-Host ""
