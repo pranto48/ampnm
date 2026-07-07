@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes pulse-border {
+      0% { stroke-width: 3; filter: drop-shadow(0 0 1px #FF3366); }
+      50% { stroke-width: 5; filter: drop-shadow(0 0 6px #FF3366); }
+      100% { stroke-width: 3; filter: drop-shadow(0 0 1px #FF3366); }
+    }
+    .shield-shape {
+      fill: #1a0b16;
+      stroke: #FF3366;
+      animation: pulse-border 2s ease-in-out infinite;
+    }
+  </style>
+  <!-- Shield outline -->
+  <path d="M 50,15 C 65,15 80,18 80,35 C 80,60 50,85 50,85 C 50,85 20,60 20,35 C 20,18 35,15 50,15 Z" class="shield-shape" />
+  <!-- Interior details -->
+  <path d="M 35,35 L 65,35 M 30,50 L 70,50 M 35,65 L 65,65 M 50,15 L 50,85" stroke="#FF3366" stroke-width="1.5" opacity="0.4" />
+  <!-- Scanning sweep core -->
+  <circle cx="50" cy="48" r="8" fill="#FF3366" opacity="0.8">
+    <animate attributeName="r" values="3;14;3" dur="2.2s" repeatCount="indefinite" />
+    <animate attributeName="opacity" values="0.8;0.1;0.8" dur="2.2s" repeatCount="indefinite" />
+  </circle>
+</svg>

@@ -574,6 +574,16 @@ return [
         ]
     ],
 
+    'animated-icons' => [
+        'label' => 'Animated SVG Icons',
+        'icons' => [
+            ['image' => 'assets/images/device-icons/animated-globe.svg', 'label' => 'Animated Globe (Internet)'],
+            ['image' => 'assets/images/device-icons/animated-router.svg', 'label' => 'Animated Router'],
+            ['image' => 'assets/images/device-icons/animated-firewall.svg', 'label' => 'Animated Firewall'],
+            ['image' => 'assets/images/device-icons/animated-server.svg', 'label' => 'Animated Server'],
+        ]
+    ],
+
     'png-icons' => [
         'label' => 'High-Fidelity PNG Icons',
         'icons' => [

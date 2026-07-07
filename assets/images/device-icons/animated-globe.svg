@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .globe-spin {
+      animation: spin 12s linear infinite;
+      transform-origin: 50px 50px;
+    }
+  </style>
+  <!-- Outer dotted atmosphere ring -->
+  <circle cx="50" cy="50" r="47" fill="none" stroke="#00F2FE" stroke-width="2" stroke-dasharray="4,4" opacity="0.8" />
+  <g class="globe-spin">
+    <!-- Globe sphere background -->
+    <circle cx="50" cy="50" r="40" fill="#0b1e36" stroke="#00F2FE" stroke-width="3" />
+    <!-- Latitudes -->
+    <line x1="10" y1="50" x2="90" y2="50" stroke="#00F2FE" stroke-width="1.5" />
+    <ellipse cx="50" cy="50" rx="40" ry="18" fill="none" stroke="#00F2FE" stroke-width="1.5" />
+    <ellipse cx="50" cy="50" rx="40" ry="30" fill="none" stroke="#00F2FE" stroke-width="1.0" opacity="0.7" />
+    <!-- Longitudes -->
+    <line x1="50" y1="10" x2="50" y2="90" stroke="#00F2FE" stroke-width="1.5" />
+    <ellipse cx="50" cy="50" rx="18" ry="40" fill="none" stroke="#00F2FE" stroke-width="1.5" />
+    <ellipse cx="50" cy="50" rx="30" ry="40" fill="none" stroke="#00F2FE" stroke-width="1.0" opacity="0.7" />
+  </g>
+</svg>

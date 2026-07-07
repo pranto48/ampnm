@@ -373,16 +373,21 @@ MapApp.mapManager = {
             let imagePath = null;
             const name = d.name || "";
             
-            if (d.type === 'png-icons') {
-                const pngIcons = [
+            if (d.type === 'png-icons' || d.type === 'animated-icons') {
+                const imgList = d.type === 'png-icons' ? [
                     "assets/images/device-icons/sophos-firewall.png",
                     "assets/images/device-icons/cisco-switch.png",
                     "assets/images/device-icons/mikrotik-router.png",
                     "assets/images/device-icons/online-ups.png",
                     "assets/images/device-icons/rack-server.png",
                     "assets/images/device-icons/default-device.png"
+                ] : [
+                    "assets/images/device-icons/animated-globe.svg",
+                    "assets/images/device-icons/animated-router.svg",
+                    "assets/images/device-icons/animated-firewall.svg",
+                    "assets/images/device-icons/animated-server.svg"
                 ];
-                imagePath = pngIcons[d.subchoice] || "assets/images/device-icons/default-device.png";
+                imagePath = imgList[d.subchoice] || "assets/images/device-icons/default-device.png";
             } else if (!d.subchoice || d.subchoice == 0) {
                 if (/Firewall|CNF|UTM/i.test(name)) {
                     imagePath = "assets/images/device-icons/sophos-firewall.png";
