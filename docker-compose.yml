@@ -1,48 +1,42 @@
+version: '3.8'
+
 services:
-  app:
+  ampnm-ui:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
-    # This entrypoint ensures the script is executable and then runs it.
-    # The script configures and starts the Apache server on the correct port.
-    entrypoint: ["/bin/sh", "-c", "chmod +x /var/www/html/docker-entrypoint.sh && /var/www/html/docker-entrypoint.sh"]
     volumes:
-      - ./:/var/www/html/
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      db:
-        condition: service_healthy
+      - ./frontend/src:/app/src
+    ports:
+      - "3000:3000"
+      - "8080:8080"
     environment:
-      # We use db because bridge networking connects the app container
-      # to the database container over the docker network.
       - DB_HOST=db
       - DB_NAME=${MYSQL_DATABASE:-network_monitor}
       - DB_USER=${DB_USER:-user}
       - DB_PASSWORD=${DB_PASSWORD:-password}
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-password}
-      - APP_LICENSE_KEY=${APP_LICENSE_KEY:-}
-      - ALPHA_SMS_USERNAME=${ALPHA_SMS_USERNAME:-}
-      - ALPHA_SMS_API_KEY=${ALPHA_SMS_API_KEY:-}
-      - ALPHA_SMS_SENDER_ID=${ALPHA_SMS_SENDER_ID:-}
-      - SMS_ALERTS_ENABLED=${SMS_ALERTS_ENABLED:-1}
-      - SMS_COOLDOWN_MINUTES=${SMS_COOLDOWN_MINUTES:-30}
-      - APACHE_PORT=${APACHE_PORT:-2266}
-      # Cloud Monitoring Bridge - connect Docker ICMP pings to Lovable Cloud
-      - CLOUD_SYNC_URL=${CLOUD_SYNC_URL:-}
-      - CLOUD_ANON_KEY=${CLOUD_ANON_KEY:-}
-      - CLOUD_POLL_INTERVAL=${CLOUD_POLL_INTERVAL:-15}
-      # Non-disruptive update awareness scheduler (fetch + behind count only).
-      - AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER=1
-      - AMPNM_UPDATE_CHECK_INTERVAL_SECONDS=3600
-      - LICENSE_API_URL=${LICENSE_API_URL:-http://127.0.0.1:2266/mock_license_api.php}
-      - LICENSE_FINGERPRINT_MODE=${LICENSE_FINGERPRINT_MODE:-allow-rebaseline}
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
-    # Standard bridge mode with port mapping so the app works on Windows.
-    # We expose the Apache port and the telemetry port.
+
+  ampnm-trapper:
+    build:
+      context: ./backend/trapper
+      dockerfile: Dockerfile
     ports:
-      - "${APACHE_PORT:-2266}:${APACHE_PORT:-2266}"
       - "10051:10051"
+      - "10050:10050"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${MYSQL_DATABASE:-network_monitor}
+      - DB_USER=${DB_USER:-user}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - WS_URL=ws://ampnm-ui:8080
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
   db:
     image: mysql:8.0
@@ -55,7 +49,6 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     ports:
-      # Expose the database port to the host for external tools if needed
       - "3306:3306"
     restart: unless-stopped
     healthcheck:
