@@ -53,12 +53,31 @@ MapApp.deviceManager = {
                 label += `\n${updatedDeviceData.last_avg_time}ms | TTL:${updatedDeviceData.last_ttl || 'N/A'}`;
             }
             
-            MapApp.state.nodes.update({ id: deviceId, deviceData: updatedDeviceData, icon: { ...node.icon, color: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown }, title: MapApp.utils.buildNodeTitle(updatedDeviceData), label: label });
+            const borderCol = MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown;
+            const updatePayload = { 
+                id: deviceId, 
+                deviceData: updatedDeviceData, 
+                title: MapApp.utils.buildNodeTitle(updatedDeviceData), 
+                label: label 
+            };
+            if (node.shape === 'image') {
+                updatePayload.color = { border: borderCol, background: 'transparent' };
+            } else {
+                updatePayload.icon = { ...node.icon, color: borderCol };
+            }
+            MapApp.state.nodes.update(updatePayload);
             MapApp.ui.updateStaticEdgeColors();
         } catch (error) {
             console.error("Failed to ping device:", error);
             // Silent – no error toast for transient network issues
-            MapApp.state.nodes.update({ id: deviceId, icon: { ...node.icon, color: MapApp.config.statusColorMap[oldStatus] || MapApp.config.statusColorMap.unknown } });
+            const borderCol = MapApp.config.statusColorMap[oldStatus] || MapApp.config.statusColorMap.unknown;
+            const errorPayload = { id: deviceId };
+            if (node.shape === 'image') {
+                errorPayload.color = { border: borderCol, background: 'transparent' };
+            } else {
+                errorPayload.icon = { ...node.icon, color: borderCol };
+            }
+            MapApp.state.nodes.update(errorPayload);
         }
     },
 
@@ -126,13 +145,19 @@ MapApp.deviceManager = {
                     label += `\n${updatedDeviceData.last_avg_time}ms | TTL:${updatedDeviceData.last_ttl || 'N/A'}`;
                 }
                 
-                return {
+                const borderCol = MapApp.config.statusColorMap[effectiveStatus] || MapApp.config.statusColorMap.unknown;
+                const updateItem = {
                     id: device.id,
                     deviceData: updatedDeviceData,
-                    icon: { ...node.icon, color: MapApp.config.statusColorMap[effectiveStatus] || MapApp.config.statusColorMap.unknown },
                     title: MapApp.utils.buildNodeTitle(updatedDeviceData),
                     label: label
                 };
+                if (node.shape === 'image') {
+                    updateItem.color = { border: borderCol, background: 'transparent' };
+                } else {
+                    updateItem.icon = { ...node.icon, color: borderCol };
+                }
+                return updateItem;
             }).filter(Boolean);
 
             if (nodeUpdates.length > 0) {

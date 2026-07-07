@@ -369,19 +369,30 @@ MapApp.mapManager = {
                 return MapApp.utils.buildVisBoxNode(baseNode, d);
             }
 
-            // Use dynamic icon mapping based on type and subchoice
-            const iconCode = MapApp.mapManager.getDeviceIconUnicode(d);
+            // Use dynamic image mapping based on name/type
+            let imagePath = "assets/images/device-icons/default-device.png";
+            const name = d.name || "";
             
-            return { 
-                ...baseNode, 
-                shape: 'icon', 
-                icon: { 
-                    face: "'Font Awesome 6 Free'", 
-                    weight: "900", 
-                    code: iconCode,
-                    size: parseInt(d.icon_size) || 50, 
-                    color: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown 
-                } 
+            if (/Firewall|CNF|UTM/i.test(name)) {
+                imagePath = "assets/images/device-icons/sophos-firewall.png";
+            } else if (/Switch|Core SW|DMZ SW/i.test(name)) {
+                imagePath = "assets/images/device-icons/cisco-switch.png";
+            } else if (/Router|IT Router|Dyeing Floor/i.test(name)) {
+                imagePath = "assets/images/device-icons/mikrotik-router.png";
+            } else if (/UPS|GMT/i.test(name)) {
+                imagePath = "assets/images/device-icons/online-ups.png";
+            } else if (/Server|ARIF-OPC/i.test(name)) {
+                imagePath = "assets/images/device-icons/rack-server.png";
+            }
+            
+            return {
+                ...baseNode,
+                shape: 'image',
+                image: imagePath,
+                brokenImage: "assets/images/device-icons/default-device.png",
+                size: (parseInt(d.icon_size) || 50) / 2,
+                color: { border: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' },
+                borderWidth: 3
             };
         });
         MapApp.state.nodes.clear(); 
