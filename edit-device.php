@@ -201,7 +201,7 @@ $form_data = $device ?? [];
                     </div>
                     
                     <!-- Enhanced Icon Picker Container -->
-                    <link rel="stylesheet" href="assets/icon-picker.css">
+                    <link rel="stylesheet" href="assets/icon-picker.css?v=<?= time() ?>">
                     <div id="iconPickerContainer" class="icon-picker-container"></div>
                 </div>
 
@@ -338,7 +338,7 @@ $form_data = $device ?? [];
 </script>
 
 <!-- Load enhanced icon picker -->
-<script src="assets/icon-picker.js"></script>
+<script src="assets/icon-picker.js?v=<?= time() ?>"></script>
 
 <!-- Port Group Builder + Grid Visualization with Used Port Detection -->
 <script>

@@ -574,6 +574,18 @@ return [
         ]
     ],
 
+    'png-icons' => [
+        'label' => 'High-Fidelity PNG Icons',
+        'icons' => [
+            ['image' => 'assets/images/device-icons/sophos-firewall.png', 'label' => 'Sophos Firewall (PNG)'],
+            ['image' => 'assets/images/device-icons/cisco-switch.png', 'label' => 'Cisco Switch (PNG)'],
+            ['image' => 'assets/images/device-icons/mikrotik-router.png', 'label' => 'Mikrotik Router (PNG)'],
+            ['image' => 'assets/images/device-icons/online-ups.png', 'label' => 'Online UPS (PNG)'],
+            ['image' => 'assets/images/device-icons/rack-server.png', 'label' => 'Rack Server (PNG)'],
+            ['image' => 'assets/images/device-icons/default-device.png', 'label' => 'Default Device (PNG)'],
+        ]
+    ],
+
     'other' => [
         'label' => 'Generic / Other',
         'icons' => [

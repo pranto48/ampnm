@@ -38,7 +38,12 @@
         },
 
         updateSelectionPreview: function(deviceType, subchoice) {
-            if (!this.previewIcon || !this.previewTitle || !this.previewSubtitle || !window.deviceIconsLibrary) {
+            const previewIcon = document.getElementById('selectedIconPreviewIcon');
+            const previewImg = document.getElementById('selectedIconPreviewImage');
+            const previewTitle = document.getElementById('selectedIconPreviewTitle');
+            const previewSubtitle = document.getElementById('selectedIconPreviewSubtitle');
+            
+            if ((!previewIcon && !previewImg) || !previewTitle || !previewSubtitle || !window.deviceIconsLibrary) {
                 return;
             }
             const typeData = window.deviceIconsLibrary[deviceType];
@@ -46,9 +51,34 @@
             const idx = parseInt(subchoice, 10) || 0;
             const variant = icons[idx] || icons[0] || { icon: 'fa-circle', label: 'Default' };
 
-            this.previewIcon.className = `fas ${variant.icon}`;
-            this.previewTitle.textContent = typeData?.label ? typeData.label : deviceType;
-            this.previewSubtitle.textContent = variant.label ? `Variant: ${variant.label}` : `Variant #${idx}`;
+            const currentVisual = previewIcon || previewImg;
+            const parent = currentVisual.parentNode;
+            
+            if (variant.image) {
+                if (previewIcon) {
+                    const imgEl = document.createElement('img');
+                    imgEl.id = 'selectedIconPreviewImage';
+                    imgEl.style.width = '24px';
+                    imgEl.style.height = '24px';
+                    imgEl.style.objectFit = 'contain';
+                    imgEl.src = variant.image;
+                    parent.replaceChild(imgEl, previewIcon);
+                } else if (previewImg) {
+                    previewImg.src = variant.image;
+                }
+            } else {
+                if (previewImg) {
+                    const iEl = document.createElement('i');
+                    iEl.id = 'selectedIconPreviewIcon';
+                    iEl.className = `fas ${variant.icon} text-slate-200`;
+                    parent.replaceChild(iEl, previewImg);
+                } else if (previewIcon) {
+                    previewIcon.className = `fas ${variant.icon}`;
+                }
+            }
+            
+            previewTitle.textContent = typeData?.label ? typeData.label : deviceType;
+            previewSubtitle.textContent = variant.label ? `Variant: ${variant.label}` : `Variant #${idx}`;
         },
 
         bindEvents: function() {
@@ -113,13 +143,19 @@
             // Render icon gallery
             html += '<div class="icon-gallery" id="iconGallery">';
             iconVariants.forEach((variant, idx) => {
+                let iconHtml = '';
+                if (variant.image) {
+                    iconHtml = `<img src="${variant.image}" alt="${variant.label}" style="width: 24px; height: 24px; object-fit: contain;">`;
+                } else {
+                    iconHtml = `<i class="fas ${variant.icon}"></i>`;
+                }
                 html += `
                     <button type="button" class="icon-gallery-btn" 
                             data-icon-choice="${deviceType}" 
                             data-icon-subchoice="${idx}"
                             title="${variant.label}">
                         <div class="icon-gallery-btn-content">
-                            <i class="fas ${variant.icon}"></i>
+                            ${iconHtml}
                             <span>${variant.label}</span>
                         </div>
                     </button>
