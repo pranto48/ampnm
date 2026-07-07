@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -53,13 +54,20 @@ type GeneralPayload struct {
 }
 
 var (
-	db       *sql.DB
-	wsClient *websocket.Conn
-	wsMutex  sync.Mutex
+	db        *sql.DB
+	upgrader  = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true; // Allow all origins for browser clients
+		},
+	}
+	clients   = make(map[*websocket.Conn]bool)
+	clientsMu sync.Mutex
 )
 
 func main() {
-	log.Println("Starting Trapper & Passive Poller Ingestion Stack...")
+	log.Println("Starting Decoupled Trapper Ingestion Stack...")
 
 	// 1. Database Connection Pooling Setup
 	dbHost := getEnv("DB_HOST", "db")
@@ -89,8 +97,15 @@ func main() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 	log.Println("✓ Database connection pool established.")
 
-	// 2. Connect to Next.js WebSocket Gateway
-	go connectWebSocket()
+	// 2. Start Go Ingestion WebSocket Server on Port 8080
+	go func() {
+		http.HandleFunc("/", handleWebSocket)
+		http.HandleFunc("/ws", handleWebSocket)
+		log.Println("Go WebSocket server listening on port :8080...")
+		if err := http.ListenAndServe("0.0.0.0:8080", nil); err != nil {
+			log.Fatalf("Go WebSocket server failed: %v", err)
+		}
+	}()
 
 	// 3. Start Background Passive Agent Outbound Polling
 	go runPassivePollerLoop()
@@ -112,56 +127,61 @@ func main() {
 	wg.Wait()
 }
 
-// connectWebSocket establishes and maintains persistent WebSocket connection to UI Gateway
-func connectWebSocket() {
-	for {
-		wsUrl := getEnv("WS_URL", "ws://localhost:8080")
-		log.Printf("Connecting to Next.js WebSocket Gateway: %s\n", wsUrl)
-		conn, _, err := websocket.DefaultDialer.Dial(wsUrl, nil)
-		if err != nil {
-			log.Printf("WebSocket connection failed: %v. Retrying in 5s...\n", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		log.Println("✓ Connected to Next.js WebSocket Gateway.")
-		
-		wsMutex.Lock()
-		wsClient = conn
-		wsMutex.Unlock()
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Failed to upgrade socket: %v\n", err)
+		return
+	}
+	log.Printf("Browser client connected from %s\n", r.RemoteAddr)
 
-		// Block and read messages (just keep connection alive)
-		for {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				log.Printf("WebSocket disconnected: %v\n", err)
-				break
-			}
+	clientsMu.Lock()
+	clients[conn] = true
+	clientsMu.Unlock()
+
+	defer func() {
+		clientsMu.Lock()
+		delete(clients, conn)
+		clientsMu.Unlock()
+		conn.Close()
+		log.Println("Browser client disconnected.")
+	}()
+
+	// Read loop to detect disconnects
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
 		}
-		
-		wsMutex.Lock()
-		wsClient = nil
-		wsMutex.Unlock()
-		time.Sleep(5 * time.Second)
 	}
 }
 
-func broadcastUpdate(deviceID int64, status string, avgTime float64, ttl float64) {
-	wsMutex.Lock()
-	defer wsMutex.Unlock()
-	if wsClient == nil {
-		return
-	}
-
+func broadcastUpdate(deviceID int64, status string, avgTime float64, ttl float64, cpu, memory, netIn, netOut float64) {
 	msg := map[string]interface{}{
 		"device_id":     deviceID,
 		"status":        status,
 		"last_avg_time": avgTime,
 		"last_ttl":      ttl,
 		"last_seen":     time.Now().Format("2006-01-02 15:04:05"),
+		"cpu_usage":     cpu,
+		"memory_usage":  memory,
+		"network_in":    netIn,
+		"network_out":   netOut,
 	}
 	jsonData, err := json.Marshal(msg)
-	if err == nil {
-		_ = wsClient.WriteMessage(websocket.TextMessage, jsonData)
+	if err != nil {
+		return
+	}
+
+	clientsMu.Lock()
+	defer clientsMu.Unlock()
+	for client := range clients {
+		err := client.WriteMessage(websocket.TextMessage, jsonData)
+		if err != nil {
+			log.Printf("Error sending message to WebSocket client: %v\n", err)
+			client.Close()
+			delete(clients, client)
+		}
 	}
 }
 
@@ -428,8 +448,8 @@ func ingestMetrics(metrics MetricsPayload, userID int64) {
 		metrics.HostName, metrics.CPUPercent, metrics.MemoryPercent, metrics.MemoryTotal, metrics.DiskPercent, metrics.DiskTotal, int64(metrics.NetworkIn), int64(metrics.NetworkOut),
 	)
 
-	// 4. Trigger alert checks / live updates broadcast
-	broadcastUpdate(deviceID, "online", 0.0, 0.0)
+	// 4. Trigger alert checks / live updates broadcast to WebSocket clients
+	broadcastUpdate(deviceID, "online", 0.0, 0.0, metrics.CPUPercent, metrics.MemoryPercent, metrics.NetworkIn, metrics.NetworkOut)
 }
 
 func validateToken(token string) (int64, bool) {

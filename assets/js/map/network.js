@@ -733,9 +733,39 @@ MapApp.network.websocket = {
             const node = MapApp.state.nodes.get(nodeId);
             if (node && node.deviceData) {
                 const oldStatus = node.deviceData.status;
-                const newStatus = data.status;
                 
+                // Store telemetry metrics if present
+                if (data.cpu_usage !== undefined) node.deviceData.cpu_usage = data.cpu_usage;
+                if (data.memory_usage !== undefined) node.deviceData.memory_usage = data.memory_usage;
+                if (data.network_in !== undefined) node.deviceData.network_in = data.network_in;
+                if (data.network_out !== undefined) node.deviceData.network_out = data.network_out;
+                
+                // Classify status based on metrics thresholds
+                let newStatus = data.status;
+                if (newStatus === 'online') {
+                    if (data.cpu_usage !== undefined && data.cpu_usage > 95.0) {
+                        newStatus = 'critical';
+                    } else if (data.cpu_usage !== undefined && data.cpu_usage > 85.0) {
+                        newStatus = 'warning';
+                    }
+                }
                 node.deviceData.status = newStatus;
+                
+                // Adjust animation speed multiplier dynamically based on CPU usage
+                if (data.cpu_usage !== undefined && data.cpu_usage !== null) {
+                    const dynamicSpeed = 0.5 + (data.cpu_usage / 100.0) * 4.5;
+                    globalSpeedMultiplier = dynamicSpeed;
+                    
+                    const speedSelector = document.getElementById('animationSpeedSelector');
+                    if (speedSelector) {
+                        speedSelector.value = dynamicSpeed.toFixed(1);
+                    }
+                    const display = document.getElementById('speedValueDisplay');
+                    if (display) {
+                        display.textContent = dynamicSpeed.toFixed(1) + 'x';
+                    }
+                }
+                
                 if (data.last_avg_time !== undefined) node.deviceData.last_avg_time = data.last_avg_time;
                 if (data.last_ttl !== undefined) node.deviceData.last_ttl = data.last_ttl;
                 if (data.last_seen !== undefined) node.deviceData.last_seen = data.last_seen;

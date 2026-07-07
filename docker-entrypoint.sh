@@ -89,11 +89,11 @@ echo ""
 UPDATE_CHECK_INTERVAL_SECONDS="${AMPNM_UPDATE_CHECK_INTERVAL_SECONDS:-3600}"
 if [ "${AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER:-1}" = "1" ]; then
     echo "→ Starting update check scheduler (${UPDATE_CHECK_INTERVAL_SECONDS}s interval)..."
-    /var/www/html/scripts/update_check.sh || true
+    bash /var/www/html/scripts/update_check.sh || true
     (
       while true; do
         sleep "${UPDATE_CHECK_INTERVAL_SECONDS}"
-        /var/www/html/scripts/update_check.sh || true
+        bash /var/www/html/scripts/update_check.sh || true
       done
     ) &
     echo "✓ Update check scheduler started"
