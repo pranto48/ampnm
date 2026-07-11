@@ -345,10 +345,14 @@ MapApp.mapManager = {
 
             const overridePos = nodePositionOverrides[d.id] || nodePositionOverrides[String(d.id)] || null;
 
+            const labelColor = d.name_text_color || '#ffffff';
+            const labelBold = d.name_text_bold == 1;
+            const labelItalic = d.name_text_italic == 1;
+            const labelFace = labelBold && labelItalic ? 'bold italic Arial' : labelBold ? 'bold Arial' : labelItalic ? 'italic Arial' : 'Arial';
             const baseNode = {
                 id: d.id, label: label, title: MapApp.utils.buildNodeTitle(d),
                 x: overridePos?.x ?? d.x, y: overridePos?.y ?? d.y,
-                font: { color: 'white', size: parseInt(d.name_text_size) || 14, multi: true },
+                font: { color: labelColor, size: parseInt(d.name_text_size) || 14, multi: true, face: labelFace },
                 deviceData: d
             };
 
@@ -385,7 +389,13 @@ MapApp.mapManager = {
                     "assets/images/device-icons/animated-globe.svg",
                     "assets/images/device-icons/animated-router.svg",
                     "assets/images/device-icons/animated-firewall.svg",
-                    "assets/images/device-icons/animated-server.svg"
+                    "assets/images/device-icons/animated-server.svg",
+                    "assets/images/device-icons/animated-access-point.svg",
+                    "assets/images/device-icons/animated-switch.svg",
+                    "assets/images/device-icons/animated-cloud.svg",
+                    "assets/images/device-icons/animated-camera.svg",
+                    "assets/images/device-icons/animated-database.svg",
+                    "assets/images/device-icons/animated-workstation.svg"
                 ];
                 imagePath = imgList[d.subchoice] || "assets/images/device-icons/default-device.png";
             } else if (!d.subchoice || d.subchoice == 0) {
@@ -488,13 +498,17 @@ MapApp.mapManager = {
             const createdDevice = await MapApp.api.post('create_device', newDeviceData);
             window.notyf.success(`Device "${originalDevice.name}" copied.`);
             
+            const cpLabelColor = createdDevice.name_text_color || '#ffffff';
+            const cpLabelBold = createdDevice.name_text_bold == 1;
+            const cpLabelItalic = createdDevice.name_text_italic == 1;
+            const cpLabelFace = cpLabelBold && cpLabelItalic ? 'bold italic Arial' : cpLabelBold ? 'bold Arial' : cpLabelItalic ? 'italic Arial' : 'Arial';
             const baseNode = {
                 id: createdDevice.id,
                 label: createdDevice.name,
                 title: MapApp.utils.buildNodeTitle(createdDevice),
                 x: createdDevice.x,
                 y: createdDevice.y,
-                font: { color: 'white', size: parseInt(createdDevice.name_text_size) || 14, multi: true },
+                font: { color: cpLabelColor, size: parseInt(createdDevice.name_text_size) || 14, multi: true, face: cpLabelFace },
                 deviceData: createdDevice
             };
 

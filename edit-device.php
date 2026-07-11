@@ -64,6 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ping_interval = $_POST['ping_interval'] ?? null;
     $icon_size = $_POST['icon_size'] ?? 50;
     $name_text_size = $_POST['name_text_size'] ?? 14;
+    $name_text_color = trim($_POST['name_text_color'] ?? '#ffffff');
+    $name_text_bold = isset($_POST['name_text_bold']) ? 1 : 0;
+    $name_text_italic = isset($_POST['name_text_italic']) ? 1 : 0;
     $icon_url = trim($_POST['icon_url'] ?? '');
     $warning_latency_threshold = $_POST['warning_latency_threshold'] ?? null;
     $warning_packetloss_threshold = $_POST['warning_packetloss_threshold'] ?? null;
@@ -81,12 +84,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $schemaWarning = '';
 
             if ($hasSubchoice) {
-                $fields = "name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, subchoice = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?";
+                $fields = "name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, subchoice = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, name_text_color = ?, name_text_bold = ?, name_text_italic = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?";
                 $values = [
                     $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
                     $monitor_method, $type, is_numeric($subchoice) ? (int)$subchoice : 0,
                     empty($description) ? null : $description, empty($map_id) ? null : $map_id,
                     empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                    $name_text_color, $name_text_bold, $name_text_italic,
                     empty($icon_url) ? null : $icon_url,
                     empty($warning_latency_threshold) ? null : $warning_latency_threshold,
                     empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
@@ -292,6 +296,39 @@ $form_data = $device ?? [];
                     </div>
                 </div>
 
+                <!-- Device Label Style -->
+                <fieldset class="border border-cyan-800/50 rounded-lg p-4 bg-slate-900/30">
+                    <legend class="text-sm font-semibold text-cyan-400 px-2"><i class="fas fa-font mr-1"></i> Device Label Style</legend>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="name_text_color" class="block text-xs font-medium text-slate-400 mb-1">Label Color</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="name_text_color" name="name_text_color" class="p-1 h-10 w-14 bg-slate-900 border border-slate-600 cursor-pointer rounded-lg" value="<?= htmlspecialchars($form_data['name_text_color'] ?? '#ffffff') ?>">
+                                <input type="text" id="name_text_color_hex" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500" placeholder="#ffffff" value="<?= htmlspecialchars($form_data['name_text_color'] ?? '#ffffff') ?>">
+                            </div>
+                        </div>
+                        <div class="flex items-end pb-1">
+                            <div class="space-y-2">
+                                <label class="text-xs font-medium text-slate-400 block mb-2">Text Style</label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="name_text_bold" name="name_text_bold" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500" <?= ($form_data['name_text_bold'] ?? 0) ? 'checked' : '' ?>>
+                                    <span class="text-sm font-bold text-white">Bold</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="name_text_italic" name="name_text_italic" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500" <?= ($form_data['name_text_italic'] ?? 0) ? 'checked' : '' ?>>
+                                    <span class="text-sm italic text-white">Italic</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-slate-400 block mb-2">Live Preview</label>
+                            <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 flex items-center justify-center" style="min-height:60px;">
+                                <span id="label_preview" class="text-sm transition-all" style="color:<?= htmlspecialchars($form_data['name_text_color'] ?? '#ffffff') ?>;font-weight:<?= ($form_data['name_text_bold'] ?? 0) ? 'bold' : 'normal' ?>;font-style:<?= ($form_data['name_text_italic'] ?? 0) ? 'italic' : 'normal' ?>"><?= htmlspecialchars($form_data['name'] ?? 'Device Name') ?></span>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+
                 <fieldset class="border border-slate-600 rounded-lg p-4">
                     <legend class="text-sm font-medium text-slate-400 px-2">Status Thresholds (Optional)</legend>
                     <div class="grid grid-cols-2 gap-4">
@@ -487,4 +524,45 @@ $form_data = $device ?? [];
 })();
 </script>
 
-<?php include 'footer.php'; ?>
+<script>
+// Label Style Live Preview Sync
+(function() {
+    const colorPicker = document.getElementById('name_text_color');
+    const colorHex    = document.getElementById('name_text_color_hex');
+    const boldCheck   = document.getElementById('name_text_bold');
+    const italicCheck = document.getElementById('name_text_italic');
+    const preview     = document.getElementById('label_preview');
+    const nameInput   = document.getElementById('name');
+
+    function updatePreview() {
+        if (!preview) return;
+        const color  = colorHex ? colorHex.value : '#ffffff';
+        const bold   = boldCheck && boldCheck.checked ? 'bold' : 'normal';
+        const italic = italicCheck && italicCheck.checked ? 'italic' : 'normal';
+        preview.style.color = color;
+        preview.style.fontWeight = bold;
+        preview.style.fontStyle = italic;
+        if (nameInput) preview.textContent = nameInput.value || 'Device Name';
+    }
+
+    if (colorPicker) {
+        colorPicker.addEventListener('input', function() {
+            if (colorHex) colorHex.value = this.value;
+            updatePreview();
+        });
+    }
+    if (colorHex) {
+        colorHex.addEventListener('input', function() {
+            if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+                if (colorPicker) colorPicker.value = this.value;
+            }
+            updatePreview();
+        });
+    }
+    if (boldCheck) boldCheck.addEventListener('change', updatePreview);
+    if (italicCheck) italicCheck.addEventListener('change', updatePreview);
+    if (nameInput) nameInput.addEventListener('input', updatePreview);
+})();
+</script>
+
+<?php include 'footer.php'; ?>

@@ -581,6 +581,12 @@ return [
             ['image' => 'assets/images/device-icons/animated-router.svg', 'label' => 'Animated Router'],
             ['image' => 'assets/images/device-icons/animated-firewall.svg', 'label' => 'Animated Firewall'],
             ['image' => 'assets/images/device-icons/animated-server.svg', 'label' => 'Animated Server'],
+            ['image' => 'assets/images/device-icons/animated-access-point.svg', 'label' => 'Animated Access Point (WiFi)'],
+            ['image' => 'assets/images/device-icons/animated-switch.svg', 'label' => 'Animated Network Switch'],
+            ['image' => 'assets/images/device-icons/animated-cloud.svg', 'label' => 'Animated Cloud'],
+            ['image' => 'assets/images/device-icons/animated-camera.svg', 'label' => 'Animated Security Camera'],
+            ['image' => 'assets/images/device-icons/animated-database.svg', 'label' => 'Animated Database'],
+            ['image' => 'assets/images/device-icons/animated-workstation.svg', 'label' => 'Animated Workstation / PC'],
         ]
     ],
 

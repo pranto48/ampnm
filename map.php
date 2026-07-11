@@ -371,6 +371,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-cyan-700 text-white" data-map-settings-tab="device">Mouse Over Device Information</button>
                         <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="connection">Mouse Over Connection Information</button>
                         <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="motion">Connection Running Options</button>
+                        <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="labelstyle"><i class="fas fa-font mr-1"></i>Label Style</button>
                     </div>
                     <div data-map-settings-panel="device" class="space-y-3">
                     <h3 class="text-lg font-semibold text-white">Mouse Over Device Information</h3>
@@ -473,6 +474,51 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         </div>
                     </div>
                     <p class="text-xs text-slate-500">Use this panel to control how connection lines run and animate on the map.</p>
+                    </div>
+                    <!-- Global Label Style Panel -->
+                    <div data-map-settings-panel="labelstyle" class="space-y-4 hidden">
+                        <h3 class="text-lg font-semibold text-white pt-1">Global Label Style</h3>
+                        <p class="text-xs text-slate-500">Set default label color, size, and text style for <em>all</em> devices on this map. Individual device settings override these globals.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="globalLabelColor" class="block text-xs font-medium text-slate-400 mb-1">Default Label Color</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="globalLabelColor" class="p-1 h-10 w-14 bg-slate-900 border border-slate-600 cursor-pointer rounded-lg" value="#ffffff">
+                                    <input type="text" id="globalLabelColorHex" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500" placeholder="#ffffff" value="#ffffff">
+                                </div>
+                            </div>
+                            <div>
+                                <label for="globalLabelSize" class="block text-xs font-medium text-slate-400 mb-1">Default Label Size <span id="globalLabelSizeVal" class="text-cyan-400">14px</span></label>
+                                <input id="globalLabelSize" type="range" min="8" max="32" step="1" value="14" class="w-full accent-cyan-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="text-xs font-medium text-slate-400 block mb-2">Text Style</label>
+                                <div class="space-y-2">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" id="globalLabelBold" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500">
+                                        <span class="text-sm font-bold text-white">Bold</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" id="globalLabelItalic" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500">
+                                        <span class="text-sm italic text-white">Italic</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="text-xs font-medium text-slate-400 block mb-2">Preview</label>
+                                <div class="bg-slate-900 border border-slate-700 rounded-lg p-4 flex items-center justify-center" style="min-height:56px;">
+                                    <span id="globalLabelPreview" class="text-sm transition-all" style="color:#ffffff;">Device Name Label</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-slate-700">
+                            <button type="button" id="applyGlobalLabelStyleBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-semibold">
+                                <i class="fas fa-magic mr-2"></i>Apply to All Devices on Map
+                            </button>
+                            <p class="text-xs text-slate-500 mt-1">This will refresh all nodes on the current map with the chosen label style.</p>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mt-6">
@@ -588,4 +634,94 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
     });
 </script>
 
+<!-- Global Label Style JS -->
+<script>
+(function() {
+    function updateGlobalLabelPreview() {
+        const colorPicker = document.getElementById('globalLabelColor');
+        const colorHex    = document.getElementById('globalLabelColorHex');
+        const preview     = document.getElementById('globalLabelPreview');
+        const sizeSlider  = document.getElementById('globalLabelSize');
+        const sizeVal     = document.getElementById('globalLabelSizeVal');
+        const boldCheck   = document.getElementById('globalLabelBold');
+        const italicCheck = document.getElementById('globalLabelItalic');
+        if (!preview) return;
+        const color  = colorHex ? colorHex.value : '#ffffff';
+        const size   = sizeSlider ? sizeSlider.value : 14;
+        const bold   = boldCheck && boldCheck.checked ? 'bold' : 'normal';
+        const italic = italicCheck && italicCheck.checked ? 'italic' : 'normal';
+        if (sizeVal) sizeVal.textContent = size + 'px';
+        preview.style.color = color;
+        preview.style.fontSize = size + 'px';
+        preview.style.fontWeight = bold;
+        preview.style.fontStyle = italic;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const colorPicker = document.getElementById('globalLabelColor');
+        const colorHex    = document.getElementById('globalLabelColorHex');
+        const sizeSlider  = document.getElementById('globalLabelSize');
+        const boldCheck   = document.getElementById('globalLabelBold');
+        const italicCheck = document.getElementById('globalLabelItalic');
+        const applyBtn    = document.getElementById('applyGlobalLabelStyleBtn');
+
+        if (colorPicker) {
+            colorPicker.addEventListener('input', function() {
+                if (colorHex) colorHex.value = this.value;
+                updateGlobalLabelPreview();
+            });
+        }
+        if (colorHex) {
+            colorHex.addEventListener('input', function() {
+                if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+                    if (colorPicker) colorPicker.value = this.value;
+                }
+                updateGlobalLabelPreview();
+            });
+        }
+        if (sizeSlider) sizeSlider.addEventListener('input', updateGlobalLabelPreview);
+        if (boldCheck)  boldCheck.addEventListener('change', updateGlobalLabelPreview);
+        if (italicCheck) italicCheck.addEventListener('change', updateGlobalLabelPreview);
+
+        // Tab switching: include new labelstyle tab
+        document.querySelectorAll('.map-settings-tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.mapSettingsTab;
+                document.querySelectorAll('[data-map-settings-panel]').forEach(p => p.classList.add('hidden'));
+                document.querySelectorAll('.map-settings-tab-btn').forEach(b => {
+                    b.classList.remove('bg-cyan-700', 'text-white');
+                    b.classList.add('bg-slate-700', 'text-slate-200');
+                });
+                const panel = document.querySelector('[data-map-settings-panel="' + tab + '"]');
+                if (panel) panel.classList.remove('hidden');
+                this.classList.remove('bg-slate-700', 'text-slate-200');
+                this.classList.add('bg-cyan-700', 'text-white');
+            });
+        });
+
+        // Apply global label style to all map nodes
+        if (applyBtn) {
+            applyBtn.addEventListener('click', function() {
+                if (!window.MapApp || !MapApp.state || !MapApp.state.nodes) {
+                    if (window.notyf) notyf.error('Map is not loaded yet.');
+                    return;
+                }
+                const color  = colorHex ? colorHex.value : '#ffffff';
+                const size   = sizeSlider ? parseInt(sizeSlider.value) : 14;
+                const bold   = boldCheck && boldCheck.checked;
+                const italic = italicCheck && italicCheck.checked;
+                const face   = bold && italic ? 'bold italic Arial' : bold ? 'bold Arial' : italic ? 'italic Arial' : 'Arial';
+                const updates = MapApp.state.nodes.get().map(n => ({
+                    id: n.id,
+                    font: { color, size, face, multi: true }
+                }));
+                MapApp.state.nodes.update(updates);
+                if (window.notyf) notyf.success('Global label style applied to ' + updates.length + ' devices.');
+            });
+        }
+    });
+})();
+</script>
+
 <?php include 'footer.php'; ?>
+

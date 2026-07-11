@@ -213,7 +213,8 @@ MapApp.network = {
                 title: MapApp.utils.buildNodeTitle(updatedDeviceData),
                 x: boxResizeState.originalPos.x,
                 y: boxResizeState.originalPos.y,
-                font: { color: 'white', size: parseInt(updatedDeviceData.name_text_size, 10) || 14, multi: true },
+                font: { color: updatedDeviceData.name_text_color || 'white', size: parseInt(updatedDeviceData.name_text_size, 10) || 14, multi: true,
+                    face: (updatedDeviceData.name_text_bold == 1 && updatedDeviceData.name_text_italic == 1) ? 'bold italic Arial' : updatedDeviceData.name_text_bold == 1 ? 'bold Arial' : updatedDeviceData.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
                 deviceData: updatedDeviceData
             }, updatedDeviceData);
             MapApp.state.nodes.update(visNode);
@@ -511,7 +512,8 @@ MapApp.network = {
                                         title: MapApp.utils.buildNodeTitle(updated),
                                         x: pos.x,
                                         y: pos.y,
-                                        font: { color: 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true },
+                                        font: { color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
+                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
                                         deviceData: updated
                                     };
                                     MapApp.state.nodes.update(MapApp.utils.buildVisBoxNode(baseNode, updated));
@@ -583,7 +585,8 @@ MapApp.network = {
                                 title: MapApp.utils.buildNodeTitle(updated),
                                 x: pos.x,
                                 y: pos.y,
-                                font: { color: 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true },
+                                font: { color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
+                                    face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
                                 deviceData: updated
                             };
                             MapApp.state.nodes.update(MapApp.utils.buildVisBoxNode(baseNode, updated));
