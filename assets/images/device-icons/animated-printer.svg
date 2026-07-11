@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes printer-print {
+      0%,20% { transform: translateY(0); }
+      40%,60% { transform: translateY(8px); }
+      80%,100% { transform: translateY(0); }
+    }
+    @keyframes printer-led {
+      0%,100% { fill: #00FF87; }
+      50% { fill: #FFAA00; }
+    }
+    @keyframes printer-paper {
+      0% { transform: translateY(-16px); opacity: 0; }
+      30% { opacity: 1; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes printer-line {
+      0%,100% { opacity: 0; }
+      30%,70% { opacity: 1; }
+    }
+    .paper { animation: printer-paper 2s ease-in-out infinite; }
+    .print-line1 { animation: printer-line 2s ease-in-out 0.3s infinite; }
+    .print-line2 { animation: printer-line 2s ease-in-out 0.6s infinite; }
+    .p-led { animation: printer-led 1.5s ease-in-out infinite; }
+  </style>
+  <!-- Printer body -->
+  <rect x="15" y="38" width="70" height="30" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Top paper slot -->
+  <rect x="25" y="34" width="50" height="6" rx="2" fill="#0b1e36" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Paper slot opening -->
+  <rect x="30" y="37" width="40" height="3" rx="1" fill="#041830"/>
+  <!-- Paper coming out bottom -->
+  <g class="paper">
+    <rect x="30" y="64" width="40" height="20" rx="2" fill="white" stroke="#00F2FE" stroke-width="1.5"/>
+    <line x1="34" y1="69" x2="66" y2="69" stroke="#0b1e36" stroke-width="1.5" class="print-line1"/>
+    <line x1="34" y1="74" x2="60" y2="74" stroke="#0b1e36" stroke-width="1.5" class="print-line2"/>
+  </g>
+  <!-- Control lights -->
+  <circle cx="25" cy="53" r="3" class="p-led"/>
+  <circle cx="34" cy="53" r="3" fill="#00F2FE" opacity="0.7"/>
+  <!-- Status bar -->
+  <rect x="42" y="50" width="30" height="6" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="44" y="51" width="15" height="4" rx="1" fill="#00F2FE" opacity="0.7"/>
+</svg>

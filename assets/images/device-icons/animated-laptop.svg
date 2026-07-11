@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes laptop-screen {
+      0%,100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes laptop-cursor {
+      0%,49% { opacity: 1; }
+      50%,100% { opacity: 0; }
+    }
+    @keyframes laptop-wifi {
+      0%,100% { opacity: 0.3; }
+      33% { opacity: 1; }
+    }
+    @keyframes laptop-activity {
+      0%,100% { fill: #00FF87; }
+      50% { fill: #00F2FE; }
+    }
+    .screen-glow { animation: laptop-screen 3s ease-in-out infinite; }
+    .cursor { animation: laptop-cursor 1s step-end infinite; }
+    .w1 { animation: laptop-wifi 1.5s ease-in-out 0s infinite; }
+    .w2 { animation: laptop-wifi 1.5s ease-in-out 0.3s infinite; }
+    .w3 { animation: laptop-wifi 1.5s ease-in-out 0.6s infinite; }
+    .activity { animation: laptop-activity 2s ease-in-out infinite; }
+  </style>
+  <!-- Laptop screen -->
+  <rect x="14" y="14" width="72" height="48" rx="4" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Screen inner -->
+  <rect x="18" y="18" width="64" height="40" rx="2" fill="#041830" class="screen-glow"/>
+  <!-- Screen content lines -->
+  <line x1="22" y1="26" x2="60" y2="26" stroke="#00F2FE" stroke-width="1.5" opacity="0.7"/>
+  <line x1="22" y1="31" x2="50" y2="31" stroke="#00FF87" stroke-width="1.2" opacity="0.6"/>
+  <line x1="22" y1="36" x2="66" y2="36" stroke="#00F2FE" stroke-width="1" opacity="0.4"/>
+  <line x1="22" y1="41" x2="44" y2="41" stroke="#00F2FE" stroke-width="1" opacity="0.4"/>
+  <!-- Blinking cursor -->
+  <rect x="46" y="39" width="2" height="5" fill="#00FF87" class="cursor"/>
+  <!-- WiFi icon in top-right of screen -->
+  <path d="M69 19 Q76 22 76 28" fill="none" stroke="#00F2FE" stroke-width="1.2" class="w1"/>
+  <path d="M71 22 Q75 24 75 28" fill="none" stroke="#00F2FE" stroke-width="1.2" class="w2"/>
+  <circle cx="74" cy="28" r="1.5" fill="#00F2FE" class="w3"/>
+  <!-- Hinge -->
+  <rect x="14" y="62" width="72" height="4" rx="0" fill="#0d2540" stroke="#00F2FE" stroke-width="1"/>
+  <!-- Keyboard base -->
+  <rect x="8" y="66" width="84" height="16" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Keyboard keys hint -->
+  <rect x="18" y="70" width="64" height="8" rx="2" fill="#041830" opacity="0.8"/>
+  <rect x="20" y="71" width="8" height="5" rx="1" fill="#0d2540" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="30" y="71" width="8" height="5" rx="1" fill="#0d2540" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="40" y="71" width="8" height="5" rx="1" fill="#0d2540" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="50" y="71" width="8" height="5" rx="1" fill="#0d2540" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="60" y="71" width="8" height="5" rx="1" fill="#0d2540" stroke="#00F2FE" stroke-width="0.5"/>
+  <!-- Power LED -->
+  <circle cx="50" cy="65" r="1.5" class="activity"/>
+</svg>

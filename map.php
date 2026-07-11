@@ -683,7 +683,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         if (boldCheck)  boldCheck.addEventListener('change', updateGlobalLabelPreview);
         if (italicCheck) italicCheck.addEventListener('change', updateGlobalLabelPreview);
 
-        // Tab switching: include new labelstyle tab
+        // Tab switching handler (includes labelstyle tab)
         document.querySelectorAll('.map-settings-tab-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const tab = this.dataset.mapSettingsTab;
@@ -699,29 +699,79 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             });
         });
 
-        // Apply global label style to all map nodes
+        // Apply global label style to all map nodes AND save to database
         if (applyBtn) {
-            applyBtn.addEventListener('click', function() {
+            applyBtn.addEventListener('click', async function() {
                 if (!window.MapApp || !MapApp.state || !MapApp.state.nodes) {
                     if (window.notyf) notyf.error('Map is not loaded yet.');
                     return;
                 }
-                const color  = colorHex ? colorHex.value : '#ffffff';
-                const size   = sizeSlider ? parseInt(sizeSlider.value) : 14;
-                const bold   = boldCheck && boldCheck.checked;
-                const italic = italicCheck && italicCheck.checked;
-                const face   = bold && italic ? 'bold italic Arial' : bold ? 'bold Arial' : italic ? 'italic Arial' : 'Arial';
-                const updates = MapApp.state.nodes.get().map(n => ({
-                    id: n.id,
-                    font: { color, size, face, multi: true }
-                }));
-                MapApp.state.nodes.update(updates);
-                if (window.notyf) notyf.success('Global label style applied to ' + updates.length + ' devices.');
+                const color      = colorHex ? colorHex.value : '#ffffff';
+                const size       = sizeSlider ? parseInt(sizeSlider.value) : 14;
+                const bold       = boldCheck && boldCheck.checked ? 1 : 0;
+                const italic     = italicCheck && italicCheck.checked ? 1 : 0;
+                const face       = (bold && italic) ? 'bold italic Arial' : bold ? 'bold Arial' : italic ? 'italic Arial' : 'Arial';
+
+                const allNodes = MapApp.state.nodes.get();
+                const realDevices = allNodes.filter(n => n.deviceData && n.deviceData.type !== 'box');
+
+                if (realDevices.length === 0) {
+                    if (window.notyf) notyf.error('No devices on this map.');
+                    return;
+                }
+
+                applyBtn.disabled = true;
+                applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+                let savedCount = 0;
+                let failCount  = 0;
+
+                // Save each device via API and update canvas
+                const promises = realDevices.map(async (n) => {
+                    try {
+                        await MapApp.api.post('update_device', {
+                            id:                n.id,
+                            name_text_color:   color,
+                            name_text_size:    size,
+                            name_text_bold:    bold,
+                            name_text_italic:  italic,
+                        });
+                        // Update node's deviceData in memory
+                        const updatedDeviceData = {
+                            ...n.deviceData,
+                            name_text_color:  color,
+                            name_text_size:   size,
+                            name_text_bold:   bold,
+                            name_text_italic: italic,
+                        };
+                        MapApp.state.nodes.update({
+                            id:   n.id,
+                            font: { color, size, face, multi: true },
+                            deviceData: updatedDeviceData
+                        });
+                        savedCount++;
+                    } catch(e) {
+                        console.warn('Failed to save label style for device', n.id, e);
+                        failCount++;
+                    }
+                });
+
+                await Promise.all(promises);
+
+                applyBtn.disabled = false;
+                applyBtn.innerHTML = '<i class="fas fa-magic mr-2"></i>Apply to All Devices on Map';
+
+                if (failCount === 0) {
+                    if (window.notyf) notyf.success('Label style saved for all ' + savedCount + ' devices!');
+                } else {
+                    if (window.notyf) notyf.error('Saved ' + savedCount + ' devices, ' + failCount + ' failed.');
+                }
             });
         }
     });
 })();
 </script>
+
 
 <?php include 'footer.php'; ?>
 

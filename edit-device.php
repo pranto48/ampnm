@@ -109,13 +109,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($values);
             } else {
-                $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
+                $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, name_text_color = ?, name_text_bold = ?, name_text_italic = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
                     $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
                     $monitor_method, $type, empty($description) ? null : $description,
                     empty($map_id) ? null : $map_id,
                     empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                    $name_text_color, $name_text_bold, $name_text_italic,
                     empty($icon_url) ? null : $icon_url,
                     empty($warning_latency_threshold) ? null : $warning_latency_threshold,
                     empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,

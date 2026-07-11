@@ -395,7 +395,14 @@ MapApp.mapManager = {
                     "assets/images/device-icons/animated-cloud.svg",
                     "assets/images/device-icons/animated-camera.svg",
                     "assets/images/device-icons/animated-database.svg",
-                    "assets/images/device-icons/animated-workstation.svg"
+                    "assets/images/device-icons/animated-workstation.svg",
+                    "assets/images/device-icons/animated-phone.svg",
+                    "assets/images/device-icons/animated-printer.svg",
+                    "assets/images/device-icons/animated-laptop.svg",
+                    "assets/images/device-icons/animated-nas.svg",
+                    "assets/images/device-icons/animated-iot-sensor.svg",
+                    "assets/images/device-icons/animated-ups.svg",
+                    "assets/images/device-icons/animated-utm.svg"
                 ];
                 imagePath = imgList[d.subchoice] || "assets/images/device-icons/default-device.png";
             } else if (!d.subchoice || d.subchoice == 0) {

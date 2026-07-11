@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes fw-packet {
+      0%   { transform: translateX(-35px); opacity: 0; }
+      10%  { opacity: 1; }
+      45%  { transform: translateX(0px); opacity: 1; }
+      55%  { transform: translateX(0px); opacity: 0; }
+      100% { transform: translateX(0px); opacity: 0; }
+    }
+    @keyframes fw-block {
+      0%,44% { opacity: 0; }
+      50%,60% { opacity: 1; fill: #ff4444; }
+      65%,100% { opacity: 0; }
+    }
+    @keyframes fw-allow {
+      0%,44% { opacity: 0; }
+      50% { opacity: 0; }
+      55%,70% { opacity: 1; }
+      80%,100% { opacity: 0; }
+    }
+    @keyframes fw-shield-pulse {
+      0%,100% { stroke: #00F2FE; filter: drop-shadow(0 0 3px #00F2FE); }
+      50%      { stroke: #00FF87; filter: drop-shadow(0 0 6px #00FF87); }
+    }
+    @keyframes fw-led {
+      0%,100% { fill: #00FF87; }
+      50% { fill: #00F2FE; }
+    }
+    .pkt1 { animation: fw-packet 2.5s linear 0s infinite; }
+    .pkt2 { animation: fw-packet 2.5s linear 0.8s infinite; }
+    .pkt3 { animation: fw-packet 2.5s linear 1.6s infinite; }
+    .block { animation: fw-block 2.5s linear infinite; }
+    .allow { animation: fw-allow 2.5s linear infinite; }
+    .shield { animation: fw-shield-pulse 2s ease-in-out infinite; }
+    .fw-led { animation: fw-led 1s ease-in-out infinite; }
+  </style>
+  <!-- Firewall chassis -->
+  <rect x="30" y="28" width="40" height="44" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Shield emblem -->
+  <path d="M50 34 L60 39 L60 50 Q60 60 50 64 Q40 60 40 50 L40 39 Z"
+        fill="#0b2040" class="shield" stroke-width="2"/>
+  <!-- Shield lock icon -->
+  <rect x="46" y="48" width="8" height="6" rx="1.5" fill="#00F2FE" opacity="0.8"/>
+  <path d="M47 48 Q47 44 50 44 Q53 44 53 48" fill="none" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Incoming packets from left -->
+  <rect x="10" y="45" width="9" height="6" rx="2" fill="#00F2FE" class="pkt1"/>
+  <rect x="10" y="55" width="9" height="6" rx="2" fill="#FFAA00" class="pkt2"/>
+  <rect x="10" y="35" width="9" height="6" rx="2" fill="#00FF87" class="pkt3"/>
+  <!-- Connection lines incoming -->
+  <line x1="19" y1="48" x2="30" y2="48" stroke="#00F2FE" stroke-width="1" stroke-dasharray="3,2"/>
+  <line x1="19" y1="58" x2="30" y2="58" stroke="#FFAA00" stroke-width="1" stroke-dasharray="3,2"/>
+  <!-- Block X for rejected packet -->
+  <text x="66" y="55" fill="#ff4444" font-size="12" font-weight="bold" class="block">✕</text>
+  <!-- Check for allowed packet -->
+  <text x="65" y="52" fill="#00FF87" font-size="11" font-weight="bold" class="allow">✓</text>
+  <!-- Status LEDs -->
+  <circle cx="38" cy="68" r="2.5" class="fw-led"/>
+  <circle cx="46" cy="68" r="2.5" fill="#00F2FE" opacity="0.6"/>
+  <circle cx="54" cy="68" r="2.5" fill="#ff4444" opacity="0.8"/>
+  <circle cx="62" cy="68" r="2.5" fill="#00FF87" opacity="0.6"/>
+</svg>

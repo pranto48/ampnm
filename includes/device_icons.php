@@ -587,6 +587,13 @@ return [
             ['image' => 'assets/images/device-icons/animated-camera.svg', 'label' => 'Animated Security Camera'],
             ['image' => 'assets/images/device-icons/animated-database.svg', 'label' => 'Animated Database'],
             ['image' => 'assets/images/device-icons/animated-workstation.svg', 'label' => 'Animated Workstation / PC'],
+            ['image' => 'assets/images/device-icons/animated-phone.svg', 'label' => 'Animated IP Phone / VoIP'],
+            ['image' => 'assets/images/device-icons/animated-printer.svg', 'label' => 'Animated Network Printer'],
+            ['image' => 'assets/images/device-icons/animated-laptop.svg', 'label' => 'Animated Laptop'],
+            ['image' => 'assets/images/device-icons/animated-nas.svg', 'label' => 'Animated NAS Storage'],
+            ['image' => 'assets/images/device-icons/animated-iot-sensor.svg', 'label' => 'Animated IoT Sensor'],
+            ['image' => 'assets/images/device-icons/animated-ups.svg', 'label' => 'Animated UPS'],
+            ['image' => 'assets/images/device-icons/animated-utm.svg', 'label' => 'Animated UTM / Next-Gen Firewall'],
         ]
     ],
 

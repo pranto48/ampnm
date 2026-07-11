@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes phone-ring {
+      0%,100% { transform: rotate(0deg); }
+      10% { transform: rotate(-15deg); }
+      20% { transform: rotate(15deg); }
+      30% { transform: rotate(-10deg); }
+      40% { transform: rotate(10deg); }
+      50% { transform: rotate(0deg); }
+    }
+    @keyframes phone-wave {
+      0% { opacity: 0; stroke-width: 3; r: 8; }
+      50% { opacity: 0.8; }
+      100% { opacity: 0; stroke-width: 1; r: 28; }
+    }
+    @keyframes phone-led {
+      0%,100% { fill: #00FF87; }
+      50% { fill: #00F2FE; }
+    }
+    .phone-body { animation: phone-ring 3s ease-in-out infinite; transform-origin: 50px 50px; }
+    .ring1 { animation: phone-wave 2s ease-out 0s infinite; }
+    .ring2 { animation: phone-wave 2s ease-out 0.7s infinite; }
+    .led { animation: phone-led 1s ease-in-out infinite; }
+  </style>
+  <!-- Signal rings from handset -->
+  <circle cx="68" cy="32" r="8"  fill="none" stroke="#00F2FE" class="ring1"/>
+  <circle cx="68" cy="32" r="18" fill="none" stroke="#00F2FE" class="ring2"/>
+  <!-- IP Phone body -->
+  <g class="phone-body">
+    <rect x="18" y="38" width="52" height="38" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+    <!-- Screen -->
+    <rect x="22" y="42" width="34" height="16" rx="2" fill="#001a30"/>
+    <!-- Screen lines -->
+    <line x1="25" y1="47" x2="48" y2="47" stroke="#00F2FE" stroke-width="1.2" opacity="0.8"/>
+    <line x1="25" y1="51" x2="42" y2="51" stroke="#00F2FE" stroke-width="1" opacity="0.5"/>
+    <!-- Keypad dots -->
+    <circle cx="24" cy="63" r="2" class="led"/>
+    <circle cx="30" cy="63" r="2" fill="#00F2FE" opacity="0.5"/>
+    <circle cx="36" cy="63" r="2" fill="#00F2FE" opacity="0.5"/>
+    <circle cx="42" cy="63" r="2" fill="#00F2FE" opacity="0.5"/>
+    <circle cx="48" cy="63" r="2" fill="#FFAA00" opacity="0.7"/>
+    <!-- Handset icon -->
+    <path d="M58 45 Q65 42 65 50 L62 56 Q55 60 52 55 L54 50 Q57 47 58 45Z" fill="#00F2FE" opacity="0.9"/>
+  </g>
+</svg>
