@@ -111,14 +111,14 @@ MapApp.network = {
         MapApp.state.network = new vis.Network(container, data, options);
         MapApp.network.restoreSavedView();
 
-        // Continuous redraw loop so CSS-animated SVGs play on vis.js canvas
+        // Continuous redraw loop so CSS-animated SVGs play on vis.js canvas via DOM Overlay Engine
         (function startAnimationLoop() {
             let rafId = null;
             function loop() {
                 if (!MapApp.state.network) return;
                 // Check if any node uses an animated SVG
                 const hasAnimated = MapApp.state.nodes.get().some(n =>
-                    n.image && typeof n.image === 'string' && n.image.includes('animated-')
+                    n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
                 );
                 if (hasAnimated) {
                     MapApp.state.network.redraw();
@@ -132,6 +132,70 @@ MapApp.network = {
 
         MapApp.state.network.on("afterDrawing", (ctx) => {
             if (!MapApp.state.network) return;
+
+            // Synchronize DOM Overlay for animated SVGs
+            let overlayContainer = document.getElementById('animated-svg-overlay-container');
+            if (!overlayContainer) {
+                overlayContainer = document.createElement('div');
+                overlayContainer.id = 'animated-svg-overlay-container';
+                overlayContainer.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden; z-index:5;';
+                const wrapper = document.getElementById('network-map-wrapper');
+                if (wrapper) {
+                    wrapper.appendChild(overlayContainer);
+                }
+            }
+
+            const nodes = MapApp.state.nodes.get();
+            const activeIds = new Set();
+            const scale = MapApp.state.network.getScale();
+
+            if (overlayContainer) {
+                nodes.forEach(node => {
+                    const isAnimated = node.originalImage && typeof node.originalImage === 'string' && node.originalImage.includes('animated-');
+                    if (!isAnimated) return;
+
+                    activeIds.add(String(node.id));
+
+                    let imgEl = document.getElementById(`overlay-anim-${node.id}`);
+                    if (!imgEl) {
+                        imgEl = document.createElement('img');
+                        imgEl.id = `overlay-anim-${node.id}`;
+                        imgEl.src = node.originalImage;
+                        imgEl.setAttribute('data-src', node.originalImage);
+                        imgEl.style.cssText = 'position:absolute; pointer-events:none; transition:none; transform-origin: center center; z-index: 5;';
+                        overlayContainer.appendChild(imgEl);
+                    }
+
+                    if (imgEl.getAttribute('data-src') !== node.originalImage) {
+                        imgEl.src = node.originalImage;
+                        imgEl.setAttribute('data-src', node.originalImage);
+                    }
+
+                    const nodePos = MapApp.state.network.getPositions([node.id])[node.id];
+                    if (nodePos) {
+                        const domPos = MapApp.state.network.canvasToDOM(nodePos);
+                        const baseSize = (node.deviceData?.icon_size || 50);
+                        const size = baseSize * scale;
+
+                        imgEl.style.left = (domPos.x - size / 2) + 'px';
+                        imgEl.style.top = (domPos.y - size / 2) + 'px';
+                        imgEl.style.width = size + 'px';
+                        imgEl.style.height = size + 'px';
+                        imgEl.style.display = 'block';
+                    } else {
+                        imgEl.style.display = 'none';
+                    }
+                });
+
+                // Clean up any deleted nodes
+                Array.from(overlayContainer.children).forEach(child => {
+                    const id = child.id.replace('overlay-anim-', '');
+                    if (!activeIds.has(id)) {
+                        child.remove();
+                    }
+                });
+            }
+
             const edges = MapApp.state.network.body.edges;
             
             // Build a lookup map of node statuses
@@ -512,18 +576,7 @@ MapApp.network = {
 
                                 // Update the node data and redraw icon
                                 node.deviceData = updated;
-                                const isImage = !!updated.icon_url;
-                                if (isImage) {
-                                    MapApp.state.nodes.update({
-                                        id: updated.id,
-                                        label: updated.name,
-                                        title: MapApp.utils.buildNodeTitle(updated),
-                                        deviceData: updated,
-                                        shape: 'image',
-                                        image: updated.icon_url,
-                                        size: (parseInt(updated.icon_size, 10) || 50) / 2,
-                                    });
-                                } else if (updated.type === 'box') {
+                                if (updated.type === 'box') {
                                     const pos = MapApp.state.network.getPositions([updated.id])[updated.id] || { x: node.x || 0, y: node.y || 0 };
                                     const baseNode = {
                                         id: updated.id,
@@ -537,19 +590,18 @@ MapApp.network = {
                                     };
                                     MapApp.state.nodes.update(MapApp.utils.buildVisBoxNode(baseNode, updated));
                                 } else {
-                                    MapApp.state.nodes.update({
+                                    const baseNode = {
                                         id: updated.id,
                                         label: updated.name,
                                         title: MapApp.utils.buildNodeTitle(updated),
-                                        deviceData: updated,
-                                        shape: 'icon',
-                                        icon: {
-                                            face: "'Font Awesome 6 Free'",
-                                            weight: '900',
-                                            code: MapApp.mapManager.getDeviceIconUnicode(updated),
-                                            size: parseInt(updated.icon_size, 10) || 50,
-                                            color: (MapApp.config && MapApp.config.statusColorMap && MapApp.config.statusColorMap[updated.status]) ? MapApp.config.statusColorMap[updated.status] : '#94a3b8'
-                                        }
+                                        font: { color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
+                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
+                                        deviceData: updated
+                                    };
+                                    const visuals = MapApp.utils.resolveNodeVisuals(updated);
+                                    MapApp.state.nodes.update({
+                                        ...baseNode,
+                                        ...visuals
                                     });
                                 }
 

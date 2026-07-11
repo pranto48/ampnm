@@ -356,98 +356,16 @@ MapApp.mapManager = {
                 deviceData: d
             };
 
-            // Custom icon URL takes precedence
-            if (d.icon_url) {
-                return {
-                    ...baseNode,
-                    shape: 'image',
-                    image: d.icon_url,
-                    size: (parseInt(d.icon_size) || 50) / 2,
-                    color: { border: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' },
-                    borderWidth: 3
-                };
-            }
-            
             // Box type
             if (d.type === 'box') {
                 return MapApp.utils.buildVisBoxNode(baseNode, d);
             }
 
-            // Use dynamic image mapping based on name/type
-            let imagePath = null;
-            const name = d.name || "";
-            
-            if (d.type === 'png-icons' || d.type === 'animated-icons') {
-                const imgList = d.type === 'png-icons' ? [
-                    "assets/images/device-icons/sophos-firewall.png",
-                    "assets/images/device-icons/cisco-switch.png",
-                    "assets/images/device-icons/mikrotik-router.png",
-                    "assets/images/device-icons/online-ups.png",
-                    "assets/images/device-icons/rack-server.png",
-                    "assets/images/device-icons/default-device.png"
-                ] : [
-                    "assets/images/device-icons/animated-globe.svg",
-                    "assets/images/device-icons/animated-router.svg",
-                    "assets/images/device-icons/animated-firewall.svg",
-                    "assets/images/device-icons/animated-server.svg",
-                    "assets/images/device-icons/animated-access-point.svg",
-                    "assets/images/device-icons/animated-switch.svg",
-                    "assets/images/device-icons/animated-cloud.svg",
-                    "assets/images/device-icons/animated-camera.svg",
-                    "assets/images/device-icons/animated-database.svg",
-                    "assets/images/device-icons/animated-workstation.svg",
-                    "assets/images/device-icons/animated-phone.svg",
-                    "assets/images/device-icons/animated-printer.svg",
-                    "assets/images/device-icons/animated-laptop.svg",
-                    "assets/images/device-icons/animated-nas.svg",
-                    "assets/images/device-icons/animated-iot-sensor.svg",
-                    "assets/images/device-icons/animated-ups.svg",
-                    "assets/images/device-icons/animated-utm.svg",
-                    "assets/images/device-icons/animated-tower.svg",
-                    "assets/images/device-icons/animated-modem.svg",
-                    "assets/images/device-icons/animated-patch-panel.svg",
-                    "assets/images/device-icons/animated-vlan.svg"
-                ];
-                imagePath = imgList[d.subchoice] || "assets/images/device-icons/default-device.png";
-            } else if (!d.subchoice || d.subchoice == 0) {
-                if (/Firewall|CNF|UTM/i.test(name)) {
-                    imagePath = "assets/images/device-icons/sophos-firewall.png";
-                } else if (/Switch|Core SW|DMZ SW/i.test(name)) {
-                    imagePath = "assets/images/device-icons/cisco-switch.png";
-                } else if (/Router|IT Router|Dyeing Floor/i.test(name)) {
-                    imagePath = "assets/images/device-icons/mikrotik-router.png";
-                } else if (/UPS|GMT/i.test(name)) {
-                    imagePath = "assets/images/device-icons/online-ups.png";
-                } else if (/Server|ARIF-OPC/i.test(name)) {
-                    imagePath = "assets/images/device-icons/rack-server.png";
-                }
-            }
-            
-            if (imagePath) {
-                return {
-                    ...baseNode,
-                    shape: 'image',
-                    image: imagePath,
-                    brokenImage: "assets/images/device-icons/default-device.png",
-                    size: (parseInt(d.icon_size) || 50) / 2,
-                    color: { border: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' },
-                    borderWidth: 3
-                };
-            }
-            
-            // Fallback: Use dynamic icon mapping based on type and subchoice (FontAwesome icon)
-            const iconCode = MapApp.mapManager.getDeviceIconUnicode(d);
-            
-            return { 
-                ...baseNode, 
-                shape: 'icon', 
-                icon: { 
-                    face: "'Font Awesome 6 Free'", 
-                    weight: "900", 
-                    code: iconCode,
-                    size: parseInt(d.icon_size) || 50, 
-                    color: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown 
-                } 
+            // Resolve visuals for normal nodes
+            const visuals = MapApp.utils.resolveNodeVisuals(d);
+            return {
+                ...baseNode,
+                ...visuals
             };
         });
         MapApp.state.nodes.clear(); 

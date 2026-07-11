@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes core-blink {
+      0%, 100% { opacity: 1; fill: #00FF87; }
+      50% { opacity: 0.15; fill: #00F2FE; }
+    }
+    @keyframes core-data {
+      0% { stroke-dashoffset: 24; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes core-pulse {
+      0%, 100% { filter: drop-shadow(0 0 1px #00F2FE); }
+      50% { filter: drop-shadow(0 0 4px #00F2FE); }
+    }
+    .led { animation: core-blink 0.8s ease-in-out infinite; }
+    .data-line { stroke-dasharray: 4,4; animation: core-data 0.5s linear infinite; }
+    .chassis { animation: core-pulse 2s ease-in-out infinite; }
+  </style>
+  <!-- Core Switch Multi-chassis stack -->
+  <rect class="chassis" x="10" y="20" width="80" height="60" rx="6" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Segment divisions (modular slots) -->
+  <line x1="10" y1="40" x2="90" y2="40" stroke="#00F2FE" stroke-width="1.5"/>
+  <line x1="10" y1="60" x2="90" y2="60" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Fiber Uplinks (high speed modules) -->
+  <rect x="16" y="25" width="22" height="10" rx="1" fill="#041830" stroke="#00FF87" stroke-width="1"/>
+  <rect x="16" y="45" width="22" height="10" rx="1" fill="#041830" stroke="#00FF87" stroke-width="1"/>
+  <rect x="16" y="65" width="22" height="10" rx="1" fill="#041830" stroke="#00FF87" stroke-width="1"/>
+  <!-- Active optical link glow -->
+  <circle cx="21" cy="30" r="2" class="led"/>
+  <circle cx="27" cy="30" r="2" class="led" style="animation-delay:0.2s;"/>
+  <circle cx="33" cy="30" r="2" fill="#00FF87"/>
+  <circle cx="21" cy="50" r="2" class="led" style="animation-delay:0.4s;"/>
+  <circle cx="27" cy="50" r="2" class="led" style="animation-delay:0.6s;"/>
+  <circle cx="33" cy="50" r="2" fill="#00FF87"/>
+  <circle cx="21" cy="70" r="2" class="led"/>
+  <circle cx="27" cy="70" r="2" class="led" style="animation-delay:0.2s;"/>
+  <circle cx="33" cy="70" r="2" fill="#00FF87"/>
+  <!-- Gigabit ethernet port array (RJ45 matrix) -->
+  <!-- Row 1 -->
+  <rect x="44" y="25" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="52" y="25" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="60" y="25" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="68" y="25" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="76" y="25" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <!-- Row 2 -->
+  <rect x="44" y="45" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="52" y="45" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="60" y="45" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="68" y="45" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <rect x="76" y="45" width="6" height="4" rx="0.5" fill="#041830" stroke="#00F2FE" stroke-width="0.5"/>
+  <!-- LEDs above RJ45 array -->
+  <circle cx="47" cy="33" r="1" fill="#00FF87" class="led"/>
+  <circle cx="55" cy="33" r="1" fill="#FFAA00" class="led" style="animation-delay:0.3s;"/>
+  <circle cx="63" cy="33" r="1" fill="#00FF87" class="led" style="animation-delay:0.15s;"/>
+  <circle cx="71" cy="33" r="1" fill="#00FF87" class="led" style="animation-delay:0.45s;"/>
+  <circle cx="79" cy="33" r="1" fill="#00FF87" class="led" style="animation-delay:0.6s;"/>
+  <!-- Central cross-connect flow lines -->
+  <path d="M42,52 L82,52" stroke="#00F2FE" stroke-width="1.5" class="data-line"/>
+  <path d="M42,72 L82,72" stroke="#00FF87" stroke-width="1.5" class="data-line" style="animation-delay: 0.25s;"/>
+</svg>

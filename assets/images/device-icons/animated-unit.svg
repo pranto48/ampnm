@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes unit-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes unit-pulse {
+      0%, 100% { fill: #00F2FE; opacity: 0.6; }
+      50% { fill: #00FF87; opacity: 1; }
+    }
+    @keyframes unit-line {
+      0% { stroke-dashoffset: 20; }
+      100% { stroke-dashoffset: 0; }
+    }
+    .rotor { animation: unit-spin 4s linear infinite; transform-origin: 50px 50px; }
+    .core { animation: unit-pulse 2s ease-in-out infinite; }
+    .flow { stroke-dasharray: 5,3; animation: unit-line 1s linear infinite; }
+  </style>
+  <!-- Outer enclosing cage -->
+  <rect x="18" y="18" width="64" height="64" rx="10" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Circular central hub -->
+  <circle cx="50" cy="50" r="22" fill="#041830" stroke="#00F2FE" stroke-width="2"/>
+  <!-- Spinning rotor spokes (compute cycles) -->
+  <g class="rotor">
+    <line x1="50" y1="28" x2="50" y2="72" stroke="#00FF87" stroke-width="2"/>
+    <line x1="28" y1="50" x2="72" y2="50" stroke="#00FF87" stroke-width="2"/>
+    <circle cx="50" cy="32" r="3" fill="#00FF87"/>
+    <circle cx="50" cy="68" r="3" fill="#00FF87"/>
+    <circle cx="32" cy="50" r="3" fill="#00FF87"/>
+    <circle cx="68" cy="50" r="3" fill="#00FF87"/>
+  </g>
+  <!-- Central compute core -->
+  <circle cx="50" cy="50" r="10" class="core"/>
+  <circle cx="50" cy="50" r="5" fill="#0b1e36"/>
+  <!-- Data pipeline flows in 4 corners -->
+  <path d="M24,24 L38,38" stroke="#00F2FE" stroke-width="1.5" class="flow"/>
+  <path d="M76,24 L62,38" stroke="#00F2FE" stroke-width="1.5" class="flow" style="animation-delay: 0.25s;"/>
+  <path d="M24,76 L38,62" stroke="#00F2FE" stroke-width="1.5" class="flow" style="animation-delay: 0.5s;"/>
+  <path d="M76,76 L62,62" stroke="#00F2FE" stroke-width="1.5" class="flow" style="animation-delay: 0.75s;"/>
+</svg>

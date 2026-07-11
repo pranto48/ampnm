@@ -228,19 +228,77 @@ function buildVisNode(device) {
         font: { color: '#e2e8f0', size: device.name_text_size ? Number(device.name_text_size) : 14, multi: true },
     };
 
+    if (device.type === 'box') {
+        return { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
+    }
+
+    let imagePath = null;
+    const name = device.name || "";
+
     if (device.icon_url) {
+        imagePath = device.icon_url;
+    } else if (device.type === 'png-icons' || device.type === 'animated-icons') {
+        const imgList = device.type === 'png-icons' ? [
+            "assets/images/device-icons/sophos-firewall.png",
+            "assets/images/device-icons/cisco-switch.png",
+            "assets/images/device-icons/mikrotik-router.png",
+            "assets/images/device-icons/online-ups.png",
+            "assets/images/device-icons/rack-server.png",
+            "assets/images/device-icons/default-device.png"
+        ] : [
+            "assets/images/device-icons/animated-globe.svg",
+            "assets/images/device-icons/animated-router.svg",
+            "assets/images/device-icons/animated-firewall.svg",
+            "assets/images/device-icons/animated-server.svg",
+            "assets/images/device-icons/animated-access-point.svg",
+            "assets/images/device-icons/animated-switch.svg",
+            "assets/images/device-icons/animated-cloud.svg",
+            "assets/images/device-icons/animated-camera.svg",
+            "assets/images/device-icons/animated-database.svg",
+            "assets/images/device-icons/animated-workstation.svg",
+            "assets/images/device-icons/animated-phone.svg",
+            "assets/images/device-icons/animated-printer.svg",
+            "assets/images/device-icons/animated-laptop.svg",
+            "assets/images/device-icons/animated-nas.svg",
+            "assets/images/device-icons/animated-iot-sensor.svg",
+            "assets/images/device-icons/animated-ups.svg",
+            "assets/images/device-icons/animated-utm.svg",
+            "assets/images/device-icons/animated-tower.svg",
+            "assets/images/device-icons/animated-modem.svg",
+            "assets/images/device-icons/animated-patch-panel.svg",
+            "assets/images/device-icons/animated-vlan.svg",
+            "assets/images/device-icons/animated-warehouse.svg",
+            "assets/images/device-icons/animated-switch-core.svg",
+            "assets/images/device-icons/animated-ups-online.svg",
+            "assets/images/device-icons/animated-firewall-nextgen.svg",
+            "assets/images/device-icons/animated-unit.svg"
+        ];
+        imagePath = imgList[device.subchoice] || "assets/images/device-icons/default-device.png";
+    } else if (!device.subchoice || device.subchoice == 0) {
+        if (/Firewall|CNF|UTM/i.test(name)) {
+            imagePath = "assets/images/device-icons/sophos-firewall.png";
+        } else if (/Switch|Core SW|DMZ SW/i.test(name)) {
+            imagePath = "assets/images/device-icons/cisco-switch.png";
+        } else if (/Router|IT Router|Dyeing Floor/i.test(name)) {
+            imagePath = "assets/images/device-icons/mikrotik-router.png";
+        } else if (/UPS|GMT/i.test(name)) {
+            imagePath = "assets/images/device-icons/online-ups.png";
+        } else if (/Server|ARIF-OPC/i.test(name)) {
+            imagePath = "assets/images/device-icons/rack-server.png";
+        }
+    }
+
+    if (imagePath) {
+        const isAnimated = imagePath.includes('animated-');
         return {
             ...baseNode,
             shape: 'image',
-            image: device.icon_url,
+            image: isAnimated ? "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" : imagePath,
+            originalImage: imagePath,
             size: device.icon_size ? Number(device.icon_size) / 2 : 25,
             color: { border: statusColorMap[device.status] || statusColorMap.unknown, background: 'transparent' },
             borderWidth: 3,
         };
-    }
-
-    if (device.type === 'box') {
-        return { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
     }
 
     const iconCode = getDeviceIconUnicode(device);
@@ -342,8 +400,94 @@ function renderMap({ map, devices, edges }) {
             edges: { smooth: { type: "dynamic" } },
             nodes: { borderWidth: 1, shadow: true },
         });
+
+        // Continuous redraw loop so CSS-animated SVGs play on the public read-only canvas
+        (function startAnimationLoop() {
+            function loop() {
+                if (!visNetwork) return;
+                const hasAnimated = visNodesDataset.get().some(n =>
+                    n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
+                );
+                if (hasAnimated) {
+                    visNetwork.redraw();
+                }
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+        })();
+
+        // Synchronize DOM Overlay for animated SVGs
+        visNetwork.on("afterDrawing", () => {
+            if (!visNetwork) return;
+
+            const mapFrame = canvas.parentElement;
+            if (!mapFrame) return;
+
+            let overlayContainer = document.getElementById('animated-svg-overlay-container');
+            if (!overlayContainer) {
+                overlayContainer = document.createElement('div');
+                overlayContainer.id = 'animated-svg-overlay-container';
+                overlayContainer.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden; z-index:5;';
+                mapFrame.appendChild(overlayContainer);
+            }
+
+            const nodes = visNodesDataset.get();
+            const activeIds = new Set();
+            const scale = visNetwork.getScale();
+
+            nodes.forEach(node => {
+                const isAnimated = node.originalImage && typeof node.originalImage === 'string' && node.originalImage.includes('animated-');
+                if (!isAnimated) return;
+
+                activeIds.add(String(node.id));
+
+                let imgEl = document.getElementById(`overlay-anim-${node.id}`);
+                if (!imgEl) {
+                    imgEl = document.createElement('img');
+                    imgEl.id = `overlay-anim-${node.id}`;
+                    imgEl.src = node.originalImage;
+                    imgEl.setAttribute('data-src', node.originalImage);
+                    imgEl.style.cssText = 'position:absolute; pointer-events:none; transition:none; transform-origin: center center; z-index: 5;';
+                    overlayContainer.appendChild(imgEl);
+                }
+
+                const nodePos = visNetwork.getPositions([node.id])[node.id];
+                if (nodePos) {
+                    const domPos = visNetwork.canvasToDOM(nodePos);
+                    const baseSize = deviceSizeMap[node.id] || 50; // Use actual device icon size or fallback to 50
+                    const size = baseSize * scale;
+
+                    imgEl.style.left = (domPos.x - size / 2) + 'px';
+                    imgEl.style.top = (domPos.y - size / 2) + 'px';
+                    imgEl.style.width = size + 'px';
+                    imgEl.style.height = size + 'px';
+                    imgEl.style.display = 'block';
+                } else {
+                    imgEl.style.display = 'none';
+                }
+            });
+
+            // Clean up any deleted nodes
+            Array.from(overlayContainer.children).forEach(child => {
+                const id = child.id.replace('overlay-anim-', '');
+                if (!activeIds.has(id)) {
+                    child.remove();
+                }
+            });
+        });
     }
 }
+
+// Track device sizes for DOM overlay scaling
+const deviceSizeMap = {};
+visNodesDataset.on('*', () => {
+    visNodesDataset.get().forEach(n => {
+        if (n.size) {
+            deviceSizeMap[n.id] = n.size * 2;
+        }
+    });
+});
+
 
 /**
  * In-place status update — only updates node icon colors and titles without resetting the network
