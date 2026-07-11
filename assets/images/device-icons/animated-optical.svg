@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes fiber-glow {
+      0%, 100% { filter: drop-shadow(0 0 2px #00FF87); stroke: #00FF87; }
+      50% { filter: drop-shadow(0 0 6px #00FF87); stroke: #00F2FE; }
+    }
+    @keyframes optic-pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    .fiber-link { animation: fiber-glow 2s ease-in-out infinite; }
+    .optic-core { animation: optic-pulse 1.5s ease-in-out infinite; }
+  </style>
+  <!-- Converter unit casing -->
+  <rect x="12" y="24" width="76" height="52" rx="4" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Dark inner terminal space -->
+  <rect x="18" y="32" width="64" height="36" rx="2" fill="#041830"/>
+  <!-- Copper ethernet port (left side) -->
+  <rect x="24" y="42" width="14" height="16" rx="1.5" fill="#0b1e36" stroke="#00F2FE" stroke-width="1.5"/>
+  <rect x="28" y="48" width="6" height="6" rx="1" fill="#FFAA00"/>
+  <!-- Optical dual fiber LC transceiver ports (right side) -->
+  <rect x="52" y="40" width="10" height="20" rx="1" fill="#0b1e36" stroke="#00FF87" stroke-width="1.5"/>
+  <rect x="64" y="40" width="10" height="20" rx="1" fill="#0b1e36" stroke="#00FF87" stroke-width="1.5"/>
+  <!-- Glowing laser cores -->
+  <circle cx="57" cy="50" r="3" fill="#00FF87" class="optic-core"/>
+  <circle cx="69" cy="50" r="3" fill="#00F2FE" class="optic-core" style="animation-delay: 0.75s;"/>
+  <!-- Fiber Optic Connection Patch Cables looping -->
+  <path d="M57,60 C57,80 69,80 69,60" fill="none" stroke="#00FF87" stroke-width="2" class="fiber-link"/>
+  <!-- Internal circuit conversion logic tracks -->
+  <line x1="38" y1="50" x2="52" y2="50" stroke="#00F2FE" stroke-dasharray="2,2"/>
+</svg>

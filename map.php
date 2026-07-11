@@ -657,6 +657,51 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         preview.style.fontStyle = italic;
     }
 
+    // Persist to localStorage whenever settings are changed in the panel
+    function saveGlobalLabelSettings() {
+        const mapId = MapApp.state?.currentMapId;
+        if (!mapId) return;
+        const colorHex    = document.getElementById('globalLabelColorHex');
+        const sizeSlider  = document.getElementById('globalLabelSize');
+        const boldCheck   = document.getElementById('globalLabelBold');
+        const italicCheck = document.getElementById('globalLabelItalic');
+
+        const settings = {
+            color: colorHex ? colorHex.value : '#ffffff',
+            size: sizeSlider ? parseInt(sizeSlider.value) : 14,
+            bold: boldCheck && boldCheck.checked ? 1 : 0,
+            italic: italicCheck && italicCheck.checked ? 1 : 0
+        };
+        localStorage.setItem(`mapLabelSettings:${mapId}`, JSON.stringify(settings));
+    }
+
+    window.loadGlobalLabelSettings = function() {
+        const mapId = MapApp.state?.currentMapId;
+        if (!mapId) return;
+        
+        try {
+            const raw = localStorage.getItem(`mapLabelSettings:${mapId}`);
+            if (raw) {
+                const settings = JSON.parse(raw);
+                const colorPicker = document.getElementById('globalLabelColor');
+                const colorHex    = document.getElementById('globalLabelColorHex');
+                const sizeSlider  = document.getElementById('globalLabelSize');
+                const boldCheck   = document.getElementById('globalLabelBold');
+                const italicCheck = document.getElementById('globalLabelItalic');
+                
+                if (colorPicker && settings.color) colorPicker.value = settings.color;
+                if (colorHex && settings.color) colorHex.value = settings.color;
+                if (sizeSlider && settings.size) sizeSlider.value = settings.size;
+                if (boldCheck) boldCheck.checked = settings.bold == 1;
+                if (italicCheck) italicCheck.checked = settings.italic == 1;
+                
+                updateGlobalLabelPreview();
+            }
+        } catch(e) {
+            console.error('Failed to load global label settings', e);
+        }
+    };
+
     document.addEventListener('DOMContentLoaded', function() {
         const colorPicker = document.getElementById('globalLabelColor');
         const colorHex    = document.getElementById('globalLabelColorHex');
@@ -669,6 +714,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             colorPicker.addEventListener('input', function() {
                 if (colorHex) colorHex.value = this.value;
                 updateGlobalLabelPreview();
+                saveGlobalLabelSettings();
             });
         }
         if (colorHex) {
@@ -677,11 +723,27 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     if (colorPicker) colorPicker.value = this.value;
                 }
                 updateGlobalLabelPreview();
+                saveGlobalLabelSettings();
             });
         }
-        if (sizeSlider) sizeSlider.addEventListener('input', updateGlobalLabelPreview);
-        if (boldCheck)  boldCheck.addEventListener('change', updateGlobalLabelPreview);
-        if (italicCheck) italicCheck.addEventListener('change', updateGlobalLabelPreview);
+        if (sizeSlider) {
+            sizeSlider.addEventListener('input', function() {
+                updateGlobalLabelPreview();
+                saveGlobalLabelSettings();
+            });
+        }
+        if (boldCheck) {
+            boldCheck.addEventListener('change', function() {
+                updateGlobalLabelPreview();
+                saveGlobalLabelSettings();
+            });
+        }
+        if (italicCheck) {
+            italicCheck.addEventListener('change', function() {
+                updateGlobalLabelPreview();
+                saveGlobalLabelSettings();
+            });
+        }
 
         // Tab switching handler (includes labelstyle tab)
         document.querySelectorAll('.map-settings-tab-btn').forEach(btn => {
@@ -768,7 +830,20 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 } else {
                     if (window.notyf) notyf.error('Saved ' + savedCount + ' devices, ' + failCount + ' failed.');
                 }
+
+                // Also persist label settings to localStorage as the map defaults
+                saveGlobalLabelSettings();
             });
+        }
+
+        // Hook into MapApp.mapManager.switchMap to load global label styles when map changes
+        if (window.MapApp && MapApp.mapManager && typeof MapApp.mapManager.switchMap === 'function') {
+            const originalSwitchMap = MapApp.mapManager.switchMap;
+            MapApp.mapManager.switchMap = async function(mapId) {
+                const res = await originalSwitchMap.apply(this, arguments);
+                window.loadGlobalLabelSettings();
+                return res;
+            };
         }
     });
 })();

@@ -345,14 +345,34 @@ MapApp.mapManager = {
 
             const overridePos = nodePositionOverrides[d.id] || nodePositionOverrides[String(d.id)] || null;
 
-            const labelColor = d.name_text_color || '#ffffff';
-            const labelBold = d.name_text_bold == 1;
-            const labelItalic = d.name_text_italic == 1;
+            // Fallback to map-specific settings from localStorage if node styles are default/unset
+            let labelColor = d.name_text_color;
+            let labelSize = parseInt(d.name_text_size);
+            let labelBold = d.name_text_bold == 1;
+            let labelItalic = d.name_text_italic == 1;
+
+            const mapSettingsRaw = localStorage.getItem(`mapLabelSettings:${mapId}`);
+            if (mapSettingsRaw) {
+                try {
+                    const mapSettings = JSON.parse(mapSettingsRaw);
+                    if (!labelColor || labelColor === '#ffffff') {
+                        labelColor = mapSettings.color || '#ffffff';
+                    }
+                    if (isNaN(labelSize) || labelSize === 14) {
+                        labelSize = parseInt(mapSettings.size) || 14;
+                    }
+                    if (!labelBold) labelBold = mapSettings.bold == 1;
+                    if (!labelItalic) labelItalic = mapSettings.italic == 1;
+                } catch(e) {}
+            }
+            if (!labelColor) labelColor = '#ffffff';
+            if (isNaN(labelSize)) labelSize = 14;
+
             const labelFace = labelBold && labelItalic ? 'bold italic Arial' : labelBold ? 'bold Arial' : labelItalic ? 'italic Arial' : 'Arial';
             const baseNode = {
                 id: d.id, label: label, title: MapApp.utils.buildNodeTitle(d),
                 x: overridePos?.x ?? d.x, y: overridePos?.y ?? d.y,
-                font: { color: labelColor, size: parseInt(d.name_text_size) || 14, multi: true, face: labelFace },
+                font: { color: labelColor, size: labelSize, multi: true, face: labelFace },
                 deviceData: d
             };
 

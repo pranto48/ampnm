@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes sat-orbit {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    @keyframes sat-beam {
+      0% { opacity: 0; stroke-width: 1; }
+      50% { opacity: 0.8; stroke-width: 2.5; }
+      100% { opacity: 0; stroke-width: 1; }
+    }
+    .sat { animation: sat-orbit 4s ease-in-out infinite; transform-origin: 50px 35px; }
+    .beam { stroke-dasharray: 4,4; animation: sat-beam 2s ease-in-out infinite; }
+  </style>
+  <g class="sat">
+    <!-- Satellite Solar Panels -->
+    <rect x="14" y="28" width="22" height="10" rx="1.5" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+    <line x1="25" y1="28" x2="25" y2="38" stroke="#00F2FE" stroke-width="1"/>
+    <line x1="30" y1="28" x2="30" y2="38" stroke="#00F2FE" stroke-width="1"/>
+    
+    <rect x="64" y="28" width="22" height="10" rx="1.5" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+    <line x1="75" y1="28" x2="75" y2="38" stroke="#00F2FE" stroke-width="1"/>
+    <line x1="70" y1="28" x2="70" y2="38" stroke="#00F2FE" stroke-width="1"/>
+    
+    <!-- Cross struts -->
+    <line x1="36" y1="33" x2="64" y2="33" stroke="#00F2FE" stroke-width="2"/>
+    
+    <!-- Main Satellite Body -->
+    <rect x="42" y="22" width="16" height="22" rx="3" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+    
+    <!-- Dish reflector -->
+    <path d="M38,50 Q50,56 62,50" fill="none" stroke="#00FF87" stroke-width="2"/>
+    <line x1="50" y1="44" x2="50" y2="52" stroke="#00FF87" stroke-width="1.5"/>
+  </g>
+  <!-- Downlink transmission beam -->
+  <line x1="50" y1="56" x2="50" y2="88" stroke="#00FF87" stroke-dasharray="5,4" class="beam"/>
+  <circle cx="50" cy="90" r="3" fill="#00FF87"/>
+</svg>

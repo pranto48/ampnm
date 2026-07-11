@@ -598,6 +598,17 @@ return [
             ['image' => 'assets/images/device-icons/animated-modem.svg', 'label' => 'Animated Wireless Modem'],
             ['image' => 'assets/images/device-icons/animated-patch-panel.svg', 'label' => 'Animated Patch Panel'],
             ['image' => 'assets/images/device-icons/animated-vlan.svg', 'label' => 'Animated VLAN / Network Segment'],
+            ['image' => 'assets/images/device-icons/animated-warehouse.svg', 'label' => 'Animated Warehouse / Facility'],
+            ['image' => 'assets/images/device-icons/animated-switch-core.svg', 'label' => 'Animated Core Switch Stack'],
+            ['image' => 'assets/images/device-icons/animated-ups-online.svg', 'label' => 'Animated Online Double-Conversion UPS'],
+            ['image' => 'assets/images/device-icons/animated-firewall-nextgen.svg', 'label' => 'Animated Next-Gen DPI Firewall'],
+            ['image' => 'assets/images/device-icons/animated-unit.svg', 'label' => 'Animated Compute Node / Unit'],
+            ['image' => 'assets/images/device-icons/animated-sat.svg', 'label' => 'Animated Satellite Transceiver'],
+            ['image' => 'assets/images/device-icons/animated-sdwan.svg', 'label' => 'Animated SD-WAN Edge Gateway'],
+            ['image' => 'assets/images/device-icons/animated-datacenter.svg', 'label' => 'Animated Datacenter Rack Enclosure'],
+            ['image' => 'assets/images/device-icons/animated-wifi-router.svg', 'label' => 'Animated Enterprise WiFi Router'],
+            ['image' => 'assets/images/device-icons/animated-optical.svg', 'label' => 'Animated Optical Fiber Converter'],
+            ['image' => 'assets/images/device-icons/animated-server-blade.svg', 'label' => 'Animated Server Blade Shelf'],
         ]
     ],
 

@@ -271,7 +271,13 @@ function buildVisNode(device) {
             "assets/images/device-icons/animated-switch-core.svg",
             "assets/images/device-icons/animated-ups-online.svg",
             "assets/images/device-icons/animated-firewall-nextgen.svg",
-            "assets/images/device-icons/animated-unit.svg"
+            "assets/images/device-icons/animated-unit.svg",
+            "assets/images/device-icons/animated-sat.svg",
+            "assets/images/device-icons/animated-sdwan.svg",
+            "assets/images/device-icons/animated-datacenter.svg",
+            "assets/images/device-icons/animated-wifi-router.svg",
+            "assets/images/device-icons/animated-optical.svg",
+            "assets/images/device-icons/animated-server-blade.svg"
         ];
         imagePath = imgList[device.subchoice] || "assets/images/device-icons/default-device.png";
     } else if (!device.subchoice || device.subchoice == 0) {

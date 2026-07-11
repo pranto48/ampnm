@@ -206,13 +206,33 @@ MapApp.network = {
                 }
             });
 
+            // Load dynamic connection line style preferences
+            const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function') 
+                ? MapApp.utils.getCurrentTooltipDisplaySettings() 
+                : { connection_run_style: 'auto', connection_animation_speed: 100 };
+            
+            const runStyle = displaySettings.connection_run_style || 'auto';
+            const animSpeed = displaySettings.connection_animation_speed !== undefined ? (displaySettings.connection_animation_speed / 100) : 1.0;
+            globalSpeedMultiplier = animSpeed;
+
             ctx.save();
             
+            function getPointAlongEdge(edge, t) {
+                try {
+                    if (edge.edgeType && typeof edge.edgeType.getPoint === 'function') {
+                        return edge.edgeType.getPoint(t);
+                    } else if (typeof edge.getPoint === 'function') {
+                        return edge.getPoint(t);
+                    }
+                } catch(e) {}
+                return null;
+            }
+
             for (const edgeId in edges) {
                 const edge = edges[edgeId];
                 if (!edge.from || !edge.to) continue;
 
-                // Ensure invisible or hidden edges (e.g., collapsed cluster nodes) are ignored to maintain performance
+                // Ensure invisible or hidden edges are ignored
                 if (edge.options?.hidden === true || edge.hidden === true) continue;
                 if (edge.from?.options?.hidden === true || edge.to?.options?.hidden === true) continue;
 
@@ -225,27 +245,116 @@ MapApp.network = {
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 if (isOffline) continue;
 
-                // Draw 3 glowing circles along each edge
-                for (let i = 0; i < 3; i++) {
-                    const offset = i / 3;
-                    const t = (globalProgress + offset) % 1.0;
-                    try {
-                        let point = null;
-                        if (edge.edgeType && typeof edge.edgeType.getPoint === 'function') {
-                            point = edge.edgeType.getPoint(t);
-                        } else if (typeof edge.getPoint === 'function') {
-                            point = edge.getPoint(t);
+                // Match edge color with glow
+                const edgeColor = edge.options?.color?.color || '#00F2FE';
+
+                if (runStyle === 'data-flow') {
+                    // Draw flowing packets
+                    for (let i = 0; i < 4; i++) {
+                        const t = (globalProgress + i / 4) % 1.0;
+                        const pt = getPointAlongEdge(edge, t);
+                        if (pt) {
+                            ctx.fillStyle = edgeColor;
+                            ctx.shadowColor = edgeColor;
+                            ctx.shadowBlur = 8;
+                            ctx.fillRect(pt.x - 4, pt.y - 2.5, 8, 5);
                         }
-                        if (point) {
+                    }
+                } else if (runStyle === 'data-stream') {
+                    // High-density stream
+                    for (let i = 0; i < 12; i++) {
+                        const t = (globalProgress + i / 12) % 1.0;
+                        const pt = getPointAlongEdge(edge, t);
+                        if (pt) {
                             ctx.beginPath();
-                            ctx.arc(point.x, point.y, 4.5, 0, 2 * Math.PI);
-                            ctx.fillStyle = '#00F2FE';
-                            ctx.shadowColor = '#00F2FE';
+                            ctx.arc(pt.x, pt.y, 2.5, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#00FF87';
+                            ctx.shadowColor = '#00FF87';
+                            ctx.shadowBlur = 6;
+                            ctx.fill();
+                        }
+                    }
+                } else if (runStyle === 'pulse') {
+                    // Single sweep pulse
+                    const pt = getPointAlongEdge(edge, globalProgress);
+                    if (pt) {
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 7, 0, 2 * Math.PI);
+                        ctx.fillStyle = edgeColor;
+                        ctx.shadowColor = edgeColor;
+                        ctx.shadowBlur = 15;
+                        ctx.fill();
+                    }
+                } else if (runStyle === 'wave') {
+                    // Sinusoidal wave flow
+                    for (let i = 0; i < 6; i++) {
+                        const t = (globalProgress + i / 6) % 1.0;
+                        const pt = getPointAlongEdge(edge, t);
+                        if (pt) {
+                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI/2;
+                            const waveOffset = Math.sin(t * Math.PI * 4) * 6;
+                            const wx = pt.x + Math.cos(angle) * waveOffset;
+                            const wy = pt.y + Math.sin(angle) * waveOffset;
+
+                            ctx.beginPath();
+                            ctx.arc(wx, wy, 4, 0, 2 * Math.PI);
+                            ctx.fillStyle = edgeColor;
+                            ctx.shadowColor = edgeColor;
+                            ctx.shadowBlur = 8;
+                            ctx.fill();
+                        }
+                    }
+                } else if (runStyle === 'morse') {
+                    // Morse code style (dash and dot)
+                    for (let i = 0; i < 5; i++) {
+                        const t = (globalProgress + i / 5) % 1.0;
+                        const pt = getPointAlongEdge(edge, t);
+                        if (pt) {
+                            ctx.fillStyle = edgeColor;
+                            ctx.shadowColor = edgeColor;
+                            ctx.shadowBlur = 8;
+                            if (i % 2 === 0) {
+                                ctx.fillRect(pt.x - 6, pt.y - 2, 12, 4);
+                            } else {
+                                ctx.beginPath();
+                                ctx.arc(pt.x, pt.y, 3, 0, 2 * Math.PI);
+                                ctx.fill();
+                            }
+                        }
+                    }
+                } else if (runStyle === 'zipper') {
+                    // Zipper interlocking style
+                    for (let i = 0; i < 8; i++) {
+                        const t = (globalProgress + i / 8) % 1.0;
+                        const pt = getPointAlongEdge(edge, t);
+                        if (pt) {
+                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI/2;
+                            const offsetSign = i % 2 === 0 ? 1 : -1;
+                            const zx = pt.x + Math.cos(angle) * offsetSign * 3.5;
+                            const zy = pt.y + Math.sin(angle) * offsetSign * 3.5;
+
+                            ctx.beginPath();
+                            ctx.arc(zx, zy, 3, 0, 2 * Math.PI);
+                            ctx.fillStyle = edgeColor;
+                            ctx.shadowColor = edgeColor;
+                            ctx.shadowBlur = 6;
+                            ctx.fill();
+                        }
+                    }
+                } else {
+                    // Standard 3-dot animation flow
+                    for (let i = 0; i < 3; i++) {
+                        const offset = i / 3;
+                        const t = (globalProgress + offset) % 1.0;
+                        const pt = getPointAlongEdge(edge, t);
+                        if (pt) {
+                            ctx.beginPath();
+                            ctx.arc(pt.x, pt.y, 4.5, 0, 2 * Math.PI);
+                            ctx.fillStyle = edgeColor;
+                            ctx.shadowColor = edgeColor;
                             ctx.shadowBlur = 10;
                             ctx.fill();
                         }
-                    } catch (e) {
-                        // getPoint can fail during initialization or node dragging
                     }
                 }
             }

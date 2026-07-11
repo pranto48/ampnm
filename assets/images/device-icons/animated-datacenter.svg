@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes dc-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+    @keyframes dc-flow {
+      0% { stroke-dashoffset: 20; }
+      100% { stroke-dashoffset: 0; }
+    }
+    .core { animation: dc-pulse 2s ease-in-out infinite; }
+    .data { stroke-dasharray: 4,4; animation: dc-flow 0.8s linear infinite; }
+  </style>
+  <!-- Main rack enclosure structure -->
+  <rect x="22" y="10" width="56" height="80" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Server unit 1 -->
+  <rect x="28" y="18" width="44" height="16" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <circle cx="36" cy="26" r="2.5" fill="#00FF87" class="core"/>
+  <circle cx="44" cy="26" r="2.5" fill="#00FF87" class="core" style="animation-delay: 0.5s;"/>
+  <line x1="52" y1="26" x2="66" y2="26" stroke="#00F2FE" stroke-width="1.5" class="data"/>
+  
+  <!-- Server unit 2 -->
+  <rect x="28" y="42" width="44" height="16" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <circle cx="36" cy="50" r="2.5" fill="#00FF87" class="core" style="animation-delay: 0.3s;"/>
+  <circle cx="44" cy="50" r="2.5" fill="#00FF87" class="core" style="animation-delay: 0.8s;"/>
+  <line x1="52" y1="50" x2="66" y2="50" stroke="#00FF87" stroke-width="1.5" class="data" style="animation-delay: 0.25s;"/>
+  
+  <!-- Server unit 3 -->
+  <rect x="28" y="66" width="44" height="16" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <circle cx="36" cy="74" r="2.5" fill="#00FF87" class="core" style="animation-delay: 0.6s;"/>
+  <circle cx="44" cy="74" r="2.5" fill="#00FF87" class="core" style="animation-delay: 0.1s;"/>
+  <line x1="52" y1="74" x2="66" y2="74" stroke="#00F2FE" stroke-width="1.5" class="data" style="animation-delay: 0.5s;"/>
+</svg>
