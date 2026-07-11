@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes tower-blink {
+      0%,100%{ opacity:1; fill:#ff4444; }
+      50%{ opacity:0.15; fill:#ff4444; }
+    }
+    @keyframes tower-wave {
+      0%{ r:4; opacity:0.9; }
+      100%{ r:26; opacity:0; }
+    }
+    @keyframes tower-beam {
+      0%,100%{ opacity:0.2; }
+      50%{ opacity:0.8; }
+    }
+    .t-blink{ animation:tower-blink 1s ease-in-out infinite; }
+    .tw1{ animation:tower-wave 2s ease-out 0s infinite; }
+    .tw2{ animation:tower-wave 2s ease-out 0.7s infinite; }
+    .tw3{ animation:tower-wave 2s ease-out 1.4s infinite; }
+    .t-beam{ animation:tower-beam 2s ease-in-out infinite; }
+  </style>
+  <!-- Tower mast -->
+  <polygon points="50,10 43,88 57,88" fill="#0b1e36" stroke="#00F2FE" stroke-width="2"/>
+  <!-- Cross struts -->
+  <line x1="44" y1="35" x2="56" y2="35" stroke="#00F2FE" stroke-width="1.5"/>
+  <line x1="43" y1="55" x2="57" y2="55" stroke="#00F2FE" stroke-width="1.5"/>
+  <line x1="43" y1="72" x2="57" y2="72" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Base feet -->
+  <line x1="43" y1="88" x2="35" y2="96" stroke="#00F2FE" stroke-width="2.5"/>
+  <line x1="57" y1="88" x2="65" y2="96" stroke="#00F2FE" stroke-width="2.5"/>
+  <line x1="43" y1="88" x2="57" y2="88" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Signal rings at top -->
+  <circle cx="50" cy="12" r="4" fill="none" stroke="#00F2FE" class="tw1"/>
+  <circle cx="50" cy="12" r="4" fill="none" stroke="#00F2FE" class="tw2"/>
+  <circle cx="50" cy="12" r="4" fill="none" stroke="#00F2FE" class="tw3"/>
+  <!-- Beacon blink -->
+  <circle cx="50" cy="10" r="3.5" class="t-blink"/>
+  <!-- Dish / antenna arm -->
+  <line x1="50" y1="32" x2="70" y2="22" stroke="#00F2FE" stroke-width="1.5"/>
+  <ellipse cx="71" cy="21" rx="6" ry="3" fill="none" stroke="#00F2FE" stroke-width="1.5" transform="rotate(-30,71,21)" class="t-beam"/>
+</svg>

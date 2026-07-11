@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes modem-blink {
+      0%,100%{ opacity:1; }
+      50%{ opacity:0.1; }
+    }
+    @keyframes modem-wave {
+      0%{ stroke-dashoffset:30; opacity:0; }
+      30%{ opacity:1; }
+      100%{ stroke-dashoffset:0; opacity:0; }
+    }
+    @keyframes modem-ant {
+      0%,100%{ transform:rotate(-8deg); }
+      50%{ transform:rotate(8deg); }
+    }
+    .m1{ animation:modem-blink 0.8s ease-in-out 0s infinite; }
+    .m2{ animation:modem-blink 0.8s ease-in-out 0.2s infinite; }
+    .m3{ animation:modem-blink 0.8s ease-in-out 0.4s infinite; }
+    .m4{ animation:modem-blink 0.8s ease-in-out 0.6s infinite; }
+    .wave1{ animation:modem-wave 1.5s linear 0s infinite; }
+    .wave2{ animation:modem-wave 1.5s linear 0.5s infinite; }
+    .ant-left{ animation:modem-ant 4s ease-in-out infinite; transform-origin:22px 30px; }
+    .ant-right{ animation:modem-ant 4s ease-in-out infinite reverse; transform-origin:78px 30px; }
+  </style>
+  <!-- Antennas -->
+  <line x1="22" y1="30" x2="18" y2="10" stroke="#00F2FE" stroke-width="2.5" class="ant-left"/>
+  <circle cx="18" cy="9" r="2.5" fill="#00F2FE" class="ant-left"/>
+  <line x1="78" y1="30" x2="82" y2="10" stroke="#00F2FE" stroke-width="2.5" class="ant-right"/>
+  <circle cx="82" cy="9" r="2.5" fill="#00F2FE" class="ant-right"/>
+  <!-- Modem chassis -->
+  <rect x="14" y="30" width="72" height="40" rx="6" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Signal wave lines across modem -->
+  <path d="M22 50 Q31 44 40 50 Q49 56 58 50 Q67 44 76 50" fill="none" stroke="#00F2FE" stroke-width="2" class="wave1"/>
+  <path d="M22 50 Q31 44 40 50 Q49 56 58 50 Q67 44 76 50" fill="none" stroke="#00F2FE" stroke-width="1.5" opacity="0.5" class="wave2"/>
+  <!-- Status LEDs -->
+  <circle cx="24" cy="64" r="3" fill="#00FF87" class="m1"/>
+  <circle cx="34" cy="64" r="3" fill="#00F2FE" class="m2"/>
+  <circle cx="44" cy="64" r="3" fill="#00FF87" class="m3"/>
+  <circle cx="54" cy="64" r="3" fill="#FFAA00" class="m4"/>
+  <!-- Port on right -->
+  <rect x="68" y="59" width="12" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.2"/>
+</svg>

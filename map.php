@@ -730,11 +730,13 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 const promises = realDevices.map(async (n) => {
                     try {
                         await MapApp.api.post('update_device', {
-                            id:                n.id,
-                            name_text_color:   color,
-                            name_text_size:    size,
-                            name_text_bold:    bold,
-                            name_text_italic:  italic,
+                            id: n.id,
+                            updates: {
+                                name_text_color:  color,
+                                name_text_size:   size,
+                                name_text_bold:   bold,
+                                name_text_italic: italic,
+                            }
                         });
                         // Update node's deviceData in memory
                         const updatedDeviceData = {

@@ -111,6 +111,25 @@ MapApp.network = {
         MapApp.state.network = new vis.Network(container, data, options);
         MapApp.network.restoreSavedView();
 
+        // Continuous redraw loop so CSS-animated SVGs play on vis.js canvas
+        (function startAnimationLoop() {
+            let rafId = null;
+            function loop() {
+                if (!MapApp.state.network) return;
+                // Check if any node uses an animated SVG
+                const hasAnimated = MapApp.state.nodes.get().some(n =>
+                    n.image && typeof n.image === 'string' && n.image.includes('animated-')
+                );
+                if (hasAnimated) {
+                    MapApp.state.network.redraw();
+                }
+                rafId = requestAnimationFrame(loop);
+            }
+            rafId = requestAnimationFrame(loop);
+            // Store so it can be cancelled if needed
+            MapApp.state._animationRafId = rafId;
+        })();
+
         MapApp.state.network.on("afterDrawing", (ctx) => {
             if (!MapApp.state.network) return;
             const edges = MapApp.state.network.body.edges;

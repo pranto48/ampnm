@@ -402,7 +402,11 @@ MapApp.mapManager = {
                     "assets/images/device-icons/animated-nas.svg",
                     "assets/images/device-icons/animated-iot-sensor.svg",
                     "assets/images/device-icons/animated-ups.svg",
-                    "assets/images/device-icons/animated-utm.svg"
+                    "assets/images/device-icons/animated-utm.svg",
+                    "assets/images/device-icons/animated-tower.svg",
+                    "assets/images/device-icons/animated-modem.svg",
+                    "assets/images/device-icons/animated-patch-panel.svg",
+                    "assets/images/device-icons/animated-vlan.svg"
                 ];
                 imagePath = imgList[d.subchoice] || "assets/images/device-icons/default-device.png";
             } else if (!d.subchoice || d.subchoice == 0) {

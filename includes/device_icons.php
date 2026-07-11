@@ -594,6 +594,10 @@ return [
             ['image' => 'assets/images/device-icons/animated-iot-sensor.svg', 'label' => 'Animated IoT Sensor'],
             ['image' => 'assets/images/device-icons/animated-ups.svg', 'label' => 'Animated UPS'],
             ['image' => 'assets/images/device-icons/animated-utm.svg', 'label' => 'Animated UTM / Next-Gen Firewall'],
+            ['image' => 'assets/images/device-icons/animated-tower.svg', 'label' => 'Animated Cell / Radio Tower'],
+            ['image' => 'assets/images/device-icons/animated-modem.svg', 'label' => 'Animated Wireless Modem'],
+            ['image' => 'assets/images/device-icons/animated-patch-panel.svg', 'label' => 'Animated Patch Panel'],
+            ['image' => 'assets/images/device-icons/animated-vlan.svg', 'label' => 'Animated VLAN / Network Segment'],
         ]
     ],
 
