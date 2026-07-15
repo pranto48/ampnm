@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { useMonitorStore } from "@/store/use-monitor-store";
@@ -12,11 +12,17 @@ interface MainLayoutWrapperProps {
 }
 
 export function MainLayoutWrapper({ children }: MainLayoutWrapperProps) {
-  const { sidebarOpen } = useMonitorStore();
+  const { sidebarOpen, syncWithFirestore } = useMonitorStore();
   const pathname = usePathname();
 
   // Check if this is a login or registration screen
   const isAuthPage = pathname === "/login" || pathname === "/register" || pathname === "/";
+
+  useEffect(() => {
+    if (!isAuthPage) {
+      syncWithFirestore();
+    }
+  }, [isAuthPage, syncWithFirestore]);
 
   if (isAuthPage) {
     return <>{children}</>;

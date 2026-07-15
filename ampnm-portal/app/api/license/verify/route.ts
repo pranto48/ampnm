@@ -191,6 +191,8 @@ async function verifyCore(
     maxDevices = 10;
   } else if (licenseData.productId === "prod-enterprise") {
     maxDevices = 9999;
+  } else if (licenseData.productId === "prod-ampos") {
+    maxDevices = 1; // 1 device active limit for standard AmPOS license
   }
 
   if (isPhpClient) {
