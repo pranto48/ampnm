@@ -20,7 +20,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
-  billingPeriod: "monthly" | "yearly" | "one-time";
+  billingPeriod: "monthly" | "yearly" | "one-time" | "lifetime";
   features: string[];
 }
 

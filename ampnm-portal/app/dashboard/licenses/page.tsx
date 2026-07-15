@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { License } from "@/types";
 
 export default function LicensesPage() {
-  const { licenses, organizations, products, addLicense, revokeLicense, profile } = useMonitorStore();
+  const { licenses, organizations, products, addLicense, revokeLicense, profile, paymentSettings } = useMonitorStore();
   const [selectedOrgId, setSelectedOrgId] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
   const [txnId, setTxnId] = useState("");
