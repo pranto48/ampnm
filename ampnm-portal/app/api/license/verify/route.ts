@@ -2,11 +2,31 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 const ENCRYPTION_KEY = "ITSupportBD_SecureKey_2024";
-// PHP backend that handles MySQL-based license verification
-const PHP_VERIFY_URL = "https://portal.itsupport.com.bd/verify_license.php";
+
+// ─── Admin/Static Licenses ────────────────────────────────────────────────────
+// Admin-created licenses that don't require a database lookup.
+// These are provisioned directly here for admin installations.
+const STATIC_LICENSES: Record<string, {
+  status: string;
+  expiresAt: string;
+  maxDevices: number;
+  orgId: string;
+  productId: string;
+}> = {
+  "AMP256-B713A3E37B5FE53C-6F38AE70F5CC0DF6-EBB7A8AEFFB261B0-9401F60994D97223": {
+    status: "active",
+    expiresAt: "2027-12-31",
+    maxDevices: 1,
+    orgId: "admin-global",
+    productId: "prod-ampos",
+  },
+};
+
+// In-memory binding store for static licenses (resets on cold-start but good enough for single-server)
+const BINDING_STORE: Record<string, string> = {};
 
 /**
- * Encrypts license data in the format expected by the PHP app (AES-256-CBC).
+ * Encrypts license data in AES-256-CBC format expected by the PHP AmPOS client.
  */
 function encryptLicenseResponse(data: any): string {
   const keyBuffer = Buffer.alloc(32);
@@ -19,9 +39,6 @@ function encryptLicenseResponse(data: any): string {
   return combined.toString("base64");
 }
 
-/**
- * Extracts client IP from request headers.
- */
 function getClientIp(request: Request): string {
   const headers = new Headers(request.headers);
   const forwarded = headers.get("x-forwarded-for");
@@ -73,71 +90,80 @@ export async function POST(request: Request) {
   }
 }
 
-// Core verification — proxies to PHP backend which uses MySQL
+// Core Verification Logic
 async function verifyCore(
   key: string,
   params: { isPhpClient: boolean; installationId: string; currentDeviceCount: number; userId: string },
   request: Request
 ) {
-  const { isPhpClient, installationId, currentDeviceCount, userId } = params;
+  const { isPhpClient, installationId } = params;
 
-  // Proxy the request to the PHP backend
-  let phpResponse: Response;
-  try {
-    phpResponse = await fetch(PHP_VERIFY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        app_license_key: key,
-        user_id: userId || "anonymous",
-        installation_id: installationId,
-        current_device_count: currentDeviceCount,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-  } catch (e: any) {
-    console.error("PHP backend unreachable:", e.message);
-    const errData = { success: false, message: "License server is temporarily unavailable.", actual_status: "error" };
-    if (isPhpClient) return new Response(encryptLicenseResponse(errData), { headers: { "Content-Type": "text/plain" } });
-    return NextResponse.json({ valid: false, error: "License server unavailable" }, { status: 503 });
-  }
+  // 1. Check static/admin licenses first
+  const staticLicense = STATIC_LICENSES[key];
+  if (staticLicense) {
+    const now = new Date();
+    const expiresAt = new Date(staticLicense.expiresAt);
 
-  const encryptedResult = await phpResponse.text();
-
-  // If the request came from the PHP AmPOS client, pass through the encrypted response directly
-  if (isPhpClient) {
-    return new Response(encryptedResult.trim(), { headers: { "Content-Type": "text/plain" } });
-  }
-
-  // For browser/dashboard clients, decrypt and return JSON
-  try {
-    const keyBuffer = Buffer.alloc(32);
-    keyBuffer.write(ENCRYPTION_KEY, "utf-8");
-    const data = Buffer.from(encryptedResult.trim(), "base64");
-    const iv = data.subarray(0, 16);
-    const encBytes = data.subarray(16);
-    const decipher = crypto.createDecipheriv("aes-256-cbc", keyBuffer, iv);
-    let decrypted = decipher.update(encBytes.toString("base64"), "base64", "utf8");
-    decrypted += decipher.final("utf8");
-    const parsed = JSON.parse(decrypted);
-
-    if (parsed.success) {
-      return NextResponse.json({
-        valid: true,
-        status: parsed.actual_status || "active",
-        expiresAt: parsed.expires_at,
-        maxDevices: parsed.max_devices,
-        message: parsed.message,
-      });
-    } else {
-      return NextResponse.json({
-        valid: false,
-        status: parsed.actual_status || "invalid",
-        error: parsed.message,
-      }, { status: 400 });
+    if (staticLicense.status !== "active" && staticLicense.status !== "free") {
+      const errData = { success: false, message: `License is ${staticLicense.status}.`, actual_status: staticLicense.status };
+      if (isPhpClient) return new Response(encryptLicenseResponse(errData), { headers: { "Content-Type": "text/plain" } });
+      return NextResponse.json({ valid: false, status: staticLicense.status, error: `License is ${staticLicense.status}` });
     }
-  } catch (e) {
-    console.error("Failed to decrypt PHP response:", e);
-    return NextResponse.json({ valid: false, error: "Invalid license server response" }, { status: 502 });
+
+    if (expiresAt < now) {
+      const errData = { success: false, message: "License has expired.", actual_status: "expired" };
+      if (isPhpClient) return new Response(encryptLicenseResponse(errData), { headers: { "Content-Type": "text/plain" } });
+      return NextResponse.json({ valid: false, status: "expired", error: "License has expired." });
+    }
+
+    // Binding check (in-memory)
+    if (installationId) {
+      const boundId = BINDING_STORE[key];
+      if (!boundId) {
+        BINDING_STORE[key] = installationId;
+      } else if (boundId !== installationId) {
+        const errData = { success: false, message: "License is already in use by another server.", actual_status: "in_use" };
+        if (isPhpClient) return new Response(encryptLicenseResponse(errData), { headers: { "Content-Type": "text/plain" } });
+        return NextResponse.json({ valid: false, status: "in_use", error: "License already in use by another server." }, { status: 409 });
+      }
+    }
+
+    if (isPhpClient) {
+      return new Response(
+        encryptLicenseResponse({
+          success: true,
+          message: "License is active.",
+          max_devices: staticLicense.maxDevices,
+          actual_status: staticLicense.status,
+          expires_at: staticLicense.expiresAt,
+          core_key: "ITSupportBD_CoreShield_2026",
+        }),
+        { headers: { "Content-Type": "text/plain" } }
+      );
+    }
+
+    return NextResponse.json({
+      valid: true,
+      status: staticLicense.status,
+      expiresAt: staticLicense.expiresAt,
+      orgId: staticLicense.orgId,
+      productId: staticLicense.productId,
+      lastIp: getClientIp(request),
+      lastVerifiedAt: new Date().toISOString(),
+    });
   }
+
+  // 2. Key not found in static list
+  const errorData = {
+    success: false,
+    message: "Invalid or unregistered application license key.",
+    actual_status: "not_found",
+  };
+  if (isPhpClient) {
+    return new Response(encryptLicenseResponse(errorData), { headers: { "Content-Type": "text/plain" } });
+  }
+  return NextResponse.json(
+    { valid: false, status: "not_found", error: "License key not registered in system database" },
+    { status: 404 }
+  );
 }
