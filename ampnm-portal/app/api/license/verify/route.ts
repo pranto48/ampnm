@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
 import crypto from "crypto";
+import { app } from "@/lib/firebase";
+import { getFirestore, collection, query, where, limit, getDocs, updateDoc, doc, getDoc } from "firebase/firestore";
 
 const ENCRYPTION_KEY = "ITSupportBD_SecureKey_2024";
 
@@ -99,9 +100,10 @@ async function verifyCore(
   request: Request
 ) {
   const { isPhpClient, installationId, currentDeviceCount } = params;
-  const adminDb = getAdminDb();
-  const licensesRef = adminDb.collection("licenses");
-  const snapshot = await licensesRef.where("key", "==", key).limit(1).get();
+  const db = getFirestore(app);
+  const licensesRef = collection(db, "licenses");
+  const q = query(licensesRef, where("key", "==", key), limit(1));
+  const snapshot = await getDocs(q);
 
   if (snapshot.empty) {
     const errorData = {
@@ -118,15 +120,15 @@ async function verifyCore(
     );
   }
 
-  const doc = snapshot.docs[0];
-  const licenseData = doc.data();
+  const licenseDoc = snapshot.docs[0];
+  const licenseData = licenseDoc.data();
 
   // Expiration boundary check
   const now = new Date();
   const expiresAt = new Date(licenseData.expiresAt);
 
   if (licenseData.status === "active" && expiresAt < now) {
-    await doc.ref.update({ status: "expired" });
+    await updateDoc(licenseDoc.ref, { status: "expired" });
     licenseData.status = "expired";
   }
 
@@ -152,7 +154,7 @@ async function verifyCore(
   if (installationId) {
     if (!licenseData.boundInstallationId) {
       // Bind to this installation ID
-      await doc.ref.update({ boundInstallationId: installationId });
+      await updateDoc(licenseDoc.ref, { boundInstallationId: installationId });
       licenseData.boundInstallationId = installationId;
     } else if (licenseData.boundInstallationId !== installationId) {
       const errorData = {
@@ -176,7 +178,7 @@ async function verifyCore(
   const verifiedAt = new Date().toISOString();
 
   try {
-    await doc.ref.update({
+    await updateDoc(licenseDoc.ref, {
       lastIp: clientIp,
       lastVerifiedAt: verifiedAt,
       currentDevices: currentDeviceCount,
@@ -215,8 +217,9 @@ async function verifyCore(
     orgName = "Admin / Global System";
   } else {
     try {
-      const orgSnap = await adminDb.collection("organizations").doc(licenseData.orgId).get();
-      if (orgSnap.exists) {
+      const orgRef = doc(db, "organizations", licenseData.orgId);
+      const orgSnap = await getDoc(orgRef);
+      if (orgSnap.exists()) {
         orgName = orgSnap.data()?.name || "Unknown Client";
       }
     } catch (e) {
