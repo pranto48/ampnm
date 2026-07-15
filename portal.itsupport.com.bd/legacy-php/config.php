@@ -2,7 +2,7 @@
 // External License Service Database Configuration
 // These values will be set during the setup process via license_setup.php
 
-define('LICENSE_DB_SERVER', 'localhost');
+define('LICENSE_DB_SERVER', '127.0.0.1');
 define('LICENSE_DB_USERNAME', 'bdoldco1_itportal');
 define('LICENSE_DB_PASSWORD', 'Aa329093+-*');
 define('LICENSE_DB_NAME', 'bdoldco1_itportal');

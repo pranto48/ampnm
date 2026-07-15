@@ -2,6 +2,8 @@
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
+$current_group_user_ids = $GLOBALS['current_group_user_ids'] ?? [$current_user_id];
+$groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
 require_once __DIR__ . '/../../includes/smtp_mailer.php';
 
 function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) {
@@ -771,10 +773,8 @@ switch ($action) {
             // But if the map itself is user-specific, map_handler's get_maps would have already filtered.
             // So, no user_id filter here for mapped devices.
         } else {
-            // If no map_id is provided (e.g., on the main devices inventory page),
-            // always filter by user_id, as this is a personal inventory.
-            $sql .= " AND d.user_id = ?";
-            $params[] = $current_user_id;
+            // Filter by user group user IDs
+            $sql .= " AND d.user_id IN ($groupIdsStr)";
         }
 
         if ($unmapped) {
@@ -814,8 +814,8 @@ switch ($action) {
                 $portConfigValue
             ]);
             $lastId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?");
-            $stmt->execute([$lastId, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt->execute([$lastId]);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode($device);
         }
@@ -869,25 +869,16 @@ switch ($action) {
             }
             if (empty($fields)) { http_response_code(400); echo json_encode(['error' => 'No valid fields to update']); exit; }
             
-            $updateSql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $updateSql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id IN ($groupIdsStr)";
             $updateParams = $params;
             $updateParams[] = $id;
 
-            // Only add user_id filter if the user is NOT a viewer
-            if ($user_role !== 'viewer') {
-                $updateSql .= " AND user_id = ?";
-                $updateParams[] = $current_user_id;
-            }
             $stmt = $pdo->prepare($updateSql); 
             $stmt->execute($updateParams);
 
             // Re-fetch the device to return the updated data
-            $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ?";
+            $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id IN ($groupIdsStr)";
             $fetchParams = [$id];
-            if ($user_role !== 'viewer') {
-                $fetchSql .= " AND d.user_id = ?";
-                $fetchParams[] = $current_user_id;
-            }
             $stmt = $pdo->prepare($fetchSql); 
             $stmt->execute($fetchParams);
             $device = $stmt->fetch(PDO::FETCH_ASSOC); 
@@ -896,7 +887,6 @@ switch ($action) {
         break;
 
     case 'update_device_status_by_ip': // NEW ACTION
-        // Allow viewers to trigger pings, but ensure they can only update devices on maps they can see.
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ip_address = $input['ip_address'] ?? null;
             $status = $input['status'] ?? null;
@@ -907,17 +897,16 @@ switch ($action) {
                 exit;
             }
 
-            // Select device without user_id filter for viewers
-            $sql = "SELECT * FROM devices WHERE ip = ?";
+            // Select device within the user group
+            $sql = "SELECT * FROM devices WHERE ip = ? AND user_id IN ($groupIdsStr)";
             $params = [$ip_address];
-            // For viewers, do NOT filter by user_id here when SELECTING device.
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$device) {
                 http_response_code(404);
-                echo json_encode(['error' => 'Device not found for the given IP.']);
+                echo json_encode(['error' => 'Device not found for the given IP in your group.']);
                 exit;
             }
             
@@ -931,26 +920,14 @@ switch ($action) {
             sendTelegramNotification($pdo, $device, $old_status, $status, $details);
             sendWhatsappNotification($pdo, $device, $old_status, $status, $details);
 
-            // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
-            // This allows viewers to update the status of devices on shared maps.
-            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, updated_at = CURRENT_TIMESTAMP WHERE ip = ?";
+            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, updated_at = CURRENT_TIMESTAMP WHERE ip = ? AND user_id IN ($groupIdsStr)";
             $updateParams = [$status, $last_seen, $ip_address];
-
-            // Only add user_id filter if the user is NOT a viewer
-            if ($user_role !== 'viewer') {
-                $updateSql .= " AND user_id = ?";
-                $updateParams[] = $current_user_id;
-            }
             $updateStmt = $pdo->prepare($updateSql);
             $updateStmt->execute($updateParams);
 
             // Re-fetch the updated device to return
-            $fetchSql = "SELECT * FROM devices WHERE ip = ?";
+            $fetchSql = "SELECT * FROM devices WHERE ip = ? AND user_id IN ($groupIdsStr)";
             $fetchParams = [$ip_address];
-            if ($user_role !== 'viewer') {
-                $fetchSql .= " AND user_id = ?";
-                $fetchParams[] = $current_user_id;
-            }
             $stmt = $pdo->prepare($fetchSql);
             $stmt->execute($fetchParams);
             $updated_device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -964,7 +941,7 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
-            $stmt = $pdo->prepare("DELETE FROM devices WHERE id = ? AND user_id = ?"); $stmt->execute([$id, $current_user_id]);
+            $stmt = $pdo->prepare("DELETE FROM devices WHERE id = ? AND user_id IN ($groupIdsStr)"); $stmt->execute([$id]);
             echo json_encode(['success' => true, 'message' => 'Device deleted successfully']);
         }
         break;

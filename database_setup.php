@@ -171,6 +171,7 @@ try {
         `username` VARCHAR(50) NOT NULL UNIQUE,
         `password` VARCHAR(255) NOT NULL,
         `role` ENUM('admin', 'viewer') DEFAULT 'admin', /* NEW: Add role column */
+        `user_group` VARCHAR(50) NOT NULL DEFAULT 'default_group',
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'users' checked/created successfully.");
@@ -188,6 +189,11 @@ try {
         // Set existing users to 'admin' role
         $pdo->exec("UPDATE `users` SET `role` = 'admin' WHERE `role` IS NULL;");
         message("Migrated existing users to 'admin' role.");
+    }
+
+    if (!columnExists($pdo, $dbname, 'users', 'user_group')) {
+        $pdo->exec("ALTER TABLE `users` ADD COLUMN `user_group` VARCHAR(50) NOT NULL DEFAULT 'default_group' AFTER `role`;");
+        message("Migrated 'users' table: added 'user_group' column.");
     }
 
 
@@ -294,6 +300,12 @@ try {
             `target_id` INT(6) UNSIGNED NOT NULL,
             `map_id` INT(6) UNSIGNED NOT NULL,
             `connection_type` VARCHAR(50) DEFAULT 'cat6',
+            `thickness` INT DEFAULT 2,
+            `color` VARCHAR(50) DEFAULT NULL,
+            `line_style` VARCHAR(20) DEFAULT 'solid',
+            `arrows` VARCHAR(20) DEFAULT 'none',
+            `label` VARCHAR(100) DEFAULT NULL,
+            `animated` TINYINT(1) DEFAULT 1,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`source_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,

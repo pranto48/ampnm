@@ -392,17 +392,59 @@ MapApp.mapManager = {
         MapApp.state.nodes.add(visNodes);
 
         const visEdges = edgeData.map(e => {
-            let edgeLabel = e.connection_type;
-            if (e.source_port_label && e.target_port_label) {
-                edgeLabel = `${e.source_port_label} ↔ ${e.target_port_label}`;
-            } else if (e.source_port_label || e.target_port_label) {
-                edgeLabel = `${e.source_port_label || '—'} ↔ ${e.target_port_label || '—'}`;
+            let edgeLabel = e.label || e.connection_type;
+            if (!e.label) {
+                if (e.source_port_label && e.target_port_label) {
+                    edgeLabel = `${e.source_port_label} ↔ ${e.target_port_label}`;
+                } else if (e.source_port_label || e.target_port_label) {
+                    edgeLabel = `${e.source_port_label || '—'} ↔ ${e.target_port_label || '—'}`;
+                }
             }
             // Build rich tooltip for edge
             const srcDevice = deviceData.find(d => d.id === e.source_id || d.id == e.source_id);
             const tgtDevice = deviceData.find(d => d.id === e.target_id || d.id == e.target_id);
             const title = MapApp.utils.buildEdgeTitle(e, srcDevice, tgtDevice);
-            return { id: e.id, from: e.source_id, to: e.target_id, connection_type: e.connection_type, source_port_label: e.source_port_label, target_port_label: e.target_port_label, label: edgeLabel, title };
+            
+            // Format Vis.js custom properties
+            const width = parseInt(e.thickness) || 2;
+            const color = e.color ? { color: e.color, hover: e.color, highlight: e.color } : undefined;
+            
+            let dashes = false;
+            if (e.line_style === 'dashed') {
+                dashes = [6, 4];
+            } else if (e.line_style === 'dotted') {
+                dashes = [2, 3];
+            } else if (e.line_style === 'solid') {
+                dashes = false;
+            } else if (e.connection_type === 'wifi' || e.connection_type === 'radio' || e.connection_type === 'logical-tunneling') {
+                dashes = [5, 5];
+            }
+            
+            let arrows = undefined;
+            if (e.arrows === 'to') arrows = { to: { enabled: true } };
+            else if (e.arrows === 'from') arrows = { from: { enabled: true } };
+            else if (e.arrows === 'both') arrows = { to: { enabled: true }, from: { enabled: true } };
+
+            return { 
+                id: e.id, 
+                from: e.source_id, 
+                to: e.target_id, 
+                connection_type: e.connection_type, 
+                source_port_label: e.source_port_label, 
+                target_port_label: e.target_port_label, 
+                label: edgeLabel, 
+                title,
+                width,
+                color,
+                dashes,
+                arrows,
+                custom_thickness: e.thickness,
+                custom_color: e.color,
+                custom_line_style: e.line_style,
+                custom_arrows: e.arrows,
+                custom_label: e.label,
+                custom_animated: e.animated
+            };
         });
         console.log('visEdges array before adding to dataset:', visEdges);
         MapApp.state.edges.clear(); 

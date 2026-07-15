@@ -28,6 +28,10 @@ include 'header.php';
                                 <option value="admin">Admin</option>
                             </select>
                         </div>
+                        <div>
+                            <label for="new_user_group" class="block text-sm font-medium text-slate-300 mb-1">User Group</label>
+                            <input type="text" id="new_user_group" name="user_group" value="default_group" placeholder="e.g. default_group" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        </div>
                         <button type="submit" class="w-full px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
                             <i class="fas fa-user-plus mr-2"></i>Create User
                         </button>
@@ -45,6 +49,7 @@ include 'header.php';
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Username</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Role</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">User Group</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Created At</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th>
                                 </tr>
@@ -79,6 +84,10 @@ include 'header.php';
                         <option value="viewer">Viewer</option>
                         <option value="admin">Admin</option>
                     </select>
+                </div>
+                <div>
+                    <label for="edit_group" class="block text-sm font-medium text-slate-400 mb-1">User Group</label>
+                    <input type="text" id="edit_group" name="user_group" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 text-white">
                 </div>
                 <div class="flex justify-end gap-4 mt-6">
                     <button type="button" id="cancelEditRoleBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>

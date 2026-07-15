@@ -311,34 +311,114 @@ function initMap() {
             });
         }
 
+        // Color picker and hex input sync
+        const edgeColorPicker = document.getElementById('edgeColorPicker');
+        const edgeColorHex = document.getElementById('edgeColorHex');
+        if (edgeColorPicker && edgeColorHex) {
+            edgeColorPicker.addEventListener('input', (e) => {
+                edgeColorHex.value = e.target.value;
+            });
+            edgeColorHex.addEventListener('input', (e) => {
+                const val = e.target.value;
+                if (/^#[0-9A-F]{6}$/i.test(val)) {
+                    edgeColorPicker.value = val;
+                }
+            });
+        }
+
         els.edgeForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('edgeId').value;
             const connection_type = document.getElementById('connectionType').value;
             const source_port_label = document.getElementById('edgeSourcePort').value || null;
             const target_port_label = document.getElementById('edgeTargetPort').value || null;
+            
+            // Gather custom edge attributes
+            const thickness = parseInt(document.getElementById('edgeThickness').value) || 2;
+            const line_style = document.getElementById('edgeLineStyle').value || 'solid';
+            const color = document.getElementById('edgeColorHex').value || null;
+            const arrowsVal = document.getElementById('edgeArrows').value || 'none';
+            const labelVal = document.getElementById('edgeLabel').value || null;
+            const animated = document.getElementById('edgeAnimated').checked ? 1 : 0;
+
             try {
-                await api.post('update_edge', { id, connection_type, source_port_label, target_port_label });
+                await api.post('update_edge', { 
+                    id, 
+                    connection_type, 
+                    source_port_label, 
+                    target_port_label,
+                    thickness,
+                    line_style,
+                    color,
+                    arrows: arrowsVal,
+                    label: labelVal,
+                    animated
+                });
                 closeModal('edgeModal');
-                // Build label with port info
-                let edgeLabel = connection_type;
-                if (source_port_label && target_port_label) {
-                    edgeLabel = `${source_port_label} ↔ ${target_port_label}`;
-                } else if (source_port_label || target_port_label) {
-                    edgeLabel = `${source_port_label || '—'} ↔ ${target_port_label || '—'}`;
+
+                // Build default label if no custom label is provided
+                let edgeLabel = labelVal;
+                if (!edgeLabel) {
+                    if (source_port_label && target_port_label) {
+                        edgeLabel = `${source_port_label} ↔ ${target_port_label}`;
+                    } else if (source_port_label || target_port_label) {
+                        edgeLabel = `${source_port_label || '—'} ↔ ${target_port_label || '—'}`;
+                    } else {
+                        edgeLabel = connection_type;
+                    }
                 }
+
                 const existingEdge = state.edges.get(id);
                 const srcDevice = state.nodes.get(existingEdge?.from)?.deviceData || null;
                 const tgtDevice = state.nodes.get(existingEdge?.to)?.deviceData || null;
+                
                 const edgeTitle = MapApp.utils.buildEdgeTitle({
                     ...(existingEdge || {}),
                     connection_type,
                     source_port_label,
-                    target_port_label
+                    target_port_label,
+                    label: labelVal
                 }, srcDevice, tgtDevice);
-                state.edges.update({ id, connection_type, source_port_label, target_port_label, label: edgeLabel, title: edgeTitle });
+
+                // Set formatting parameters for Vis.js dataset
+                const visColor = color ? { color, hover: color, highlight: color } : undefined;
+                let visDashes = false;
+                if (line_style === 'dashed') {
+                    visDashes = [6, 4];
+                } else if (line_style === 'dotted') {
+                    visDashes = [2, 3];
+                } else if (line_style === 'solid') {
+                    visDashes = false;
+                } else if (connection_type === 'wifi' || connection_type === 'radio' || connection_type === 'logical-tunneling') {
+                    visDashes = [5, 5];
+                }
+
+                let visArrows = undefined;
+                if (arrowsVal === 'to') visArrows = { to: { enabled: true } };
+                else if (arrowsVal === 'from') visArrows = { from: { enabled: true } };
+                else if (arrowsVal === 'both') visArrows = { to: { enabled: true }, from: { enabled: true } };
+
+                state.edges.update({ 
+                    id, 
+                    connection_type, 
+                    source_port_label, 
+                    target_port_label, 
+                    label: edgeLabel, 
+                    title: edgeTitle,
+                    width: thickness,
+                    color: visColor,
+                    dashes: visDashes,
+                    arrows: visArrows,
+                    custom_thickness: thickness,
+                    custom_color: color,
+                    custom_line_style: line_style,
+                    custom_arrows: arrowsVal,
+                    custom_label: labelVal,
+                    custom_animated: animated
+                });
+
                 window.notyf.success('Connection updated.');
-                // Trigger color update
+                // Trigger color/animation updates
                 MapApp.ui.updateAndAnimateEdges();
             } catch (error) {
                 console.error("Failed to update connection:", error);

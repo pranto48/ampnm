@@ -51,6 +51,29 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
                 FOREIGN KEY (`schedule_id`) REFERENCES `system_backup_schedules`(`id`) ON DELETE SET NULL,
                 FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try {
+            $pdo->query("SELECT `thickness`, `color`, `line_style`, `arrows`, `label`, `animated` FROM `device_edges` LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $pdo->exec("ALTER TABLE `device_edges` 
+                    ADD COLUMN `thickness` INT DEFAULT 2,
+                    ADD COLUMN `color` VARCHAR(50) DEFAULT NULL,
+                    ADD COLUMN `line_style` VARCHAR(20) DEFAULT 'solid',
+                    ADD COLUMN `arrows` VARCHAR(20) DEFAULT 'none',
+                    ADD COLUMN `label` VARCHAR(100) DEFAULT NULL,
+                    ADD COLUMN `animated` TINYINT(1) DEFAULT 1");
+            } catch (Exception $e2) {
+                // Ignore if already run or lock
+            }
+        }
+
+        // Auto-migrate users for group isolation
+        try {
+            $pdo->query("SELECT `user_group` FROM `users` LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $pdo->exec("ALTER TABLE `users` ADD COLUMN `user_group` VARCHAR(50) NOT NULL DEFAULT 'default_group'");
+            } catch (Exception $e2) {}
         }
     } catch (PDOException $e) {
         // Check for the specific "table not found" error.

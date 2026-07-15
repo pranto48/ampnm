@@ -80,3 +80,14 @@ if ($decrypted === false) {
 
 // Execute decrypted core logic in memory
 eval($decrypted);
+
+if (isset($_SESSION['user_id'])) {
+    $current_user_id = $_SESSION['user_id'];
+    $current_user_group = $_SESSION['user_group'] ?? 'default_group';
+    $pdo = getDbConnection();
+    
+    // Retrieve all users in the same user group
+    $stmtGroup = $pdo->prepare("SELECT id FROM users WHERE user_group = ?");
+    $stmtGroup->execute([$current_user_group]);
+    $current_group_user_ids = $stmtGroup->fetchAll(PDO::FETCH_COLUMN) ?: [$current_user_id];
+}

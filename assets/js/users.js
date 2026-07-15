@@ -45,13 +45,13 @@ function initUsers() {
                 const deleteDisabled = isDefaultAdmin || isCurrentUser ? 'disabled' : '';
                 const deleteClass = deleteDisabled ? 'opacity-50 cursor-not-allowed' : '';
 
-                return `
                     <tr class="border-b border-slate-700">
                         <td class="px-6 py-4 whitespace-nowrap text-white">${user.username}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-slate-400 capitalize">${user.role}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-slate-400 font-mono text-xs">${user.user_group || 'default_group'}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-slate-400">${new Date(user.created_at).toLocaleString()}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <button class="edit-role-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${user.id}" data-username="${user.username}" data-role="${user.role}"><i class="fas fa-user-tag mr-2"></i>Edit Role</button>
+                            <button class="edit-role-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${user.id}" data-username="${user.username}" data-role="${user.role}" data-group="${user.user_group || 'default_group'}"><i class="fas fa-user-tag mr-2"></i>Edit</button>
                             <button class="change-password-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-key mr-2"></i>Change Password</button>
                             <button class="delete-user-btn text-red-500 hover:text-red-400 ${deleteClass}" data-id="${user.id}" data-username="${user.username}" ${deleteDisabled}><i class="fas fa-trash mr-2"></i>Delete</button>
                         </td>
@@ -71,6 +71,7 @@ function initUsers() {
         const username = e.target.username.value;
         const password = e.target.password.value;
         const role = e.target.role.value;
+        const user_group = e.target.user_group.value || 'default_group';
         if (!username || !password) return;
 
         const button = createUserForm.querySelector('button[type="submit"]');
@@ -78,10 +79,14 @@ function initUsers() {
         button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
 
         try {
-            const result = await api.post('create_user', { username, password, role });
+            const result = await api.post('create_user', { username, password, role, user_group });
             if (result.success) {
                 window.notyf.success('User created successfully.');
                 createUserForm.reset();
+                // Set default group fallback back in input
+                if (document.getElementById('new_user_group')) {
+                    document.getElementById('new_user_group').value = 'default_group';
+                }
                 await loadUsers();
             } else {
                 window.notyf.error(`Error: ${result.error}`);
@@ -117,10 +122,13 @@ function initUsers() {
                 }
             }
         } else if (editRoleButton) {
-            const { id, username, role } = editRoleButton.dataset;
+            const { id, username, role, group } = editRoleButton.dataset;
             editUserId.value = id;
             editUsernameDisplay.value = username;
             editRoleSelect.value = role;
+            if (document.getElementById('edit_group')) {
+                document.getElementById('edit_group').value = group || 'default_group';
+            }
             openModal('editRoleModal');
         } else if (changePasswordButton) {
             const { id, username } = changePasswordButton.dataset;
@@ -139,15 +147,16 @@ function initUsers() {
         e.preventDefault();
         const id = editUserId.value;
         const role = editRoleSelect.value;
+        const user_group = document.getElementById('edit_group') ? document.getElementById('edit_group').value : 'default_group';
 
         const button = editRoleForm.querySelector('button[type="submit"]');
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
 
         try {
-            const result = await api.post('update_user_role', { id, role });
+            const result = await api.post('update_user_role', { id, role, user_group });
             if (result.success) {
-                window.notyf.success('User role updated successfully.');
+                window.notyf.success('User updated successfully.');
                 closeModal('editRoleModal');
                 await loadUsers();
             } else {

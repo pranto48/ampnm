@@ -239,6 +239,53 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                 </div>
 
+                <!-- Custom Line Design Options -->
+                <div class="border border-slate-700 bg-slate-900/35 rounded-lg p-4 mb-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-cyan-400 flex items-center gap-2">
+                        <i class="fas fa-sliders-h"></i> Line Styling & Customization
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Line Thickness (px)</label>
+                            <input id="edgeThickness" type="number" min="1" max="10" value="2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Line Style</label>
+                            <select id="edgeLineStyle" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                                <option value="solid">Solid Line</option>
+                                <option value="dashed">Dashed Line</option>
+                                <option value="dotted">Dotted Line</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Custom Color (Hex/Picker)</label>
+                            <div class="flex gap-1.5">
+                                <input id="edgeColorPicker" type="color" value="#00f2fe" class="h-8 w-10 bg-slate-900 border border-slate-600 rounded p-0.5 cursor-pointer">
+                                <input id="edgeColorHex" placeholder="#00f2fe" class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:ring-2 focus:ring-cyan-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Directional Arrows</label>
+                            <select id="edgeArrows" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                                <option value="none">None (Bi-directional)</option>
+                                <option value="to">Source ➔ Target</option>
+                                <option value="from">Source ↵ Target</option>
+                                <option value="both">Both Directions</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Custom Label (Overrides Type Label)</label>
+                        <input id="edgeLabel" placeholder="e.g. 10Gbps Fiber" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input id="edgeAnimated" type="checkbox" checked class="h-4 w-4 bg-slate-900 border-slate-600 rounded text-cyan-500 focus:ring-cyan-500">
+                        <label for="edgeAnimated" class="text-xs font-semibold text-slate-350 select-none">Enable Flow Animations</label>
+                    </div>
+                </div>
+
                 <!-- Port-to-Port Connection (Cisco Packet Tracer style) -->
                 <div class="border border-slate-600 rounded-lg p-4 mb-4 space-y-3">
                     <h3 class="text-sm font-semibold text-cyan-400 flex items-center gap-2">

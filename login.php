@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = 'Please enter both username and password.';
     } else {
         $pdo = getDbConnection();
-        $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE username = ?");
+        $stmt = $pdo->prepare("SELECT id, password, role, user_group FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
             $_SESSION['user_role'] = $user['role']; // Store user role in session
+            $_SESSION['user_group'] = $user['user_group'] ?: 'default_group'; // Store user group in session
             header('Location: index.php');
             exit;
         } else {

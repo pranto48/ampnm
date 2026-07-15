@@ -10,7 +10,7 @@ if ($_SESSION['user_role'] !== 'admin') {
 
 switch ($action) {
     case 'get_users':
-        $stmt = $pdo->query("SELECT id, username, role, created_at FROM users ORDER BY username ASC");
+        $stmt = $pdo->query("SELECT id, username, role, user_group, created_at FROM users ORDER BY username ASC");
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($users);
         break;
@@ -20,6 +20,7 @@ switch ($action) {
             $username = $input['username'] ?? '';
             $password = $input['password'] ?? '';
             $role = $input['role'] ?? 'viewer'; // Default to 'viewer' for new users
+            $user_group = !empty($input['user_group']) ? $input['user_group'] : 'default_group';
 
             if (empty($username) || empty($password)) {
                 http_response_code(400);
@@ -37,8 +38,8 @@ switch ($action) {
             }
 
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
-            $stmt->execute([$username, $hashed_password, $role]);
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, role, user_group) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$username, $hashed_password, $role, $user_group]);
             
             echo json_encode(['success' => true, 'message' => 'User created successfully.']);
         }
@@ -48,10 +49,11 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $new_role = $input['role'] ?? null;
+            $new_group = $input['user_group'] ?? null;
 
-            if (!$id || empty($new_role)) {
+            if (!$id || (empty($new_role) && empty($new_group))) {
                 http_response_code(400);
-                echo json_encode(['error' => 'User ID and new role are required.']);
+                echo json_encode(['error' => 'User ID and either role or group are required.']);
                 exit;
             }
 
@@ -59,15 +61,34 @@ switch ($action) {
             $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
             $stmt->execute([$id]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($user && $user['username'] === $_SESSION['username'] && $id == $_SESSION['user_id']) { // Check against session username
-                http_response_code(403);
-                echo json_encode(['error' => 'Cannot change your own role.']);
-                exit;
+            
+            // Build fields to update
+            $fields = [];
+            $params = [];
+            if (!empty($new_role)) {
+                if ($user && $user['username'] === $_SESSION['username'] && $id == $_SESSION['user_id'] && $new_role !== $_SESSION['user_role']) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'Cannot change your own role.']);
+                    exit;
+                }
+                $fields[] = "role = ?";
+                $params[] = $new_role;
             }
-
-            $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
-            $stmt->execute([$new_role, $id]);
-            echo json_encode(['success' => true, 'message' => 'User role updated successfully.']);
+            if (!empty($new_group)) {
+                $fields[] = "user_group = ?";
+                $params[] = $new_group;
+            }
+            
+            $params[] = $id;
+            $stmt = $pdo->prepare("UPDATE users SET " . implode(', ', $fields) . " WHERE id = ?");
+            $stmt->execute($params);
+            
+            // If updating current user's group, refresh their session
+            if ($user && $user['username'] === $_SESSION['username'] && $id == $_SESSION['user_id'] && !empty($new_group)) {
+                $_SESSION['user_group'] = $new_group;
+            }
+            
+            echo json_encode(['success' => true, 'message' => 'User updated successfully.']);
         }
         break;
 

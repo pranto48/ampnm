@@ -175,6 +175,18 @@ MapApp.ui = {
         }
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || '';
+        
+        // Populate custom edge style fields
+        document.getElementById('edgeThickness').value = edge.custom_thickness !== undefined ? edge.custom_thickness : 2;
+        document.getElementById('edgeLineStyle').value = edge.custom_line_style || 'solid';
+        
+        const customColor = edge.custom_color || '';
+        document.getElementById('edgeColorHex').value = customColor;
+        document.getElementById('edgeColorPicker').value = customColor ? customColor : '#00f2fe';
+        
+        document.getElementById('edgeArrows').value = edge.custom_arrows || 'none';
+        document.getElementById('edgeLabel').value = edge.custom_label || '';
+        document.getElementById('edgeAnimated').checked = edge.custom_animated !== undefined ? (edge.custom_animated == 1) : true;
 
         // Use loose comparison for node lookup (MySQL IDs can be string or number)
         const allNodes = MapApp.state.nodes.get();
@@ -332,15 +344,36 @@ MapApp.ui = {
                 const sourceStatus = deviceStatusMap.get(String(edge.from));
                 const targetStatus = deviceStatusMap.get(String(edge.to));
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
-                const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
                 
-                // Static dashed representation for wireless/logical-tunneling, solid for others
+                // Color configuration: custom color or status fallback
+                let colorVal = edge.custom_color;
+                if (!colorVal) {
+                    colorVal = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
+                }
+                const color = { color: colorVal, hover: colorVal, highlight: colorVal };
+                
+                // Thickness configuration
+                const width = parseInt(edge.custom_thickness) || 2;
+                
+                // Dashes style configuration
                 let dashes = false;
-                if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
+                if (edge.custom_line_style === 'dashed') {
+                    dashes = [6, 4];
+                } else if (edge.custom_line_style === 'dotted') {
+                    dashes = [2, 3];
+                } else if (edge.custom_line_style === 'solid') {
+                    dashes = false;
+                } else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
                     dashes = [5, 5];
                 }
                 
-                updates.push({ id: edge.id, color, dashes });
+                // Arrows configuration
+                let arrows = undefined;
+                if (edge.custom_arrows === 'to') arrows = { to: { enabled: true } };
+                else if (edge.custom_arrows === 'from') arrows = { from: { enabled: true } };
+                else if (edge.custom_arrows === 'both') arrows = { to: { enabled: true }, from: { enabled: true } };
+
+                updates.push({ id: edge.id, color, dashes, width, arrows });
             });
             if (updates.length > 0) {
                 MapApp.state.edges.update(updates);

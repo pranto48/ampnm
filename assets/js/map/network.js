@@ -245,6 +245,11 @@ MapApp.network = {
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 if (isOffline) continue;
 
+                // Check if animation is disabled for this specific edge
+                const rawEdge = MapApp.state.edges.get(edgeId);
+                const isAnimated = rawEdge && rawEdge.custom_animated !== undefined ? (rawEdge.custom_animated == 1) : true;
+                if (!isAnimated) continue;
+
                 // Match edge color with glow
                 const edgeColor = edge.options?.color?.color || '#00F2FE';
 

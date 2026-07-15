@@ -2,21 +2,13 @@
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
+$current_group_user_ids = $GLOBALS['current_group_user_ids'] ?? [$current_user_id];
+$groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
 
 switch ($action) {
     case 'get_maps':
-        $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m";
-        $params = [$current_user_id];
-
-        if ($user_role === 'viewer') {
-            // Viewers can see all maps, so remove the user_id filter for the main map list
-            $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id) as deviceCount FROM maps m";
-            $params = []; // No user_id filter for the main map list for viewers
-        } else {
-            // Admins and other roles only see their own maps
-            $sql .= " WHERE m.user_id = ?";
-            $params[] = $current_user_id;
-        }
+        $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id IN ($groupIdsStr)) as deviceCount FROM maps m WHERE m.user_id IN ($groupIdsStr)";
+        $params = [];
         $sql .= " ORDER BY m.created_at ASC";
 
         $stmt = $pdo->prepare($sql);
@@ -66,8 +58,8 @@ switch ($action) {
 
             if (empty($fields)) { http_response_code(400); echo json_encode(['error' => 'No valid fields to update']); exit; }
             
-            $params[] = $id; $params[] = $current_user_id;
-            $sql = "UPDATE maps SET " . implode(', ', $fields) . " WHERE id = ? AND user_id = ?";
+            $params[] = $id;
+            $sql = "UPDATE maps SET " . implode(', ', $fields) . " WHERE id = ? AND user_id IN ($groupIdsStr)";
             $stmt = $pdo->prepare($sql); $stmt->execute($params);
             
             echo json_encode(['success' => true, 'message' => 'Map updated successfully.']);
@@ -79,7 +71,7 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
-            $stmt = $pdo->prepare("DELETE FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$id, $current_user_id]);
+            $stmt = $pdo->prepare("DELETE FROM maps WHERE id = ? AND user_id IN ($groupIdsStr)"); $stmt->execute([$id]);
             echo json_encode(['success' => true, 'message' => 'Map deleted successfully']);
         }
         break;
@@ -102,7 +94,7 @@ switch ($action) {
     case 'create_edge':
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can create edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type, source_port_label, target_port_label) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type, source_port_label, target_port_label, thickness, color, line_style, arrows, label, animated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 $current_user_id, 
@@ -111,11 +103,17 @@ switch ($action) {
                 $input['map_id'], 
                 $input['connection_type'] ?? 'cat5',
                 $input['source_port_label'] ?? null,
-                $input['target_port_label'] ?? null
+                $input['target_port_label'] ?? null,
+                isset($input['thickness']) ? (int)$input['thickness'] : 2,
+                $input['color'] ?? null,
+                $input['line_style'] ?? 'solid',
+                $input['arrows'] ?? 'none',
+                $input['label'] ?? null,
+                isset($input['animated']) ? (int)$input['animated'] : 1
             ]);
             $lastId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
-            $stmt->execute([$lastId, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt->execute([$lastId]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode($edge);
         }
@@ -128,11 +126,18 @@ switch ($action) {
             $connection_type = $input['connection_type'] ?? 'cat5';
             $source_port_label = $input['source_port_label'] ?? null;
             $target_port_label = $input['target_port_label'] ?? null;
+            $thickness = isset($input['thickness']) ? (int)$input['thickness'] : 2;
+            $color = !empty($input['color']) ? $input['color'] : null;
+            $line_style = $input['line_style'] ?? 'solid';
+            $arrows = $input['arrows'] ?? 'none';
+            $label = !empty($input['label']) ? $input['label'] : null;
+            $animated = isset($input['animated']) ? (int)$input['animated'] : 1;
+            
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
-            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ?, source_port_label = ?, target_port_label = ? WHERE id = ? AND user_id = ?");
-            $stmt->execute([$connection_type, $source_port_label, $target_port_label, $id, $current_user_id]);
-            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
-            $stmt->execute([$id, $current_user_id]);
+            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ?, source_port_label = ?, target_port_label = ?, thickness = ?, color = ?, line_style = ?, arrows = ?, label = ?, animated = ? WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt->execute([$connection_type, $source_port_label, $target_port_label, $thickness, $color, $line_style, $arrows, $label, $animated, $id]);
+            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt->execute([$id]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode($edge);
         }
@@ -143,8 +148,8 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
-            $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ? AND user_id = ?");
-            $stmt->execute([$id, $current_user_id]);
+            $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt->execute([$id]);
             echo json_encode(['success' => true]);
         }
         break;
@@ -155,16 +160,16 @@ switch ($action) {
         $map_id = $_GET['map_id'] ?? null;
         if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
 
-        $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id = ?");
-        $stmt->execute([$map_id, $current_user_id]);
+        $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id IN ($groupIdsStr)");
+        $stmt->execute([$map_id]);
         if (!$stmt->fetch(PDO::FETCH_ASSOC)) { http_response_code(404); echo json_encode(['error' => 'Map not found or access denied.']); exit; }
 
-        $stmt = $pdo->prepare("SELECT * FROM devices WHERE map_id = ? AND user_id = ? ORDER BY id ASC");
-        $stmt->execute([$map_id, $current_user_id]);
+        $stmt = $pdo->prepare("SELECT * FROM devices WHERE map_id = ? AND user_id IN ($groupIdsStr) ORDER BY id ASC");
+        $stmt->execute([$map_id]);
         $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $stmt = $pdo->prepare("SELECT source_id, target_id, connection_type, source_port_label, target_port_label FROM device_edges WHERE map_id = ? AND user_id = ? ORDER BY id ASC");
-        $stmt->execute([$map_id, $current_user_id]);
+        $stmt = $pdo->prepare("SELECT source_id, target_id, connection_type, source_port_label, target_port_label FROM device_edges WHERE map_id = ? AND user_id IN ($groupIdsStr) ORDER BY id ASC");
+        $stmt->execute([$map_id]);
         $edges = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $deviceIds = array_map(static fn($d) => (int)$d['id'], $devices);
@@ -211,15 +216,15 @@ switch ($action) {
                 $pdo->beginTransaction();
 
                 // Ensure map ownership
-                $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id = ?");
-                $stmt->execute([$map_id, $current_user_id]);
+                $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id IN ($groupIdsStr)");
+                $stmt->execute([$map_id]);
                 if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
                     throw new Exception('Map not found or access denied.');
                 }
 
                 // Collect existing map device IDs for cable cleanup
-                $stmt = $pdo->prepare("SELECT id FROM devices WHERE map_id = ? AND user_id = ?");
-                $stmt->execute([$map_id, $current_user_id]);
+                $stmt = $pdo->prepare("SELECT id FROM devices WHERE map_id = ? AND user_id IN ($groupIdsStr)");
+                $stmt->execute([$map_id]);
                 $existingIds = array_map(static fn($r) => (int)$r['id'], $stmt->fetchAll(PDO::FETCH_ASSOC));
                 if (!empty($existingIds)) {
                     $in = implode(',', array_fill(0, count($existingIds), '?'));
@@ -231,10 +236,10 @@ switch ($action) {
                 }
 
                 // Delete old data for this user and map
-                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE map_id = ? AND user_id = ?");
-                $stmt->execute([$map_id, $current_user_id]);
-                $stmt = $pdo->prepare("DELETE FROM devices WHERE map_id = ? AND user_id = ?");
-                $stmt->execute([$map_id, $current_user_id]);
+                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE map_id = ? AND user_id IN ($groupIdsStr)");
+                $stmt->execute([$map_id]);
+                $stmt = $pdo->prepare("DELETE FROM devices WHERE map_id = ? AND user_id IN ($groupIdsStr)");
+                $stmt->execute([$map_id]);
 
                 // Insert new devices
                 $device_id_map = [];
@@ -370,8 +375,8 @@ switch ($action) {
                 exit;
             }
     
-            $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id = ?");
-            $stmt->execute([$mapId, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt->execute([$mapId]);
             if (!$stmt->fetch()) {
                 http_response_code(404);
                 echo json_encode(['error' => 'Map not found or access denied.']);
@@ -402,14 +407,14 @@ switch ($action) {
                 echo json_encode(['error' => 'Invalid file type.']);
                 exit;
             }
-
+ 
             $newFileName = 'map_' . $mapId . '_' . time() . '.' . $extension;
             $uploadPath = $uploadDir . $newFileName;
             $urlPath = 'uploads/map_backgrounds/' . $newFileName;
     
             if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
-                $stmt = $pdo->prepare("UPDATE maps SET background_image_url = ? WHERE id = ? AND user_id = ?");
-                $stmt->execute([$urlPath, $mapId, $current_user_id]);
+                $stmt = $pdo->prepare("UPDATE maps SET background_image_url = ? WHERE id = ? AND user_id IN ($groupIdsStr)");
+                $stmt->execute([$urlPath, $mapId]);
                 echo json_encode(['success' => true, 'url' => $urlPath]);
             } else {
                 http_response_code(500);
@@ -453,15 +458,13 @@ switch ($action) {
             exit;
         }
 
-        // Check ownership if not viewer
-        if ($user_role !== 'viewer') {
-            $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id = ?");
-            $stmt->execute([$map_id, $current_user_id]);
-            if (!$stmt->fetch()) {
-                http_response_code(403);
-                echo json_encode(['error' => 'Access denied to this map']);
-                exit;
-            }
+        // Check ownership against user group
+        $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id IN ($groupIdsStr)");
+        $stmt->execute([$map_id]);
+        if (!$stmt->fetch()) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Access denied to this map']);
+            exit;
         }
 
         // Fetch the historical state of devices in the map
