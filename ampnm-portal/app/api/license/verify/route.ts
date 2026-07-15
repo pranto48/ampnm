@@ -211,13 +211,17 @@ async function verifyCore(
 
   // Fetch target corporate client/organization metadata for JSON client
   let orgName = "Unknown Client";
-  try {
-    const orgSnap = await adminDb.collection("organizations").doc(licenseData.orgId).get();
-    if (orgSnap.exists) {
-      orgName = orgSnap.data()?.name || "Unknown Client";
+  if (licenseData.orgId === "admin-global") {
+    orgName = "Admin / Global System";
+  } else {
+    try {
+      const orgSnap = await adminDb.collection("organizations").doc(licenseData.orgId).get();
+      if (orgSnap.exists) {
+        orgName = orgSnap.data()?.name || "Unknown Client";
+      }
+    } catch (e) {
+      console.warn("Failed to fetch organization details:", e);
     }
-  } catch (e) {
-    console.warn("Failed to fetch organization details:", e);
   }
 
   return NextResponse.json({

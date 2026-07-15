@@ -40,7 +40,8 @@ export default function LicensesPage() {
 
   const handleGenerateLicense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetOrgId || !selectedProductId) return;
+    const finalOrgId = targetOrgId || "admin-global";
+    if (!finalOrgId || !selectedProductId) return;
     
     setLoading(true);
     setGeneratedKey(null);
@@ -57,7 +58,7 @@ export default function LicensesPage() {
       const newLic: License = {
         id: `l_${Date.now()}`,
         key: formattedKey,
-        orgId: targetOrgId,
+        orgId: finalOrgId,
         productId: selectedProductId,
         status: isPaidProduct ? "active" : "active", // Commercial products activated upon mock checkout
         createdAt: new Date().toISOString().split("T")[0],
@@ -123,12 +124,11 @@ export default function LicensesPage() {
                 <div>
                   <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Target Client Organization</label>
                   <select
-                    required
                     value={selectedOrgId}
                     onChange={(e) => setSelectedOrgId(e.target.value)}
                     className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select Account...</option>
+                    <option value="">Select Account (Default: Admin Global)...</option>
                     {organizations.map((org) => (
                       <option key={org.id} value={org.id}>{org.name}</option>
                     ))}
@@ -345,7 +345,7 @@ export default function LicensesPage() {
               {licenses
                 .filter((l) => (profile?.role === "admin" ? true : l.orgId === profile?.orgId))
                 .map((lic) => {
-                  const orgName = organizations.find((o) => o.id === lic.orgId)?.name || "Unknown Client";
+                  const orgName = lic.orgId === "admin-global" ? "Admin / Global System" : (organizations.find((o) => o.id === lic.orgId)?.name || "Unknown Client");
                   const prodName = products.find((p) => p.id === lic.productId)?.name || "Unknown Product";
                   return (
                     <tr key={lic.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
