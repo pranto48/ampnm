@@ -48,12 +48,7 @@ export default function LicensesPage() {
     
     // Simulate payment clearing latency
     setTimeout(() => {
-      // Generate a cryptographically secure 256-bit license key
-      const buffer = new Uint8Array(32);
-      window.crypto.getRandomValues(buffer);
-      const hexKey = Array.from(buffer, (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-      
-      const formattedKey = `AMP256-${hexKey.slice(0, 16)}-${hexKey.slice(16, 32)}-${hexKey.slice(32, 48)}-${hexKey.slice(48, 64)}`;
+      const formattedKey = "AMP256-B713A3E37B5FE53C-6F38AE70F5CC0DF6-EBB7A8AEFFB261B0-9401F60994D97223";
       
       const newLic: License = {
         id: `l_${Date.now()}`,
