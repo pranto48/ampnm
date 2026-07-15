@@ -140,6 +140,8 @@ try {
         'get_floor_plan_devices', 'get_annotations',
         // Port usage
         'get_device_used_ports',
+        // System Backup viewing
+        'get_system_backup_schedules', 'get_system_backup_runs',
     ];
 
     // Define specific POST actions that 'viewer' role can perform
@@ -179,6 +181,7 @@ try {
     $dashboardActions = ['get_dashboard_data'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'save_log_backup_schedule', 'delete_log_backup_schedule', 'run_log_backup_now', 'run_due_log_backups'];
+    $systemBackupActions = ['get_system_backup_schedules', 'save_system_backup_schedule', 'delete_system_backup_schedule', 'run_system_backup_now', 'run_due_system_backups', 'get_system_backup_runs', 'delete_system_backup_run'];
     $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'send_test_email', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions', 'get_sms_settings', 'save_sms_settings', 'send_test_sms', 'get_device_sms_subscriptions', 'save_device_sms_subscription', 'delete_device_sms_subscription', 'get_telegram_settings', 'save_telegram_settings', 'send_test_telegram', 'get_device_telegram_subscriptions', 'save_device_telegram_subscription', 'delete_device_telegram_subscription', 'get_whatsapp_settings', 'save_whatsapp_settings', 'send_test_whatsapp', 'get_device_whatsapp_subscriptions', 'save_device_whatsapp_subscription', 'delete_device_whatsapp_subscription', 'register_telegram_webhook'];
     $licenseActions = ['get_current_license_info', 'update_app_license_key', 'force_license_recheck']; // Added license actions
     $metricsActions = [
@@ -203,6 +206,8 @@ try {
         require __DIR__ . '/api/handlers/user_handler.php';
     } elseif (in_array($action, $logActions)) {
         require __DIR__ . '/api/handlers/log_handler.php';
+    } elseif (in_array($action, $systemBackupActions)) {
+        require __DIR__ . '/api/handlers/backup_handler.php';
     } elseif (in_array($action, $notificationActions)) {
         require __DIR__ . '/api/handlers/notification_handler.php';
     } elseif (in_array($action, $licenseActions)) { // Handle new license actions

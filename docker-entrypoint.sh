@@ -100,6 +100,16 @@ if [ "${AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER:-1}" = "1" ]; then
     echo ""
 fi
 
+echo "→ Starting scheduled backup auditor (60s check interval)..."
+(
+  while true; do
+    php /var/www/html/scripts/backup_check.php || true
+    sleep 60
+  done
+) &
+echo "✓ Scheduled backup auditor started"
+echo ""
+
 echo "→ Starting Active Telemetry Trapper Server..."
 php /var/www/html/api/workers/trapper_server.php > /var/log/trapper_server.log 2>&1 &
 echo "✓ Trapper Server started"

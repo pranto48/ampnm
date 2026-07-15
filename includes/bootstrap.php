@@ -11,6 +11,47 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
         // A simple query to check if the main 'users' table exists.
         // If this fails, we assume the database has not been initialized.
         $pdo->query("SELECT 1 FROM `users` LIMIT 1");
+        
+        // Auto-create system backup tables if missing
+        try {
+            $pdo->query("SELECT 1 FROM `system_backup_schedules` LIMIT 1");
+        } catch (PDOException $e) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `system_backup_schedules` (
+                `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `user_id` INT(6) UNSIGNED NOT NULL,
+                `name` VARCHAR(120) NOT NULL,
+                `target_type` ENUM('ftp', 'nas') NOT NULL,
+                `target_config` TEXT NULL,
+                `schedule_type` ENUM('daily', 'weekly', 'monthly') NOT NULL DEFAULT 'daily',
+                `schedule_time` TIME NOT NULL DEFAULT '00:15:00',
+                `day_of_week` TINYINT UNSIGNED NULL,
+                `day_of_month` TINYINT UNSIGNED NULL,
+                `enabled` TINYINT(1) NOT NULL DEFAULT 1,
+                `last_run_at` TIMESTAMP NULL,
+                `next_run_at` TIMESTAMP NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+
+        try {
+            $pdo->query("SELECT 1 FROM `system_backup_runs` LIMIT 1");
+        } catch (PDOException $e) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `system_backup_runs` (
+                `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `schedule_id` INT(10) UNSIGNED NULL,
+                `user_id` INT(6) UNSIGNED NOT NULL,
+                `status` ENUM('success', 'failed') NOT NULL,
+                `target_type` ENUM('ftp', 'nas') NOT NULL,
+                `file_name` VARCHAR(255) NULL,
+                `file_size_bytes` BIGINT UNSIGNED NULL,
+                `error_message` TEXT NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (`schedule_id`) REFERENCES `system_backup_schedules`(`id`) ON DELETE SET NULL,
+                FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
     } catch (PDOException $e) {
         // Check for the specific "table not found" error.
         if (strpos($e->getMessage(), 'Base table or view not found') !== false) {

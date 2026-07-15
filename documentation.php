@@ -90,6 +90,9 @@ $page_title = "Documentation - AMPNM User Manual";
                         <a href="#license" class="block px-3 py-2 rounded transition">
                             <i class="fas fa-key mr-2"></i>License Management
                         </a>
+                        <a href="#system-backup" class="block px-3 py-2 rounded transition">
+                            <i class="fas fa-database mr-2"></i>System Backup (FTP / NAS)
+                        </a>
                         <a href="#troubleshooting" class="block px-3 py-2 rounded transition">
                             <i class="fas fa-tools mr-2"></i>Troubleshooting
                         </a>
@@ -611,6 +614,53 @@ docker-compose restart<br><br>
 docker-compose build --no-cache<br>
 docker-compose up -d</code>
                                 </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- System Backup -->
+                    <section id="system-backup" class="doc-section">
+                        <h2 class="text-3xl font-bold text-cyan-400 mb-4">
+                            <i class="fas fa-database mr-2"></i>System Backup (FTP / NAS)
+                        </h2>
+
+                        <p class="mb-4">Configure automatic system backups including both the entire database schema/data (via <code>mysqldump</code>) and all uploaded client assets (icons, maps, backgrounds) into single compressed tarballs.</p>
+
+                        <div class="space-y-4">
+                            <div class="bg-slate-700 p-4 rounded">
+                                <h3 class="font-bold text-lg mb-2"><i class="fas fa-hdd text-cyan-400 mr-2"></i>NAS / Local Folder Backup</h3>
+                                <p class="mb-2">NAS backups copy the completed archives directly to a directory path mounted inside the container.</p>
+                                <p class="mb-2"><strong>To set up a local NAS mount in Docker:</strong></p>
+                                <ol class="list-decimal list-inside ml-4 mb-3 space-y-1 text-sm text-slate-200">
+                                    <li>Mount your NAS or local backup folder to your host operating system (e.g., <code>/mnt/nas/backups</code>).</li>
+                                    <li>Bind mount that host path to the application container in your <code>docker-compose.yml</code>:
+                                        <div class="code-block my-2">
+                                            <code>services:<br>
+&nbsp;&nbsp;app:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;volumes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- /mnt/nas/backups:/backups/nas</code>
+                                        </div>
+                                    </li>
+                                    <li>Restart the stack using <code>docker-compose down && docker-compose up -d</code>.</li>
+                                    <li>In the **System Backup** panel, select **NAS** and set the path to <code>/backups/nas</code>.</li>
+                                </ol>
+                            </div>
+
+                            <div class="bg-slate-700 p-4 rounded">
+                                <h3 class="font-bold text-lg mb-2"><i class="fas fa-cloud-upload-alt text-cyan-400 mr-2"></i>FTP Server Backup</h3>
+                                <p class="mb-2">FTP backups upload the system archive over network connection to any standard FTP server.</p>
+                                <p class="text-sm text-slate-200 mb-2">Configure the host, port, credentials, and directory path directly in the backup scheduler panel. Passive mode (PASV) is used automatically for uploads.</p>
+                            </div>
+
+                            <div class="bg-slate-700 p-4 rounded">
+                                <h3 class="font-bold text-lg mb-2"><i class="fas fa-clock text-cyan-400 mr-2"></i>Automated Time Schedules</h3>
+                                <p class="mb-2">Schedules can be set to run at specific times recurrently:</p>
+                                <ul class="list-disc list-inside ml-4 space-y-1 text-sm text-slate-200">
+                                    <li><strong>Daily:</strong> Executes every day at the chosen time.</li>
+                                    <li><strong>Weekly:</strong> Executes on a specific day of the week (e.g., Sunday).</li>
+                                    <li><strong>Monthly:</strong> Executes on a specific calendar day of the month (1-28).</li>
+                                </ul>
+                                <p class="text-sm text-slate-300 mt-2">The background daemon process <code>scripts/backup_check.php</code> runs automatically in a 60-second loop inside the Docker container to monitor and run backups.</p>
                             </div>
                         </div>
                     </section>
