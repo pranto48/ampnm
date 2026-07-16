@@ -450,12 +450,12 @@ switch ($action) {
             $pdo->beginTransaction();
             try {
                 $sql = "INSERT INTO devices (
-                    user_id, name, ip, check_port, monitor_method, type, description,
-                    ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port,
+                    user_id, name, ip, check_port, monitor_method, type, subchoice, description,
+                    ping_interval, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, router_api_username, router_api_password, router_api_port,
                     warning_latency_threshold, warning_packetloss_threshold,
                     critical_latency_threshold, critical_packetloss_threshold,
-                    show_live_ping, map_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"; // map_id is NULL
+                    show_live_ping, port_config, map_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"; // map_id is NULL
 
                 $stmt = $pdo->prepare($sql);
                 $imported_count = 0;
@@ -468,10 +468,14 @@ switch ($action) {
                         $device['check_port'] ?? null,
                         $device['monitor_method'] ?? 'ping',
                         $device['type'] ?? 'other',
+                        $device['subchoice'] ?? 0,
                         $device['description'] ?? null,
                         $device['ping_interval'] ?? null,
                         $device['icon_size'] ?? 50,
                         $device['name_text_size'] ?? 14,
+                        $device['name_text_color'] ?? '#ffffff',
+                        $device['name_text_bold'] ?? 0,
+                        $device['name_text_italic'] ?? 0,
                         $device['icon_url'] ?? null,
                         $device['router_api_username'] ?? null,
                         $device['router_api_password'] ?? null,
@@ -480,7 +484,8 @@ switch ($action) {
                         $device['warning_packetloss_threshold'] ?? null,
                         $device['critical_latency_threshold'] ?? null,
                         $device['critical_packetloss_threshold'] ?? null,
-                        ($device['show_live_ping'] ?? false) ? 1 : 0
+                        ($device['show_live_ping'] ?? false) ? 1 : 0,
+                        $device['port_config'] ?? null
                     ]);
                     $imported_count++;
                 }
@@ -1105,28 +1110,34 @@ switch ($action) {
 
                 // Insert devices
                 $sql_device = "INSERT INTO devices (
-                    user_id, name, ip, check_port, type, description, map_id, x, y,
-                    ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port,
+                    user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y,
+                    ping_interval, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, 
+                    router_api_username, router_api_password, router_api_port,
                     warning_latency_threshold, warning_packetloss_threshold,
                     critical_latency_threshold, critical_packetloss_threshold,
-                    show_live_ping
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    show_live_ping, port_config
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt_device = $pdo->prepare($sql_device);
 
                 foreach ($devices_data as $device) {
                     $stmt_device->execute([
                         $current_user_id,
                         ($device['name'] ?? 'Imported Device'),
-                        $device['ip'] ?? null, // Use ip_address from frontend
+                        $device['ip'] ?? null,
                         $device['check_port'] ?? null,
-                        $device['type'] ?? 'other', // Use icon from frontend
+                        $device['monitor_method'] ?? 'ping',
+                        $device['type'] ?? 'other',
+                        $device['subchoice'] ?? 0,
                         $device['description'] ?? null,
-                        $map_id, // Assign to the current map_id
-                        $device['position_x'] ?? null,
-                        $device['position_y'] ?? null,
+                        $map_id,
+                        $device['position_x'] ?? $device['x'] ?? null,
+                        $device['position_y'] ?? $device['y'] ?? null,
                         $device['ping_interval'] ?? null,
                         $device['icon_size'] ?? 50,
                         $device['name_text_size'] ?? 14,
+                        $device['name_text_color'] ?? '#ffffff',
+                        $device['name_text_bold'] ?? 0,
+                        $device['name_text_italic'] ?? 0,
                         $device['icon_url'] ?? null,
                         $device['router_api_username'] ?? null,
                         $device['router_api_password'] ?? null,
@@ -1135,10 +1146,11 @@ switch ($action) {
                         $device['warning_packetloss_threshold'] ?? null,
                         $device['critical_latency_threshold'] ?? null,
                         $device['critical_packetloss_threshold'] ?? null,
-                        ($device['show_live_ping'] ?? false) ? 1 : 0
+                        ($device['show_live_ping'] ?? false) ? 1 : 0,
+                        $device['port_config'] ?? null
                     ]);
                     $new_id = $pdo->lastInsertId();
-                    $device_id_map[$device['id']] = $new_id; // Map old ID to new ID
+                    $device_id_map[$device['id']] = $new_id;
                 }
 
                 // Insert edges, using the new device IDs

@@ -5,6 +5,18 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.7.0",
+      date: "July 2026",
+      badge: "Feature Alignment Release",
+      badgeColor: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+      highlights: [
+        {
+          title: "Map Export & Import Style Preservation",
+          description: "Fixed map backup importing by adding missing columns (`name_text_color`, `name_text_bold`, `name_text_italic`) to the devices table creation, bootstrap auto-migrations, and handler imports."
+        }
+      ]
+    },
+    {
       version: "v1.6.0",
       date: "July 2026",
       badge: "Database Stability Release",

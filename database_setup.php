@@ -276,6 +276,9 @@ try {
             `ping_interval` INT(11) NULL,
             `icon_size` INT(11) DEFAULT 50,
             `name_text_size` INT(11) DEFAULT 14,
+            `name_text_color` VARCHAR(20) DEFAULT '#ffffff',
+            `name_text_bold` TINYINT(1) DEFAULT 0,
+            `name_text_italic` TINYINT(1) DEFAULT 0,
             `icon_url` VARCHAR(255) NULL,
             `router_api_username` VARCHAR(100) NULL,
             `router_api_password` TEXT NULL,
@@ -902,6 +905,18 @@ try {
     if (!columnExists($pdo, $dbname, 'devices', 'icon_url')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `icon_url` VARCHAR(255) NULL AFTER `name_text_size`;");
         message("Upgraded 'devices' table: added 'icon_url' column for custom icons.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'name_text_color')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_color` VARCHAR(20) DEFAULT '#ffffff' AFTER `name_text_size`;");
+        message("Upgraded 'devices' table: added 'name_text_color' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'name_text_bold')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_bold` TINYINT(1) DEFAULT 0 AFTER `name_text_color`;");
+        message("Upgraded 'devices' table: added 'name_text_bold' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'name_text_italic')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_italic` TINYINT(1) DEFAULT 0 AFTER `name_text_bold`;");
+        message("Upgraded 'devices' table: added 'name_text_italic' column.");
     }
     // NEW MIGRATION: Add subchoice column for icon variants
     if (!columnExists($pdo, $dbname, 'devices', 'subchoice')) {

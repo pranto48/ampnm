@@ -245,10 +245,10 @@ switch ($action) {
                 $device_id_map = [];
                 $sql = "INSERT INTO devices (
                     user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y,
-                    ping_interval, icon_size, name_text_size, icon_url,
+                    ping_interval, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url,
                     warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold,
                     show_live_ping, port_config
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
                 foreach ($devices as $device) {
                     $stmt->execute([
@@ -266,6 +266,9 @@ switch ($action) {
                         $device['ping_interval'] ?? null,
                         $device['icon_size'] ?? 50,
                         $device['name_text_size'] ?? 14,
+                        $device['name_text_color'] ?? '#ffffff',
+                        $device['name_text_bold'] ?? 0,
+                        $device['name_text_italic'] ?? 0,
                         $device['icon_url'] ?? null,
                         $device['warning_latency_threshold'] ?? null,
                         $device['warning_packetloss_threshold'] ?? null,
