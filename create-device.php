@@ -52,8 +52,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $max_devices = $_SESSION['license_max_devices'] ?? 0;
             $current_devices = $_SESSION['current_device_count'] ?? 0;
 
+            // Retrieve all users in the same user group
+            $current_user_group = $_SESSION['user_group'] ?? 'default_group';
+            $stmtGroup = $pdo->prepare("SELECT id FROM users WHERE user_group = ?");
+            $stmtGroup->execute([$current_user_group]);
+            $current_group_user_ids = $stmtGroup->fetchAll(PDO::FETCH_COLUMN) ?: [$current_user_id];
+            $groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
+
+            // Check duplicate name
+            $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND user_id IN ($groupIdsStr)");
+            $stmtDupName->execute([$name]);
+            $nameExists = (int)$stmtDupName->fetchColumn() > 0;
+
+            // Check duplicate IP
+            $ipExists = false;
+            if (!empty($ip)) {
+                $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND user_id IN ($groupIdsStr)");
+                $stmtDupIp->execute([$ip]);
+                $ipExists = (int)$stmtDupIp->fetchColumn() > 0;
+            }
+
             if ($max_devices > 0 && $current_devices >= $max_devices) {
                 $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">License limit reached. You cannot add more than ' . $max_devices . ' devices.</div>';
+            } elseif ($nameExists) {
+                $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">A device with this name already exists in your group.</div>';
+            } elseif ($ipExists) {
+                $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">A device with this IP address already exists in your group.</div>';
             } else {
                 $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
                 $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');

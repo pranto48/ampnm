@@ -9,6 +9,10 @@ function initDevices() {
     const importDevicesFile = document.getElementById('importDevicesFile');
     const deviceSearchInput = document.getElementById('deviceSearchInput');
     const createNewDeviceLink = document.querySelector('a[href="create-device.php"]');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const bulkActionsContainer = document.getElementById('bulkActionsContainer');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const selectedCountSpan = document.getElementById('selectedCount');
 
     // Modals
     const detailsModal = document.getElementById('detailsModal');
@@ -60,6 +64,9 @@ function initDevices() {
 
         return `
             <tr data-id="${device.id}" class="border-b border-slate-700 hover:bg-slate-800/50">
+                <td class="px-4 py-4 whitespace-nowrap">
+                    <input type="checkbox" class="device-select-checkbox rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-800" data-id="${device.id}">
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${device.name}</div><div class="text-sm text-slate-400 capitalize">${device.type}</div></td>
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-slate-400 font-mono">${device.ip || 'N/A'}</div><div class="text-xs text-slate-500 mt-1 flex items-center gap-2">${monitorBadge}<span>${monitorDetail}</span></div></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">${mapLink}</td>
@@ -76,6 +83,8 @@ function initDevices() {
         tableLoader.classList.remove('hidden');
         noDevicesMessage.classList.add('hidden');
         devicesTableBody.innerHTML = '';
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        if (bulkActionsContainer) bulkActionsContainer.classList.add('hidden');
         
         try {
             const result = await api.get('get_devices'); // This fetches from api.php
@@ -357,6 +366,75 @@ function initDevices() {
             noDevicesMessage.classList.add('hidden');
         }
     });
+
+    const updateBulkActionsToolbar = () => {
+        if (!bulkActionsContainer || !selectedCountSpan) return;
+        const checkedBoxes = devicesTableBody.querySelectorAll('.device-select-checkbox:checked');
+        const count = checkedBoxes.length;
+        if (count > 0) {
+            selectedCountSpan.textContent = count;
+            bulkActionsContainer.classList.remove('hidden');
+        } else {
+            bulkActionsContainer.classList.add('hidden');
+        }
+        
+        if (selectAllCheckbox) {
+            const allCheckboxes = devicesTableBody.querySelectorAll('.device-select-checkbox');
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && count === allCheckboxes.length;
+        }
+    };
+
+    devicesTableBody.addEventListener('change', (e) => {
+        if (e.target.classList.contains('device-select-checkbox')) {
+            updateBulkActionsToolbar();
+        }
+    });
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            const checkboxes = devicesTableBody.querySelectorAll('.device-select-checkbox');
+            checkboxes.forEach(cb => {
+                const row = cb.closest('tr');
+                if (row && row.style.display !== 'none') {
+                    cb.checked = checked;
+                } else {
+                    cb.checked = false;
+                }
+            });
+            updateBulkActionsToolbar();
+        });
+    }
+
+    if (bulkDeleteBtn) {
+        bulkDeleteBtn.addEventListener('click', async () => {
+            const checkedBoxes = devicesTableBody.querySelectorAll('.device-select-checkbox:checked');
+            const ids = Array.from(checkedBoxes).map(cb => parseInt(cb.dataset.id, 10));
+            if (ids.length === 0) return;
+            
+            if (confirm(`Are you sure you want to delete the ${ids.length} selected devices?`)) {
+                bulkDeleteBtn.disabled = true;
+                const originalHtml = bulkDeleteBtn.innerHTML;
+                bulkDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Deleting...';
+                
+                try {
+                    const result = await api.post('bulk_delete_devices', { ids });
+                    if (result && result.success) {
+                        window.notyf.success(result.message || 'Devices deleted successfully.');
+                        await loadDevices();
+                    } else {
+                        throw new Error(result.error || 'Failed to delete devices.');
+                    }
+                } catch (error) {
+                    console.error('Failed to perform bulk delete:', error);
+                    window.notyf.error(error.message || 'Failed to delete selected devices.');
+                } finally {
+                    bulkDeleteBtn.disabled = false;
+                    bulkDeleteBtn.innerHTML = originalHtml;
+                }
+            }
+        });
+    }
 
     closeDetailsModal.addEventListener('click', () => closeModal('detailsModal'));
 

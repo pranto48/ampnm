@@ -19,6 +19,11 @@ include 'header.php';
             <div class="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
                 <h2 class="text-xl font-semibold text-white">All Devices</h2>
                 <div class="w-full md:w-auto flex items-center gap-4">
+                    <div id="bulkActionsContainer" class="hidden flex items-center gap-2">
+                        <button id="bulkDeleteBtn" class="px-4 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-700 text-sm font-semibold flex items-center gap-1.5 transition-colors">
+                            <i class="fas fa-trash-alt"></i> Delete Selected (<span id="selectedCount">0</span>)
+                        </button>
+                    </div>
                     <div class="relative flex-grow">
                         <input type="search" id="deviceSearchInput" placeholder="Search devices..." class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
@@ -33,6 +38,9 @@ include 'header.php';
                 <table class="min-w-full">
                     <thead class="border-b border-slate-700">
                         <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase w-10">
+                                <input type="checkbox" id="selectAllCheckbox" class="rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-800">
+                            </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Device</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">IP Address</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Map</th>

@@ -79,9 +79,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Device name is required.</div>';
     } else {
         try {
-            $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
-            $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
-            $schemaWarning = '';
+            // Retrieve all users in the same user group
+            $current_user_group = $_SESSION['user_group'] ?? 'default_group';
+            $stmtGroup = $pdo->prepare("SELECT id FROM users WHERE user_group = ?");
+            $stmtGroup->execute([$current_user_group]);
+            $current_group_user_ids = $stmtGroup->fetchAll(PDO::FETCH_COLUMN) ?: [$current_user_id];
+            $groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
+
+            // Check duplicate name (excluding current device)
+            $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND id != ? AND user_id IN ($groupIdsStr)");
+            $stmtDupName->execute([$name, $device_id]);
+            $nameExists = (int)$stmtDupName->fetchColumn() > 0;
+
+            // Check duplicate IP (excluding current device)
+            $ipExists = false;
+            if (!empty($ip)) {
+                $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND id != ? AND user_id IN ($groupIdsStr)");
+                $stmtDupIp->execute([$ip, $device_id]);
+                $ipExists = (int)$stmtDupIp->fetchColumn() > 0;
+            }
+
+            if ($nameExists) {
+                $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">A device with this name already exists in your group.</div>';
+            } elseif ($ipExists) {
+                $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">A device with this IP address already exists in your group.</div>';
+            } else {
+                $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
+                $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
+                $schemaWarning = '';
 
             if ($hasSubchoice) {
                 $fields = "name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, subchoice = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, name_text_color = ?, name_text_bold = ?, name_text_italic = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?";
@@ -131,6 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = $schemaWarning . '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">Device "' . htmlspecialchars($name) . '" updated successfully!</div>';
             $stmt_device->execute([$device_id, $current_user_id]);
             $device = $stmt_device->fetch(PDO::FETCH_ASSOC);
+        }
         } catch (PDOException $e) {
             $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Error updating device: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }

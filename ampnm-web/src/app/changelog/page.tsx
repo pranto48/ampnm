@@ -5,6 +5,30 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.8.0",
+      date: "July 2026",
+      badge: "Feature Enhancement Release",
+      badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+      highlights: [
+        {
+          title: "Bulk Delete Operations",
+          description: "Implemented bulk deletion controls on the inventory page supporting selection checking and transaction-safe API deletes."
+        },
+        {
+          title: "Duplicate Device Detector",
+          description: "Added real-time name and IP duplication detector on creation, editing, and API handlers to prevent map inconsistencies."
+        },
+        {
+          title: "Dual Update Checks & Actions",
+          description: "Provided a dual updating dashboard displaying Git repository commits alongside Docker Hub tag/digest updates with self-container recreation capabilities."
+        },
+        {
+          title: "FTP Backups Integrity Fix",
+          description: "Fixed scheduled remote backups by compiling the PHP ftp extension into the main container image."
+        }
+      ]
+    },
+    {
       version: "v1.7.0",
       date: "July 2026",
       badge: "Feature Alignment Release",

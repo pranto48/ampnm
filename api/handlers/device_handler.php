@@ -805,6 +805,26 @@ switch ($action) {
                 exit;
             }
 
+            // Check duplicate name
+            $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND user_id IN ($groupIdsStr)");
+            $stmtDupName->execute([$input['name']]);
+            if ((int)$stmtDupName->fetchColumn() > 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'A device with this name already exists in your group.']);
+                exit;
+            }
+
+            // Check duplicate IP
+            if (!empty($input['ip'])) {
+                $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND user_id IN ($groupIdsStr)");
+                $stmtDupIp->execute([$input['ip']]);
+                if ((int)$stmtDupIp->fetchColumn() > 0) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'A device with this IP address already exists in your group.']);
+                    exit;
+                }
+            }
+
             $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $portConfigValue = isset($input['port_config']) ? (is_string($input['port_config']) ? $input['port_config'] : json_encode($input['port_config'])) : null;
@@ -832,6 +852,26 @@ switch ($action) {
             $id = $input['id'] ?? null;
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Device ID and updates are required']); exit; }
+
+            // Check duplicates if name or ip is updated
+            if (array_key_exists('name', $updates)) {
+                $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND id != ? AND user_id IN ($groupIdsStr)");
+                $stmtDupName->execute([$updates['name'], $id]);
+                if ((int)$stmtDupName->fetchColumn() > 0) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'A device with this name already exists in your group.']);
+                    exit;
+                }
+            }
+            if (array_key_exists('ip', $updates) && !empty($updates['ip'])) {
+                $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND id != ? AND user_id IN ($groupIdsStr)");
+                $stmtDupIp->execute([$updates['ip'], $id]);
+                if ((int)$stmtDupIp->fetchColumn() > 0) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'A device with this IP address already exists in your group.']);
+                    exit;
+                }
+            }
 
             // Detect schema capability (fresh/old DB might miss devices.subchoice)
             $hasSubchoice = false;
@@ -948,6 +988,18 @@ switch ($action) {
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
             $stmt = $pdo->prepare("DELETE FROM devices WHERE id = ? AND user_id IN ($groupIdsStr)"); $stmt->execute([$id]);
             echo json_encode(['success' => true, 'message' => 'Device deleted successfully']);
+        }
+        break;
+
+    case 'bulk_delete_devices':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can delete devices.']); exit; }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $ids = $input['ids'] ?? [];
+            if (!is_array($ids) || empty($ids)) { http_response_code(400); echo json_encode(['error' => 'No device IDs provided']); exit; }
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $pdo->prepare("DELETE FROM devices WHERE id IN ($in) AND user_id IN ($groupIdsStr)");
+            $stmt->execute($ids);
+            echo json_encode(['success' => true, 'message' => 'Devices deleted successfully']);
         }
         break;
 

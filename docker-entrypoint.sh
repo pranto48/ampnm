@@ -67,6 +67,13 @@ fi
 echo "✓ Permissions configured"
 echo ""
 
+# Allow www-data to write to docker socket if mounted
+if [ -S /var/run/docker.sock ]; then
+    chmod 666 /var/run/docker.sock || true
+    echo "✓ Docker socket permissions configured (chmod 666)"
+    echo ""
+fi
+
 echo "→ Configuring Apache to listen on port ${APACHE_PORT}..."
 sed -ri "s/Listen 80/Listen ${APACHE_PORT}/" /etc/apache2/ports.conf || true
 sed -ri "s/<VirtualHost \*:80>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/sites-available/000-default.conf || true

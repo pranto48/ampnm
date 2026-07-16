@@ -53,6 +53,7 @@ RUN set -eux; \
         bcmath \
         curl \
         exif \
+        ftp \
         gd \
         intl \
         opcache \
@@ -79,7 +80,7 @@ RUN set -eux; \
     install -d -m 0775 -o www-data -g www-data \
         /var/www/html/data/code_backups \
         /var/www/html/storage/logs; \
-    chmod +x /var/www/html/scripts/update.sh /var/www/html/scripts/update_check.sh /var/www/html/scripts/backup_check.php; \
+    chmod +x /var/www/html/scripts/update.sh /var/www/html/scripts/update_check.sh /var/www/html/scripts/backup_check.php /var/www/html/scripts/docker_update.sh; \
     chown -R www-data:www-data /var/www/html; \
     find /var/www/html -type d -exec chmod 0755 {} \;; \
     find /var/www/html/uploads -type d -exec chmod 0775 {} \;
