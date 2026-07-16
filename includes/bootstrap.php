@@ -51,6 +51,7 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
                 FOREIGN KEY (`schedule_id`) REFERENCES `system_backup_schedules`(`id`) ON DELETE SET NULL,
                 FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
         try {
             $pdo->query("SELECT `thickness`, `color`, `line_style`, `arrows`, `label`, `animated` FROM `device_edges` LIMIT 1");
         } catch (PDOException $e) {

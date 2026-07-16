@@ -5,6 +5,18 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.4.0",
+      date: "July 2026",
+      badge: "Stability Release",
+      badgeColor: "bg-red-500/10 text-red-400 border-red-500/20",
+      highlights: [
+        {
+          title: "Database Schema Migration Recovery",
+          description: "Fixed a critical syntax parse error inside the central bootstrap system (`includes/bootstrap.php`) related to unclosed try-catch statements during automatic migration table setup."
+        }
+      ]
+    },
+    {
       version: "v1.3.0",
       date: "July 2026",
       badge: "Repository Restructure",
