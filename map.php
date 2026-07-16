@@ -361,9 +361,9 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
     </div>
 
     <div id="mapSettingsModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
-            <h2 class="text-xl font-semibold text-white mb-4">Map Appearance Settings</h2>
-            <form id="mapSettingsForm">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700 flex flex-col" style="max-height:90vh;">
+            <h2 class="text-xl font-semibold text-white mb-4 flex-shrink-0">Map Appearance Settings</h2>
+            <form id="mapSettingsForm" class="overflow-y-auto flex-1 pr-1" style="max-height:calc(90vh - 120px);scrollbar-width:thin;scrollbar-color:#334155 transparent;">
                 <div class="space-y-4">
                     <div>
                         <label for="mapBgColor" class="block text-sm font-medium text-slate-400 mb-1">Background Color</label>
@@ -521,6 +521,17 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         </div>
                     </div>
                     <p class="text-xs text-slate-500">Use this panel to control how connection lines run and animate on the map.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-700/80">
+                        <div>
+                            <label for="globalLineThickness" class="block text-xs font-medium text-slate-400 mb-1">Global Line Thickness <span id="globalLineThicknessValue" class="text-cyan-400">2px</span></label>
+                            <input id="globalLineThickness" type="range" min="1" max="8" step="0.5" value="2" class="w-full accent-cyan-500">
+                            <p class="text-xs text-slate-500 mt-1">Applies to all connection lines on this map. Individual overrides take priority.</p>
+                        </div>
+                        <div>
+                            <label for="globalLineThicknessPx" class="block text-xs font-medium text-slate-400 mb-1">Exact Value (px)</label>
+                            <input id="globalLineThicknessPx" type="number" min="1" max="16" step="0.5" value="2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                        </div>
+                    </div>
                     </div>
                     <!-- Global Label Style Panel -->
                     <div data-map-settings-panel="labelstyle" class="space-y-4 hidden">
@@ -568,7 +579,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         </div>
                     </div>
                 </div>
-                <div class="flex justify-between items-center mt-6">
+                <div class="flex justify-between items-center mt-6 flex-shrink-0 border-t border-slate-700 pt-4">
                     <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Reset to Default</button>
                     <div>
                         <button type="button" id="cancelMapSettingsBtn" class="px-4 py-2 bg-slate-600 text-slate-300 rounded-lg hover:bg-slate-500 mr-2">Close</button>
@@ -896,6 +907,98 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
 })();
 </script>
 
+
+<!-- Global Line Thickness JS -->
+<script>
+(function() {
+    const STORAGE_KEY_PREFIX = 'mapLineThickness:';
+
+    function getLineThicknessKey() {
+        const mapId = (window.MapApp && MapApp.state) ? MapApp.state.currentMapId : null;
+        return mapId ? STORAGE_KEY_PREFIX + mapId : null;
+    }
+
+    function saveLineThickness(val) {
+        const key = getLineThicknessKey();
+        if (key) localStorage.setItem(key, val);
+    }
+
+    function loadLineThickness() {
+        const key = getLineThicknessKey();
+        if (!key) return 2;
+        const stored = localStorage.getItem(key);
+        return stored ? parseFloat(stored) : 2;
+    }
+
+    function applyLineThicknessToNetwork(val) {
+        try {
+            if (window.MapApp && MapApp.networkManager && MapApp.networkManager.network) {
+                const net = MapApp.networkManager.network;
+                const edgeIds = net.body.data.edges.getIds();
+                const updates = edgeIds.map(id => {
+                    const edge = net.body.data.edges.get(id);
+                    // Only apply if no per-edge custom width is set
+                    if (!edge.width || edge._useGlobalWidth) {
+                        return { id, width: val, _useGlobalWidth: true };
+                    }
+                    return null;
+                }).filter(Boolean);
+                if (updates.length > 0) net.body.data.edges.update(updates);
+            }
+        } catch(e) {
+            console.warn('Line thickness apply failed:', e);
+        }
+    }
+
+    window.loadGlobalLineThickness = function() {
+        const val = loadLineThickness();
+        const slider = document.getElementById('globalLineThickness');
+        const numInput = document.getElementById('globalLineThicknessPx');
+        const label = document.getElementById('globalLineThicknessValue');
+        if (slider) slider.value = val;
+        if (numInput) numInput.value = val;
+        if (label) label.textContent = val + 'px';
+        applyLineThicknessToNetwork(val);
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const slider = document.getElementById('globalLineThickness');
+        const numInput = document.getElementById('globalLineThicknessPx');
+        const label = document.getElementById('globalLineThicknessValue');
+
+        if (slider && numInput && label) {
+            slider.addEventListener('input', function() {
+                const v = parseFloat(this.value);
+                numInput.value = v;
+                label.textContent = v + 'px';
+            });
+            numInput.addEventListener('input', function() {
+                const v = Math.max(1, Math.min(16, parseFloat(this.value) || 2));
+                slider.value = v;
+                label.textContent = v + 'px';
+            });
+        }
+
+        // Save on form submit
+        const form = document.getElementById('mapSettingsForm');
+        if (form) {
+            form.addEventListener('submit', function() {
+                const val = parseFloat(numInput ? numInput.value : 2) || 2;
+                saveLineThickness(val);
+                applyLineThicknessToNetwork(val);
+            }, true);
+        }
+
+        // Load when map settings modal opens
+        const settingsBtn = document.getElementById('mapSettingsBtn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', function() {
+                setTimeout(function() { window.loadGlobalLineThickness(); }, 50);
+            });
+        }
+    });
+})();
+</script>
 
 <?php include 'footer.php'; ?>
 
