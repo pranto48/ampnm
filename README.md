@@ -1,454 +1,248 @@
-# AMPNM - Advanced Multi-Protocol Network Monitor (Docker Version)
+# 🛡️ AMPNM — Advanced Monitoring & Network Manager
 
-Real-time network monitoring system with visual topology mapping.
+**Free & Open Source** | Network Monitoring · License Management · Docker-First
 
-## 🚀 Quick Start
+> AMPNM is a self-hosted, Docker-native network monitoring and license management platform built for IT teams. Monitor devices, enforce software licenses, stream agent telemetry, and manage everything from a clean web console — all for free.
 
-```bash
-# Optional: pre-pull images on slow connections
-docker compose pull
-
-# Build and start with full progress output
-docker compose up --build --progress=plain -d
-```
-
-Access at: http://localhost:2266
-
-**Default Login:**
-- Username: `admin`
-- Password: `password` (change in docker-compose.yml)
-
-> Stuck during download/build? See `INSTALL_TROUBLESHOOTING.md` for diagnostics and progress tips.
-> If you see `unexpected EOF` while pulling images, rerun `docker compose pull db --progress=plain` (or `docker pull mysql:8`) to resume the largest layer, then rerun the start command.
-
-## 🪟 Install AMPNM on Windows PC with Docker Desktop
-
-For a seamless setup on Windows 11, you can use our PowerShell scripts or manually run the commands below.
-
-### PowerShell Automatic Script (Recommended)
-1. Open PowerShell or Windows Terminal.
-2. Run the installer script:
-   ```powershell
-   .\scripts\windows-install.ps1
-   ```
-
-### Manual Step-by-Step Instructions
-1. **Install Docker Desktop**: Download and install Docker Desktop for Windows.
-2. **Enable WSL 2 Backend**: Ensure "Use the WSL 2 based engine" is enabled during Docker Desktop setup.
-3. **Run Docker Desktop**: Start the Docker Desktop application and wait until it indicates Docker is running.
-4. **Open PowerShell or Windows Terminal** in the cloned repository directory:
-   ```powershell
-   git clone https://github.com/pranto48/ampnm.git
-   cd ampnm
-   ```
-5. **Set Environment Variables**:
-   - Copy `.env.example` to `.env`.
-   - Customize `.env` as needed.
-6. **Start AMPNM**:
-   ```powershell
-   docker compose pull
-   docker compose up --build --progress=plain -d
-   ```
-7. **Access the App**: Open your browser at http://localhost:2266 (or the port defined in `APACHE_PORT`).
-8. **Login**:
-   - **Username**: `admin`
-   - **Password**: `password`
-9. **Change default passwords**: Immediately modify the default admin password (`ADMIN_PASSWORD`) and database passwords in your `.env` file for security, then run the installer again.
-
-### Additional Windows Command Utilities
-- **Stop services**: Run `.\scripts\windows-stop.ps1` to cleanly shut down containers.
-- **Update system**: Run `.\scripts\windows-update.ps1` to pull changes, fetch new images, and rebuild.
-- **Create database backup**: Run `.\scripts\windows-backup.ps1` to generate a timestamped SQL backup in the `backups/` folder.
-
-## 📋 Requirements
-
-- Docker & Docker Compose
-- No other dependencies needed!
-
-## ✨ Features
-
-- **Real-time Monitoring**: ICMP Ping, HTTP/HTTPS, TCP port checks
-- **Network Topology Map**: Visual representation with status colors
-- **Alert System**: Email notifications on status changes
-- **Historical Data**: Track performance metrics over time
-- **Multi-User**: Admin and viewer roles
-- **License Management**: Built-in licensing system
-
-## 🔧 Configuration
-
-### Environment Variables (docker-compose.yml)
-
-```yaml
-environment:
-  MYSQL_ROOT_PASSWORD: yourSecurePassword
-  MYSQL_DATABASE: network_monitor
-  DB_USER: ampnm_user
-  DB_PASSWORD: yourDbPassword
-  ADMIN_PASSWORD: yourAdminPassword
-  APP_LICENSE_KEY: your-license-key
-```
-
-### Important Settings
-
-- **MYSQL_ROOT_PASSWORD**: MySQL root password
-- **DB_PASSWORD**: Application database password
-- **ADMIN_PASSWORD**: Admin user password (default: `password`)
-- **APP_LICENSE_KEY**: Your license key from portal
-
-## 📊 Monitoring Features
-
-### Check Types
-
-1. **Windows Usage Agent** (New Desktop Client)
-   - Real-time CPU, RAM, and Disk metrics via Tauri desktop app
-   - Network interface Tx/Rx tracking
-   - Centralized status logging and process counting
-   - Silent tray icon integration with pause options
-
-2. **ICMP Ping**
-   - Latency monitoring
-   - Packet loss detection
-   - TTL tracking
-   - Thresholds: Warning & Critical
-
-3. **TCP Port Check**
-   - Port availability
-   - Connection time
-   - Service status
-
-4. **HTTP/HTTPS Check**
-   - Response code
-   - Response time
-   - Content verification
-
-### Status Levels
-
-- 🟢 **Online**: Device responding normally
-- 🟡 **Warning**: Latency or packet loss threshold exceeded
-- 🔴 **Critical**: Severe latency, packet loss, or offline
-- ⚪ **Offline**: Device unreachable
-- ⚫ **Unknown**: No data or unconfigured
-
-## 🗺️ Network Topology
-
-- Drag-and-drop device placement
-- Connection visualization
-- Real-time status updates
-- Color-coded indicators
-- Custom icons and sizes
-- Public map sharing option
-
-## 📧 Email Notifications
-
-Configure SMTP settings to receive alerts:
-
-1. Go to **Email Notifications**
-2. Enter SMTP server details
-3. Add recipient emails per device
-4. Choose notification triggers:
-   - Device goes online
-   - Device goes offline
-   - Warning status
-   - Critical status
-
-## 🔐 Security
-
-### Best Practices
-
-1. **Change Default Passwords**
-   ```yaml
-   ADMIN_PASSWORD: strong_password_here
-   MYSQL_ROOT_PASSWORD: another_strong_password
-   ```
-
-2. **Restrict Port Access**
-   ```yaml
-   ports:
-     - "127.0.0.1:2266:80"  # Only accessible from localhost
-   ```
-
-3. **Use HTTPS** (Production)
-   - Set up reverse proxy (Nginx/Apache)
-   - Configure SSL certificates
-   - Enable HTTPS redirects
-
-4. **Regular Backups**
-   ```bash
-   docker exec ampnm-mysql mysqldump -u root -p network_monitor > backup.sql
-   ```
-
-## 🛠️ Advanced Configuration
-
-### Custom Ping Intervals
-
-Set per-device:
-- Minimum: 10 seconds
-- Default: 60 seconds
-- Maximum: 3600 seconds (1 hour)
-
-### Threshold Configuration
-
-**Warning Thresholds:**
-- Latency: 100ms default
-- Packet Loss: 10% default
-
-**Critical Thresholds:**
-- Latency: 300ms default
-- Packet Loss: 50% default
-
-## 📂 Docker Volumes
-
-```yaml
-volumes:
-  mysql-data: {}      # Database storage
-  app-uploads: {}     # Icons, backgrounds, backups
-```
-
-### Backup Volumes
-
-```bash
-# Backup database
-docker-compose exec mysql mysqldump -u root -p network_monitor > backup.sql
-
-# Backup uploads
-docker cp ampnm-app:/var/www/html/uploads ./uploads-backup
-```
-
-## 🔄 Updates
-
-```bash
-# Pull latest image
-docker-compose pull
-
-# Restart with new image
-docker-compose down
-docker-compose up -d
-```
-
-### Automated update helpers
-
-```bash
-# Run safe update (captures pre-update state and optional DB dump)
-./scripts/auto-update.sh
-
-# Roll back to previous version snapshot
-```
-
-Rollback metadata and DB backups are stored in `.update-state/<timestamp>/`.
-
-## 🐛 Troubleshooting
-
-### Ping Not Working
-
-**Issue**: "sh: 1: ping: not found"
-
-**Solution**: The Dockerfile has been updated to include `iputils-ping`. Rebuild:
-
-```bash
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-### Database Connection Errors
-
-```bash
-# Check MySQL is running
-docker-compose ps
-
-# View logs
-docker-compose logs mysql
-docker-compose logs app
-
-# Restart services
-docker-compose restart
-```
-
-### Permission Issues
-
-```bash
-# Fix ownership
-docker-compose exec app chown -R www-data:www-data /var/www/html
-```
-
-### Network Access Issues
-
-```bash
-# Check if container can ping external hosts
-docker-compose exec app ping 8.8.8.8
-
-# Check internal network
-docker network inspect ampnm-network
-```
-
-## 🛠️ Windows Docker Troubleshooting
-
-Here are typical troubleshooting steps for common issues encountered on Windows environments:
-
-### Docker Desktop not running
-- **Symptom**: Script reports Docker is not running or commands time out.
-- **Fix**: Launch Docker Desktop from the Start menu and wait until the status bar indicator turns green.
-
-### WSL 2 not enabled
-- **Symptom**: Docker Desktop fails to start, displaying a WSL 2 kernel update prompt.
-- **Fix**: Open PowerShell as Administrator and run:
-  ```powershell
-  wsl --install
-  ```
-  Restart your computer if prompted.
-
-### Port 2266 already in use
-- **Symptom**: Apache fails to start, or container exits.
-- **Fix**: Modify `APACHE_PORT` in your `.env` file to an unused port (e.g., `APACHE_PORT=8080`) and rerun the installer.
-
-### MySQL container not healthy
-- **Symptom**: Connection failures, loop redirecting back to `database_setup.php`.
-- **Fix**: Verify logs and database state. Run `docker compose ps` to inspect. If the database volume was corrupted, reset it using the commands below.
-
-### Docker pull unexpected EOF
-- **Symptom**: Connection drop on large layers.
-- **Fix**: Run `docker compose pull --progress=plain` to resume downloads.
-
-### Cannot access http://localhost:2266
-- **Symptom**: Page not found.
-- **Fix**: Ensure the containers are running:
-  ```powershell
-  docker compose ps
-  ```
-  If they are not running, check logs:
-  ```powershell
-  docker compose logs -f app
-  docker compose logs -f db
-  ```
-
-### Ping/ICMP limitations inside Docker Desktop/Windows
-- **Symptom**: Pings inside containers do not work or show 100% packet loss.
-- **Fix**: Docker Desktop on Windows routes traffic through a user-space network translation layer that does not pass through low-level ICMP ping requests directly unless running with special permissions, or using the Cloud Sync bridge mode. If ping fails, use TCP port checks as a monitor method.
-
-### How to View Logs
-- **Application logs**:
-  ```powershell
-  docker compose logs -f app
-  ```
-- **Database logs**:
-  ```powershell
-  docker compose logs -f db
-  ```
-
-### How to Restart
-```powershell
-docker compose restart
-```
-
-### How to Reset Completely
-> [!CAUTION]
-> This deletes all stored database data and configurations.
-```powershell
-docker compose down -v
-docker compose up --build -d
-```
-
-## 📋 Windows Post-Installation Testing Checklist
-
-After running the installation script, verify your AMPNM instance works correctly by checking off the following tasks:
-
-- [ ] **Docker Desktop Running**: Docker Desktop engine is active and indicating healthy status.
-- [ ] **Containers Started**: Both `app` and `db` services show as `running` under `docker compose ps`.
-- [ ] **Web UI Access**: Browser connects and renders correctly at http://localhost:2266.
-- [ ] **Admin Login**: Logging in with `admin` and `password` works and redirects to the dashboard.
-- [ ] **Device Monitor**: Adding a new device and monitoring via Ping or Port works.
-- [ ] **SMS Configuration**: The SMS settings page displays and permits updates.
-- [ ] **Windows Usage Agent UI**: Verify `agent_devices.php` loads correctly.
-- [ ] **Windows Usage Agent Build**: Run `.\scripts\build-agent-windows.ps1` and verify `.msi` installers are built successfully in `apps/windows-agent/src-tauri/target/release/bundle/`.
-- [ ] **Windows Usage Agent Registration**: Add a Windows PC agent using an enrollment token.
-- [ ] **Test SMS Integration**: Sending a test SMS succeeds after setting the Alpha SMS API keys.
-- [ ] **SMS Alerts**: Device status modifications (Online -> Offline / Offline -> Online) trigger SMS alerts.
-
-## 📊 Performance
-
-### Recommended Resources
-
-- **Small Setup** (1-10 devices): 512MB RAM, 1 CPU
-- **Medium Setup** (10-50 devices): 1GB RAM, 2 CPUs
-- **Large Setup** (50-200 devices): 2GB RAM, 4 CPUs
-
-### Optimization
-
-```yaml
-services:
-  app:
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-```
-
-## 📞 Support
-
-- **Portal**: https://portal.itsupport.com.bd
-- **Email**: support@itsupport.com.bd
-- **License**: Purchase at portal
-
-## 📝 License
-
-This software requires a valid license key.
-
-### License Tiers
-
-- **Starter**: Up to 10 devices
-- **Professional**: Up to 50 devices
-- **Enterprise**: Up to 200 devices
-
-## 🔗 Related
-
-- **Script Version**: For XAMPP/LAMP installations (see `../script-ampnm/`)
-- **Comparison**: See `../AMPNM_VERSIONS_COMPARISON.md`
-
-## 🆕 What's New
-
-### v1.0 (2024)
-- Initial Docker release
-- ICMP Ping support with iputils-ping
-- Network topology visualization
-- Email notifications
-- Multi-user support
-- License management
+[![Docker Pulls](https://img.shields.io/docker/pulls/pranto48/ampnm?style=flat-square&color=0ea5e9&label=pulls)](https://hub.docker.com/r/pranto48/ampnm)
+[![Docker Image Size](https://img.shields.io/docker/image-size/pranto48/ampnm/latest?style=flat-square&color=6366f1)](https://hub.docker.com/r/pranto48/ampnm/tags)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](https://github.com/pranto48/ampnm)
+[![PHP](https://img.shields.io/badge/PHP-8.2-7c3aed?style=flat-square)](https://hub.docker.com/r/pranto48/ampnm)
 
 ---
 
-**Made with ❤️ by IT Support Bangladesh**
+## 📦 Image Tags & Versions
 
-## 🔄 Container Update Runtime (`scripts/update.sh`)
+All AMPNM components are versioned together under a unified release cycle.
 
-The update script is included in the image at `scripts/update.sh` and is executable by default.
+### 🔵 AMPNM Core App — `pranto48/ampnm`
 
-### Required environment variables / paths
+| Tag | Description | Status |
+|-----|-------------|--------|
+| `latest` | Always points to the most recent stable release | ✅ Stable |
+| `v1.1.0` | Tamper-proof licensing, self-healing auth, open-source free tier | ✅ Stable |
+| `v1.0.0` | Initial Docker release with license verification | ✅ Legacy |
+| `nightly` | Latest development build (may be unstable) | ⚠️ Dev |
 
-- `HOST_APP_DIR`
-  - Path to the **host-mounted application source** that should be backed up and updated.
-  - Example: `/var/www/html` when the host repo is bind-mounted there.
-- Backup path
-  - Controlled by `BACKUP_BASE` (default: `/var/www/html/docker-ampnm/data/code_backups`).
-  - Ensure this directory is bind-mounted if you want durable backups across container recreations.
-- Compose location
-  - Controlled by `APP_DIR` (script checks compose files in this directory for restart).
-  - Set this to the directory that contains `docker-compose.yml`/`compose.yml`.
-- Update repo URL override
-  - `REPO_URL` overrides the default repository source used for clone/fetch.
+### 🌐 AMPNM Web (Landing Site) — `pranto48/ampnm-web`
 
-### Recommended bind mounts
+| Tag | Description | Status |
+|-----|-------------|--------|
+| `latest` | Most recent stable web release | ✅ Stable |
+| `web-v1.1.0` | Docker Hub install guide, Solutions page with screenshots & fix walkthrough | ✅ Stable |
+| `web-v1.0.0` | Initial landing page release | ✅ Legacy |
+
+### 🔑 AMPNM Portal (License Management) — `pranto48/ampnm-portal`
+
+| Tag | Description | Status |
+|-----|-------------|--------|
+| `latest` | Most recent stable portal release | ✅ Stable |
+| `portal-v1.1.0` | Free + commercial license tiers, bKash/Rocket/Nagad payment support | ✅ Stable |
+| `portal-v1.0.0` | Initial portal with paid license management only | ✅ Legacy |
+
+### 📡 AMPNM Agent (Telemetry Daemon) — `pranto48/ampnm-agent`
+
+| Tag | Description | Status |
+|-----|-------------|--------|
+| `latest` | Most recent stable agent release | ✅ Stable |
+| `agent-v1.1.0` | Go-based telemetry daemon, Docker + native host support | 🧪 Beta |
+| `agent-v1.0.0` | Initial agent release | ✅ Legacy |
+
+---
+
+## 🚀 Quick Start
+
+### Pull the image
+
+```bash
+docker pull pranto48/ampnm
+```
+
+### Full stack with docker compose (Recommended)
+
+```bash
+# 1. Create docker-compose.yml (see below)
+# 2. Start all services:
+docker compose up -d
+
+# 3. Open the web console:
+http://localhost:2266
+```
+
+---
+
+## 🐳 docker-compose.yml
 
 ```yaml
 services:
-  app:
+  ampnm-app:
+    image: pranto48/ampnm:latest
+    container_name: ampnm-app
+    restart: unless-stopped
+    ports:
+      - "2266:2266"
+      - "10051:10051"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=network_monitor
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - ADMIN_PASSWORD=admin123
+      - APP_LICENSE_KEY=your_free_license_key_here
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    container_name: ampnm-db
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: network_monitor
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
     volumes:
-      - ${HOST_APP_DIR}:/var/www/html
-      - ./data/code_backups:/var/www/html/docker-ampnm/data/code_backups
-      - /var/run/docker.sock:/var/run/docker.sock
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 300s
+
+volumes:
+  db_data:
 ```
 
-Notes:
-- Mounting `/var/run/docker.sock` is required if the script should run `docker compose restart` from inside the container.
-- If your compose files live elsewhere, set `APP_DIR` accordingly.
+---
 
+## 🔑 Get Your Free License Key
+
+AMPNM Core is **completely free**. A license key is required but costs nothing.
+
+1. **Register** at [portal.itsupport.com.bd/register](https://portal.itsupport.com.bd/register)
+2. Navigate to **Licenses → AMPNM Core → Generate Free Key**
+3. Copy your `AMP256-XXXX-XXXX-XXXX-XXXX` key
+4. Open `http://localhost:2266/license_setup.php`
+5. Paste the key and click **Verify License** ✅
+
+---
+
+## 🏗️ AMPNM Platform Architecture
+
+AMPNM is a multi-component platform. All components work together:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   AMPNM Platform  v1.1.0                    │
+├──────────────────┬──────────────────────────────────────────┤
+│ ampnm            │ Core PHP app — device monitor,           │
+│ (this image)     │ license enforcer, agent dashboard        │
+│ pranto48/ampnm   │ Port: 2266  |  DB: MySQL 8.0             │
+│ v1.1.0           │ Base: PHP 8.2 + Apache                   │
+├──────────────────┼──────────────────────────────────────────┤
+│ ampnm-web        │ Next.js 16 marketing & docs site         │
+│ pranto48/ampnm   │ Download page, pricing, solutions,       │
+│ -web  v1.1.0     │ Docker Hub install guide, screenshots    │
+├──────────────────┼──────────────────────────────────────────┤
+│ ampnm-portal     │ Next.js 16 license management portal     │
+│ pranto48/ampnm   │ Issue free + commercial license keys,    │
+│ -portal v1.1.0   │ manage organizations, bKash/Rocket pay   │
+├──────────────────┼──────────────────────────────────────────┤
+│ ampnm-agent      │ Go-based telemetry daemon                │
+│ pranto48/ampnm   │ Streams CPU, RAM, disk, net metrics      │
+│ -agent  v1.1.0   │ Port: 10050 (passive) | 10051 (trapper) │
+└──────────────────┴──────────────────────────────────────────┘
+```
+
+---
+
+## ⚙️ Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_HOST` | `db` | MySQL hostname (docker service name) |
+| `DB_NAME` | `network_monitor` | Database name |
+| `DB_USER` | `user` | Database username |
+| `DB_PASSWORD` | `password` | Database password |
+| `MYSQL_ROOT_PASSWORD` | `rootpassword` | MySQL root password |
+| `ADMIN_PASSWORD` | `password` | AMPNM admin panel password |
+| `APP_LICENSE_KEY` | *(empty)* | Pre-set license key (skips setup wizard) |
+| `APACHE_PORT` | `2266` | Web console HTTP port |
+| `LICENSE_API_URL` | *(portal URL)* | Override license verification endpoint |
+| `LICENSE_FINGERPRINT_MODE` | `allow-rebaseline` | `strict` or `allow-rebaseline` |
+| `SMS_ALERTS_ENABLED` | `1` | Enable Alpha SMS alert notifications |
+| `SMS_COOLDOWN_MINUTES` | `30` | Minimum minutes between SMS alerts |
+| `CLOUD_SYNC_URL` | *(empty)* | Optional cloud monitoring bridge URL |
+
+---
+
+## 🔄 Upgrading
+
+```bash
+# Pull the latest image
+docker pull pranto48/ampnm:latest
+
+# Recreate only the app container (DB volume is preserved)
+docker compose up -d --no-deps --force-recreate ampnm-app
+```
+
+> ✅ Your database is stored in the `db_data` named volume and is **never lost** on upgrade.
+
+---
+
+## 📋 Changelog
+
+### v1.1.0 — 2026-06-27 *(Latest)*
+- 🔧 **Self-healing auth:** `auth_check.php` now auto-recovers `core_key` on container restart — eliminates `ERR_TOO_MANY_REDIRECTS`
+- 🔒 **Tamper-proof core:** AES-256-CBC encrypted PHP logic, machine-locked decryption key
+- 🆓 **Open source & free:** AMPNM Core is free for all registered portal users
+- 🛒 **Portal: commercial support:** bKash, Rocket, Nagad payment gateway integration
+- 🌐 **Web: install guide:** Docker Hub banner, 4-step setup, solutions screenshots
+
+### v1.0.0 — 2026-06-20 *(Initial Release)*
+- 🚀 First Docker Hub public release
+- 🔑 License verification via portal.itsupport.com.bd
+- 📡 SNMP + ICMP device monitoring
+- 📊 Network bandwidth & device health dashboard
+- 👤 Multi-user admin panel
+
+---
+
+## 🔒 Security Architecture
+
+| Feature | Implementation |
+|---------|---------------|
+| Core logic protection | AES-256-CBC encrypted `auth_check.enc` |
+| Key storage | Machine-locked, host-fingerprint-derived key |
+| License payloads | HMAC-SHA256 signed JSON, AES encrypted response |
+| DB sensitive values | `encryptSensitiveValue()` — all keys encrypted at rest |
+| Container restart | Self-healing: auto re-verifies license on boot |
+
+---
+
+## 📞 Support & Links
+
+| Resource | Link |
+|----------|------|
+| 🌍 Website | [ampnm.itsupport.com.bd](https://ampnm.itsupport.com.bd) |
+| 🔑 License Portal | [portal.itsupport.com.bd](https://portal.itsupport.com.bd) |
+| 📦 Docker Hub | [hub.docker.com/r/pranto48/ampnm](https://hub.docker.com/r/pranto48/ampnm) |
+| 📄 GitHub | [github.com/pranto48/ampnm](https://github.com/pranto48/ampnm) |
+| 📚 Docs | [ampnm.itsupport.com.bd/docs](https://ampnm.itsupport.com.bd/docs) |
+| 💬 Contact | [itsupport.com.bd](https://itsupport.com.bd) |
+
+---
+
+## 📝 License
+
+**MIT License** — Free to use, modify, and distribute.
+
+Commercial support, enterprise licensing, and additional IT monitoring products are available at [portal.itsupport.com.bd](https://portal.itsupport.com.bd).
+
+---
+
+*Made with ❤️ by [IT Support BD](https://itsupport.com.bd)*
