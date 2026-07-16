@@ -5,6 +5,22 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.5.0",
+      date: "July 2026",
+      badge: "Zero-Config Release",
+      badgeColor: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+      highlights: [
+        {
+          title: "Self-Contained Single-Container Architecture",
+          description: "Embedded a lightweight local MariaDB database server inside the Docker image. The application can now be deployed instantly with a simple single-container run command without requiring an external database service."
+        },
+        {
+          title: "Automated Data Initialization & Persistence",
+          description: "Enhanced the Docker entrypoint script to automatically provision the MariaDB directory, configure user access permissions, and initialize tables dynamically on the first boot."
+        }
+      ]
+    },
+    {
       version: "v1.4.0",
       date: "July 2026",
       badge: "Stability Release",

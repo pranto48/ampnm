@@ -17,7 +17,8 @@ RUN set -eux; \
         net-tools \
         dnsutils \
         iproute2 \
-        default-mysql-client \
+        mariadb-server \
+        mariadb-client \
         libcurl4-openssl-dev \
         libfreetype6-dev \
         libicu-dev \

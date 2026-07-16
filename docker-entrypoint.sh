@@ -86,6 +86,87 @@ done
 echo "✓ Environment variables exported"
 echo ""
 
+# --- Initialize and Start Internal Database (MariaDB) if single container ---
+START_INTERNAL_DB=0
+DB_HOST_VAL="${DB_HOST:-127.0.0.1}"
+
+if [ "$DB_HOST_VAL" = "127.0.0.1" ] || [ "$DB_HOST_VAL" = "localhost" ] || [ "$DB_HOST_VAL" = "db" ]; then
+    if [ "$DB_HOST_VAL" = "db" ]; then
+        if getent hosts db >/dev/null; then
+            echo "→ External database container 'db' detected. Skipping internal MariaDB..."
+        else
+            echo "→ Hostname 'db' could not be resolved. Falling back to internal MariaDB..."
+            START_INTERNAL_DB=1
+            # Override DB_HOST to 127.0.0.1 for the container environment
+            export DB_HOST="127.0.0.1"
+            # Rewrite Apache env file with the updated DB_HOST
+            sed -i "s/export DB_HOST=.*/export DB_HOST='127.0.0.1'/g" /etc/apache2/envvars || true
+        fi
+    else
+        START_INTERNAL_DB=1
+    fi
+fi
+
+if [ "$START_INTERNAL_DB" = "1" ]; then
+    echo "→ Standalone container mode: Setting up internal MariaDB..."
+
+    # Ensure correct ownership on database folder
+    chown -R mysql:mysql /var/lib/mysql || true
+
+    # Initialize MariaDB if data folder is uninitialized
+    if [ ! -d "/var/lib/mysql/mysql" ]; then
+        echo "  Initializing MariaDB system tables..."
+        mariadb-install-db --user=mysql --datadir=/var/lib/mysql >/dev/null
+    fi
+
+    # Start MariaDB service in the background
+    echo "  Starting MariaDB service..."
+    mariadbd-safe --user=mysql --datadir=/var/lib/mysql &
+    
+    # Wait for service to be active
+    for i in {1..30}; do
+        if mariadb-admin ping --silent; then
+            echo "  ✓ MariaDB started successfully"
+            break
+        fi
+        echo "  Waiting for MariaDB server... ($i/30)"
+        sleep 1
+    done
+
+    # Setup database, user access rights and passwords
+    echo "  Configuring database privileges..."
+    MYSQL_DATABASE="${DB_NAME:-network_monitor}"
+    MYSQL_USER="${DB_USER:-user}"
+    MYSQL_PASSWORD="${DB_PASSWORD:-password}"
+    MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-rootpassword}"
+
+    # Setup database
+    mariadb -u root <<EOF
+CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\`;
+EOF
+
+    # Setup user
+    if [ -n "$MYSQL_PASSWORD" ] && [ "$MYSQL_USER" != "root" ]; then
+        mariadb -u root <<EOF
+CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
+GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'%';
+CREATE USER IF NOT EXISTS '$MYSQL_USER'@'localhost' IDENTIFIED BY '$MYSQL_PASSWORD';
+GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+    fi
+
+    # Setup root user
+    if [ -n "$MYSQL_ROOT_PASSWORD" ]; then
+        mariadb -u root <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
+FLUSH PRIVILEGES;
+EOF
+    fi
+    echo "  ✓ Internal database configuration complete"
+    echo ""
+fi
+
 UPDATE_CHECK_INTERVAL_SECONDS="${AMPNM_UPDATE_CHECK_INTERVAL_SECONDS:-3600}"
 if [ "${AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER:-1}" = "1" ]; then
     echo "→ Starting update check scheduler (${UPDATE_CHECK_INTERVAL_SECONDS}s interval)..."
