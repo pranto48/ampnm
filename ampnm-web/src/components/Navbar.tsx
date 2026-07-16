@@ -36,7 +36,7 @@ export function Navbar() {
               <span className="font-extrabold text-zinc-900 dark:text-zinc-50 text-base leading-tight tracking-tight flex items-center gap-1.5 transition-colors">
                 AMPNM
                 <span className="text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 font-bold px-1.5 py-0.5 rounded transition-colors">
-                  v1.5
+                  v1.6
                 </span>
               </span>
               <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-medium tracking-wide uppercase select-none">

@@ -136,30 +136,44 @@ if [ "$START_INTERNAL_DB" = "1" ]; then
     # Setup database, user access rights and passwords
     echo "  Configuring database privileges..."
     MYSQL_DATABASE="${DB_NAME:-network_monitor}"
-    MYSQL_USER="${DB_USER:-user}"
-    MYSQL_PASSWORD="${DB_PASSWORD:-password}"
-    MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-rootpassword}"
+    MYSQL_USER="${DB_USER:-}"
+    MYSQL_PASSWORD="${DB_PASSWORD:-}"
+    MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 
-    # Setup database
+    # Setup database and configure root user privileges
     mariadb -u root <<EOF
 CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\`;
 EOF
 
-    # Setup user
-    if [ -n "$MYSQL_PASSWORD" ] && [ "$MYSQL_USER" != "root" ]; then
+    if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
         mariadb -u root <<EOF
-CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
-GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'%';
-CREATE USER IF NOT EXISTS '$MYSQL_USER'@'localhost' IDENTIFIED BY '$MYSQL_PASSWORD';
-GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'localhost';
+ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('');
+CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED VIA mysql_native_password USING PASSWORD('');
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED VIA mysql_native_password USING PASSWORD('');
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+EOF
+    else
+        mariadb -u root <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
+CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 EOF
     fi
 
-    # Setup root user
-    if [ -n "$MYSQL_ROOT_PASSWORD" ]; then
-        mariadb -u root <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_ROOT_PASSWORD';
+    # Setup user if configured and not root
+    if [ -n "$MYSQL_USER" ] && [ "$MYSQL_USER" != "root" ]; then
+        mariadb -u root -p"$MYSQL_ROOT_PASSWORD" <<EOF
+CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
+GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'%';
+CREATE USER IF NOT EXISTS '$MYSQL_USER'@'localhost' IDENTIFIED BY '$MYSQL_PASSWORD';
+GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'localhost';
 FLUSH PRIVILEGES;
 EOF
     fi

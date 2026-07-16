@@ -5,6 +5,18 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.6.0",
+      date: "July 2026",
+      badge: "Database Stability Release",
+      badgeColor: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+      highlights: [
+        {
+          title: "Root Loopback Socket & TCP Access",
+          description: "Configured local database root permissions to accept TCP loopback connections over 127.0.0.1 and % host interfaces. Bypassed default unix_socket restrictions, allowing PHP web clients to run passwordless queries securely."
+        }
+      ]
+    },
+    {
       version: "v1.5.0",
       date: "July 2026",
       badge: "Zero-Config Release",
