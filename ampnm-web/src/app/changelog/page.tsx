@@ -5,6 +5,26 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.3.0",
+      date: "July 2026",
+      badge: "Repository Restructure",
+      badgeColor: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+      highlights: [
+        {
+          title: "Portal Decoupled from Docker Image",
+          description: "Moved the license management portal (ampnm-portal) to its own standalone git repository portal.itsupport.com.bd, keeping the Docker image lean and focused on the monitoring core."
+        },
+        {
+          title: "Slimmer Docker Image",
+          description: "Removed Next.js portal source, node_modules, and build artifacts from the Docker build context, resulting in a faster build and smaller image footprint."
+        },
+        {
+          title: "Independent Portal Deployment",
+          description: "portal.itsupport.com.bd now deploys independently via Vercel, allowing portal updates without requiring a Docker image rebuild or redeployment."
+        }
+      ]
+    },
+    {
       version: "v1.2.0",
       date: "July 2026",
       badge: "Performance & Tenancy Release",
