@@ -3,7 +3,7 @@ set -e
 
 REPO="arifmahmudpranto/ampnm"
 TAG_LATEST="${REPO}:latest"
-TAG_V1="${REPO}:v1.1"
+TAG_V1="${REPO}:v1.2"
 
 echo "=============================="
 echo " AMPNM Docker Hub Push Script"
@@ -55,7 +55,7 @@ docker build \
     --label "org.opencontainers.image.title=AMPNM" \
     --label "org.opencontainers.image.description=Advanced Multi-Protocol Network Monitor" \
     --label "org.opencontainers.image.vendor=IT Support BD" \
-    --label "org.opencontainers.image.version=1.1" \
+    --label "org.opencontainers.image.version=1.2" \
     --label "org.opencontainers.image.url=https://ampnm.itsupport.com.bd" \
     --label "org.opencontainers.image.documentation=https://ampnm.itsupport.com.bd/docs" \
     .
@@ -84,5 +84,5 @@ echo "  https://hub.docker.com/r/arifmahmudpranto/ampnm"
 echo ""
 echo "  Pull with:"
 echo "  docker pull arifmahmudpranto/ampnm:latest"
-echo "  docker pull arifmahmudpranto/ampnm:v1.1"
+echo "  docker pull arifmahmudpranto/ampnm:v1.2"
 echo "=============================="

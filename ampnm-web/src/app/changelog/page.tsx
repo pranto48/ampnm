@@ -5,6 +5,30 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.2.0",
+      date: "July 2026",
+      badge: "Performance & Tenancy Release",
+      badgeColor: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+      highlights: [
+        {
+          title: "Multi-Tenancy User Group Isolation",
+          description: "Confined maps, devices, edges, logs, and dashboards to isolated user groups so multiple operators in the same group collaborate seamlessly."
+        },
+        {
+          title: "Advanced Connection Customizations",
+          description: "Added rich edge layout controls on the map: adjustable thickness, connection styles (dashed, dotted, solid), customized color picker, directional arrows, custom labels, and dynamic canvas animation toggles."
+        },
+        {
+          title: "Scheduled NAS & FTP Backups",
+          description: "Implemented a system-wide automated backup engine supporting database dumps, tarball creation, history tracking, and scheduled delivery to local NAS mounts or remote FTP servers."
+        },
+        {
+          title: "Portal Login Latency Fix",
+          description: "Optimized database server hostname configurations from localhost to 127.0.0.1, eliminating IPv6 loopback and DNS query overhead for instant console access."
+        }
+      ]
+    },
+    {
       version: "v1.1.0",
       date: "June 2026",
       badge: "Feature Release",
