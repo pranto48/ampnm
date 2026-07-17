@@ -57,6 +57,8 @@ if (isset($_GET['api']) || strpos($_SERVER['REQUEST_URI'], '/api.php') !== false
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔒 License Required - AMPNM</title>
+    <!-- Animated SVG Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><style>@keyframes spin{from{transform-origin:32px 32px;transform:rotate(0deg)}to{transform-origin:32px 32px;transform:rotate(360deg)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}.ring{animation:spin 3s linear infinite}.dot{animation:pulse 1.5s ease-in-out infinite}</style></defs><circle cx='32' cy='32' r='28' fill='%230f172a' stroke='%2306b6d4' stroke-width='3'/><circle cx='32' cy='32' r='18' fill='none' stroke='%2322d3ee' stroke-width='1.5' stroke-dasharray='8 4' class='ring'/><circle cx='32' cy='32' r='9' fill='%2306b6d4'/><circle cx='32' cy='32' r='5' fill='%230f172a' class='dot'/><circle cx='32' cy='11' r='3' fill='%2322d3ee' class='dot'/><circle cx='53' cy='43' r='3' fill='%2322d3ee' class='dot' style='animation-delay:.5s'/><circle cx='11' cy='43' r='3' fill='%2322d3ee' class='dot' style='animation-delay:1s'/></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -188,10 +190,16 @@ if (isset($_GET['api']) || strpos($_SERVER['REQUEST_URI'], '/api.php') !== false
 
                 <!-- Actions -->
                 <div class="space-y-3">
+                    <a href="https://portal.itsupport.com.bd/" target="_blank"
+                       class="block w-full text-center px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition-all shadow-lg">
+                        <i class="fas fa-gift mr-2"></i>
+                        Get Open Source Free License Key
+                    </a>
+
                     <a href="https://portal.itsupport.com.bd/products.php" target="_blank"
                        class="block w-full text-center px-6 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold rounded-lg hover:from-cyan-700 hover:to-blue-700 transform hover:scale-105 transition-all shadow-lg">
                         <i class="fas fa-shopping-cart mr-2"></i>
-                        Purchase or Renew License Now
+                        Purchase or Renew Commercial License
                     </a>
 
                     <a href="https://portal.itsupport.com.bd/support.php" target="_blank"

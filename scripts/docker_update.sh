@@ -20,17 +20,33 @@ NAME=$(echo "${JSON_CONFIG}" | jq -r '.[0].Name' | sed 's/^\///')
 # Resolve target image
 TARGET_IMAGE="arifmahmudpranto/ampnm:latest"
 
+# Backup active license key from database before stopping the old container
+ACTIVE_LICENSE=$(docker exec "${CONTAINER_ID}" php -r "require '/var/www/html/config.php'; echo getAppLicenseKey();" 2>/dev/null || true)
+if [ -n "$ACTIVE_LICENSE" ]; then
+  echo "✓ Successfully backed up active license key during update."
+fi
+
 echo "Recreating container '${NAME}' with image '${TARGET_IMAGE}'..."
 
 # Reconstruct environment arguments safely using single quote escaping
 ENV_ARGS=""
 while read -r env; do
   if [ -n "$env" ]; then
+    # Skip the old APP_LICENSE_KEY if we successfully retrieved the active license from DB
+    if [ -n "$ACTIVE_LICENSE" ] && [[ "$env" == APP_LICENSE_KEY=* ]]; then
+      continue
+    fi
     # Escape any single quotes inside the env variable
     escaped_env=$(echo "$env" | sed "s/'/'\\\\''/g")
     ENV_ARGS="${ENV_ARGS} -e '${escaped_env}'"
   fi
 done < <(echo "${JSON_CONFIG}" | jq -r '.[0].Config.Env[]')
+
+# Append the backed up active license key
+if [ -n "$ACTIVE_LICENSE" ]; then
+  escaped_license=$(echo "$ACTIVE_LICENSE" | sed "s/'/'\\\\''/g")
+  ENV_ARGS="${ENV_ARGS} -e 'APP_LICENSE_KEY=${escaped_license}'"
+fi
 
 # Reconstruct volume mounts safely
 VOLUME_ARGS=""
@@ -84,17 +100,29 @@ docker run -d --name ampnm_updater_helper --rm \
   -e CONTAINER_ID="${CONTAINER_ID}" \
   -e TARGET_IMAGE="${TARGET_IMAGE}" \
   docker:cli sh -c '
-    echo "Waiting for parent container to finish request..."
+    echo "[10%] Initializing self-update routine..."
+    echo "[20%] Waiting for host container request context to close..."
     sleep 3
-    echo "Pulling latest image..."
-    docker pull "${TARGET_IMAGE}"
-    echo "Stopping current container..."
-    docker stop "${CONTAINER_ID}" || true
-    echo "Removing current container..."
-    docker rm "${CONTAINER_ID}" || true
-    echo "Starting new container..."
-    eval "${RUN_CMD}"
-    echo "Update completed successfully!"
+    echo "[40%] Pulling latest image \"\${TARGET_IMAGE}\" from Docker Hub..."
+    if ! docker pull "\${TARGET_IMAGE}"; then
+      echo "❌ ERROR [40%]: Failed to pull image \"\${TARGET_IMAGE}\". Please check internet connectivity or repository credentials." >&2
+      exit 1
+    fi
+    echo "[60%] Safely stopping old container \"\${CONTAINER_ID}\"..."
+    if ! docker stop "\${CONTAINER_ID}"; then
+      echo "⚠️ WARNING [60%]: Graceful shutdown failed. Forcing removal..."
+    fi
+    echo "[80%] Removing old container \"\${CONTAINER_ID}\"..."
+    if ! docker rm -f "\${CONTAINER_ID}"; then
+      echo "❌ ERROR [80%]: Failed to remove old container context." >&2
+      exit 1
+    fi
+    echo "[90%] Spawning new container..."
+    if ! eval "\${RUN_CMD}"; then
+      echo "❌ ERROR [90%]: Failed to start new container with command: \${RUN_CMD}" >&2
+      exit 1
+    fi
+    echo "[100%] Update completed successfully!"
   '
 
 echo "✓ Update helper successfully spawned. Recreating container shortly..."

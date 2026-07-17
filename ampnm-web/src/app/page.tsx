@@ -242,6 +242,76 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* QUICK START SECTION */}
+      <section className="px-6 py-12 max-w-7xl mx-auto w-full space-y-8">
+        <div className="text-center max-w-2xl mx-auto space-y-3 animate-fade-in-up">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white transition-colors">Quick Deployment Guide</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 transition-colors">Get your AMPNM monitor server up and running on Docker in minutes.</p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="p-6 bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-3">
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white font-bold text-sm">1</span>
+            <h4 className="font-bold text-zinc-950 dark:text-white text-sm">Pull Image</h4>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Download the optimized application container directly from Docker Hub repository.</p>
+            <pre className="p-2.5 rounded bg-zinc-950 text-slate-350 font-mono text-[10px] overflow-x-auto select-all">
+              docker pull arifmahmudpranto/ampnm:latest
+            </pre>
+          </div>
+
+          <div className="p-6 bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-3">
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white font-bold text-sm">2</span>
+            <h4 className="font-bold text-zinc-950 dark:text-white text-sm">Run Container</h4>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Expose port 2266 and bind mount the host Docker socket to enable self-updating.</p>
+            <pre className="p-2.5 rounded bg-zinc-950 text-slate-355 font-mono text-[10px] overflow-x-auto select-all">
+              docker run -d -p 2266:2266 -v /var/run/docker.sock:/var/run/docker.sock arifmahmudpranto/ampnm:latest
+            </pre>
+          </div>
+
+          <div className="p-6 bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-3">
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white font-bold text-sm">3</span>
+            <h4 className="font-bold text-zinc-950 dark:text-white text-sm">Activate & Connect</h4>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Access the dashboard, get your free open-source license, and start monitoring.</p>
+            <div className="flex gap-4 pt-1">
+              <Link href="/pricing" className="text-xs font-bold text-blue-500 hover:underline">Get Free Key &rarr;</Link>
+              <Link href="/docs" className="text-xs font-bold text-indigo-500 hover:underline">Read Manual &rarr;</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ARCHITECTURE DIAGRAM */}
+      <section className="px-6 py-12 max-w-7xl mx-auto w-full space-y-8">
+        <div className="text-center max-w-2xl mx-auto space-y-3">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white transition-colors">Unified Monitoring Topology</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">How the AMPNM ecosystem coordinates telemetry across routers, agents, and gateways.</p>
+        </div>
+
+        <div className="p-8 bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800 rounded-3xl relative overflow-hidden">
+          <div className="grid gap-6 md:grid-cols-4 items-center text-center relative z-10">
+            {/* Box 1: Sources */}
+            <div className="p-5 bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+              <span className="text-xs font-bold bg-blue-500/10 text-blue-500 px-2.5 py-0.5 rounded-full">Telemetry Agents</span>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Windows/Linux PowerShell telemetry services streaming system load.</p>
+            </div>
+
+            {/* Box 2: Routers */}
+            <div className="p-5 bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-2">
+              <span className="text-xs font-bold bg-purple-500/10 text-purple-500 px-2.5 py-0.5 rounded-full">Network Routers</span>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">MikroTik ROS nodes polling interface traffic via secure API connections.</p>
+            </div>
+
+            {/* Box 3: Central Server */}
+            <div className="p-6 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-2xl text-white shadow-lg space-y-2 md:col-span-2">
+              <span className="text-xs font-bold bg-white/20 text-white px-3 py-1 rounded-full">AMPNM Central Server</span>
+              <p className="text-xs text-blue-100">Drives visual Vis.js network maps, processes trap alerts, schedules NAS/FTP backups, and triggers SMTP/Telegram notifications.</p>
+            </div>
+          </div>
+          
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808003_1px,transparent_1px),linear-gradient(to_bottom,#80808003_1px,transparent_1px)] bg-[size:14px_14px]" />
+        </div>
+      </section>
+
       {/* DEVELOPED BY IT SUPPORT BD CTA BANNER */}
       <section className="px-6 pb-20 max-w-7xl mx-auto w-full">
         <div className="bg-gradient-to-r from-blue-50 via-white to-indigo-50 dark:from-blue-900/20 dark:via-zinc-900/80 dark:to-indigo-900/10 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 sm:p-12 text-center space-y-6 relative overflow-hidden transition-colors">
