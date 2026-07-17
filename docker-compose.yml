@@ -30,10 +30,7 @@ services:
       - SMS_ALERTS_ENABLED=${SMS_ALERTS_ENABLED:-1}
       - SMS_COOLDOWN_MINUTES=${SMS_COOLDOWN_MINUTES:-30}
       - APACHE_PORT=${APACHE_PORT:-2266}
-      # Cloud Monitoring Bridge - connect Docker ICMP pings to Lovable Cloud
-      - CLOUD_SYNC_URL=${CLOUD_SYNC_URL:-}
-      - CLOUD_ANON_KEY=${CLOUD_ANON_KEY:-}
-      - CLOUD_POLL_INTERVAL=${CLOUD_POLL_INTERVAL:-15}
+
       # Non-disruptive update awareness scheduler (fetch + behind count only).
       - AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER=1
       - AMPNM_UPDATE_CHECK_INTERVAL_SECONDS=3600

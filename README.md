@@ -176,7 +176,6 @@ AMPNM is a multi-component platform. All components work together:
 | `LICENSE_FINGERPRINT_MODE` | `allow-rebaseline` | `strict` or `allow-rebaseline` |
 | `SMS_ALERTS_ENABLED` | `1` | Enable Alpha SMS alert notifications |
 | `SMS_COOLDOWN_MINUTES` | `30` | Minimum minutes between SMS alerts |
-| `CLOUD_SYNC_URL` | *(empty)* | Optional cloud monitoring bridge URL |
 
 ---
 
