@@ -43,6 +43,8 @@ services:
     # Standard bridge mode with port mapping so the app works on Windows.
     ports:
       - "${APACHE_PORT:-2266}:${APACHE_PORT:-2266}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   ampnm-trapper:
     build:
