@@ -5,6 +5,26 @@ import { Calendar, GitCommit, Sparkles, AlertTriangle } from "lucide-react";
 export default function ChangelogPage() {
   const versions = [
     {
+      version: "v1.9.0",
+      date: "July 2026",
+      badge: "Performance & Backup Optimization",
+      badgeColor: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+      highlights: [
+        {
+          title: "Parallel Host Pinging",
+          description: "Implemented asynchronous/parallel ping execution for map refreshes and checks, improving reload times by up to 25x and resolving UI lag."
+        },
+        {
+          title: "FTP & Synology NAS Backup Preservation",
+          description: "Optimized backup handlers to always save copy in local backups first for instant download from the web interface, and corrected file permissions."
+        },
+        {
+          title: "Animated Icon Enhancement",
+          description: "Enabled status pulse glows and added micro-animations to icons throughout the user interface."
+        }
+      ]
+    },
+    {
       version: "v1.8.0",
       date: "July 2026",
       badge: "Feature Enhancement Release",

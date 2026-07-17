@@ -3,7 +3,8 @@ set -e
 
 REPO="arifmahmudpranto/ampnm"
 TAG_LATEST="${REPO}:latest"
-TAG_V1="${REPO}:v1.8"
+TAG_V1="${REPO}:v1.9"
+
 
 echo "=============================="
 echo " AMPNM Docker Hub Push Script"
@@ -84,5 +85,5 @@ echo "  https://hub.docker.com/r/arifmahmudpranto/ampnm"
 echo ""
 echo "  Pull with:"
 echo "  docker pull arifmahmudpranto/ampnm:latest"
-echo "  docker pull arifmahmudpranto/ampnm:v1.8"
+echo "  docker pull arifmahmudpranto/ampnm:v1.9"
 echo "=============================="

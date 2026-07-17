@@ -374,6 +374,168 @@ function getFreshAgentMetrics(PDO $pdo, int $deviceId, int $freshnessSeconds = 1
     return $row;
 }
 
+function checkDevicesInParallel(PDO $pdo, array $devices, string $userRole, int $currentUserId): array {
+    $results = [];
+    $pingDevices = [];
+    $pingIps = [];
+
+    // First pass: identify agent telemetry and port-monitored devices
+    foreach ($devices as $device) {
+        $deviceId = isset($device['id']) ? (int)$device['id'] : 0;
+        $monitorMethod = $device['monitor_method'] ?? 'ping';
+        $hasPort = !empty($device['check_port']) && is_numeric($device['check_port']);
+
+        // 1. Agent Telemetry Check
+        if ($deviceId > 0) {
+            $agentMetrics = getFreshAgentMetrics($pdo, $deviceId);
+            if ($agentMetrics && !empty($agentMetrics['is_fresh'])) {
+                $last_seen = date('Y-m-d H:i:s');
+                $details = sprintf(
+                    'Agent telemetry active (CPU %s%%, RAM %s%%, Disk %s%%, GPU %s%%).',
+                    round((float)($agentMetrics['cpu_percent'] ?? 0), 1),
+                    round((float)($agentMetrics['memory_percent'] ?? 0), 1),
+                    round((float)($agentMetrics['disk_percent'] ?? 0), 1),
+                    round((float)($agentMetrics['gpu_percent'] ?? 0), 1)
+                );
+                $results[$device['id']] = [
+                    'status' => 'online',
+                    'last_seen' => $last_seen,
+                    'last_avg_time' => null,
+                    'last_ttl' => null,
+                    'check_output' => 'Agent active',
+                    'details' => $details
+                ];
+                continue;
+            }
+        }
+
+        // 2. No IP check
+        if (empty($device['ip'])) {
+            $results[$device['id']] = [
+                'status' => 'unknown',
+                'last_seen' => $device['last_seen'],
+                'last_avg_time' => null,
+                'last_ttl' => null,
+                'check_output' => 'Device has no IP configured.',
+                'details' => 'Device has no IP configured.'
+            ];
+            continue;
+        }
+
+        // 3. Port check
+        if ($monitorMethod === 'port' && $hasPort) {
+            $portCheckResult = checkPortStatus($device['ip'], $device['check_port']);
+            $details = $portCheckResult['success'] ? "Port {$device['check_port']} is open." : "Port {$device['check_port']} is closed.";
+            $results[$device['id']] = [
+                'status' => $portCheckResult['success'] ? 'online' : 'offline',
+                'last_seen' => $portCheckResult['success'] ? date('Y-m-d H:i:s') : $device['last_seen'],
+                'last_avg_time' => $portCheckResult['time'],
+                'last_ttl' => null,
+                'check_output' => $portCheckResult['output'] ?? '',
+                'details' => $details
+            ];
+            continue;
+        }
+
+        // Fallback or explicit Ping check
+        $pingDevices[] = $device;
+        $pingIps[] = $device['ip'];
+    }
+
+    // Second pass: perform parallel pinging
+    if (count($pingIps) > 0) {
+        $pingIps = array_unique($pingIps);
+        $pingResults = pingMultiple($pingIps, 2, 1); // 2 packets, 1s timeout for accuracy and speed
+
+        foreach ($pingDevices as $device) {
+            $ip = $device['ip'];
+            $pingResult = $pingResults[$ip] ?? [
+                'success' => false,
+                'output' => 'Parallel ping failed',
+                'avg_time' => 0,
+                'packet_loss' => 100,
+                'ttl' => null
+            ];
+
+            // Save individual result
+            savePingResult($pdo, $ip, $pingResult);
+
+            $parsedResult = [
+                'packet_loss' => $pingResult['packet_loss'],
+                'avg_time' => $pingResult['avg_time'],
+                'ttl' => $pingResult['ttl']
+            ];
+
+            $details = '';
+            $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details);
+
+            $results[$device['id']] = [
+                'status' => $status,
+                'last_seen' => $status !== 'offline' ? date('Y-m-d H:i:s') : $device['last_seen'],
+                'last_avg_time' => $parsedResult['avg_time'] ?? null,
+                'last_ttl' => $parsedResult['ttl'] ?? null,
+                'check_output' => $pingResult['output'],
+                'details' => $details
+            ];
+        }
+    }
+
+    // Third pass: perform update, log, notifications
+    $status_changes = 0;
+    $updated_list = [];
+
+    foreach ($devices as $device) {
+        if (!isset($results[$device['id']])) {
+            continue;
+        }
+        $eval = $results[$device['id']];
+        $old_status = $device['status'];
+        $new_status = $eval['status'];
+        $last_seen = $eval['last_seen'];
+        $last_avg_time = $eval['last_avg_time'];
+        $last_ttl = $eval['last_ttl'];
+        $details = $eval['details'];
+
+        if ($old_status !== $new_status) {
+            logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
+            sendEmailNotification($pdo, $device, $old_status, $new_status, $details);
+            sendSMSNotification($pdo, $device, $old_status, $new_status, $details);
+            sendTelegramNotification($pdo, $device, $old_status, $new_status, $details);
+            sendWhatsappNotification($pdo, $device, $old_status, $new_status, $details);
+            $status_changes++;
+        }
+
+        // Update database
+        $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ?";
+        $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $device['id']];
+
+        if ($userRole !== 'viewer') {
+            $updateSql .= " AND user_id = ?";
+            $updateParams[] = $currentUserId;
+        }
+
+        $updateStmt = $pdo->prepare($updateSql);
+        $updateStmt->execute($updateParams);
+
+        $updated_list[] = [
+            'id' => $device['id'],
+            'name' => $device['name'],
+            'old_status' => $old_status,
+            'status' => $new_status,
+            'last_seen' => $last_seen,
+            'last_avg_time' => $last_avg_time,
+            'last_ttl' => $last_ttl,
+            'last_ping_output' => $eval['check_output']
+        ];
+    }
+
+    return [
+        'checked_count' => count($devices),
+        'status_changes' => $status_changes,
+        'updated_devices' => $updated_list
+    ];
+}
+
 function evaluateDeviceCheck($pdo, $device, &$details, &$last_avg_time, &$last_ttl, &$check_output = '') {
     $monitorMethod = $device['monitor_method'] ?? 'ping';
     $hasPort = !empty($device['check_port']) && is_numeric($device['check_port']);
@@ -508,122 +670,35 @@ switch ($action) {
             $stmt->execute([$current_user_id]);
             $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            $checked_count = 0;
-            $status_changes = 0;
-
-            foreach ($devices as $device) {
-                $old_status = $device['status'];
-                $new_status = 'unknown';
-                $last_avg_time = null;
-                $last_ttl = null;
-                $last_seen = $device['last_seen'];
-                $details = '';
-
-                $check_output = '';
-                $evaluation = evaluateDeviceCheck($pdo, $device, $details, $last_avg_time, $last_ttl, $check_output);
-                $new_status = $evaluation['status'];
-                $last_seen = $evaluation['last_seen'];
-                
-                if ($old_status !== $new_status) {
-                    logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
-                    sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
-                    sendSMSNotification($pdo, $device, $old_status, $new_status, $details); // Trigger SMS notification
-                    sendTelegramNotification($pdo, $device, $old_status, $new_status, $details); // Trigger Telegram
-                    sendWhatsappNotification($pdo, $device, $old_status, $new_status, $details); // Trigger WhatsApp
-                    $status_changes++;
-                }
-                
-                $updateStmt = $pdo->prepare("UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ? AND user_id = ?");
-                $updateStmt->execute([$new_status, $last_seen, $last_avg_time, $last_ttl, $device['id'], $current_user_id]);
-                $checked_count++;
-            }
+            $res = checkDevicesInParallel($pdo, $devices, $user_role, (int)$current_user_id);
             
             echo json_encode([
                 'success' => true, 
-                'message' => "Checked {$checked_count} devices.",
-                'checked_count' => $checked_count,
-                'status_changes' => $status_changes
+                'message' => "Checked {$res['checked_count']} devices.",
+                'checked_count' => $res['checked_count'],
+                'status_changes' => $res['status_changes']
             ]);
         }
         break;
 
     case 'ping_all_devices':
-        // Allow viewers to trigger pings, but ensure they can only update devices on maps they can see.
-        // The actual update logic in the loop already handles this by checking user_role.
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $map_id = $input['map_id'] ?? null;
             if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
 
             $sql = "SELECT * FROM devices WHERE enabled = TRUE AND map_id = ? AND ip IS NOT NULL AND ip != '' AND type != 'box'";
             $params = [$map_id];
-            // IMPORTANT: For viewers, do NOT filter by user_id here when SELECTING devices.
-            // Viewers should be able to ping all devices on a map they can see.
-            // The update logic below will ensure they only update if they own it, or if it's a shared map.
-            // For now, we'll let them *select* all devices on a map.
-            // If the map itself is user-specific, the map_handler's get_maps would have already filtered.
-            // For public maps, this is fine.
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            $updated_devices = [];
-            $processed_devices_count = 0;
-
-            foreach ($devices as $device) {
-                $old_status = $device['status'];
-                $new_status = 'unknown';
-                $last_avg_time = null;
-                $last_ttl = null;
-                $last_seen = $device['last_seen'];
-                $check_output = 'Device has no IP configured for checking.';
-                $details = '';
-
-                if (!empty($device['ip'])) {
-                    $evaluation = evaluateDeviceCheck($pdo, $device, $details, $last_avg_time, $last_ttl, $check_output);
-                    $new_status = $evaluation['status'];
-                    $last_seen = $evaluation['last_seen'];
-                }
-                
-                logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
-                sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
-                sendSMSNotification($pdo, $device, $old_status, $new_status, $details); // Trigger SMS notification
-                sendTelegramNotification($pdo, $device, $old_status, $new_status, $details); // Trigger Telegram
-                sendWhatsappNotification($pdo, $device, $old_status, $new_status, $details); // Trigger WhatsApp
-                
-                // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
-                // This allows viewers to update the status of devices on shared maps.
-                $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ?";
-                $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $device['id']];
-
-                // Only add user_id filter if the user is NOT a viewer
-                if ($user_role !== 'viewer') {
-                    $updateSql .= " AND user_id = ?";
-                    $updateParams[] = $current_user_id;
-                }
-                $updateStmt = $pdo->prepare($updateSql);
-                $updateStmt->execute($updateParams);
-
-                $updated_devices[] = [
-                    'id' => $device['id'],
-                    'name' => $device['name'],
-                    'old_status' => $old_status,
-                    'status' => $new_status,
-                    'last_seen' => $last_seen,
-                    'last_avg_time' => $last_avg_time,
-                    'last_ttl' => $last_ttl,
-                    'last_ping_output' => $check_output
-                ];
-                $processed_devices_count++;
-            }
+            $res = checkDevicesInParallel($pdo, $devices, $user_role, (int)$current_user_id);
             
-            $overall_success = ($processed_devices_count > 0);
-            $message = $overall_success ? "Checked {$processed_devices_count} devices." : "No pingable devices found on this map.";
-
             echo json_encode([
-                'success' => $overall_success, 
-                'message' => $message,
-                'checked_count' => $processed_devices_count,
-                'updated_devices' => $updated_devices
+                'success' => ($res['checked_count'] > 0), 
+                'message' => ($res['checked_count'] > 0) ? "Checked {$res['checked_count']} devices." : "No pingable devices found on this map.",
+                'checked_count' => $res['checked_count'],
+                'updated_devices' => $res['updated_devices']
             ]);
         }
         break;

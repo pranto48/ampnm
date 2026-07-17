@@ -241,6 +241,114 @@ function checkHttpConnectivity($host) {
     ];
 }
 
+// Function to execute multiple pings concurrently
+function pingMultiple(array $ips, $count = 2, $timeout = 1) {
+    $processes = [];
+    $results = [];
+
+    // Initialize all results as offline
+    foreach ($ips as $ip) {
+        if (empty($ip)) continue;
+        $results[$ip] = [
+            'success' => false,
+            'output' => 'Ping timed out or failed.',
+            'avg_time' => 0,
+            'packet_loss' => 100,
+            'ttl' => null
+        ];
+    }
+
+    // Launch processes in parallel
+    foreach ($ips as $ip) {
+        if (empty($ip) || !preg_match('/^[a-zA-Z0-9\.\:-]+$/', $ip)) {
+            continue;
+        }
+        $escaped_host = escapeshellarg($ip);
+        if (stristr(PHP_OS, 'WIN')) {
+            $cmd = "ping -n $count -w " . ($timeout * 1000) . " $escaped_host";
+        } else {
+            $cmd = "ping -c $count -W $timeout $escaped_host";
+        }
+
+        $descriptorspec = [
+            1 => ["pipe", "w"],  // stdout
+            2 => ["pipe", "w"]   // stderr
+        ];
+
+        $proc = @proc_open($cmd, $descriptorspec, $proc_pipes);
+        if (is_resource($proc)) {
+            @stream_set_blocking($proc_pipes[1], false);
+            @stream_set_blocking($proc_pipes[2], false);
+            $processes[$ip] = [
+                'proc' => $proc,
+                'pipes' => $proc_pipes,
+                'output' => '',
+                'start_time' => microtime(true)
+            ];
+        }
+    }
+
+    // Monitor processes with a timeout loop
+    $startTime = microtime(true);
+    $running = true;
+    while ($running && (microtime(true) - $startTime) < ($timeout + 1.5)) {
+        $running = false;
+        foreach ($processes as $ip => &$procInfo) {
+            $status = proc_get_status($procInfo['proc']);
+            
+            // Read output
+            $out = fread($procInfo['pipes'][1], 8192);
+            if ($out !== false && $out !== '') {
+                $procInfo['output'] .= $out;
+            }
+            $err = fread($procInfo['pipes'][2], 8192);
+            if ($err !== false && $err !== '') {
+                $procInfo['output'] .= $err;
+            }
+
+            if ($status['running']) {
+                $running = true;
+            }
+        }
+        usleep(15000); // Sleep 15ms
+    }
+
+    // Clean up and parse results
+    foreach ($processes as $ip => &$procInfo) {
+        // Read any remaining output
+        $out = @stream_get_contents($procInfo['pipes'][1]);
+        if ($out !== false && $out !== '') {
+            $procInfo['output'] .= $out;
+        }
+        $err = @stream_get_contents($procInfo['pipes'][2]);
+        if ($err !== false && $err !== '') {
+            $procInfo['output'] .= $err;
+        }
+
+        @fclose($procInfo['pipes'][1]);
+        @fclose($procInfo['pipes'][2]);
+        @proc_close($procInfo['proc']);
+
+        // Parse result
+        $output = $procInfo['output'];
+        $parsed = parsePingOutput($output);
+        
+        // Success condition: packet loss < 100
+        $loss = isset($parsed['packet_loss']) ? $parsed['packet_loss'] : 100;
+        $success = ($loss < 100);
+
+        $results[$ip] = [
+            'success' => $success,
+            'output' => $output,
+            'avg_time' => $parsed['avg_time'] ?? 0,
+            'packet_loss' => $loss,
+            'ttl' => $parsed['ttl'] ?? null
+        ];
+    }
+
+    return $results;
+}
+
 /**
  * Generates a Font Awesome icon as an SVG data URL.
  * This version assumes Font Awesome CSS is already loaded in the browser.

@@ -101,6 +101,20 @@ function runSystemBackup(PDO $pdo, int $userId, array $schedule = null): array {
 
     $fileSize = filesize($archivePath) ?: 0;
 
+    // Local target path
+    $localDest = __DIR__ . '/../../uploads/backups/' . $archiveName;
+    @mkdir(dirname($localDest), 0777, true);
+    @chmod(dirname($localDest), 0777);
+    @chown(dirname($localDest), 'www-data');
+
+    // Copy to localDest first so it can always be downloaded locally
+    if (!@copy($archivePath, $localDest)) {
+        @unlink($archivePath);
+        return [false, 'Failed to save local backup file', '', 0];
+    }
+    @chmod($localDest, 0666);
+    @chown($localDest, 'www-data');
+
     // Deliver target if specified
     if ($schedule) {
         $ok = false;
@@ -128,7 +142,7 @@ function runSystemBackup(PDO $pdo, int $userId, array $schedule = null): array {
                     } else {
                         @ftp_pasv($conn, true);
                         $remoteFile = rtrim($ftpPath, '/') . '/' . $archiveName;
-                        $uploaded = @ftp_put($conn, $remoteFile, $archivePath, FTP_BINARY);
+                        $uploaded = @ftp_put($conn, $remoteFile, $localDest, FTP_BINARY);
                         ftp_close($conn);
                         if ($uploaded) {
                             $ok = true;
@@ -145,13 +159,17 @@ function runSystemBackup(PDO $pdo, int $userId, array $schedule = null): array {
                 $err = 'NAS mount path is required';
             } else {
                 if (!is_dir($nasPath)) {
-                    @mkdir($nasPath, 0755, true);
+                    @mkdir($nasPath, 0777, true);
+                    @chmod($nasPath, 0777);
+                    @chown($nasPath, 'www-data');
                 }
                 if (!is_writable($nasPath)) {
                     $err = 'NAS mount path is not writable';
                 } else {
                     $dest = $nasPath . '/' . $archiveName;
-                    if (@copy($archivePath, $dest)) {
+                    if (@copy($localDest, $dest)) {
+                        @chmod($dest, 0666);
+                        @chown($dest, 'www-data');
                         $ok = true;
                     } else {
                         $err = 'Failed to copy archive to NAS path';
@@ -160,26 +178,17 @@ function runSystemBackup(PDO $pdo, int $userId, array $schedule = null): array {
             }
         }
 
+        @unlink($archivePath); // Clean up the original tmp file
+
         if (!$ok) {
-            // Keep local backup in uploads/backups as fallback if transfer failed
-            $localDest = __DIR__ . '/../../uploads/backups/' . $archiveName;
-            @mkdir(dirname($localDest), 0775, true);
-            @copy($archivePath, $localDest);
-            @unlink($archivePath);
+            // Transfer failed, but we still have the local backup in uploads/backups
             return [false, $err ?: 'Transfer failed', $archiveName, $fileSize];
         }
 
-        @unlink($archivePath);
         return [true, null, $archiveName, $fileSize];
     } else {
-        // Manual local download/storage
-        $localDest = __DIR__ . '/../../uploads/backups/' . $archiveName;
-        @mkdir(dirname($localDest), 0775, true);
-        if (@rename($archivePath, $localDest)) {
-            return [true, null, $archiveName, $fileSize];
-        }
-        @unlink($archivePath);
-        return [false, 'Failed to save local backup file', '', 0];
+        @unlink($archivePath); // Clean up the original tmp file
+        return [true, null, $archiveName, $fileSize];
     }
 }
 
