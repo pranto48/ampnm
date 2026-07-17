@@ -353,7 +353,8 @@ MapApp.ui = {
                 const color = { color: colorVal, hover: colorVal, highlight: colorVal };
                 
                 // Thickness configuration
-                const width = parseInt(edge.custom_thickness) || 2;
+                const defaultThickness = parseInt(displaySettings.connection_line_thickness) || 2;
+                const width = parseInt(edge.custom_thickness) || defaultThickness;
                 
                 // Dashes style configuration
                 let dashes = false;

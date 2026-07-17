@@ -212,7 +212,8 @@ MapApp.utils = {
         panel_muted_color: '#94a3b8',
         panel_accent_color: '#22d3ee',
         connection_run_style: 'auto', // auto | solid | dashed | dotted
-        connection_animation_speed: 100 // percentage; 0 disables animation motion
+        connection_animation_speed: 100, // percentage; 0 disables animation motion
+        connection_line_thickness: 2
     }),
 
     getTooltipFontStack: (fontFamilyKey) => {

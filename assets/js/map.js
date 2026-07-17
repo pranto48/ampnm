@@ -127,6 +127,11 @@ function initMap() {
         const connectionRunStyle = document.getElementById('connectionRunStyle');
         const connectionAnimationSpeed = document.getElementById('connectionAnimationSpeed');
         const connectionAnimationSpeedValue = document.getElementById('connectionAnimationSpeedValue');
+        const globalThickness = merged.connection_line_thickness ?? 2;
+        const globalThicknessInput = document.getElementById('globalLineThickness');
+        const globalThicknessPxInput = document.getElementById('globalLineThicknessPx');
+        const globalThicknessVal = document.getElementById('globalLineThicknessValue');
+
         if (density) density.value = merged.density || 'comfortable';
         if (fontScale) fontScale.value = String(merged.font_scale ?? 100);
         if (fontScaleValue) fontScaleValue.textContent = `${merged.font_scale ?? 100}%`;
@@ -141,6 +146,9 @@ function initMap() {
         if (connectionRunStyle) connectionRunStyle.value = merged.connection_run_style || 'auto';
         if (connectionAnimationSpeed) connectionAnimationSpeed.value = String(merged.connection_animation_speed ?? 100);
         if (connectionAnimationSpeedValue) connectionAnimationSpeedValue.textContent = `${merged.connection_animation_speed ?? 100}%`;
+        if (globalThicknessInput) globalThicknessInput.value = String(globalThickness);
+        if (globalThicknessPxInput) globalThicknessPxInput.value = String(globalThickness);
+        if (globalThicknessVal) globalThicknessVal.textContent = `${globalThickness}px`;
     };
 
     const readTooltipDisplayControls = () => {
@@ -156,6 +164,8 @@ function initMap() {
         const panelAccentColor = document.getElementById('tooltipAccentColor')?.value || defaults.panel_accent_color;
         const connectionRunStyle = document.getElementById('connectionRunStyle')?.value || defaults.connection_run_style;
         const connectionAnimationSpeed = Number(document.getElementById('connectionAnimationSpeed')?.value ?? defaults.connection_animation_speed);
+        const globalLineThickness = parseFloat(document.getElementById('globalLineThicknessPx')?.value || document.getElementById('globalLineThickness')?.value || 2);
+
         return {
             density: density === 'compact' ? 'compact' : 'comfortable',
             font_scale: Math.min(130, Math.max(85, fontScale)),
@@ -167,7 +177,8 @@ function initMap() {
             panel_muted_color: panelMutedColor,
             panel_accent_color: panelAccentColor,
             connection_run_style: ['auto', 'solid', 'dashed', 'dotted', 'data-flow', 'data-stream', 'pulse', 'wave', 'morse', 'zipper'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
-            connection_animation_speed: Math.min(200, Math.max(0, connectionAnimationSpeed))
+            connection_animation_speed: Math.min(200, Math.max(0, connectionAnimationSpeed)),
+            connection_line_thickness: Math.min(16, Math.max(1, globalLineThickness))
         };
     };
 
@@ -233,6 +244,33 @@ function initMap() {
             if (state.currentMapId) {
                 state.tooltipDisplaySettingsByMap[state.currentMapId] = state.tooltipDisplaySettingsByMap[state.currentMapId] || {};
                 state.tooltipDisplaySettingsByMap[state.currentMapId].connection_run_style = connectionRunStyleSelect.value;
+                MapApp.ui.updateStaticEdgeColors();
+            }
+        });
+    }
+
+    const globalLineThicknessInput = document.getElementById('globalLineThickness');
+    const globalLineThicknessPxInput = document.getElementById('globalLineThicknessPx');
+    const globalLineThicknessValue = document.getElementById('globalLineThicknessValue');
+
+    if (globalLineThicknessInput && globalLineThicknessPxInput) {
+        globalLineThicknessInput.addEventListener('input', () => {
+            const val = parseFloat(globalLineThicknessInput.value) || 2;
+            globalLineThicknessPxInput.value = val;
+            if (globalLineThicknessValue) globalLineThicknessValue.textContent = `${val}px`;
+            if (state.currentMapId) {
+                state.tooltipDisplaySettingsByMap[state.currentMapId] = state.tooltipDisplaySettingsByMap[state.currentMapId] || {};
+                state.tooltipDisplaySettingsByMap[state.currentMapId].connection_line_thickness = val;
+                MapApp.ui.updateStaticEdgeColors();
+            }
+        });
+        globalLineThicknessPxInput.addEventListener('input', () => {
+            const val = Math.max(1, Math.min(16, parseFloat(globalLineThicknessPxInput.value) || 2));
+            globalLineThicknessInput.value = val;
+            if (globalLineThicknessValue) globalLineThicknessValue.textContent = `${val}px`;
+            if (state.currentMapId) {
+                state.tooltipDisplaySettingsByMap[state.currentMapId] = state.tooltipDisplaySettingsByMap[state.currentMapId] || {};
+                state.tooltipDisplaySettingsByMap[state.currentMapId].connection_line_thickness = val;
                 MapApp.ui.updateStaticEdgeColors();
             }
         });
