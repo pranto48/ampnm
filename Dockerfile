@@ -17,6 +17,7 @@ RUN set -eux; \
         net-tools \
         dnsutils \
         iproute2 \
+        jq \
         mariadb-server \
         mariadb-client \
         libcurl4-openssl-dev \
