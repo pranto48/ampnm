@@ -2,16 +2,8 @@
 require_once __DIR__ . '/includes/bootstrap.php';
 
 $page_title = "Documentation - AMPNM User Manual";
+require_once __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $page_title ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
     <style>
         .doc-section {
             scroll-margin-top: 80px;
@@ -34,23 +26,6 @@ $page_title = "Documentation - AMPNM User Manual";
             font-family: 'Courier New', monospace;
         }
     </style>
-</head>
-<body class="bg-slate-900 text-slate-100">
-    
-    <!-- Header -->
-    <header class="bg-slate-800 shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <i class="fas fa-book text-cyan-400 text-2xl"></i>
-                    <h1 class="text-xl font-bold">AMPNM Documentation</h1>
-                </div>
-                <a href="index.php" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition">
-                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
-                </a>
-            </div>
-        </div>
-    </header>
 
     <div class="container mx-auto px-4 py-8">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -854,6 +829,4 @@ docker cp ampnm-app:/var/www/html/uploads ./uploads-backup</code>
             });
         });
     </script>
-
-</body>
-</html>
+<?php require_once __DIR__ . '/footer.php'; ?>
