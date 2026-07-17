@@ -93,6 +93,9 @@ $page_title = "Documentation - AMPNM User Manual";
                         <a href="#system-backup" class="block px-3 py-2 rounded transition">
                             <i class="fas fa-database mr-2"></i>System Backup (FTP / NAS)
                         </a>
+                        <a href="#system-updates" class="block px-3 py-2 rounded transition">
+                            <i class="fas fa-sync mr-2"></i>System Updates
+                        </a>
                         <a href="#troubleshooting" class="block px-3 py-2 rounded transition">
                             <i class="fas fa-tools mr-2"></i>Troubleshooting
                         </a>
@@ -284,6 +287,21 @@ $page_title = "Documentation - AMPNM User Manual";
                             </table>
                             <p class="text-xs mt-3 text-slate-400">* Default values. Customize per device during setup.</p>
                         </div>
+
+                        <h3 class="text-2xl font-semibold mb-3 mt-6">Duplicate Device / IP Detector</h3>
+                        <p class="mb-4">To ensure network monitoring integrity, AMPNM features an automatic conflict detector. When adding or editing a device, the system scans existing records in your workspace:</p>
+                        <ul class="list-disc list-inside ml-4 mb-4 space-y-1 text-sm text-slate-200">
+                            <li><strong>Duplicate Hostname Blocking:</strong> Friendly names (case-insensitive) must be unique.</li>
+                            <li><strong>Duplicate IP Blocking:</strong> Active monitoring IP addresses must not overlap with existing entries.</li>
+                            <li><strong>Instant Feedback:</strong> Alerts appear directly in the creation/edit modal and blocking occurs at the API level (returning a <code>400 Bad Request</code>).</li>
+                        </ul>
+
+                        <h3 class="text-2xl font-semibold mb-3">Bulk Device Deletion</h3>
+                        <p class="mb-4">Manage large inventories efficiently using the bulk action toolbar on the <strong>Devices</strong> management page:</p>
+                        <ul class="list-disc list-inside ml-4 space-y-1 text-sm text-slate-200">
+                            <li>Select individual checkboxes in the device list or use the <strong>Select All</strong> header checkbox.</li>
+                            <li>Click the floating <strong>Delete Selected</strong> button to execute a secure transaction-safe batch deletion.</li>
+                        </ul>
                     </section>
 
                     <!-- Network Map -->
@@ -300,6 +318,8 @@ $page_title = "Documentation - AMPNM User Manual";
                             <li><i class="fas fa-link text-cyan-400 mr-2"></i><strong>Connections:</strong> Draw lines between connected devices</li>
                             <li><i class="fas fa-eye text-cyan-400 mr-2"></i><strong>Public Map:</strong> Share read-only view with stakeholders</li>
                             <li><i class="fas fa-image text-cyan-400 mr-2"></i><strong>Custom Icons:</strong> Upload device-specific icons</li>
+                            <li><i class="fas fa-paint-roller text-cyan-400 mr-2"></i><strong>Universal Line Thickness:</strong> Configure global default connection line thickness (in pixels) with overrides from individual edge custom parameters</li>
+                            <li><i class="fas fa-scroll text-cyan-400 mr-2"></i><strong>Scrollable Modals:</strong> Restricts settings panels to 90% viewport height with native internal scrolling for high usability on any screen size</li>
                         </ul>
 
                         <div class="bg-blue-900/30 border-l-4 border-blue-500 p-4">
@@ -650,6 +670,9 @@ docker-compose up -d</code>
                                 <h3 class="font-bold text-lg mb-2"><i class="fas fa-cloud-upload-alt text-cyan-400 mr-2"></i>FTP Server Backup</h3>
                                 <p class="mb-2">FTP backups upload the system archive over network connection to any standard FTP server.</p>
                                 <p class="text-sm text-slate-200 mb-2">Configure the host, port, credentials, and directory path directly in the backup scheduler panel. Passive mode (PASV) is used automatically for uploads.</p>
+                                <div class="bg-slate-800 p-3 rounded mt-2 border border-slate-600 text-xs text-slate-300">
+                                    <p><strong>Note:</strong> The Docker image includes native PHP FTP support compiled by default, ensuring error-free backups. Verify server paths and permissions before setting up automated crons.</p>
+                                </div>
                             </div>
 
                             <div class="bg-slate-700 p-4 rounded">
@@ -661,6 +684,32 @@ docker-compose up -d</code>
                                     <li><strong>Monthly:</strong> Executes on a specific calendar day of the month (1-28).</li>
                                 </ul>
                                 <p class="text-sm text-slate-300 mt-2">The background daemon process <code>scripts/backup_check.php</code> runs automatically in a 60-second loop inside the Docker container to monitor and run backups.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- System Updates -->
+                    <section id="system-updates" class="doc-section">
+                        <h2 class="text-3xl font-bold text-cyan-400 mb-4">
+                            <i class="fas fa-sync mr-2"></i>System Updates
+                        </h2>
+
+                        <p class="mb-4">AMPNM supports dual update mechanisms: local source-code updates via Git Repository synchronization, and live container recreation using Docker Hub Registry.</p>
+
+                        <div class="space-y-4">
+                            <div class="bg-slate-700 p-4 rounded">
+                                <h3 class="font-bold text-lg mb-2"><i class="fab fa-git-alt text-cyan-400 mr-2"></i>Git-Based Updates</h3>
+                                <p class="text-sm mb-2">Synchronizes the local code files directly from the main GitHub repository. Safe for non-container setups, but does not upgrade PHP extensions or container services.</p>
+                            </div>
+
+                            <div class="bg-slate-700 p-4 rounded">
+                                <h3 class="font-bold text-lg mb-2"><i class="fab fa-docker text-cyan-400 mr-2"></i>Docker Hub-Based Updates</h3>
+                                <p class="text-sm mb-2">Triggers live container self-recreation to upgrade to the latest official release directly from Docker Hub.</p>
+                                <div class="bg-blue-900/30 border-l-4 border-blue-500 p-3 text-xs text-slate-200 mt-2">
+                                    <p class="font-semibold mb-1">Docker Socket Bind Requirement:</p>
+                                    <p>To let the container recreate itself from the web dashboard, start your container with the host's Docker socket mounted:</p>
+                                    <code class="block bg-slate-800 p-2 rounded mt-2 text-cyan-400">docker run -d --name ampnm_server -p 2266:2266 -v /var/run/docker.sock:/var/run/docker.sock arifmahmudpranto/ampnm:latest</code>
+                                </div>
                             </div>
                         </div>
                     </section>
