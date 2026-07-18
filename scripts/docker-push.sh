@@ -4,12 +4,23 @@ set -e
 DOCKER_USERNAME="itsupportbd"
 REPO="${DOCKER_USERNAME}/ampnm"
 TAG_LATEST="${REPO}:latest"
-TAG_V19="${REPO}:V1.9"
+
+# Get version tag from command line parameter, defaulting to V1.10
+VERSION_TAG="${1:-V1.10}"
+
+# Ensure it starts with uppercase V
+if [[ ! "$VERSION_TAG" =~ ^[vV] ]]; then
+    VERSION_TAG="V${VERSION_TAG}"
+fi
+# Strip any leading 'v' to get standard numeric version for image labels
+VERSION_NUM=$(echo "${VERSION_TAG}" | sed -E 's/^[vV]//')
+
+TAG_VERSION="${REPO}:${VERSION_TAG}"
 
 echo "=============================="
 echo " AMPNM Docker Hub Push Script"
 echo " Repository: ${REPO}"
-echo " Version: V1.9"
+echo " Version: ${VERSION_TAG} (Numeric: ${VERSION_NUM})"
 echo "=============================="
 echo ""
 
@@ -41,25 +52,25 @@ echo "✓ Logged in as ${DOCKER_USERNAME}"
 echo ""
 echo "→ Removing old local AMPNM images..."
 docker rmi "${TAG_LATEST}" 2>/dev/null && echo "  Removed: ${TAG_LATEST}" || echo "  None to remove (${TAG_LATEST})"
-docker rmi "${TAG_V19}" 2>/dev/null && echo "  Removed: ${TAG_V19}" || echo "  None to remove (${TAG_V19})"
+docker rmi "${TAG_VERSION}" 2>/dev/null && echo "  Removed: ${TAG_VERSION}" || echo "  None to remove (${TAG_VERSION})"
 
 # 4. Build fresh image
 echo ""
 echo "→ Building AMPNM Docker image..."
 echo "  Build context: $(pwd)"
 echo "  Platform: linux/amd64"
-echo "  Tags: ${TAG_LATEST}, ${TAG_V19}"
+echo "  Tags: ${TAG_LATEST}, ${TAG_VERSION}"
 echo ""
 
 docker build \
     --platform linux/amd64 \
     --progress=plain \
     -t "${TAG_LATEST}" \
-    -t "${TAG_V19}" \
+    -t "${TAG_VERSION}" \
     --label "org.opencontainers.image.title=AMPNM" \
     --label "org.opencontainers.image.description=Advanced Multi-Protocol Network Monitor" \
     --label "org.opencontainers.image.vendor=IT Support BD" \
-    --label "org.opencontainers.image.version=1.9" \
+    --label "org.opencontainers.image.version=${VERSION_NUM}" \
     --label "org.opencontainers.image.url=https://ampnm.itsupport.com.bd" \
     --label "org.opencontainers.image.documentation=https://ampnm.itsupport.com.bd/docs" \
     --label "org.opencontainers.image.source=https://github.com/pranto48/ampnm" \
@@ -75,8 +86,8 @@ docker images | grep -E "ampnm|REPOSITORY"
 
 # 6. Push to Docker Hub
 echo ""
-echo "→ Pushing ${TAG_V19} to Docker Hub..."
-docker push "${TAG_V19}"
+echo "→ Pushing ${TAG_VERSION} to Docker Hub..."
+docker push "${TAG_VERSION}"
 
 echo ""
 echo "→ Pushing ${TAG_LATEST} to Docker Hub..."
@@ -88,6 +99,6 @@ echo "✓ DONE! Images pushed to:"
 echo "  https://hub.docker.com/r/${REPO}"
 echo ""
 echo "  Pull with:"
-echo "  docker pull ${TAG_V19}"
+echo "  docker pull ${TAG_VERSION}"
 echo "  docker pull ${TAG_LATEST}"
 echo "=============================="
