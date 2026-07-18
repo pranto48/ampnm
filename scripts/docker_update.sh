@@ -20,8 +20,10 @@ JSON_CONFIG=$(docker inspect "${CONTAINER_ID}")
 # 2. Extract configuration values
 NAME=$(echo "${JSON_CONFIG}" | jq -r '.[0].Name' | sed 's/^\///')
 
-# Resolve target image
-TARGET_IMAGE="arifmahmudpranto/ampnm:latest"
+# Resolve target image dynamically from the currently running container's repository
+CURRENT_IMAGE=$(echo "${JSON_CONFIG}" | jq -r '.[0].Config.Image')
+BASE_REPO=$(echo "${CURRENT_IMAGE}" | cut -d':' -f1 | cut -d'@' -f1)
+TARGET_IMAGE="${BASE_REPO:-itsupportbd/ampnm}:latest"
 
 # Backup active license key from database before stopping the old container
 ACTIVE_LICENSE=$(docker exec "${CONTAINER_ID}" php -r "require '/var/www/html/config.php'; echo getAppLicenseKey();" 2>/dev/null || true)

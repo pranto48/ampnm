@@ -41,10 +41,24 @@ function appendRestorePoint(array $entry): void
 }
 
 function getDockerHubUpdateStatus(): array {
-    $repo = 'arifmahmudpranto/ampnm';
+    $repo = 'itsupportbd/ampnm'; // Default fallback
     $tag = 'latest';
     $socketPath = '/var/run/docker.sock';
     $isSocketWritable = is_writable($socketPath);
+    
+    if ($isSocketWritable) {
+        $cid = trim(shell_exec('hostname') ?? '');
+        if ($cid !== '') {
+            $inspectImage = trim(shell_exec("docker inspect --format='{{.Config.Image}}' " . escapeshellarg($cid)) ?? '');
+            if ($inspectImage !== '') {
+                $base = explode(':', $inspectImage)[0] ?? '';
+                $base = explode('@', $base)[0] ?? '';
+                if ($base !== '') {
+                    $repo = $base;
+                }
+            }
+        }
+    }
     
     // 1. Get local image digest if socket is writable
     $localDigest = '';
@@ -101,7 +115,7 @@ function getDockerHubUpdateStatus(): array {
         $httpCodeAll = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
-        $latestTag = 'v1.11';
+        $latestTag = 'v1.12';
         if ($httpCodeAll === 200 && $responseAll) {
             $dataAll = json_decode($responseAll, true);
             if (!empty($dataAll['results'])) {
@@ -115,7 +129,7 @@ function getDockerHubUpdateStatus(): array {
                 }
             }
         }
-        $currentTag = 'v1.11'; 
+        $currentTag = 'v1.12'; 
         $updateAvailable = ($latestTag !== $currentTag);
         $remoteDigest = $latestTag;
         $localDigest = $currentTag;

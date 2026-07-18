@@ -255,7 +255,7 @@ export default function LandingPage() {
             <h4 className="font-bold text-zinc-950 dark:text-white text-sm">Pull Image</h4>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Download the optimized application container directly from Docker Hub repository.</p>
             <pre className="p-2.5 rounded bg-zinc-950 text-zinc-200 font-mono text-[10px] overflow-x-auto select-all">
-              docker pull itsupportbd/ampnm:V1.11
+              docker pull itsupportbd/ampnm:V1.12
               {"\n"}
               docker pull itsupportbd/ampnm:latest
             </pre>
