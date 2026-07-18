@@ -27,6 +27,7 @@ require_once __DIR__ . '/header.php';
         }
     </style>
 
+<main id="app">
     <div class="container mx-auto px-4 py-8">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
             
@@ -82,7 +83,7 @@ require_once __DIR__ . '/header.php';
             </aside>
 
             <!-- Main Content -->
-            <main class="lg:col-span-3">
+            <div class="lg:col-span-3">
                 <div class="bg-slate-800 rounded-lg p-8 space-y-12">
 
                     <!-- Introduction -->
@@ -779,19 +780,12 @@ docker cp ampnm-app:/var/www/html/uploads ./uploads-backup</code>
                     </section>
 
                 </div>
-            </main>
+            </div>
 
         </div>
     </div>
+</main>
 
-    <!-- Footer -->
-    <footer class="bg-slate-800 mt-12 py-6">
-        <div class="container mx-auto px-4 text-center text-slate-400">
-            <p><strong>AMPNM</strong> - Advanced Multi-Protocol Network Monitor</p>
-            <p class="text-sm mt-2">Made with <i class="fas fa-heart text-red-500"></i> by IT Support Bangladesh</p>
-            <p class="text-xs mt-2">Version 1.0 | <a href="https://portal.itsupport.com.bd" class="text-cyan-400 hover:underline">portal.itsupport.com.bd</a></p>
-        </div>
-    </footer>
 
     <script>
         // Smooth scrolling for navigation links

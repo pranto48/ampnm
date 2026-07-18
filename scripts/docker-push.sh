@@ -56,7 +56,7 @@ docker build \
     --label "org.opencontainers.image.title=AMPNM" \
     --label "org.opencontainers.image.description=Advanced Multi-Protocol Network Monitor" \
     --label "org.opencontainers.image.vendor=IT Support BD" \
-    --label "org.opencontainers.image.version=1.7" \
+    --label "org.opencontainers.image.version=1.9" \
     --label "org.opencontainers.image.url=https://ampnm.itsupport.com.bd" \
     --label "org.opencontainers.image.documentation=https://ampnm.itsupport.com.bd/docs" \
     .
