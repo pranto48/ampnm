@@ -4,6 +4,9 @@ set -euo pipefail
 
 CONTAINER_ID=$(hostname)
 
+# Force minimum supported API version for compatibility with newer host engines (e.g. Docker 25/26/28+)
+export DOCKER_API_VERSION="${DOCKER_API_VERSION:-1.44}"
+
 if [ ! -S /var/run/docker.sock ]; then
   echo "ERROR: /var/run/docker.sock is not accessible. Cannot perform Docker Hub updates."
   exit 1
@@ -99,6 +102,7 @@ docker run -d --name ampnm_updater_helper --rm \
   -e RUN_CMD="${RUN_CMD}" \
   -e CONTAINER_ID="${CONTAINER_ID}" \
   -e TARGET_IMAGE="${TARGET_IMAGE}" \
+  -e DOCKER_API_VERSION="${DOCKER_API_VERSION}" \
   docker:cli sh -c '
     echo "[10%] Initializing self-update routine..."
     echo "[20%] Waiting for host container request context to close..."

@@ -1,4 +1,6 @@
 <?php
+// Force minimum supported API version for compatibility with newer host engines (e.g. Docker 25/26/28+)
+putenv('DOCKER_API_VERSION=1.44');
 require_once 'includes/auth_check.php';
 require_once 'includes/update_state.php';
 
