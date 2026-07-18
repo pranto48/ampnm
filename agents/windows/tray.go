@@ -244,7 +244,6 @@ func ShowGUI() {
 		metrics, err := collectMetrics(cfg)
 		if err == nil {
 			transmitActiveTelemetry(cfg, metrics)
-			addLog("Initial telemetry metrics transmitted successfully.")
 		} else {
 			addLog(fmt.Sprintf("Failed to collect initial metrics: %v", err))
 		}
@@ -258,7 +257,6 @@ func ShowGUI() {
 			metrics, err := collectMetrics(cfg)
 			if err == nil {
 				transmitActiveTelemetry(cfg, metrics)
-				addLog("Periodic telemetry metrics transmitted successfully.")
 			} else {
 				addLog(fmt.Sprintf("Failed to collect periodic metrics: %v", err))
 			}

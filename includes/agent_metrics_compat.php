@@ -2,17 +2,71 @@
 
 function agentCompatGetHeader($key) {
     $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
-    return isset($_SERVER[$serverKey]) ? trim((string)$_SERVER[$serverKey]) : '';
+    if (isset($_SERVER[$serverKey])) {
+        return trim((string)$_SERVER[$serverKey]);
+    }
+
+    // Fallback 1: getallheaders() (case-insensitive)
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        foreach ($headers as $hKey => $hVal) {
+            if (strcasecmp($hKey, $key) === 0) {
+                return trim((string)$hVal);
+            }
+        }
+    }
+
+    // Fallback 2: Check standard HTTP authorization header
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $auth = trim((string)$_SERVER['HTTP_AUTHORIZATION']);
+        if (str_starts_with(strtolower($auth), 'bearer ')) {
+            return trim(substr($auth, 7));
+        }
+    }
+
+    // Fallback 3: Query parameters (makes debugging / simple scripts very robust)
+    if (isset($_GET['token'])) {
+        return trim((string)$_GET['token']);
+    }
+    if (isset($_GET['agent_token'])) {
+        return trim((string)$_GET['agent_token']);
+    }
+    if (isset($_GET['X-Agent-Token'])) {
+        return trim((string)$_GET['X-Agent-Token']);
+    }
+
+    // Fallback 4: POST parameters or JSON body fields (in case headers are completely stripped)
+    if (isset($_POST['agent_token'])) {
+        return trim((string)$_POST['agent_token']);
+    }
+    
+    // Check if JSON body contains token field
+    $rawInput = file_get_contents('php://input');
+    if ($rawInput) {
+        $json = json_decode($rawInput, true);
+        if (is_array($json)) {
+            if (isset($json['agent_token'])) {
+                return trim((string)$json['agent_token']);
+            }
+            if (isset($json['token'])) {
+                return trim((string)$json['token']);
+            }
+        }
+    }
+
+    return '';
 }
 
 function agentCompatValidateToken($pdo, $token) {
     if ($token === '') {
+        error_log("AMPNM Agent Auth Warning: Empty token provided by request from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
         return false;
     }
     $stmt = $pdo->prepare("SELECT id, user_id FROM agent_tokens WHERE token = ? AND enabled = 1 LIMIT 1");
     $stmt->execute(array($token));
     $tokenRow = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$tokenRow) {
+        error_log("AMPNM Agent Auth Warning: Invalid/disabled agent token (" . htmlspecialchars(substr($token, 0, 12)) . "...) requested from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
         return false;
     }
     $touch = $pdo->prepare("UPDATE agent_tokens SET last_used_at = NOW() WHERE id = ?");

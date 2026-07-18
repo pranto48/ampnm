@@ -212,15 +212,26 @@ func transmitActiveTelemetry(cfg Config, payload MetricsPayload) {
 	// 1. HTTP Endpoint transmission
 	if cfg.ServerUrl != "" {
 		jsonData, err := json.Marshal(payload)
-		if err == nil {
+		if err != nil {
+			addLog(fmt.Sprintf("Failed to marshal JSON for telemetry: %v", err))
+		} else {
 			req, err := http.NewRequest("POST", cfg.ServerUrl, bytes.NewBuffer(jsonData))
-			if err == nil {
+			if err != nil {
+				addLog(fmt.Sprintf("Failed to create HTTP request for telemetry: %v", err))
+			} else {
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("X-Agent-Token", cfg.AgentToken)
 				client := &http.Client{Timeout: 10 * time.Second}
 				resp, err := client.Do(req)
-				if err == nil {
-					resp.Body.Close()
+				if err != nil {
+					addLog(fmt.Sprintf("Telemetry transmission failed: server unreachable: %v", err))
+				} else {
+					defer resp.Body.Close()
+					if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+						addLog(fmt.Sprintf("Telemetry transmission failed: server error (HTTP %s)", resp.Status))
+					} else {
+						addLog("Telemetry metrics transmitted successfully.")
+					}
 				}
 			}
 		}
@@ -240,8 +251,15 @@ func transmitActiveTelemetry(cfg Config, payload MetricsPayload) {
 			jsonData, err := json.Marshal(wrap)
 			if err == nil {
 				packet := createTrapperPacket(jsonData)
-				_, _ = conn.Write(packet)
+				_, errWrite := conn.Write(packet)
+				if errWrite != nil {
+					addLog(fmt.Sprintf("Trapper transmission failed: %v", errWrite))
+				} else {
+					addLog("Trapper metrics transmitted successfully.")
+				}
 			}
+		} else {
+			addLog(fmt.Sprintf("Trapper connection failed: %v", err))
 		}
 	}
 }
