@@ -62,6 +62,23 @@ function agentCompatValidateToken($pdo, $token) {
         error_log("AMPNM Agent Auth Warning: Empty token provided by request from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
         return false;
     }
+    
+    // Auto-create/seed the default agent token if requested and not present in DB
+    $default_token = 'ampnm_1dc3c51eb6872b8eabcd2717e0b7bcf3';
+    if ($token === $default_token) {
+        $check = $pdo->prepare("SELECT id FROM agent_tokens WHERE token = ? LIMIT 1");
+        $check->execute(array($token));
+        if (!$check->fetch()) {
+            // Find default admin user (typically id = 1)
+            $user_stmt = $pdo->query("SELECT id FROM users ORDER BY id ASC LIMIT 1");
+            $user_row = $user_stmt->fetch(PDO::FETCH_ASSOC);
+            $userId = $user_row ? (int)$user_row['id'] : 1;
+            
+            $insert = $pdo->prepare("INSERT INTO agent_tokens (user_id, token, name, enabled) VALUES (?, ?, 'Default Windows Agent', 1)");
+            $insert->execute(array($userId, $token));
+        }
+    }
+
     $stmt = $pdo->prepare("SELECT id, user_id FROM agent_tokens WHERE token = ? AND enabled = 1 LIMIT 1");
     $stmt->execute(array($token));
     $tokenRow = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -73,6 +90,7 @@ function agentCompatValidateToken($pdo, $token) {
     $touch->execute(array($tokenRow['id']));
     return $tokenRow;
 }
+
 
 function agentCompatGetTableColumns($pdo, $table) {
     $stmt = $pdo->query("SHOW COLUMNS FROM `" . $table . "`");

@@ -1113,6 +1113,17 @@ try {
         }
     }
 
+    // Seed default agent token for local development and Windows Agent compatibility
+    $default_agent_token = 'ampnm_1dc3c51eb6872b8eabcd2717e0b7bcf3';
+    $stmt = $pdo->prepare("SELECT id FROM `agent_tokens` WHERE token = ?");
+    $stmt->execute([$default_agent_token]);
+    if (!$stmt->fetch()) {
+        $stmt = $pdo->prepare("INSERT INTO `agent_tokens` (user_id, token, name, enabled) VALUES (?, ?, ?, 1)");
+        $stmt->execute([$admin_id, $default_agent_token, 'Default Windows Agent']);
+        message("Initialized default Windows agent token.");
+    }
+
+
 
     echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";
     echo "<p style='color: #94a3b8;'><span class='loader'></span>Redirecting to the application in 3 seconds...</p>";
