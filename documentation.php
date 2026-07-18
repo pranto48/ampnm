@@ -27,7 +27,6 @@ require_once __DIR__ . '/header.php';
         }
     </style>
 
-<main id="app">
     <div class="container mx-auto px-4 py-8">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
             
@@ -784,7 +783,6 @@ docker cp ampnm-app:/var/www/html/uploads ./uploads-backup</code>
 
         </div>
     </div>
-</main>
 
 
     <script>
