@@ -2,6 +2,8 @@ function initUsers() {
     const API_URL = 'api.php';
     const usersTableBody = document.getElementById('usersTableBody');
     const usersLoader = document.getElementById('usersLoader');
+    const userSearchInput = document.getElementById('userSearchInput');
+    let allUsers = [];
     const createUserForm = document.getElementById('createUserForm');
 
     // Edit Role Modal elements
@@ -32,47 +34,105 @@ function initUsers() {
         }).then(res => res.json())
     };
 
+    const renderUsers = (users) => {
+        if (!users || users.length === 0) {
+            usersTableBody.innerHTML = `
+                <tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">
+                    <i class="fas fa-users mb-2 text-2xl block"></i>No users found.
+                </td></tr>`;
+            return;
+        }
+        usersTableBody.innerHTML = users.map(user => {
+            const isDefaultAdmin = user.username === 'admin';
+            const isCurrentUser = String(user.id) === String(window.currentLoggedInUserId);
+            const deleteDisabled = isDefaultAdmin || isCurrentUser ? 'disabled' : '';
+            const deleteClass = deleteDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:text-red-400';
+            const roleBadge = user.role === 'admin'
+                ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-cyan-900/60 text-cyan-300 border border-cyan-700">Admin</span>'
+                : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-700 text-slate-300 border border-slate-600">Viewer</span>';
+            const createdAt = user.created_at ? new Date(user.created_at).toLocaleString() : '—';
+            return `
+                <tr class="border-b border-slate-700/60 hover:bg-slate-700/30 transition-colors">
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm font-bold text-white">${user.username.charAt(0).toUpperCase()}</span>
+                            <span class="text-white font-medium">${user.username}</span>
+                            ${isCurrentUser ? '<span class="text-xs text-slate-400">(you)</span>' : ''}
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">${roleBadge}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-slate-400 font-mono text-xs">${user.user_group || 'default_group'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-slate-400 text-xs">${createdAt}</td>
+                    <td class="px-4 py-3 whitespace-nowrap space-x-1">
+                        <button class="edit-role-btn inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-md bg-yellow-900/40 text-yellow-300 border border-yellow-700/50 hover:bg-yellow-800/50 transition-colors"
+                            data-id="${user.id}" data-username="${user.username}" data-role="${user.role}" data-group="${user.user_group || 'default_group'}">
+                            <i class="fas fa-user-tag"></i> Edit
+                        </button>
+                        <button class="change-password-btn inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-md bg-blue-900/40 text-blue-300 border border-blue-700/50 hover:bg-blue-800/50 transition-colors"
+                            data-id="${user.id}" data-username="${user.username}">
+                            <i class="fas fa-key"></i> Password
+                        </button>
+                        <button class="delete-user-btn inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-md bg-red-900/30 text-red-400 border border-red-800/40 ${deleteClass} transition-colors"
+                            data-id="${user.id}" data-username="${user.username}" ${deleteDisabled}>
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </td>
+                </tr>`;
+        }).join('');
+    };
+
     const loadUsers = async () => {
         usersLoader.classList.remove('hidden');
         usersTableBody.innerHTML = '';
         try {
             const users = await api.get('get_users');
-            usersTableBody.innerHTML = users.map(user => {
-                const isDefaultAdmin = user.username === 'admin';
-                const isCurrentUser = user.id == window.currentLoggedInUserId; // Compare with exposed ID
-
-                // Delete button should be disabled for default admin and the current logged-in user
-                const deleteDisabled = isDefaultAdmin || isCurrentUser ? 'disabled' : '';
-                const deleteClass = deleteDisabled ? 'opacity-50 cursor-not-allowed' : '';
-
-                    <tr class="border-b border-slate-700">
-                        <td class="px-6 py-4 whitespace-nowrap text-white">${user.username}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-slate-400 capitalize">${user.role}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-slate-400 font-mono text-xs">${user.user_group || 'default_group'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-slate-400">${new Date(user.created_at).toLocaleString()}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <button class="edit-role-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${user.id}" data-username="${user.username}" data-role="${user.role}" data-group="${user.user_group || 'default_group'}"><i class="fas fa-user-tag mr-2"></i>Edit</button>
-                            <button class="change-password-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-key mr-2"></i>Change Password</button>
-                            <button class="delete-user-btn text-red-500 hover:text-red-400 ${deleteClass}" data-id="${user.id}" data-username="${user.username}" ${deleteDisabled}><i class="fas fa-trash mr-2"></i>Delete</button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+            allUsers = Array.isArray(users) ? users : [];
+            renderUsers(allUsers);
+            // Update count badge
+            const countEl = document.getElementById('userCount');
+            if (countEl) countEl.textContent = allUsers.length;
         } catch (error) {
             console.error('Failed to load users:', error);
-            window.notyf.error('Failed to load users.');
+            usersTableBody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-red-400"><i class="fas fa-exclamation-circle mr-2"></i>Failed to load users. Check console for details.</td></tr>`;
         } finally {
             usersLoader.classList.add('hidden');
         }
     };
 
+    // Expose globally for the refresh button
+    window.loadUsers = loadUsers;
+
+    // Search / filter
+    if (userSearchInput) {
+        userSearchInput.addEventListener('input', () => {
+            const q = userSearchInput.value.trim().toLowerCase();
+            if (!q) { renderUsers(allUsers); return; }
+            renderUsers(allUsers.filter(u =>
+                u.username.toLowerCase().includes(q) || (u.user_group || '').toLowerCase().includes(q) || u.role.toLowerCase().includes(q)
+            ));
+        });
+    }
+
+
+
     createUserForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const username = e.target.username.value;
+        const username = e.target.username.value.trim();
         const password = e.target.password.value;
+        const confirmPassword = e.target.confirm_password ? e.target.confirm_password.value : password;
         const role = e.target.role.value;
-        const user_group = e.target.user_group.value || 'default_group';
-        if (!username || !password) return;
+        const user_group = (e.target.user_group.value || 'default_group').trim();
+
+        // Client-side validation
+        const formError = document.getElementById('createUserError');
+        const showError = (msg) => { if (formError) { formError.textContent = msg; formError.classList.remove('hidden'); } else { window.notyf.error(msg); } };
+        const clearError = () => { if (formError) formError.classList.add('hidden'); };
+        clearError();
+
+        if (!username) { showError('Username is required.'); return; }
+        if (!password) { showError('Password is required.'); return; }
+        if (password.length < 6) { showError('Password must be at least 6 characters.'); return; }
+        if (password !== confirmPassword) { showError('Passwords do not match.'); return; }
 
         const button = createUserForm.querySelector('button[type="submit"]');
         button.disabled = true;
@@ -81,24 +141,25 @@ function initUsers() {
         try {
             const result = await api.post('create_user', { username, password, role, user_group });
             if (result.success) {
-                window.notyf.success('User created successfully.');
+                window.notyf.success(`User "${username}" created successfully.`);
                 createUserForm.reset();
-                // Set default group fallback back in input
-                if (document.getElementById('new_user_group')) {
-                    document.getElementById('new_user_group').value = 'default_group';
-                }
+                clearError();
+                const groupInput = document.getElementById('new_user_group');
+                if (groupInput) groupInput.value = 'default_group';
                 await loadUsers();
             } else {
-                window.notyf.error(`Error: ${result.error}`);
+                showError(result.error || 'Failed to create user.');
             }
         } catch (error) {
-            window.notyf.error('An unexpected error occurred.');
+            showError('An unexpected error occurred. Check console.');
             console.error(error);
         } finally {
             button.disabled = false;
             button.innerHTML = '<i class="fas fa-user-plus mr-2"></i>Create User';
         }
     });
+
+
 
     usersTableBody.addEventListener('click', async (e) => {
         const deleteButton = e.target.closest('.delete-user-btn');
@@ -180,36 +241,37 @@ function initUsers() {
         const newPassword = newPasswordInput.value;
         const confirmNewPassword = confirmNewPasswordInput.value;
 
-        if (newPassword !== confirmNewPassword) {
-            window.notyf.error('New passwords do not match.');
-            return;
-        }
-        if (newPassword.length < 6) {
-            window.notyf.error('Password must be at least 6 characters long.');
-            return;
-        }
+        const errEl = document.getElementById('changePasswordError');
+        const showErr = (msg) => { if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); } else { window.notyf.error(msg); } };
+        const clearErr = () => { if (errEl) errEl.classList.add('hidden'); };
+        clearErr();
+
+        if (newPassword.length < 6) { showErr('Password must be at least 6 characters long.'); return; }
+        if (newPassword !== confirmNewPassword) { showErr('Passwords do not match.'); return; }
 
         const button = changePasswordForm.querySelector('button[type="submit"]');
         button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...';
 
         try {
             const result = await api.post('update_user_password', { id, new_password: newPassword });
             if (result.success) {
-                window.notyf.success('User password updated successfully.');
+                window.notyf.success(result.message || 'Password updated successfully.');
                 closeModal('changePasswordModal');
                 await loadUsers();
             } else {
-                window.notyf.error(`Error: ${result.error}`);
+                showErr(result.error || 'Failed to update password.');
             }
         } catch (error) {
-            window.notyf.error('An unexpected error occurred.');
+            showErr('An unexpected error occurred. Check console.');
             console.error(error);
         } finally {
             button.disabled = false;
-            button.innerHTML = 'Save Changes';
+            button.innerHTML = '<i class="fas fa-save mr-1"></i>Update Password';
         }
     });
+
+
 
     loadUsers();
 }

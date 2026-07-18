@@ -77,41 +77,220 @@ include 'header.php';
             </div>
         </div>
 
-        <!-- Backup Schedules -->
-        <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6 mt-8">
-            <h2 class="text-xl font-semibold text-white mb-4">Log Backup Schedules (FTP / SMB / Email)</h2>
-            <form id="backupScheduleForm" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                <input type="hidden" id="backupScheduleId">
-                <input id="backupName" placeholder="Schedule name" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
-                <select id="backupTargetType" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
-                    <option value="ftp">FTP</option>
-                    <option value="smb">SMB</option>
-                    <option value="email">Email</option>
-                </select>
-                <select id="backupPeriodScope" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
-                    <option value="day">Day Logs</option>
-                    <option value="month">Month Logs</option>
-                    <option value="year">Year Logs</option>
-                </select>
-                <select id="backupScheduleType" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                </select>
-                <input id="backupScheduleTime" type="time" value="00:15" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
-                <input id="backupDayOfWeek" type="number" min="1" max="7" placeholder="Day of week (1-7)" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
-                <input id="backupDayOfMonth" type="number" min="1" max="28" placeholder="Day of month (1-28)" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2">
-                <label class="flex items-center gap-2 text-sm text-slate-300"><input id="backupEnabled" type="checkbox" checked>Enabled</label>
-                <textarea id="backupTargetConfig" rows="3" placeholder='Target JSON: {"host":"ftp.example.com","username":"u","password":"p","remote_path":"/backups"} | {"mount_path":"/mnt/smb_backups"} | {"recipient_email":"ops@example.com"}' class="md:col-span-3 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2"></textarea>
-                <div class="md:col-span-3 flex gap-2">
-                    <button type="submit" class="px-4 py-2 bg-cyan-600 rounded-lg text-white">Save Schedule</button>
-                    <button type="button" id="backupScheduleReset" class="px-4 py-2 bg-slate-700 rounded-lg text-slate-300">Reset</button>
+        <!-- ── Log Backup Schedules ─────────────────────────────────────── -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-xl mt-8 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-xl font-semibold text-white flex items-center gap-2">
+                        <i class="fas fa-archive text-cyan-400"></i> Log Backup Schedules
+                    </h2>
+                    <p class="text-slate-400 text-xs mt-0.5">Automate CSV log exports to NAS, FTP, or Email on a schedule.</p>
                 </div>
-            </form>
+                <button id="showBackupFormBtn" class="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-lg transition-colors">
+                    <i class="fas fa-plus"></i> New Schedule
+                </button>
+            </div>
+
+            <!-- Form panel (hidden by default, toggled by button) -->
+            <div id="backupFormPanel" class="hidden border-b border-slate-700 bg-slate-900/40">
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-white mb-5 flex items-center gap-2">
+                        <i class="fas fa-edit text-cyan-400"></i>
+                        <span id="backupFormTitle">Create Backup Schedule</span>
+                    </h3>
+                    <form id="backupScheduleForm" class="space-y-4">
+                        <input type="hidden" id="backupScheduleId">
+
+                        <!-- Row 1: Name + Target Type + Scope -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Schedule Name <span class="text-red-400">*</span></label>
+                                <input id="backupName" placeholder="e.g. Daily NAS Log Backup" required
+                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Destination Type</label>
+                                <select id="backupTargetType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                    <option value="nas">NAS (Network / Mounted Volume)</option>
+                                    <option value="ftp">FTP Server</option>
+                                    <option value="email">Email (SMTP)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Log Scope</label>
+                                <select id="backupPeriodScope" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                    <option value="day">Last Day</option>
+                                    <option value="month">Last Month</option>
+                                    <option value="year">Last Year</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- NAS Config Group -->
+                        <div id="lbNasGroup" class="space-y-3 bg-slate-900/60 border border-slate-700 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fas fa-server text-cyan-400 text-sm"></i>
+                                <span class="text-sm font-semibold text-slate-300">NAS Configuration</span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">NAS Server IP / Hostname <span class="text-slate-500">(optional — informational)</span></label>
+                                    <input id="lbNasIp" placeholder="e.g. 192.168.1.100 or nas.local"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Protocol Port <span class="text-slate-500">(SMB=445, NFS=2049)</span></label>
+                                    <input id="lbNasPort" type="number" placeholder="445"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">NAS Username <span class="text-slate-500">(optional)</span></label>
+                                    <input id="lbNasUsername" placeholder="backup_user"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">NAS Password <span class="text-slate-500">(optional)</span></label>
+                                    <input id="lbNasPassword" type="password" placeholder="••••••••"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">
+                                    Destination Path (inside Docker container) <span class="text-red-400">*</span>
+                                </label>
+                                <div class="flex gap-2">
+                                    <input id="lbNasMountPath" placeholder="/mnt/nas/logs or /backups/logs" required
+                                        class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                    <button type="button" id="lbNasTestBtn"
+                                        class="px-3 py-2 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap">
+                                        <i class="fas fa-plug"></i> Test Connection
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">Must match a Docker <code class="text-cyan-400">-v /your/nas/share:/mnt/nas/logs</code> bind-mount.</p>
+                            </div>
+                            <!-- Test results panel -->
+                            <div id="lbNasTestResults" class="hidden rounded-lg overflow-hidden border border-slate-600"></div>
+                        </div>
+
+                        <!-- FTP Config Group -->
+                        <div id="lbFtpGroup" class="hidden space-y-3 bg-slate-900/60 border border-slate-700 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fas fa-upload text-cyan-400 text-sm"></i>
+                                <span class="text-sm font-semibold text-slate-300">FTP Configuration</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">FTP Host / IP <span class="text-red-400">*</span></label>
+                                    <input id="lbFtpHost" placeholder="ftp.example.com or 192.168.1.10"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Port</label>
+                                    <input id="lbFtpPort" type="number" value="21" min="1" max="65535"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Username <span class="text-red-400">*</span></label>
+                                    <input id="lbFtpUser" placeholder="backup_user"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Password</label>
+                                    <input id="lbFtpPass" type="password" placeholder="••••••••"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Remote Directory Path</label>
+                                <input id="lbFtpPath" value="/backups/logs" placeholder="/backups/logs"
+                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                            </div>
+                        </div>
+
+                        <!-- Email Config Group -->
+                        <div id="lbEmailGroup" class="hidden space-y-3 bg-slate-900/60 border border-slate-700 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fas fa-envelope text-cyan-400 text-sm"></i>
+                                <span class="text-sm font-semibold text-slate-300">Email Configuration</span>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Recipient Email <span class="text-red-400">*</span></label>
+                                <input id="lbEmailRecipient" type="email" placeholder="ops@example.com"
+                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                <p class="text-xs text-slate-500 mt-1">SMTP settings must be configured in Notifications → Email Settings.</p>
+                            </div>
+                        </div>
+
+                        <!-- Schedule Settings -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Recurrence</label>
+                                <select id="backupScheduleType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Time</label>
+                                <input id="backupScheduleTime" type="time" value="00:15"
+                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                            </div>
+                            <div id="lbWeeklyGroup">
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Day of Week</label>
+                                <select id="backupDayOfWeek" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                                    <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+                                    <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="7">Sunday</option>
+                                </select>
+                            </div>
+                            <div id="lbMonthlyGroup" class="hidden">
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Day of Month</label>
+                                <input id="backupDayOfMonth" type="number" min="1" max="28" value="1"
+                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition">
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input id="backupEnabled" type="checkbox" checked class="h-4 w-4 bg-slate-900 border-slate-600 rounded text-cyan-500 focus:ring-cyan-500">
+                                <span class="text-sm text-slate-300 font-medium">Enabled</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <button type="button" id="backupScheduleReset"
+                                    class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                    class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
+                                    <i class="fas fa-save"></i> Save Schedule
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Schedules Table -->
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
-                    <thead><tr class="border-b border-slate-700"><th class="px-3 py-2 text-left text-slate-400">Name</th><th class="px-3 py-2 text-left text-slate-400">Target</th><th class="px-3 py-2 text-left text-slate-400">Scope</th><th class="px-3 py-2 text-left text-slate-400">Schedule</th><th class="px-3 py-2 text-left text-slate-400">Last Run</th><th class="px-3 py-2 text-left text-slate-400">Actions</th></tr></thead>
-                    <tbody id="backupSchedulesTable"></tbody>
+                    <thead class="bg-slate-900/60">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Target</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Scope</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Schedule</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Last Run</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Status</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backupSchedulesTable" class="divide-y divide-slate-700/50">
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 italic">Loading schedules…</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -119,3 +298,4 @@ include 'header.php';
 </main>
 
 <?php include 'footer.php'; ?>
+

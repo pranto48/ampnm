@@ -64,40 +64,51 @@ function deliverLogBackup(array $schedule, string $csvFilePath, string $csvName,
     $cfg = json_decode($schedule['target_config'] ?? '{}', true);
     if (!is_array($cfg)) $cfg = [];
 
+    // ── FTP ──────────────────────────────────────────────────────────────────
     if ($targetType === 'ftp') {
-        $host = trim((string)($cfg['host'] ?? ''));
-        $username = trim((string)($cfg['username'] ?? ''));
-        $password = (string)($cfg['password'] ?? '');
+        $host       = trim((string)($cfg['host'] ?? ''));
+        $username   = trim((string)($cfg['username'] ?? ''));
+        $password   = (string)($cfg['password'] ?? '');
         $remotePath = trim((string)($cfg['remote_path'] ?? '/'));
-        $port = (int)($cfg['port'] ?? 21);
+        $port       = (int)($cfg['port'] ?? 21);
         if ($host === '' || $username === '') return [false, 'FTP host/username are required'];
         $conn = @ftp_connect($host, $port, 15);
-        if (!$conn) return [false, 'FTP connection failed'];
+        if (!$conn) return [false, 'FTP connection failed to ' . $host . ':' . $port];
         if (!@ftp_login($conn, $username, $password)) {
             ftp_close($conn);
-            return [false, 'FTP authentication failed'];
+            return [false, 'FTP authentication failed for user ' . $username];
         }
         @ftp_pasv($conn, true);
         $remoteFile = rtrim($remotePath, '/') . '/' . $csvName;
         $ok = @ftp_put($conn, $remoteFile, $csvFilePath, FTP_BINARY);
         ftp_close($conn);
-        return [$ok, $ok ? null : 'FTP upload failed'];
+        return [$ok, $ok ? null : 'FTP upload failed — check remote path permissions'];
     }
 
-    if ($targetType === 'smb') {
+    // ── NAS (container-mounted path) ─────────────────────────────────────────
+    if ($targetType === 'nas' || $targetType === 'smb') {
         $mountPath = rtrim((string)($cfg['mount_path'] ?? ''), '/');
-        if ($mountPath === '') return [false, 'SMB mount_path is required'];
-        if (!is_dir($mountPath) || !is_writable($mountPath)) return [false, 'SMB mount path is not writable'];
+        if ($mountPath === '') return [false, 'NAS destination path is required'];
+        if (!is_dir($mountPath)) {
+            @mkdir($mountPath, 0777, true);
+        }
+        if (!is_dir($mountPath) || !is_writable($mountPath)) {
+            return [false, 'NAS path "' . $mountPath . '" is not writable. Check your Docker volume bind-mount.'];
+        }
         $dest = $mountPath . '/' . $csvName;
-        return [@copy($csvFilePath, $dest), @copy($csvFilePath, $dest) ? null : 'Failed to copy file to SMB mount path'];
+        $copied = @copy($csvFilePath, $dest);
+        if ($copied) @chmod($dest, 0664);
+        return [$copied, $copied ? null : 'Failed to copy log backup to NAS path: ' . $mountPath];
     }
 
+    // ── Email ─────────────────────────────────────────────────────────────────
     if ($targetType === 'email') {
         require_once __DIR__ . '/../../includes/smtp_mailer.php';
         $to = trim((string)($cfg['recipient_email'] ?? ''));
         if ($to === '') return [false, 'Email recipient is required'];
         $pdo = getDbConnection();
         $stmt = $pdo->prepare("SELECT * FROM smtp_settings WHERE user_id = ? LIMIT 1");
+
         $stmt->execute([$schedule['user_id']]);
         $smtp = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$smtp) return [false, 'SMTP settings not configured'];
@@ -208,7 +219,7 @@ if ($action === 'save_log_backup_schedule' && $_SERVER['REQUEST_METHOD'] === 'PO
     if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit; }
     $id = isset($input['id']) ? (int)$input['id'] : 0;
     $name = trim((string)($input['name'] ?? ''));
-    $targetType = in_array($input['target_type'] ?? '', ['ftp', 'smb', 'email'], true) ? $input['target_type'] : '';
+    $targetType = in_array($input['target_type'] ?? '', ['ftp', 'nas', 'smb', 'email'], true) ? $input['target_type'] : '';
     $scheduleType = in_array($input['schedule_type'] ?? '', ['daily', 'weekly', 'monthly'], true) ? $input['schedule_type'] : 'daily';
     $periodScope = in_array($input['period_scope'] ?? '', ['day', 'month', 'year'], true) ? $input['period_scope'] : 'day';
     $scheduleTime = trim((string)($input['schedule_time'] ?? '00:15:00'));

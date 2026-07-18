@@ -92,7 +92,7 @@ switch ($action) {
         }
         break;
 
-    case 'update_user_password': // NEW ACTION
+    case 'update_user_password':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $new_password = $input['new_password'] ?? null;
@@ -108,21 +108,27 @@ switch ($action) {
                 exit;
             }
 
-            // Prevent admin from changing their own password through this API if they are the target user
-            // This is a safety measure, though the frontend prevents it for 'admin' user.
-            $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
-            $stmt->execute([$id]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($user && $user['username'] === $_SESSION['username'] && $id == $_SESSION['user_id']) {
+            // Prevent admin from changing their OWN password here — use the profile page for that
+            if ($id == $_SESSION['user_id']) {
                 http_response_code(403);
-                echo json_encode(['error' => 'Cannot change your own password through this interface. Please use the dedicated admin password change page if available.']);
+                echo json_encode(['error' => 'Cannot change your own password through User Management. Use your profile settings instead.']);
+                exit;
+            }
+
+            // Confirm target user exists
+            $stmt = $pdo->prepare("SELECT id, username FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            $targetUser = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$targetUser) {
+                http_response_code(404);
+                echo json_encode(['error' => 'User not found.']);
                 exit;
             }
 
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             $stmt->execute([$hashed_password, $id]);
-            echo json_encode(['success' => true, 'message' => 'User password updated successfully.']);
+            echo json_encode(['success' => true, 'message' => "Password updated for user \"{$targetUser['username']}\"."]);
         }
         break;
 

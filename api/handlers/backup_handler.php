@@ -153,26 +153,24 @@ function runSystemBackup(PDO $pdo, int $userId, array $schedule = null): array {
                 }
             }
         } elseif ($targetType === 'nas') {
-            // Copy to NAS mount path
+            // Resolve NAS backup path (container-side mount path)
             $nasPath = rtrim((string)($cfg['mount_path'] ?? ''), '/');
             if ($nasPath === '') {
-                $err = 'NAS mount path is required';
+                $err = 'NAS destination path is required';
             } else {
                 if (!is_dir($nasPath)) {
                     @mkdir($nasPath, 0777, true);
                     @chmod($nasPath, 0777);
-                    @chown($nasPath, 'www-data');
                 }
                 if (!is_writable($nasPath)) {
-                    $err = 'NAS mount path is not writable';
+                    $err = 'NAS path "' . $nasPath . '" is not writable inside the container. Verify your Docker volume bind-mount.';
                 } else {
                     $dest = $nasPath . '/' . $archiveName;
                     if (@copy($localDest, $dest)) {
                         @chmod($dest, 0666);
-                        @chown($dest, 'www-data');
                         $ok = true;
                     } else {
-                        $err = 'Failed to copy archive to NAS path';
+                        $err = 'Failed to copy archive to NAS path: ' . $nasPath;
                     }
                 }
             }
@@ -384,5 +382,135 @@ if ($action === 'run_due_system_backups' && $_SERVER['REQUEST_METHOD'] === 'POST
         $ran++;
     }
     echo json_encode(['success' => true, 'ran' => $ran]);
+    return;
+}
+
+// ── NAS: Test Connection / Path Reachability ─────────────────────────────────
+if ($action === 'nas_test_connection' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($user_role !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+
+    $nasIp       = trim((string)($input['nas_ip']       ?? ''));
+    $nasPath     = rtrim(trim((string)($input['nas_path'] ?? '')), '/');
+    $nasUsername = trim((string)($input['nas_username']  ?? ''));
+    $nasPassword = (string)($input['nas_password']       ?? '');
+    $nasPort     = (int)($input['nas_port']              ?? 0);
+    $protocol    = strtolower(trim((string)($input['protocol'] ?? 'local')));
+
+    $results = [];
+    $overallOk = true;
+
+    // Step 1: Host reachability (ping or TCP) — only if an IP/host is provided
+    if ($nasIp !== '') {
+        $pingPort = $nasPort > 0 ? $nasPort : ($protocol === 'smb' ? 445 : ($protocol === 'nfs' ? 2049 : 0));
+        if ($pingPort > 0) {
+            $sock = @fsockopen($nasIp, $pingPort, $errno, $errstr, 4);
+            if ($sock) {
+                fclose($sock);
+                $results[] = ['step' => 'Host Reachability', 'ok' => true,  'msg' => "TCP port {$pingPort} reachable on {$nasIp}"];
+            } else {
+                $results[] = ['step' => 'Host Reachability', 'ok' => false, 'msg' => "Cannot reach {$nasIp}:{$pingPort} — {$errstr}"];
+                $overallOk = false;
+            }
+        } else {
+            // ICMP ping fallback
+            $pingOut = [];
+            exec('ping -c 1 -W 3 ' . escapeshellarg($nasIp) . ' 2>&1', $pingOut, $pingRet);
+            if ($pingRet === 0) {
+                $results[] = ['step' => 'Host Reachability', 'ok' => true,  'msg' => "Host {$nasIp} is reachable (ICMP)"];
+            } else {
+                $results[] = ['step' => 'Host Reachability', 'ok' => false, 'msg' => "Host {$nasIp} did not respond to ping"];
+                $overallOk = false;
+            }
+        }
+    } else {
+        $results[] = ['step' => 'Host Reachability', 'ok' => true, 'msg' => 'Local path mode — no remote host to check'];
+    }
+
+    // Step 2: Container path existence and writability
+    if ($nasPath !== '') {
+        if (!is_dir($nasPath)) {
+            // Try creating it
+            if (@mkdir($nasPath, 0777, true)) {
+                $results[] = ['step' => 'Path Existence', 'ok' => true, 'msg' => "Path created: {$nasPath}"];
+            } else {
+                $results[] = ['step' => 'Path Existence', 'ok' => false, 'msg' => "Path does not exist and could not be created: {$nasPath}. Check Docker volume mounts."];
+                $overallOk = false;
+            }
+        } else {
+            $results[] = ['step' => 'Path Existence', 'ok' => true, 'msg' => "Path exists: {$nasPath}"];
+        }
+
+        // Write test
+        if (is_dir($nasPath)) {
+            $testFile = $nasPath . '/.ampnm_write_test_' . uniqid();
+            if (@file_put_contents($testFile, 'ampnm_test') !== false) {
+                @unlink($testFile);
+                $freeBytes = @disk_free_space($nasPath);
+                $freeHuman = $freeBytes !== false ? round($freeBytes / 1073741824, 2) . ' GB free' : 'unknown space';
+                $results[] = ['step' => 'Write Permission', 'ok' => true, 'msg' => "Writable. {$freeHuman} available."];
+            } else {
+                $results[] = ['step' => 'Write Permission', 'ok' => false, 'msg' => "Path exists but is not writable: {$nasPath}. Check permissions or Docker mount mode."];
+                $overallOk = false;
+            }
+        }
+    } else {
+        $results[] = ['step' => 'Path Existence', 'ok' => false, 'msg' => 'No destination path provided'];
+        $overallOk = false;
+    }
+
+    echo json_encode(['success' => $overallOk, 'results' => $results]);
+    return;
+}
+
+// ── NAS: Browse container directory paths ─────────────────────────────────────
+if ($action === 'nas_browse_path') {
+    if ($user_role !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+
+    $browsePath = trim((string)($_GET['path'] ?? '/'));
+    // Security: restrict to absolute paths only, block dangerous traversal
+    $browsePath = '/' . ltrim(str_replace(['..', '//'], ['', '/'], $browsePath), '/');
+    if ($browsePath === '/') $browsePath = '/';
+
+    if (!is_dir($browsePath)) {
+        echo json_encode(['error' => 'Path does not exist: ' . $browsePath]);
+        exit;
+    }
+
+    $entries = [];
+    $handle = @opendir($browsePath);
+    if ($handle) {
+        while (false !== ($entry = readdir($handle))) {
+            if ($entry === '.' || $entry === '..') continue;
+            $fullPath = rtrim($browsePath, '/') . '/' . $entry;
+            if (is_dir($fullPath)) {
+                $writable = is_writable($fullPath);
+                $entries[] = [
+                    'name'     => $entry,
+                    'path'     => $fullPath,
+                    'writable' => $writable,
+                ];
+            }
+        }
+        closedir($handle);
+    }
+    usort($entries, fn($a, $b) => strcmp($a['name'], $b['name']));
+
+    // Also include parent
+    $parent = $browsePath !== '/' ? dirname($browsePath) : null;
+
+    echo json_encode([
+        'current' => $browsePath,
+        'parent'  => $parent,
+        'dirs'    => $entries,
+        'writable' => is_writable($browsePath),
+    ]);
     return;
 }
