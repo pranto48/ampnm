@@ -60,7 +60,7 @@ export default function ContactPage() {
                     <Mail size={16} />
                   </div>
                   <div>
-                    <span className="block text-[10px] text-zinc-550 uppercase tracking-widest leading-none mb-1">Mailing Address</span>
+                    <span className="block text-[10px] text-zinc-500 uppercase tracking-widest leading-none mb-1">Mailing Address</span>
                     <a href="mailto:support@itsupport.com.bd" className="hover:underline text-zinc-200">support@itsupport.com.bd</a>
                   </div>
                 </div>
@@ -70,7 +70,7 @@ export default function ContactPage() {
                     <Phone size={16} />
                   </div>
                   <div>
-                    <span className="block text-[10px] text-zinc-550 uppercase tracking-widest leading-none mb-1">Telephones</span>
+                    <span className="block text-[10px] text-zinc-500 uppercase tracking-widest leading-none mb-1">Telephones</span>
                     <span className="text-zinc-200">+880 1915 822266</span>
                   </div>
                 </div>
@@ -80,7 +80,7 @@ export default function ContactPage() {
                     <MapPin size={16} />
                   </div>
                   <div>
-                    <span className="block text-[10px] text-zinc-550 uppercase tracking-widest leading-none mb-1">Dhaka Headquarters</span>
+                    <span className="block text-[10px] text-zinc-500 uppercase tracking-widest leading-none mb-1">Dhaka Headquarters</span>
                     <span className="text-zinc-200">Dhaka, Bangladesh</span>
                   </div>
                 </div>
@@ -113,7 +113,7 @@ export default function ContactPage() {
                   <Check size={24} />
                 </div>
                 <h3 className="font-bold text-white text-base">Inquiry Submitted Successfully</h3>
-                <p className="text-xs text-zinc-550 max-w-xs font-semibold leading-relaxed">
+                <p className="text-xs text-zinc-500 max-w-xs font-semibold leading-relaxed">
                   Thank you! Our engineering team will review your custom setup request and contact you at the provided mailbox.
                 </p>
               </div>

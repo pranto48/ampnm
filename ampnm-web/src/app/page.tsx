@@ -190,7 +190,7 @@ export default function LandingPage() {
                   </div>
                   <span className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white transition-colors">{m.value}</span>
                 </div>
-                <span className="text-xs text-zinc-500 dark:text-zinc-450 font-semibold uppercase tracking-wider">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider">
                   {m.label}
                 </span>
               </div>
@@ -254,8 +254,10 @@ export default function LandingPage() {
             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white font-bold text-sm">1</span>
             <h4 className="font-bold text-zinc-950 dark:text-white text-sm">Pull Image</h4>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Download the optimized application container directly from Docker Hub repository.</p>
-            <pre className="p-2.5 rounded bg-zinc-950 text-slate-350 font-mono text-[10px] overflow-x-auto select-all">
-              docker pull arifmahmudpranto/ampnm:latest
+            <pre className="p-2.5 rounded bg-zinc-950 text-zinc-200 font-mono text-[10px] overflow-x-auto select-all">
+              docker pull itsupportbd/ampnm:V1.9
+              {"\n"}
+              docker pull itsupportbd/ampnm:latest
             </pre>
           </div>
 
@@ -263,8 +265,8 @@ export default function LandingPage() {
             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white font-bold text-sm">2</span>
             <h4 className="font-bold text-zinc-950 dark:text-white text-sm">Run Container</h4>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Expose port 2266 and bind mount the host Docker socket to enable self-updating.</p>
-            <pre className="p-2.5 rounded bg-zinc-950 text-slate-355 font-mono text-[10px] overflow-x-auto select-all">
-              docker run -d -p 2266:2266 -v /var/run/docker.sock:/var/run/docker.sock arifmahmudpranto/ampnm:latest
+            <pre className="p-2.5 rounded bg-zinc-950 text-zinc-200 font-mono text-[10px] overflow-x-auto select-all">
+              docker run -d -p 2266:2266 -v /var/run/docker.sock:/var/run/docker.sock itsupportbd/ampnm:latest
             </pre>
           </div>
 
@@ -331,7 +333,7 @@ export default function LandingPage() {
             </Link>
             <a
               href="mailto:support@itsupport.com.bd"
-              className="px-5 py-2.5 bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-350 text-xs font-semibold rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700/60"
+              className="px-5 py-2.5 bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-semibold rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700/60"
             >
               Email support@itsupport.com.bd
             </a>
