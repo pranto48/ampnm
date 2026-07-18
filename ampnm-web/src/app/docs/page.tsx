@@ -130,7 +130,7 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
           </aside>
 
           {/* Core documentation text */}
-          <main className="lg:col-span-9 space-y-16 text-zinc-600 dark:text-zinc-350 text-sm leading-relaxed">
+          <main className="lg:col-span-9 space-y-16 text-zinc-600 dark:text-zinc-300 text-sm leading-relaxed">
             
             {/* Section 1: Intro */}
             <section id="intro" className="space-y-4 scroll-mt-24">
@@ -187,7 +187,7 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
                         {copiedIndex === 'pullStable' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                       </button>
                     </div>
-                    <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
+                    <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-200 text-left overflow-x-auto select-all border border-zinc-800">
                       {codeBlocks.pullStable}
                     </pre>
                   </div>
@@ -206,7 +206,7 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
                         {copiedIndex === 'pullLatest' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                       </button>
                     </div>
-                    <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
+                    <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-200 text-left overflow-x-auto select-all border border-zinc-800">
                       {codeBlocks.pullLatest}
                     </pre>
                   </div>
@@ -229,7 +229,7 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
                       {copiedIndex === 'runLinux' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                     </button>
                   </div>
-                  <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
+                  <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-200 text-left overflow-x-auto select-all border border-zinc-800">
                     {codeBlocks.runLinux}
                   </pre>
                 </div>
@@ -255,7 +255,7 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
                     {copiedIndex === 'runWindows' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                   </button>
                 </div>
-                <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
+                <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-200 text-left overflow-x-auto select-all border border-zinc-800">
                   {codeBlocks.runWindows}
                 </pre>
               </div>
@@ -342,7 +342,7 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
                     {copiedIndex === 'agentBatch' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                   </button>
                 </div>
-                <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800 max-h-[350px]">
+                <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-200 text-left overflow-x-auto select-all border border-zinc-800 max-h-[350px]">
                   {codeBlocks.agentBatch}
                 </pre>
               </div>
@@ -438,7 +438,7 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
                       {copiedIndex === 'verifyLicense' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                     </button>
                   </div>
-                  <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
+                  <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-200 text-left overflow-x-auto select-all border border-zinc-800">
                     {codeBlocks.verifyLicense}
                   </pre>
                 </div>

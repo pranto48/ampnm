@@ -67,7 +67,7 @@ export function Footer() {
           {/* Links sections */}
           {sections.map((section, idx) => (
             <div key={idx} className="space-y-3">
-              <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-250 uppercase tracking-wider">
+              <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-200 uppercase tracking-wider">
                 {section.title}
               </h4>
               <ul className="space-y-2 text-xs font-medium">
@@ -89,7 +89,7 @@ export function Footer() {
         {/* Footer Bottom */}
         <div className="pt-8 border-t border-zinc-200 dark:border-zinc-900 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-medium text-zinc-500">
           <p>© {currentYear} AMPNM. All rights reserved.</p>
-          <div className="flex items-center gap-1.5 bg-zinc-200/50 dark:bg-zinc-900/50 px-3.5 py-1.5 border border-zinc-250 dark:border-zinc-850 rounded-full font-bold text-[10px] text-zinc-650 dark:text-zinc-350 tracking-wider uppercase select-none">
+          <div className="flex items-center gap-1.5 bg-zinc-200/50 dark:bg-zinc-900/50 px-3.5 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-full font-bold text-[10px] text-zinc-600 dark:text-zinc-300 tracking-wider uppercase select-none">
             Developed by IT Support BD
           </div>
         </div>

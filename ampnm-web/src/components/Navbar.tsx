@@ -120,7 +120,7 @@ export function Navbar() {
               </Link>
             );
           })}
-          <div className="pt-4 border-t border-zinc-150 dark:border-zinc-900">
+          <div className="pt-4 border-t border-zinc-200 dark:border-zinc-900">
             <a
               href="https://portal.itsupport.com.bd/login"
               className="flex w-full items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/15"
