@@ -210,6 +210,12 @@ function ensureHostOverrideSchema(PDO $pdo): void {
             $pdo->exec("UPDATE `host_alert_overrides` SET `host_name` = `hostname` WHERE (`host_name` IS NULL OR `host_name` = '') AND `hostname` IS NOT NULL");
         }
     }
+    // Make hostname column nullable
+    try {
+        $pdo->exec("ALTER TABLE `host_alert_overrides` MODIFY COLUMN `hostname` VARCHAR(255) NULL");
+    } catch (Throwable $e) {
+        // Ignore if alter fails
+    }
 }
 
 function normalizeMetricsPayload(array $data): array {
@@ -992,9 +998,10 @@ switch ($action) {
             ]);
         } else {
             $sql = "INSERT INTO host_alert_overrides 
-                    (host_ip, host_name, enabled, cpu_warning, cpu_critical, memory_warning, memory_critical, disk_warning, disk_critical, gpu_warning, gpu_critical, status_delay_seconds)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    (hostname, host_ip, host_name, enabled, cpu_warning, cpu_critical, memory_warning, memory_critical, disk_warning, disk_critical, gpu_warning, gpu_critical, status_delay_seconds)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $pdo->prepare($sql)->execute([
+                $input['host_name'] ?? $hostIp,
                 $hostIp,
                 $input['host_name'] ?? $hostIp,
                 !empty($input['enabled']) ? 1 : 0,

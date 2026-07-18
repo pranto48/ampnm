@@ -639,7 +639,7 @@ try {
         // TABLE FOR PER-HOST ALERT OVERRIDES
         "CREATE TABLE IF NOT EXISTS `host_alert_overrides` (
             `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            `hostname` VARCHAR(255) NOT NULL,
+            `hostname` VARCHAR(255) NULL,
             `host_ip` VARCHAR(45) NULL,
             `enabled` BOOLEAN DEFAULT TRUE,
             `cpu_warning` DECIMAL(5,2) NULL,
