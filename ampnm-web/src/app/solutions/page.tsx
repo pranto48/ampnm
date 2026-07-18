@@ -150,7 +150,7 @@ export default function SolutionsPage() {
     },
     {
       q: "How do I update to the latest version?",
-      a: "Run: docker pull pranto48/ampnm:latest then docker compose up -d. Your database volume data is preserved across updates.",
+      a: "Run: docker pull itsupportbd/ampnm:latest then docker compose up -d. Your database volume data is preserved across updates.",
     },
   ];
 

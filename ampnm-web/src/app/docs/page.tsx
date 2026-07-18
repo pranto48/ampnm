@@ -29,21 +29,22 @@ export default function DocsPage() {
   };
 
   const codeBlocks = {
-    pull: "docker pull arifmahmudpranto/ampnm:latest",
+    pullStable: "docker pull itsupportbd/ampnm:V1.9",
+    pullLatest: "docker pull itsupportbd/ampnm:latest",
     runLinux: `docker run -d \\
   --name ampnm_server \\
   -p 2266:2266 \\
   -v /var/run/docker.sock:/var/run/docker.sock \\
   -v ampnm_uploads:/var/www/html/uploads \\
   --restart unless-stopped \\
-  arifmahmudpranto/ampnm:latest`,
+  itsupportbd/ampnm:latest`,
     runWindows: `docker run -d \`
   --name ampnm_server \`
   -p 2266:2266 \`
   -v /var/run/docker.sock:/var/run/docker.sock \`
   -v ampnm_uploads:/var/www/html/uploads \`
   --restart unless-stopped \`
-  arifmahmudpranto/ampnm:latest`,
+  itsupportbd/ampnm:latest`,
     agentBatch: `@echo off
 set SERVER_URL=http://<YOUR_DOCKER_HOST>:2266/api/agent/windows-metrics
 set AGENT_TOKEN=your-random-token-here
@@ -170,21 +171,45 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
               </p>
 
               {/* Step 1: Pull */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">1. Pull the Docker Image</h4>
-                <div className="relative group">
-                  <div className="absolute right-3 top-3 opacity-80 hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => copyToClipboard(codeBlocks.pull, 'pull')} 
-                      className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white"
-                      title="Copy command"
-                    >
-                      {copiedIndex === 'pull' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                    </button>
+                
+                {/* V1.9 Pull Command */}
+                <div className="space-y-1.5">
+                  <span className="block text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">Version 1.9 (Stable Release)</span>
+                  <div className="relative group">
+                    <div className="absolute right-3 top-3 opacity-80 hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => copyToClipboard(codeBlocks.pullStable, 'pullStable')} 
+                        className="p-1.5 rounded-lg bg-zinc-805 hover:bg-zinc-705 text-zinc-400 hover:text-white transition-colors duration-150 cursor-pointer"
+                        title="Copy command"
+                      >
+                        {copiedIndex === 'pullStable' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                    <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
+                      {codeBlocks.pullStable}
+                    </pre>
                   </div>
-                  <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
-                    {codeBlocks.pull}
-                  </pre>
+                </div>
+
+                {/* Latest Pull Command */}
+                <div className="space-y-1.5">
+                  <span className="block text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">Latest Build (Development / Rolling)</span>
+                  <div className="relative group">
+                    <div className="absolute right-3 top-3 opacity-80 hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => copyToClipboard(codeBlocks.pullLatest, 'pullLatest')} 
+                        className="p-1.5 rounded-lg bg-zinc-805 hover:bg-zinc-705 text-zinc-400 hover:text-white transition-colors duration-150 cursor-pointer"
+                        title="Copy command"
+                      >
+                        {copiedIndex === 'pullLatest' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                    <pre className="p-4 rounded-xl bg-zinc-950 font-mono text-[11px] sm:text-xs text-zinc-250 text-left overflow-x-auto select-all border border-zinc-800">
+                      {codeBlocks.pullLatest}
+                    </pre>
+                  </div>
                 </div>
               </div>
 

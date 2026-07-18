@@ -11,14 +11,14 @@ export default function DownloadPage() {
   const [copiedPull, setCopiedPull] = useState(false);
   const [activeTab, setActiveTab] = useState<"windows" | "linux" | "docker">("windows");
 
-  const dockerPullCmd = "docker pull pranto48/ampnm";
+  const dockerPullCmd = "docker pull itsupportbd/ampnm:latest";
 
   const installScript = "curl -sSL https://ampnm.itsupport.com.bd/install.sh | bash";
   
   const dockerServerComposeCode = `version: "3.8"
 services:
   ampnm-app:
-    image: pranto48/ampnm:latest
+    image: itsupportbd/ampnm:latest
     container_name: ampnm-app
     restart: unless-stopped
     ports:
@@ -63,7 +63,7 @@ volumes:
   const dockerAgentComposeCode = `version: "3.8"
 services:
   ampnm-agent:
-    image: pranto48/ampnm-agent:latest
+    image: itsupportbd/ampnm-agent:latest
     container_name: ampnm-agent
     restart: unless-stopped
     environment:
@@ -355,12 +355,12 @@ services:
                       <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full">OFFICIAL</span>
                     </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-0.5">
-                      pranto48/ampnm &nbsp;·&nbsp; Latest Release
+                      itsupportbd/ampnm &nbsp;·&nbsp; Latest Release
                     </p>
                   </div>
                 </div>
                 <a
-                  href="https://hub.docker.com/r/pranto48/ampnm"
+                  href="https://hub.docker.com/r/itsupportbd/ampnm"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 shrink-0"
@@ -374,7 +374,7 @@ services:
               {/* Stats row */}
               <div className="flex flex-wrap gap-3 relative">
                 {[
-                  { label: "Image", value: "pranto48/ampnm" },
+                  { label: "Image", value: "itsupportbd/ampnm" },
                   { label: "Tag", value: "latest" },
                   { label: "Base", value: "PHP 8.2 · Apache" },
                   { label: "Port", value: "2266" },
@@ -410,7 +410,7 @@ services:
               {/* Quick links */}
               <div className="flex flex-wrap gap-3 relative">
                 <a
-                  href="https://hub.docker.com/r/pranto48/ampnm/tags"
+                  href="https://hub.docker.com/r/itsupportbd/ampnm/tags"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 font-semibold transition-colors"
@@ -419,7 +419,7 @@ services:
                 </a>
                 <span className="text-zinc-300 dark:text-zinc-700">·</span>
                 <a
-                  href="https://hub.docker.com/r/pranto48/ampnm"
+                  href="https://hub.docker.com/r/itsupportbd/ampnm"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 font-semibold transition-colors"
@@ -428,7 +428,7 @@ services:
                 </a>
                 <span className="text-zinc-300 dark:text-zinc-700">·</span>
                 <a
-                  href="https://github.com/pranto48/ampnm"
+                  href="https://github.com/itsupportbd/ampnm"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 font-semibold transition-colors"
@@ -462,7 +462,7 @@ services:
                 <pre>{dockerServerComposeCode}</pre>
               </div>
               <div className="text-[10px] text-zinc-500 leading-relaxed font-semibold">
-                Note: Deploy the server config to pull the official `pranto48/ampnm:latest` image. Access the web installer at `http://localhost:2266` to activate your license key.
+                Note: Deploy the server config to pull the official `itsupportbd/ampnm:latest` image. Access the web installer at `http://localhost:2266` to activate your license key.
               </div>
             </div>
 
