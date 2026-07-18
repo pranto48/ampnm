@@ -5,6 +5,63 @@ if (session_status() === PHP_SESSION_NONE) {
 // Ensure user_role is set, default to 'viewer' if not (e.g., for new sessions after upgrade)
 $user_role = $_SESSION['user_role'] ?? 'viewer';
 $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
+
+// Load dynamic menu items and theme settings
+require_once __DIR__ . '/includes/functions.php';
+try {
+    $pdo = getDbConnection();
+    
+    // Load theme settings
+    $theme_keys = ['theme_accent_color', 'theme_navbar_bg', 'theme_text_color'];
+    $theme = [];
+    foreach ($theme_keys as $key) {
+        $stmt = $pdo->prepare("SELECT `setting_value` FROM `app_settings` WHERE `setting_key` = ? LIMIT 1");
+        $stmt->execute([$key]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $theme[$key] = $row ? $row['setting_value'] : null;
+    }
+    
+    $theme_accent = $theme['theme_accent_color'] ?: '#06b6d4';
+    $theme_nav_bg = $theme['theme_navbar_bg'] ?: '#0f172a';
+    $theme_text = $theme['theme_text_color'] ?: '#cbd5e1';
+
+    // Load menu items
+    $stmt = $pdo->prepare("SELECT * FROM `menu_items` ORDER BY `parent_id` ASC, `sort_order` ASC, `title` ASC");
+    $stmt->execute();
+    $all_menu_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $all_menu_items = [];
+    $theme_accent = '#06b6d4';
+    $theme_nav_bg = '#0f172a';
+    $theme_text = '#cbd5e1';
+}
+
+// Build hierarchical menu
+$menu_tree = [];
+$submenus = [];
+
+foreach ($all_menu_items as $item) {
+    if ($item['role_required'] === 'admin' && $user_role !== 'admin') {
+        continue;
+    }
+    if ($item['parent_id'] === null) {
+        $menu_tree[$item['id']] = $item;
+        $menu_tree[$item['id']]['children'] = [];
+    } else {
+        $submenus[] = $item;
+    }
+}
+
+foreach ($submenus as $item) {
+    if (isset($menu_tree[$item['parent_id']])) {
+        $menu_tree[$item['parent_id']]['children'][] = $item;
+    }
+}
+
+// Sort main menu
+usort($menu_tree, function($a, $b) {
+    return $a['sort_order'] <=> $b['sort_order'];
+});
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -21,6 +78,23 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        :root {
+            --theme-accent: <?= $theme_accent ?>;
+            --theme-nav-bg: <?= $theme_nav_bg ?>;
+            --theme-text: <?= $theme_text ?>;
+        }
+        .text-cyan-400 { color: var(--theme-accent) !important; }
+        .bg-cyan-600 { background-color: var(--theme-accent) !important; }
+        .bg-cyan-500 { background-color: var(--theme-accent) !important; }
+        .hover\:bg-cyan-500:hover { background-color: var(--theme-accent) !important; filter: brightness(0.9); }
+        .hover\:bg-cyan-700:hover { background-color: var(--theme-accent) !important; filter: brightness(0.8); }
+        .focus\:ring-cyan-500:focus { --tw-ring-color: var(--theme-accent) !important; }
+        .border-cyan-500 { border-color: var(--theme-accent) !important; }
+        body { color: var(--theme-text) !important; }
+        nav.bg-slate-800\/50 { background-color: var(--theme-nav-bg) !important; }
+        #main-nav-wrapper { background-color: var(--theme-nav-bg) !important; }
+    </style>
 </head>
 <body class="bg-slate-900 text-slate-300 min-h-screen">
     <nav class="bg-slate-800/50 backdrop-blur-lg shadow-lg sticky top-0 z-50 nav-3d-shell">
@@ -50,63 +124,99 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
                         </button>
                     </div>
                     <div id="main-nav" class="flex flex-col p-4 space-y-1 md:flex-row md:p-0 md:space-y-0 md:space-x-1 md:ml-10">
-                        <a href="index.php" class="nav-link"><i class="fas fa-tachometer-alt fa-fw mr-2"></i>Dashboard</a>
-
-                        <div class="nav-group">
-                            <button type="button" class="nav-link nav-group-toggle">
-                                <span class="flex items-center"><i class="fas fa-network-wired fa-fw mr-2"></i>Network</span>
-                                <i class="fas fa-chevron-down nav-group-caret"></i>
-                            </button>
-                            <div class="nav-group-items">
-                                <a href="map.php" class="nav-link nav-sublink"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
-                                <a href="floor_plan.php" class="nav-link nav-sublink"><i class="fas fa-building fa-fw mr-2"></i>Floor Plan</a>
-                                <a href="network_graphs.php" class="nav-link nav-sublink"><i class="fas fa-chart-line fa-fw mr-2"></i>Network Graphs</a>
-                            </div>
-                        </div>
-
-                        <div class="nav-group">
-                            <button type="button" class="nav-link nav-group-toggle">
-                                <span class="flex items-center"><i class="fas fa-heartbeat fa-fw mr-2"></i>Monitoring</span>
-                                <i class="fas fa-chevron-down nav-group-caret"></i>
-                            </button>
-                            <div class="nav-group-items">
-                                <a href="host_metrics.php" class="nav-link nav-sublink"><i class="fas fa-microchip fa-fw mr-2"></i>Host Metrics</a>
-                                <a href="agent_devices.php" class="nav-link nav-sublink"><i class="fas fa-desktop fa-fw mr-2"></i>Windows Agents</a>
-                                <a href="agent_enrollment.php" class="nav-link nav-sublink"><i class="fas fa-key fa-fw mr-2"></i>Agent Enrollment</a>
-                                <a href="agent_settings.php" class="nav-link nav-sublink"><i class="fas fa-sliders fa-fw mr-2"></i>Agent Settings</a>
-                                <a href="agent_logs.php" class="nav-link nav-sublink"><i class="fas fa-file-lines fa-fw mr-2"></i>Agent Logs</a>
-                                <a href="alert_settings.php" class="nav-link nav-sublink"><i class="fas fa-bell fa-fw mr-2"></i>Alert Settings</a>
-                                <a href="windows_agent.php" class="nav-link nav-sublink"><i class="fas fa-person-chalkboard fa-fw mr-2"></i>Agent Onboarding</a>
-                                <a href="download-agent.php" class="nav-link nav-sublink"><i class="fas fa-download fa-fw mr-2"></i>Download Agents</a>
-                                <a href="documentation.php#windows-agent" class="nav-link nav-sublink"><i class="fas fa-book-open fa-fw mr-2"></i>Windows Agent Guide</a>
-                                <a href="api/agent/windows-metrics/health" class="nav-link nav-sublink" target="_blank" rel="noreferrer"><i class="fas fa-plug-circle-check fa-fw mr-2"></i>Agent API Health</a>
-                            </div>
-                        </div>
-
-                        <?php if ($user_role === 'admin'): ?>
+                        <?php if (empty($menu_tree)): ?>
+                            <!-- Fallback to static menu if DB load fails or table is empty before setup runs -->
+                            <a href="index.php" class="nav-link"><i class="fas fa-tachometer-alt fa-fw mr-2"></i>Dashboard</a>
                             <div class="nav-group">
                                 <button type="button" class="nav-link nav-group-toggle">
-                                    <span class="flex items-center"><i class="fas fa-cogs fa-fw mr-2"></i>Administration</span>
+                                    <span class="flex items-center"><i class="fas fa-network-wired fa-fw mr-2"></i>Network</span>
                                     <i class="fas fa-chevron-down nav-group-caret"></i>
                                 </button>
                                 <div class="nav-group-items">
-                                    <a href="devices.php" class="nav-link nav-sublink"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
-                                    <a href="history.php" class="nav-link nav-sublink"><i class="fas fa-history fa-fw mr-2"></i>History</a>
-                                    <a href="status_logs.php" class="nav-link nav-sublink"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
-                                    <a href="system_backup.php" class="nav-link nav-sublink"><i class="fas fa-database fa-fw mr-2"></i>System Backup</a>
-                                    <a href="email_notifications.php" class="nav-link nav-sublink"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
-                                    <a href="sms_notifications.php" class="nav-link nav-sublink"><i class="fas fa-sms fa-fw mr-2"></i>SMS Notifications</a>
-                                    <a href="telegram_notifications.php" class="nav-link nav-sublink"><i class="fab fa-telegram fa-fw mr-2"></i>Telegram Notifications</a>
-                                    <a href="whatsapp_notifications.php" class="nav-link nav-sublink"><i class="fab fa-whatsapp fa-fw mr-2"></i>WhatsApp Notifications</a>
-                                                                        <a href="update_status.php" class="nav-link nav-sublink"><i class="fas fa-cloud-download-alt fa-fw mr-2"></i>Update Status</a>
-                                    <a href="users.php" class="nav-link nav-sublink"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
-                                    <a href="license_management.php" class="nav-link nav-sublink"><i class="fas fa-id-card fa-fw mr-2"></i>License</a>
+                                    <a href="map.php" class="nav-link nav-sublink"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
+                                    <a href="floor_plan.php" class="nav-link nav-sublink"><i class="fas fa-building fa-fw mr-2"></i>Floor Plan</a>
+                                    <a href="network_graphs.php" class="nav-link nav-sublink"><i class="fas fa-chart-line fa-fw mr-2"></i>Network Graphs</a>
                                 </div>
                             </div>
+                            <div class="nav-group">
+                                <button type="button" class="nav-link nav-group-toggle">
+                                    <span class="flex items-center"><i class="fas fa-heartbeat fa-fw mr-2"></i>Monitoring</span>
+                                    <i class="fas fa-chevron-down nav-group-caret"></i>
+                                </button>
+                                <div class="nav-group-items">
+                                    <a href="host_metrics.php" class="nav-link nav-sublink"><i class="fas fa-microchip fa-fw mr-2"></i>Host Metrics</a>
+                                    <a href="agent_devices.php" class="nav-link nav-sublink"><i class="fas fa-desktop fa-fw mr-2"></i>Windows Agents</a>
+                                    <a href="agent_enrollment.php" class="nav-link nav-sublink"><i class="fas fa-key fa-fw mr-2"></i>Agent Enrollment</a>
+                                    <a href="agent_settings.php" class="nav-link nav-sublink"><i class="fas fa-sliders fa-fw mr-2"></i>Agent Settings</a>
+                                    <a href="agent_logs.php" class="nav-link nav-sublink"><i class="fas fa-file-lines fa-fw mr-2"></i>Agent Logs</a>
+                                    <a href="alert_settings.php" class="nav-link nav-sublink"><i class="fas fa-bell fa-fw mr-2"></i>Alert Settings</a>
+                                    <a href="windows_agent.php" class="nav-link nav-sublink"><i class="fas fa-person-chalkboard fa-fw mr-2"></i>Agent Onboarding</a>
+                                    <a href="download-agent.php" class="nav-link nav-sublink"><i class="fas fa-download fa-fw mr-2"></i>Download Agents</a>
+                                    <a href="documentation.php#windows-agent" class="nav-link nav-sublink"><i class="fas fa-book-open fa-fw mr-2"></i>Windows Agent Guide</a>
+                                    <a href="api/agent/windows-metrics/health" class="nav-link nav-sublink" target="_blank" rel="noreferrer"><i class="fas fa-plug-circle-check fa-fw mr-2"></i>Agent API Health</a>
+                                </div>
+                            </div>
+                            <?php if ($user_role === 'admin'): ?>
+                                <div class="nav-group">
+                                    <button type="button" class="nav-link nav-group-toggle">
+                                        <span class="flex items-center"><i class="fas fa-cogs fa-fw mr-2"></i>Administration</span>
+                                        <i class="fas fa-chevron-down nav-group-caret"></i>
+                                    </button>
+                                    <div class="nav-group-items">
+                                        <a href="devices.php" class="nav-link nav-sublink"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
+                                        <a href="history.php" class="nav-link nav-sublink"><i class="fas fa-history fa-fw mr-2"></i>History</a>
+                                        <a href="status_logs.php" class="nav-link nav-sublink"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
+                                        <a href="system_backup.php" class="nav-link nav-sublink"><i class="fas fa-database fa-fw mr-2"></i>System Backup</a>
+                                        <a href="email_notifications.php" class="nav-link nav-sublink"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
+                                        <a href="sms_notifications.php" class="nav-link nav-sublink"><i class="fas fa-sms fa-fw mr-2"></i>SMS Notifications</a>
+                                        <a href="telegram_notifications.php" class="nav-link nav-sublink"><i class="fab fa-telegram fa-fw mr-2"></i>Telegram Notifications</a>
+                                        <a href="whatsapp_notifications.php" class="nav-link nav-sublink"><i class="fab fa-whatsapp fa-fw mr-2"></i>WhatsApp Notifications</a>
+                                        <a href="update_status.php" class="nav-link nav-sublink"><i class="fas fa-cloud-download-alt fa-fw mr-2"></i>Update Status</a>
+                                        <a href="users.php" class="nav-link nav-sublink"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
+                                        <a href="menu_settings.php" class="nav-link nav-sublink"><i class="fas fa-palette fa-fw mr-2"></i>Menu &amp; Themes</a>
+                                        <a href="license_management.php" class="nav-link nav-sublink"><i class="fas fa-id-card fa-fw mr-2"></i>License</a>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                            <a href="documentation.php" class="nav-link"><i class="fas fa-book fa-fw mr-2"></i>Help</a>
+                            <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Logout</a>
+                        <?php else: ?>
+                            <!-- Dynamic menu rendering -->
+                            <?php foreach ($menu_tree as $item): ?>
+                                <?php if (!empty($item['children'])): ?>
+                                    <!-- Dropdown menu -->
+                                    <div class="nav-group">
+                                        <button type="button" class="nav-link nav-group-toggle">
+                                            <span class="flex items-center">
+                                                <?php if (!empty($item['icon'])): ?>
+                                                    <i class="<?= htmlspecialchars($item['icon']) ?> fa-fw mr-2"></i>
+                                                <?php endif; ?>
+                                                <?= htmlspecialchars($item['title']) ?>
+                                            </span>
+                                            <i class="fas fa-chevron-down nav-group-caret"></i>
+                                        </button>
+                                        <div class="nav-group-items">
+                                            <?php foreach ($item['children'] as $child): ?>
+                                                <a href="<?= htmlspecialchars($child['url']) ?>" class="nav-link nav-sublink" <?= strpos($child['url'], 'http') === 0 ? 'target="_blank" rel="noreferrer"' : '' ?>>
+                                                    <?php if (!empty($child['icon'])): ?>
+                                                        <i class="<?= htmlspecialchars($child['icon']) ?> fa-fw mr-2"></i>
+                                                    <?php endif; ?>
+                                                    <?= htmlspecialchars($child['title']) ?>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <!-- Direct link -->
+                                    <a href="<?= htmlspecialchars($item['url']) ?>" class="nav-link" <?= strpos($item['url'], 'http') === 0 ? 'target="_blank" rel="noreferrer"' : '' ?>>
+                                        <?php if (!empty($item['icon'])): ?>
+                                            <i class="<?= htmlspecialchars($item['icon']) ?> fa-fw mr-2"></i>
+                                        <?php endif; ?>
+                                        <?= htmlspecialchars($item['title']) ?>
+                                    </a>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
                         <?php endif; ?>
-
-                        <a href="documentation.php" class="nav-link"><i class="fas fa-book fa-fw mr-2"></i>Help</a>
-                        <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Logout</a>
                     </div>
                 </div>
             </div>

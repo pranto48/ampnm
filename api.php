@@ -193,7 +193,8 @@ try {
         'get_all_host_overrides', 'save_host_override', 'delete_host_override',
         'export_host_overrides', 'import_host_overrides',
     ];
-
+    $settingsActions = ['get_menu_items', 'save_menu_item', 'delete_menu_item', 'get_theme_settings', 'save_theme_settings'];
+ 
     if (in_array($action, $pingActions)) {
         require __DIR__ . '/api/handlers/ping_handler.php';
     } elseif (in_array($action, $deviceActions)) {
@@ -214,6 +215,8 @@ try {
         require __DIR__ . '/api/handlers/license_handler.php';
     } elseif (in_array($action, $metricsActions)) {
         require __DIR__ . '/api/handlers/metrics_handler.php';
+    } elseif (in_array($action, $settingsActions)) {
+        require __DIR__ . '/api/handlers/settings_handler.php';
     } elseif ($handler === 'floor_plan') {
         require __DIR__ . '/api/handlers/floor_plan_handler.php';
         echo json_encode(handleFloorPlanAction($action, $input, $pdo));

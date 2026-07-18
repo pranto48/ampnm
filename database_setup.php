@@ -513,6 +513,19 @@ try {
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
 
+        "CREATE TABLE IF NOT EXISTS `menu_items` (
+            `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `parent_id` INT(6) UNSIGNED NULL,
+            `title` VARCHAR(100) NOT NULL,
+            `url` VARCHAR(255) NOT NULL,
+            `icon` VARCHAR(100) NULL,
+            `sort_order` INT(6) DEFAULT 0,
+            `role_required` ENUM('admin', 'viewer') DEFAULT 'viewer',
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (`parent_id`) REFERENCES `menu_items`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
         // TABLE FOR AGENT TOKENS (Windows Agent authentication)
         "CREATE TABLE IF NOT EXISTS `agent_tokens` (
             `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -1121,6 +1134,77 @@ try {
         $stmt = $pdo->prepare("INSERT INTO `agent_tokens` (user_id, token, name, enabled) VALUES (?, ?, ?, 1)");
         $stmt->execute([$admin_id, $default_agent_token, 'Default Windows Agent']);
         message("Initialized default Windows agent token.");
+    }
+
+    // Seed default menu items if the table is empty
+    $check_menu = $pdo->query("SELECT COUNT(*) FROM `menu_items`")->fetchColumn();
+    if ($check_menu == 0) {
+        message("Initializing default main menu items...");
+        
+        // Define default main menu tree
+        // Format: [parent_index_or_null, title, url, icon, sort_order, role_required]
+        $default_menus = [
+            // Parents (index 0 to 5)
+            [null, 'Dashboard', 'index.php', 'fas fa-tachometer-alt', 1, 'viewer'], // index 0
+            [null, 'Network', '#', 'fas fa-network-wired', 2, 'viewer'],           // index 1
+            [null, 'Monitoring', '#', 'fas fa-heartbeat', 3, 'viewer'],           // index 2
+            [null, 'Administration', '#', 'fas fa-cogs', 4, 'admin'],             // index 3
+            [null, 'Help', 'documentation.php', 'fas fa-book', 5, 'viewer'],      // index 4
+            [null, 'Logout', 'logout.php', 'fas fa-sign-out-alt', 6, 'viewer'],     // index 5
+            
+            // Network submenu (parent_index = 1)
+            [1, 'Map', 'map.php', 'fas fa-project-diagram', 1, 'viewer'],
+            [1, 'Floor Plan', 'floor_plan.php', 'fas fa-building', 2, 'viewer'],
+            [1, 'Network Graphs', 'network_graphs.php', 'fas fa-chart-line', 3, 'viewer'],
+            
+            // Monitoring submenu (parent_index = 2)
+            [2, 'Host Metrics', 'host_metrics.php', 'fas fa-microchip', 1, 'viewer'],
+            [2, 'Windows Agents', 'agent_devices.php', 'fas fa-desktop', 2, 'viewer'],
+            [2, 'Agent Enrollment', 'agent_enrollment.php', 'fas fa-key', 3, 'viewer'],
+            [2, 'Agent Settings', 'agent_settings.php', 'fas fa-sliders', 4, 'viewer'],
+            [2, 'Agent Logs', 'agent_logs.php', 'fas fa-file-lines', 5, 'viewer'],
+            [2, 'Alert Settings', 'alert_settings.php', 'fas fa-bell', 6, 'viewer'],
+            [2, 'Agent Onboarding', 'windows_agent.php', 'fas fa-person-chalkboard', 7, 'viewer'],
+            [2, 'Download Agents', 'download-agent.php', 'fas fa-download', 8, 'viewer'],
+            [2, 'Windows Agent Guide', 'documentation.php#windows-agent', 'fas fa-book-open', 9, 'viewer'],
+            [2, 'Agent API Health', 'api/agent/windows-metrics/health', 'fas fa-plug-circle-check', 10, 'viewer'],
+            
+            // Administration submenu (parent_index = 3)
+            [3, 'Devices', 'devices.php', 'fas fa-server', 1, 'admin'],
+            [3, 'History', 'history.php', 'fas fa-history', 2, 'admin'],
+            [3, 'Status Logs', 'status_logs.php', 'fas fa-clipboard-list', 3, 'admin'],
+            [3, 'System Backup', 'system_backup.php', 'fas fa-database', 4, 'admin'],
+            [3, 'Email Notifications', 'email_notifications.php', 'fas fa-envelope', 5, 'admin'],
+            [3, 'SMS Notifications', 'sms_notifications.php', 'fas fa-sms', 6, 'admin'],
+            [3, 'Telegram Notifications', 'telegram_notifications.php', 'fab fa-telegram', 7, 'admin'],
+            [3, 'WhatsApp Notifications', 'whatsapp_notifications.php', 'fab fa-whatsapp', 8, 'admin'],
+            [3, 'Update Status', 'update_status.php', 'fas fa-cloud-download-alt', 9, 'admin'],
+            [3, 'Users', 'users.php', 'fas fa-users-cog', 10, 'admin'],
+            [3, 'Menu & Themes', 'menu_settings.php', 'fas fa-palette', 11, 'admin'],
+            [3, 'License', 'license_management.php', 'fas fa-id-card', 12, 'admin']
+        ];
+        
+        $inserted_ids = [];
+        
+        // Insert parent nodes first
+        foreach ($default_menus as $idx => $m) {
+            if ($m[0] === null) {
+                $stmt = $pdo->prepare("INSERT INTO `menu_items` (parent_id, title, url, icon, sort_order, role_required) VALUES (NULL, ?, ?, ?, ?, ?)");
+                $stmt->execute([$m[1], $m[2], $m[3], $m[4], $m[5]]);
+                $inserted_ids[$idx] = $pdo->lastInsertId();
+            }
+        }
+        
+        // Insert submenus
+        foreach ($default_menus as $m) {
+            if ($m[0] !== null) {
+                $parent_id = $inserted_ids[$m[0]];
+                $stmt = $pdo->prepare("INSERT INTO `menu_items` (parent_id, title, url, icon, sort_order, role_required) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$parent_id, $m[1], $m[2], $m[3], $m[4], $m[5]]);
+            }
+        }
+        
+        message("Default menu items successfully seeded.");
     }
 
 
