@@ -83,6 +83,22 @@ function agentCompatValidateToken($pdo, $token) {
     $stmt->execute(array($token));
     $tokenRow = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$tokenRow) {
+        // Fallback: Check if it is a valid active agent enrollment token
+        $token_hash = hash('sha256', $token);
+        $stmt_enroll = $pdo->prepare("SELECT id, created_by FROM agent_enrollment_tokens WHERE token_hash = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1");
+        $stmt_enroll->execute(array($token_hash));
+        $enrollRow = $stmt_enroll->fetch(PDO::FETCH_ASSOC);
+        if ($enrollRow) {
+            $tokenRow = array(
+                'id' => (int)$enrollRow['id'],
+                'user_id' => $enrollRow['created_by'] !== null ? (int)$enrollRow['created_by'] : 1,
+                'is_enrollment_token' => true
+            );
+            $touch = $pdo->prepare("UPDATE agent_enrollment_tokens SET last_used_at = NOW() WHERE id = ?");
+            $touch->execute(array($enrollRow['id']));
+            return $tokenRow;
+        }
+
         error_log("AMPNM Agent Auth Warning: Invalid/disabled agent token (" . htmlspecialchars(substr($token, 0, 12)) . "...) requested from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
         return false;
     }
