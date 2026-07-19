@@ -931,11 +931,7 @@ function createHostCard(host) {
                             title="Custom alert thresholds">
                         <i class="fas fa-sliders text-xs"></i>
                     </button>
-                    <a href="host_device_view.php?id=${host.id}" 
-                            class="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/20 rounded transition-colors flex items-center justify-center" 
-                            title="View Detailed Dashboard">
-                        <i class="fas fa-chart-line text-xs"></i>
-                    </a>
+
                     ${IS_ADMIN ? `
                         <button onclick="event.stopPropagation(); deleteHost('${host.host_ip}', '${host.host_name || host.host_ip}')" 
                                 class="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors flex items-center justify-center" 
