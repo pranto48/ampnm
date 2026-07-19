@@ -190,7 +190,7 @@ try {
         'create_device_from_host', 'register_host_ip', 'pull_device_by_ip',
         'get_alert_settings', 'save_alert_settings',
         'get_host_override',
-        'get_all_host_overrides', 'save_host_override', 'delete_host_override',
+        'get_all_host_overrides', 'save_host_override', 'delete_host_override', 'delete_host',
         'export_host_overrides', 'import_host_overrides',
     ];
     $settingsActions = ['get_menu_items', 'save_menu_item', 'delete_menu_item', 'get_theme_settings', 'save_theme_settings'];
