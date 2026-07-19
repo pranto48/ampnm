@@ -175,9 +175,21 @@ function Get-SystemMetrics {
     } catch { }
     
     try {
-        # CPU Usage (average over 1 second)
-        $cpu = Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 1 -MaxSamples 1
-        $metrics.cpu_percent = [math]::Round($cpu.CounterSamples[0].CookedValue, 2)
+        # CPU Usage (average over 5 samples with 500ms sleep = 2.5s window)
+        $samples = @()
+        for ($i = 0; $i -lt 5; $i++) {
+            $cpuSample = Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue
+            if ($cpuSample.CounterSamples) {
+                $samples += $cpuSample.CounterSamples[0].CookedValue
+            }
+            Start-Sleep -Milliseconds 500
+        }
+        if ($samples.Count -gt 0) {
+            $cpuAvg = ($samples | Measure-Object -Average).Average
+            $metrics.cpu_percent = [math]::Round($cpuAvg, 2)
+        } else {
+            $metrics.cpu_percent = 0.0
+        }
     } catch { }
     
     try {
@@ -193,13 +205,19 @@ function Get-SystemMetrics {
     } catch { }
     
     try {
-        # Disk (primary drive)
-        $disk = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | 
-                Sort-Object -Property Size -Descending | 
-                Select-Object -First 1
-        if ($disk) {
-            $metrics.disk_total_gb = [math]::Round($disk.Size / 1GB, 2)
-            $metrics.disk_free_gb = [math]::Round($disk.FreeSpace / 1GB, 2)
+        # Disk (aggregated local fixed drives)
+        $disks = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3"
+        $totalSize = 0
+        $freeSpace = 0
+        foreach ($d in $disks) {
+            if ($d.Size -gt 0) {
+                $totalSize += $d.Size
+                $freeSpace += $d.FreeSpace
+            }
+        }
+        if ($totalSize -gt 0) {
+            $metrics.disk_total_gb = [math]::Round($totalSize / 1GB, 2)
+            $metrics.disk_free_gb = [math]::Round($freeSpace / 1GB, 2)
         }
     } catch { }
     
@@ -216,12 +234,23 @@ function Get-SystemMetrics {
     } catch { }
     
     try {
-        # GPU (if available)
-        $gpuCounters = Get-Counter -Counter '\GPU Engine(*engtype_3D)\Utilization Percentage' -ErrorAction SilentlyContinue
-        if ($gpuCounters.CounterSamples) {
-            $gpuAvg = ($gpuCounters.CounterSamples | Measure-Object CookedValue -Average).Average
-            $metrics.gpu_percent = [math]::Round($gpuAvg, 2)
+        # GPU (NVIDIA-SMI query fallback to performance counters)
+        $gpuPercent = $null
+        if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
+            $gpuRaw = nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>$null
+            $parsedVal = 0.0
+            if ($gpuRaw -and [double]::TryParse($gpuRaw.Trim(), [ref]$parsedVal)) {
+                $gpuPercent = $parsedVal
+            }
         }
+        if ($gpuPercent -eq $null) {
+            $gpuCounters = Get-Counter -Counter '\GPU Engine(*engtype_3D)\Utilization Percentage' -ErrorAction SilentlyContinue
+            if ($gpuCounters.CounterSamples) {
+                $gpuAvg = ($gpuCounters.CounterSamples | Measure-Object CookedValue -Average).Average
+                $gpuPercent = [math]::Round($gpuAvg, 2)
+            }
+        }
+        $metrics.gpu_percent = $gpuPercent
     } catch { }
     
     return $metrics

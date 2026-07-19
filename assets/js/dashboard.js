@@ -322,4 +322,279 @@ function initDashboard() {
             }
         });
     }
+
+    // --- CUSTOM DASHBOARD WIDGETS CUSTOMIZER ---
+    const customizeWidgetsBtn = document.getElementById('customize-widgets-btn');
+    const customizeWidgetsModal = document.getElementById('customize-widgets-modal');
+    const closeCustomizeBtn = document.getElementById('close-customize-btn');
+    const closeCustomizeBtnOk = document.getElementById('close-customize-btn-ok');
+
+    const openCustomizeModal = () => {
+        if (customizeWidgetsModal) {
+            customizeWidgetsModal.classList.remove('hidden');
+            customizeWidgetsModal.classList.add('flex');
+        }
+    };
+
+    const closeCustomizeModal = () => {
+        if (customizeWidgetsModal) {
+            customizeWidgetsModal.classList.add('hidden');
+            customizeWidgetsModal.classList.remove('flex');
+        }
+    };
+
+    customizeWidgetsBtn?.addEventListener('click', openCustomizeModal);
+    closeCustomizeBtn?.addEventListener('click', closeCustomizeModal);
+    closeCustomizeBtnOk?.addEventListener('click', closeCustomizeModal);
+
+    const widgetsList = [
+        { key: 'server-metrics', checkboxId: 'chk-widget-server-metrics', containerId: 'widget-server-metrics' },
+        { key: 'device-overview', checkboxId: 'chk-widget-device-overview', containerId: 'widget-device-overview' },
+        { key: 'ping-test', checkboxId: 'chk-widget-ping-test', containerId: 'widget-ping-test' },
+        { key: 'recent-activity', checkboxId: 'chk-widget-recent-activity', containerId: 'widget-recent-activity' },
+        { key: 'device-explorer', checkboxId: 'chk-widget-device-explorer', containerId: 'widget-device-explorer' }
+    ];
+
+    const updateGridMiddleClass = () => {
+        const middleGrid = document.getElementById('widget-grid-middle');
+        if (!middleGrid) return;
+
+        const pingVisible = document.getElementById('chk-widget-ping-test')?.checked !== false;
+        const recentVisible = document.getElementById('chk-widget-recent-activity')?.checked !== false;
+
+        if (pingVisible && recentVisible) {
+            middleGrid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8';
+            middleGrid.classList.remove('hidden');
+        } else if (!pingVisible && !recentVisible) {
+            middleGrid.classList.add('hidden');
+        } else {
+            middleGrid.className = 'grid grid-cols-1 gap-8 mb-8';
+            middleGrid.classList.remove('hidden');
+        }
+    };
+
+    const loadWidgetPreferences = () => {
+        let prefs = {};
+        try {
+            prefs = JSON.parse(localStorage.getItem('ampnm_dashboard_widgets')) || {};
+        } catch (e) {
+            prefs = {};
+        }
+
+        widgetsList.forEach(w => {
+            const chk = document.getElementById(w.checkboxId);
+            const container = document.getElementById(w.containerId);
+            if (!chk) return;
+
+            const visible = prefs[w.key] !== false;
+            chk.checked = visible;
+            
+            if (container) {
+                if (visible) {
+                    container.classList.remove('hidden');
+                } else {
+                    container.classList.add('hidden');
+                }
+            }
+        });
+        
+        updateGridMiddleClass();
+    };
+
+    const saveWidgetPreferences = () => {
+        const prefs = {};
+        widgetsList.forEach(w => {
+            const chk = document.getElementById(w.checkboxId);
+            if (chk) {
+                prefs[w.key] = chk.checked;
+            }
+        });
+        localStorage.setItem('ampnm_dashboard_widgets', JSON.stringify(prefs));
+    };
+
+    widgetsList.forEach(w => {
+        const chk = document.getElementById(w.checkboxId);
+        chk?.addEventListener('change', () => {
+            const container = document.getElementById(w.containerId);
+            if (container) {
+                if (chk.checked) {
+                    container.classList.remove('hidden');
+                } else {
+                    container.classList.add('hidden');
+                }
+            }
+            saveWidgetPreferences();
+            updateGridMiddleClass();
+            
+            if (w.key === 'server-metrics' && chk.checked) {
+                pollServerMetrics();
+            }
+        });
+    });
+
+    // --- REALTIME DOCKER HOST SERVER STATUS METRICS ---
+    let serverNetChart = null;
+    const maxNetworkDataPoints = 10;
+    const netChartLabels = [];
+    const netChartDataIn = [];
+    const netChartDataOut = [];
+    let serverMetricsInterval = null;
+
+    const initServerNetChart = () => {
+        const ctx = document.getElementById('serverNetChart');
+        if (!ctx) return;
+
+        netChartLabels.length = 0;
+        netChartDataIn.length = 0;
+        netChartDataOut.length = 0;
+        for (let i = 0; i < maxNetworkDataPoints; i++) {
+            netChartLabels.push('');
+            netChartDataIn.push(0);
+            netChartDataOut.push(0);
+        }
+
+        serverNetChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: netChartLabels,
+                datasets: [
+                    {
+                        label: 'Incoming (In)',
+                        data: netChartDataIn,
+                        borderColor: '#10b981', // emerald-500
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Outgoing (Out)',
+                        data: netChartDataOut,
+                        borderColor: '#3b82f6', // blue-500
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { display: false }
+                    },
+                    y: {
+                        grid: { color: 'rgba(71, 85, 105, 0.2)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { size: 10 },
+                            callback: function(value) {
+                                return value + ' Mbps';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    const updateServerMetricsUi = (data) => {
+        if (!data) return;
+
+        const hostnameEl = document.getElementById('srv-hostname');
+        const osEl = document.getElementById('srv-os');
+        if (hostnameEl) hostnameEl.textContent = data.hostname || '--';
+        if (osEl) osEl.textContent = data.os_version || '--';
+
+        const cpuValEl = document.getElementById('srv-cpu-val');
+        const cpuBarEl = document.getElementById('srv-cpu-bar');
+        if (cpuValEl) cpuValEl.textContent = data.cpu + '%';
+        if (cpuBarEl) cpuBarEl.style.width = data.cpu + '%';
+
+        if (data.ram) {
+            const ramValEl = document.getElementById('srv-ram-val');
+            const ramBarEl = document.getElementById('srv-ram-bar');
+            const ramUsedEl = document.getElementById('srv-ram-used');
+            const ramTotalEl = document.getElementById('srv-ram-total');
+
+            if (ramValEl) ramValEl.textContent = data.ram.percent + '%';
+            if (ramBarEl) ramBarEl.style.width = data.ram.percent + '%';
+            if (ramUsedEl) ramUsedEl.textContent = parseFloat(data.ram.used).toFixed(2);
+            if (ramTotalEl) ramTotalEl.textContent = parseFloat(data.ram.total).toFixed(2);
+        }
+
+        if (data.disk) {
+            const diskValEl = document.getElementById('srv-disk-val');
+            const diskBarEl = document.getElementById('srv-disk-bar');
+            const diskUsedEl = document.getElementById('srv-disk-used');
+            const diskTotalEl = document.getElementById('srv-disk-total');
+
+            if (diskValEl) diskValEl.textContent = data.disk.percent + '%';
+            if (diskBarEl) diskBarEl.style.width = data.disk.percent + '%';
+            if (diskUsedEl) diskUsedEl.textContent = parseFloat(data.disk.used).toFixed(1);
+            if (diskTotalEl) diskTotalEl.textContent = parseFloat(data.disk.total).toFixed(1);
+        }
+
+        if (data.network) {
+            const netInEl = document.getElementById('srv-net-in');
+            const netOutEl = document.getElementById('srv-net-out');
+
+            const inSpeed = parseFloat(data.network.in_mbps).toFixed(3);
+            const outSpeed = parseFloat(data.network.out_mbps).toFixed(3);
+
+            if (netInEl) netInEl.textContent = inSpeed;
+            if (netOutEl) netOutEl.textContent = outSpeed;
+
+            if (serverNetChart) {
+                const now = new Date();
+                const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                netChartLabels.push(timeLabel);
+                netChartDataIn.push(parseFloat(inSpeed));
+                netChartDataOut.push(parseFloat(outSpeed));
+
+                if (netChartLabels.length > maxNetworkDataPoints) {
+                    netChartLabels.shift();
+                    netChartDataIn.shift();
+                    netChartDataOut.shift();
+                }
+
+                serverNetChart.update('none');
+            }
+        }
+    };
+
+    const pollServerMetrics = async () => {
+        const chk = document.getElementById('chk-widget-server-metrics');
+        if (chk && !chk.checked) return;
+
+        try {
+            const data = await api.get('get_server_metrics');
+            if (data && data.success) {
+                updateServerMetricsUi(data);
+            }
+        } catch (e) {
+            console.error('Failed to poll server metrics:', e);
+        }
+    };
+
+    const startServerMetricsPolling = () => {
+        initServerNetChart();
+        pollServerMetrics();
+        if (serverMetricsInterval) clearInterval(serverMetricsInterval);
+        serverMetricsInterval = setInterval(pollServerMetrics, 3000);
+    };
+
+    loadWidgetPreferences();
+    startServerMetricsPolling();
 }

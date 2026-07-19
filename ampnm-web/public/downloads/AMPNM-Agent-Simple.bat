@@ -22,21 +22,37 @@ echo [%date% %time%] Collecting metrics...
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference = 'SilentlyContinue'; ^
-   $cpu = (Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 1 -MaxSamples 1).CounterSamples[0].CookedValue; ^
+   $samples = @(); ^
+   for ($i = 0; $i -lt 5; $i++) { ^
+     $cpuSample = Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue; ^
+     if ($cpuSample.CounterSamples) { $samples += $cpuSample.CounterSamples[0].CookedValue } ^
+     Start-Sleep -Milliseconds 500; ^
+   } ^
+   $cpu = if ($samples.Count -gt 0) { ($samples | Measure-Object -Average).Average } else { 0.0 }; ^
    $os = Get-CimInstance Win32_OperatingSystem; ^
    $totalMemGB = [math]::Round($os.TotalVisibleMemorySize/1MB,2); ^
    $freeMemGB = [math]::Round($os.FreePhysicalMemory/1MB,2); ^
    $memPercent = if ($totalMemGB -gt 0) { [math]::Round((1 - ($freeMemGB / $totalMemGB))*100,2) } else { $null }; ^
-   $disk = Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object -First 1; ^
-   $diskTotal = if ($disk) { [math]::Round($disk.Size/1GB,2) } else { $null }; ^
-   $diskFree = if ($disk) { [math]::Round($disk.FreeSpace/1GB,2) } else { $null }; ^
+   $disks = Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'; ^
+   $totalSize = 0; $freeSpace = 0; ^
+   foreach ($d in $disks) { if ($d.Size -gt 0) { $totalSize += $d.Size; $freeSpace += $d.FreeSpace } }; ^
+   $diskTotal = if ($totalSize -gt 0) { [math]::Round($totalSize/1GB,2) } else { $null }; ^
+   $diskFree = if ($totalSize -gt 0) { [math]::Round($freeSpace/1GB,2) } else { $null }; ^
    $net1 = Get-NetAdapterStatistics | Select-Object -First 1; ^
    Start-Sleep -Milliseconds 500; ^
    $net2 = Get-NetAdapterStatistics | Select-Object -First 1; ^
    $inMbps = if ($net1 -and $net2) { [math]::Round((($net2.ReceivedBytes - $net1.ReceivedBytes)*8*2)/1MB,2) } else { $null }; ^
    $outMbps = if ($net1 -and $net2) { [math]::Round((($net2.SentBytes - $net1.SentBytes)*8*2)/1MB,2) } else { $null }; ^
-   $gpuCounters = Get-Counter -Counter '\GPU Engine(*engtype_3D)\Utilization Percentage' -ErrorAction SilentlyContinue; ^
-   $gpuAvg = if ($gpuCounters.CounterSamples) { [math]::Round(($gpuCounters.CounterSamples | Measure-Object CookedValue -Average).Average,2) } else { $null }; ^
+   $gpuPercent = $null; ^
+   if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) { ^
+     $gpuRaw = nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>$null; ^
+     $parsedVal = 0.0; ^
+     if ($gpuRaw -and [double]::TryParse($gpuRaw.Trim(), [ref]$parsedVal)) { $gpuPercent = $parsedVal } ^
+   } ^
+   if ($gpuPercent -eq $null) { ^
+     $gpuCounters = Get-Counter -Counter '\GPU Engine(*engtype_3D)\Utilization Percentage' -ErrorAction SilentlyContinue; ^
+     if ($gpuCounters.CounterSamples) { $gpuPercent = [math]::Round(($gpuCounters.CounterSamples | Measure-Object CookedValue -Average).Average,2) } ^
+   } ^
    $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '169.*' -and $_.IPAddress -ne '127.0.0.1' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1 -ExpandProperty IPAddress); ^
    $payload = @{ ^
      host_name = $env:COMPUTERNAME; ^
@@ -49,7 +65,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
      disk_free_gb = $diskFree; ^
      network_in_mbps = $inMbps; ^
      network_out_mbps = $outMbps; ^
-     gpu_percent = $gpuAvg ^
+     gpu_percent = $gpuPercent ^
    }; ^
    try { ^
      Invoke-RestMethod -Method Post -Uri '%SERVER_URL%' -Headers @{ 'X-Agent-Token'='%AGENT_TOKEN%' } -Body ($payload | ConvertTo-Json -Compress) -ContentType 'application/json' -TimeoutSec 30; ^
