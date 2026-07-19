@@ -31,6 +31,8 @@ if (function_exists('curl_init')) {
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT => 6,
         CURLOPT_USERAGENT => 'DockerGraphProbe/1.0',
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
     ]);
     $response = curl_exec($ch);
     curl_close($ch);
@@ -49,6 +51,10 @@ if ($response === null || $response === false) {
             'follow_location' => 1,
             'header' => "User-Agent: DockerGraphProbe/1.0\r\n",
         ],
+        'ssl' => [
+            'verify_peer' => false,
+            'verify_peer_name' => false,
+        ]
     ]);
 
     $response = @file_get_contents($graphUrl, false, $context);

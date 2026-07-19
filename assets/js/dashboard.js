@@ -21,6 +21,9 @@ function initDashboard() {
     let statusChart = null;
     let latestDeviceRows = [];
     let deviceViewMode = 'grid';
+    let isExplorerExpanded = false;
+    const deviceInfoMoreContainer = document.getElementById('deviceInfoMoreContainer');
+    const deviceInfoMoreBtn = document.getElementById('deviceInfoMoreBtn');
 
     const pingForm = document.getElementById('pingForm');
     const pingHostInput = document.getElementById('pingHostInput');
@@ -159,11 +162,32 @@ function initDashboard() {
         if (!devices.length) {
             deviceInfoContainer.innerHTML = '';
             noDeviceInfoMessage?.classList.remove('hidden');
+            deviceInfoMoreContainer?.classList.add('hidden');
             return;
         }
         noDeviceInfoMessage?.classList.add('hidden');
 
-        deviceInfoContainer.innerHTML = devices.map((device, index) => {
+        // Toggle Show More button container and set label
+        if (devices.length > 6) {
+            deviceInfoMoreContainer?.classList.remove('hidden');
+            if (isExplorerExpanded) {
+                if (deviceInfoMoreBtn) {
+                    deviceInfoMoreBtn.querySelector('span').textContent = 'Show Less';
+                    deviceInfoMoreBtn.querySelector('i').className = 'fas fa-chevron-up';
+                }
+            } else {
+                if (deviceInfoMoreBtn) {
+                    deviceInfoMoreBtn.querySelector('span').textContent = 'Show More';
+                    deviceInfoMoreBtn.querySelector('i').className = 'fas fa-chevron-down';
+                }
+            }
+        } else {
+            deviceInfoMoreContainer?.classList.add('hidden');
+        }
+
+        const visibleDevices = isExplorerExpanded ? devices : devices.slice(0, 6);
+
+        deviceInfoContainer.innerHTML = visibleDevices.map((device, index) => {
             const status = device.status || 'unknown';
             const statusClass = statusBadgeClassMap[status] || statusBadgeClassMap.unknown;
             const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
@@ -293,6 +317,10 @@ function initDashboard() {
     });
     deviceInfoStatusFilter?.addEventListener('change', renderDeviceInfo);
     deviceInfoAnimateToggle?.addEventListener('change', renderDeviceInfo);
+    deviceInfoMoreBtn?.addEventListener('click', () => {
+        isExplorerExpanded = !isExplorerExpanded;
+        renderDeviceInfo();
+    });
 
     // Disable ping form for viewer role
     if (window.userRole === 'viewer') {

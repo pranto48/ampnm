@@ -222,6 +222,12 @@ $dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateSt
                         </div>
                     </div>
                     <div id="deviceInfoContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+                    <div id="deviceInfoMoreContainer" class="flex justify-center mt-4 hidden">
+                        <button id="deviceInfoMoreBtn" class="px-4 py-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-200 border border-slate-600 hover:border-slate-500 font-medium text-xs transition-all flex items-center gap-1.5">
+                            <span>Show More</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
                     <div id="noDeviceInfoMessage" class="text-center py-6 text-slate-500 hidden">
                         <i class="fas fa-server text-3xl mb-2"></i>
                         <p>No matching device information for this filter.</p>

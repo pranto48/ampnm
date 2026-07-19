@@ -62,28 +62,39 @@ function buildGraphUrlWithRange(string $baseUrl, string $paramName, string $rang
 }
 
 if ($is_admin && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = sanitizeGraphInput($_POST['name'] ?? '');
-    $category = sanitizeGraphInput($_POST['category'] ?? 'General');
-    $base_url = sanitizeGraphInput($_POST['base_url'] ?? '');
-    $param_name = sanitizeGraphInput($_POST['param_name'] ?? 'range');
+    $action = $_POST['action'] ?? 'add';
+    
+    if ($action === 'delete') {
+        $graph_id = (int)($_POST['graph_id'] ?? 0);
+        if ($graph_id > 0) {
+            $stmt = $pdo->prepare('DELETE FROM network_graphs WHERE id = ?');
+            $stmt->execute([$graph_id]);
+            $success_message = 'Network graph deleted successfully.';
+        }
+    } else {
+        $name = sanitizeGraphInput($_POST['name'] ?? '');
+        $category = sanitizeGraphInput($_POST['category'] ?? 'General');
+        $base_url = sanitizeGraphInput($_POST['base_url'] ?? '');
+        $param_name = sanitizeGraphInput($_POST['param_name'] ?? 'range');
 
-    if ($name === '') {
-        $errors[] = 'Name is required.';
-    }
-    if ($base_url === '' || !filter_var($base_url, FILTER_VALIDATE_URL)) {
-        $errors[] = 'A valid graph URL is required.';
-    }
-    if ($param_name === '') {
-        $param_name = 'range';
-    }
-    if ($user_id === null) {
-        $errors[] = 'Unable to determine the current user. Please sign in again.';
-    }
+        if ($name === '') {
+            $errors[] = 'Name is required.';
+        }
+        if ($base_url === '' || !filter_var($base_url, FILTER_VALIDATE_URL)) {
+            $errors[] = 'A valid graph URL is required.';
+        }
+        if ($param_name === '') {
+            $param_name = 'range';
+        }
+        if ($user_id === null) {
+            $errors[] = 'Unable to determine the current user. Please sign in again.';
+        }
 
-    if (empty($errors)) {
-        $stmt = $pdo->prepare('INSERT INTO network_graphs (user_id, name, category, base_url, param_name) VALUES (?, ?, ?, ?, ?)');
-        $stmt->execute([$user_id, $name, $category, $base_url, $param_name]);
-        $success_message = 'Network graph added successfully.';
+        if (empty($errors)) {
+            $stmt = $pdo->prepare('INSERT INTO network_graphs (user_id, name, category, base_url, param_name) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$user_id, $name, $category, $base_url, $param_name]);
+            $success_message = 'Network graph added successfully.';
+        }
     }
 }
 
@@ -181,12 +192,23 @@ foreach ($graphs as $graph) {
                             $yearly_url = buildGraphUrlWithRange($graph['base_url'], $graph['param_name'], 'yearly');
                         ?>
                         <div class="graph-card bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-lg flex flex-col" data-daily-url="<?= htmlspecialchars($daily_url) ?>" data-weekly-url="<?= htmlspecialchars($weekly_url) ?>" data-monthly-url="<?= htmlspecialchars($monthly_url) ?>" data-yearly-url="<?= htmlspecialchars($yearly_url) ?>">
-                            <div class="flex items-start justify-between mb-3">
-                                <div>
-                                    <h4 class="text-lg font-semibold text-white flex items-center gap-2"><i class="fas fa-chart-area text-emerald-400"></i><?= htmlspecialchars($graph['name']) ?></h4>
+                            <div class="flex items-start justify-between mb-3 gap-2">
+                                <div class="min-w-0">
+                                    <h4 class="text-lg font-semibold text-white flex items-center gap-2 truncate"><i class="fas fa-chart-area text-emerald-400"></i><?= htmlspecialchars($graph['name']) ?></h4>
                                     <p class="text-xs text-slate-500">Added on <?= date('M j, Y', strtotime($graph['created_at'])) ?></p>
                                 </div>
-                                <span class="range-pill text-xs bg-slate-700 text-slate-200 px-3 py-1 rounded-full">Daily</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="range-pill text-xs bg-slate-700 text-slate-200 px-3 py-1 rounded-full">Daily</span>
+                                    <?php if ($is_admin): ?>
+                                        <form method="POST" onsubmit="return confirm('Are you sure you want to delete this graph?');" class="inline">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="graph_id" value="<?= $graph['id'] ?>">
+                                            <button type="submit" class="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors" title="Delete Graph">
+                                                <i class="fas fa-trash-alt text-xs"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                             <div class="flex flex-wrap gap-2 mb-3">
                                 <button class="range-button nav-link text-xs px-3 py-1" data-range="daily"><i class="fas fa-sun mr-1"></i>Daily</button>
@@ -226,5 +248,12 @@ foreach ($graphs as $graph) {
         <?php endif; ?>
     </div>
 </main>
+
+<script src="assets/js/network_graphs.js?v=<?= time() ?>"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    initNetworkGraphs();
+});
+</script>
 
 <?php include 'footer.php'; ?>

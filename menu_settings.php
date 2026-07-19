@@ -25,6 +25,15 @@ include 'header.php';
                     <i class="fas fa-eye-dropper text-cyan-400"></i> Theme Colors
                 </h2>
 
+                <!-- Preset Themes -->
+                <div class="mb-5 bg-slate-900/60 p-3 rounded-lg border border-slate-700/60">
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Preset Themes</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" onclick="applyThemePreset('default')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-medium border border-slate-700">Default Dark</button>
+                        <button type="button" onclick="applyThemePreset('glass')" class="px-2 py-1.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 text-cyan-300 rounded text-xs font-medium border border-cyan-500/40">Liquid Glass</button>
+                    </div>
+                </div>
+
                 <form id="themeForm" class="space-y-4">
                     <!-- Accent Color -->
                     <div>
@@ -328,6 +337,7 @@ function renderMenuTable() {
     });
 
     tbody.innerHTML = html;
+    makeRowsDraggable();
 }
 
 function renderRow(item, isParent, parentTitle = '') {
@@ -339,9 +349,10 @@ function renderRow(item, isParent, parentTitle = '') {
         : '<span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-700 text-slate-300 border border-slate-600">Viewer</span>';
     
     return `
-        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${rowClass}">
+        <tr draggable="true" data-id="${item.id}" data-parent-id="${item.parent_id || ''}" class="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${rowClass} draggable-menu-row">
             <td class="px-4 py-3 whitespace-nowrap">
                 <div class="flex items-center gap-2 ${indent}">
+                    <i class="fas fa-grip-vertical text-slate-500 mr-2 cursor-grab drag-handle" title="Drag to reorder or nest"></i>
                     <span class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-400">
                         <i class="${item.icon || 'fas fa-link'}"></i>
                     </span>
@@ -440,6 +451,122 @@ function deleteMenuItem(id, title) {
             console.error(err);
         });
     }
+}
+
+function applyThemePreset(preset) {
+    if (preset === 'default') {
+        document.getElementById('theme_accent_color').value = '#06b6d4';
+        document.getElementById('theme_accent_color_text').value = '#06b6d4';
+        document.getElementById('theme_navbar_bg').value = '#0f172a';
+        document.getElementById('theme_navbar_bg_text').value = '#0f172a';
+        document.getElementById('theme_text_color').value = '#cbd5e1';
+        document.getElementById('theme_text_color_text').value = '#cbd5e1';
+        window.notyf.success('Default preset applied. Click Save to apply.');
+    } else if (preset === 'glass') {
+        document.getElementById('theme_accent_color').value = '#00f2fe';
+        document.getElementById('theme_accent_color_text').value = '#00f2fe';
+        document.getElementById('theme_navbar_bg').value = '#0f172a';
+        document.getElementById('theme_navbar_bg_text').value = 'rgba(15, 23, 42, 0.45)';
+        document.getElementById('theme_text_color').value = '#ffffff';
+        document.getElementById('theme_text_color_text').value = '#ffffff';
+        window.notyf.success('Liquid Glass preset applied. Click Save to apply.');
+    }
+}
+
+function makeRowsDraggable() {
+    const rows = document.querySelectorAll('.draggable-menu-row');
+    let draggedId = null;
+
+    rows.forEach(row => {
+        row.addEventListener('dragstart', (e) => {
+            draggedId = row.getAttribute('data-id');
+            row.classList.add('bg-slate-700/50', 'opacity-50');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedId);
+        });
+
+        row.addEventListener('dragend', () => {
+            row.classList.remove('bg-slate-700/50', 'opacity-50');
+            rows.forEach(r => r.classList.remove('border-t-2', 'border-cyan-500', 'border-b-2'));
+        });
+
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const rect = row.getBoundingClientRect();
+            const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+            rows.forEach(r => r.classList.remove('border-t-2', 'border-cyan-500', 'border-b-2'));
+            if (next) {
+                row.classList.add('border-b-2', 'border-cyan-500');
+            } else {
+                row.classList.add('border-t-2', 'border-cyan-500');
+            }
+        });
+
+        row.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            rows.forEach(r => r.classList.remove('border-t-2', 'border-cyan-500', 'border-b-2'));
+            
+            const sourceId = e.dataTransfer.getData('text/plain');
+            const targetId = row.getAttribute('data-id');
+            
+            if (sourceId === targetId) return;
+
+            const sourceItem = menuItems.find(m => String(m.id) === String(sourceId));
+            const targetItem = menuItems.find(m => String(m.id) === String(targetId));
+            
+            if (!sourceItem || !targetItem) return;
+
+            // Determine new parent and sort order
+            let newParentId = targetItem.parent_id;
+            let newSortOrder = parseInt(targetItem.sort_order || 0);
+
+            const rect = row.getBoundingClientRect();
+            const isBelow = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+
+            // If dropped on a parent item (has parent_id === null), option to nest inside
+            if (targetItem.parent_id === null && !isBelow) {
+                if (confirm(`Do you want to move "${sourceItem.title}" inside folder "${targetItem.title}"?`)) {
+                    newParentId = targetItem.id;
+                    newSortOrder = 0; // place first in folder
+                } else {
+                    newParentId = null;
+                    newSortOrder = isBelow ? newSortOrder + 1 : Math.max(0, newSortOrder - 1);
+                }
+            } else {
+                newParentId = targetItem.parent_id;
+                newSortOrder = isBelow ? newSortOrder + 1 : Math.max(0, newSortOrder - 1);
+            }
+
+            const payload = {
+                id: sourceItem.id,
+                parent_id: newParentId,
+                title: sourceItem.title,
+                url: sourceItem.url,
+                icon: sourceItem.icon,
+                sort_order: newSortOrder,
+                role_required: sourceItem.role_required
+            };
+
+            try {
+                const res = await fetch('api.php?action=save_menu_item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.notyf.success(`Reordered "${sourceItem.title}" successfully.`);
+                    loadMenuItems();
+                } else {
+                    window.notyf.error(data.error || 'Failed to reorder menu item.');
+                }
+            } catch (err) {
+                console.error(err);
+                window.notyf.error('An error occurred during reordering.');
+            }
+        });
+    });
 }
 </script>
 

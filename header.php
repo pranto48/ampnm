@@ -94,6 +94,48 @@ usort($menu_tree, function($a, $b) {
         body { color: var(--theme-text) !important; }
         nav.bg-slate-800\/50 { background-color: var(--theme-nav-bg) !important; }
         #main-nav-wrapper { background-color: var(--theme-nav-bg) !important; }
+
+        /* Liquid Glass Theme Enhancements */
+        <?php if (strpos($theme_nav_bg, 'rgba') !== false || strpos($theme_nav_bg, 'hsla') !== false): ?>
+        body {
+            background: radial-gradient(circle at top right, #0f172a, #020617, #090d16) !important;
+            background-attachment: fixed !important;
+        }
+        .bg-slate-800, 
+        .bg-slate-800\/50, 
+        .bg-slate-800\/70,
+        .host-card, 
+        .device-card, 
+        main .bg-slate-800,
+        main .border-slate-700,
+        #widget-server-metrics,
+        #widget-device-overview,
+        #widget-ping-test,
+        #widget-recent-activity,
+        #widget-device-explorer,
+        .modal-panel,
+        .bg-slate-900\/30 {
+            background-color: rgba(30, 41, 59, 0.35) !important;
+            backdrop-filter: blur(16px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+        }
+        nav, #main-nav-wrapper {
+            background-color: <?= $theme_nav_bg ?> !important;
+            backdrop-filter: blur(20px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
+        }
+        input, select, textarea {
+            background-color: rgba(15, 23, 42, 0.6) !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        .text-slate-400 {
+            color: #94a3b8 !important;
+        }
+        <?php endif; ?>
     </style>
 </head>
 <body class="bg-slate-900 text-slate-300 min-h-screen">
