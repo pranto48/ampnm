@@ -183,10 +183,23 @@ CREATE USER IF NOT EXISTS '$MYSQL_USER'@'localhost' IDENTIFIED BY '$MYSQL_PASSWO
 GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'localhost';
 FLUSH PRIVILEGES;
 EOF
+    # Restore pre-update database backup if it exists
+    if [ -f "/var/www/html/uploads/db_backup_pre_update.sql" ]; then
+        echo "→ Pre-update database backup detected. Restoring database tables..."
+        MYSQL_DATABASE="${DB_NAME:-network_monitor}"
+        MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
+        if mariadb -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < /var/www/html/uploads/db_backup_pre_update.sql; then
+            echo "  ✓ Database restore successful"
+            rm -f /var/www/html/uploads/db_backup_pre_update.sql
+        else
+            echo "  ❌ ERROR: Database restore failed"
+        fi
     fi
+
     echo "  ✓ Internal database configuration complete"
     echo ""
 fi
+
 
 UPDATE_CHECK_INTERVAL_SECONDS="${AMPNM_UPDATE_CHECK_INTERVAL_SECONDS:-3600}"
 if [ "${AMPNM_ENABLE_UPDATE_CHECK_SCHEDULER:-1}" = "1" ]; then

@@ -4,10 +4,10 @@
         <p>Copyright © <?php echo date("Y"); ?> <a href="https://itsupport.com.bd" target="_blank" class="text-cyan-400 hover:underline">IT Support BD</a>. All rights reserved.</p>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
-    <script src="assets/js/shared.js"></script>
-    <script src="assets/js/dashboard.js"></script>
-    <script src="assets/js/devices.js"></script>
-    <script src="assets/js/history.js"></script>
+    <script src="assets/js/shared.js?v=<?= time() ?>"></script>
+    <script src="assets/js/dashboard.js?v=<?= time() ?>"></script>
+    <script src="assets/js/devices.js?v=<?= time() ?>"></script>
+    <script src="assets/js/history.js?v=<?= time() ?>"></script>
     
     <!-- Modular Map Scripts -->
     <script src="assets/js/map/config.js?v=<?= time() ?>"></script>
@@ -21,13 +21,13 @@
     <script src="assets/js/map/network.js?v=<?= time() ?>"></script>
     <script src="assets/js/map.js?v=<?= time() ?>"></script>
 
-    <script src="assets/js/network_graphs.js"></script>
-    <script src="assets/js/users.js"></script>
-    <script src="assets/js/status_logs.js"></script>
-    <script src="assets/js/email_notifications.js"></script>
-    <script src="assets/js/sms_notifications.js"></script>
-    <script src="assets/js/telegram_notifications.js"></script>
-    <script src="assets/js/whatsapp_notifications.js"></script>
+    <script src="assets/js/network_graphs.js?v=<?= time() ?>"></script>
+    <script src="assets/js/users.js?v=<?= time() ?>"></script>
+    <script src="assets/js/status_logs.js?v=<?= time() ?>"></script>
+    <script src="assets/js/email_notifications.js?v=<?= time() ?>"></script>
+    <script src="assets/js/sms_notifications.js?v=<?= time() ?>"></script>
+    <script src="assets/js/telegram_notifications.js?v=<?= time() ?>"></script>
+    <script src="assets/js/whatsapp_notifications.js?v=<?= time() ?>"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {

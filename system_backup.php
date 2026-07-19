@@ -187,6 +187,6 @@ include 'header.php';
     </div>
 </main>
 
-<script src="assets/js/system_backup.js"></script>
+<script src="assets/js/system_backup.js?v=<?= time() ?>"></script>
 
 <?php include 'footer.php'; ?>

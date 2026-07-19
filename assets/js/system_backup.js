@@ -1,4 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const API_URL = 'api.php';
+    const api = {
+        get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json()),
+        post: (action, body = {}) => fetch(`${API_URL}?action=${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(res => res.json())
+    };
+    
     const els = {
         form: document.getElementById('systemBackupForm'),
         scheduleId: document.getElementById('scheduleId'),

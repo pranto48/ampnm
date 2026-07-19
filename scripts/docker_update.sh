@@ -31,6 +31,22 @@ if [ -n "$ACTIVE_LICENSE" ]; then
   echo "✓ Successfully backed up active license key during update."
 fi
 
+# Dump the active database into the persistent uploads directory
+echo "→ Creating pre-update database dump in uploads directory..."
+docker exec "${CONTAINER_ID}" sh -c '
+  [ -f /etc/apache2/envvars ] && . /etc/apache2/envvars
+  host="${DB_HOST:-127.0.0.1}"
+  user="${DB_USER:-root}"
+  pass="${DB_PASSWORD:-${MYSQL_ROOT_PASSWORD:-}}"
+  name="${DB_NAME:-network_monitor}"
+  passArg=""
+  if [ -n "$pass" ]; then
+    passArg="-p$pass"
+  fi
+  mysqldump -h "$host" -u "$user" $passArg "$name" > /var/www/html/uploads/db_backup_pre_update.sql 2>/dev/null || true
+' || true
+
+
 echo "Recreating container '${NAME}' with image '${TARGET_IMAGE}'..."
 
 # Reconstruct environment arguments safely using single quote escaping

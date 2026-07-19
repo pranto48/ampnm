@@ -4,6 +4,9 @@ if (!defined('DB_SERVER')) {
     die("Direct access forbidden.");
 }
 
+$current_user_id = $_SESSION['user_id'] ?? null;
+$user_role = $_SESSION['user_role'] ?? 'viewer';
+
 require_once __DIR__ . '/../../includes/functions.php';
 
 // Helper to compute next run time
