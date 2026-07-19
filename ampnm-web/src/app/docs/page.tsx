@@ -174,9 +174,9 @@ Invoke-RestMethod -Uri $SERVER_URL -Method Post -Body $json -Headers @{ 'X-Agent
               <div className="space-y-4">
                 <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">1. Pull the Docker Image</h4>
                 
-                {/* V1.12 Pull Command */}
+                {/* V1.14 Pull Command */}
                 <div className="space-y-1.5">
-                  <span className="block text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">Version 1.12 (Stable Release)</span>
+                  <span className="block text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">Version 1.14 (Stable Release)</span>
                   <div className="relative group">
                     <div className="absolute right-3 top-3 opacity-80 hover:opacity-100 transition-opacity">
                       <button 
