@@ -121,6 +121,13 @@ $chart_tx = array_column($chart_rows, 'avg_tx_mb');
         <span class="ml-auto px-3 py-1.5 rounded-full text-xs font-bold border <?= $sc ?>">
             <?= ucfirst($status) ?>
         </span>
+        <?php if (($_SESSION['user_role'] ?? '') === 'admin'): ?>
+            <button onclick="deleteHost('<?= htmlspecialchars($ip) ?>', '<?= htmlspecialchars($hostname) ?>')" 
+                    class="ml-3 px-3 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500/30 text-red-400 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                    title="Delete host from monitoring">
+                <i class="fas fa-trash-alt"></i> Delete Host
+            </button>
+        <?php endif; ?>
     </div>
 
     <!-- Info Cards Row -->
@@ -320,6 +327,30 @@ function changeChartRange(hours) {
     const url = new URL(window.location.href);
     url.searchParams.set('hours', hours);
     window.location.href = url.toString();
+}
+
+function deleteHost(hostIp, hostName) {
+    if (!confirm(`Are you sure you want to delete host "${hostName || hostIp}"? This will delete all collected metrics, logs, and override configurations and redirect you to the main dashboard.`)) {
+        return;
+    }
+    fetch('api.php?action=delete_host', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host_ip: hostIp, host_name: hostName })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Host deleted successfully');
+            window.location.href = 'host_metrics.php';
+        } else {
+            alert(result.error || 'Failed to delete host');
+        }
+    })
+    .catch(e => {
+        console.error('Failed to delete host:', e);
+        alert('Failed to delete host');
+    });
 }
 </script>
 

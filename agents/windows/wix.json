@@ -27,7 +27,8 @@
         "name": "AMPNM Agent Control Panel",
         "description": "Control panel for the AMPNM Telemetry Agent",
         "target": "[INSTALLDIR]\\ampnm-agent.exe",
-        "wdir": "INSTALLDIR"
+        "wdir": "INSTALLDIR",
+        "icon": "app.ico"
       }
     ]
   },

@@ -1028,6 +1028,66 @@ switch ($action) {
         echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
         break;
         
+    case 'delete_host':
+        if (($_SESSION['user_role'] ?? '') !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can delete hosts']);
+            exit;
+        }
+        $hostIp = $input['host_ip'] ?? null;
+        $hostName = $input['host_name'] ?? null;
+        
+        if (!$hostIp && !$hostName) {
+            echo json_encode(['error' => 'host_ip or host_name required']);
+            break;
+        }
+        
+        $host = null;
+        if ($hostIp) {
+            $stmt = $pdo->prepare("SELECT hostname, ip_address FROM host_metrics WHERE ip_address = ?");
+            $stmt->execute([$hostIp]);
+            $host = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        if (!$host && $hostName) {
+            $stmt = $pdo->prepare("SELECT hostname, ip_address FROM host_metrics WHERE hostname = ?");
+            $stmt->execute([$hostName]);
+            $host = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        if ($host) {
+            $ip = $host['ip_address'];
+            $name = $host['hostname'];
+            
+            $stmt = $pdo->prepare("DELETE FROM host_metrics WHERE hostname = ?");
+            $stmt->execute([$name]);
+            
+            $stmt = $pdo->prepare("DELETE FROM host_metrics_history WHERE hostname = ?");
+            $stmt->execute([$name]);
+            
+            if ($ip) {
+                $stmt = $pdo->prepare("DELETE FROM host_alert_overrides WHERE host_ip = ?");
+                $stmt->execute([$ip]);
+            }
+            if ($name) {
+                $stmt = $pdo->prepare("DELETE FROM host_alert_overrides WHERE host_ip = ? OR hostname = ?");
+                $stmt->execute([$name, $name]);
+            }
+            echo json_encode(['success' => true]);
+        } else {
+            if ($hostIp) {
+                $stmt = $pdo->prepare("DELETE FROM host_alert_overrides WHERE host_ip = ?");
+                $stmt->execute([$hostIp]);
+            }
+            if ($hostName) {
+                $stmt = $pdo->prepare("DELETE FROM host_metrics WHERE hostname = ?");
+                $stmt->execute([$hostName]);
+                $stmt = $pdo->prepare("DELETE FROM host_metrics_history WHERE hostname = ?");
+                $stmt->execute([$hostName]);
+            }
+            echo json_encode(['success' => true, 'fallback' => true]);
+        }
+        break;
+        
     case 'get_all_host_overrides':
         ensureHostOverrideSchema($pdo);
         $stmt = $pdo->query("SELECT * FROM host_alert_overrides ORDER BY host_ip");

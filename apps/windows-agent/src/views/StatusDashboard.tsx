@@ -49,7 +49,7 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
   const [logFilter, setLogFilter] = useState<string>("all");
 
   // Settings form state
-  const [interval, setInterval] = useState(config.heartbeat_interval_seconds);
+  const [heartbeatInterval, setHeartbeatInterval] = useState(config.heartbeat_interval_seconds);
   const [collectUsername, setCollectUsername] = useState(config.collect_username);
   const [collectMac, setCollectMac] = useState(config.collect_mac_address);
   const [saving, setSaving] = useState(false);
@@ -77,16 +77,16 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
 
   useEffect(() => {
     refreshTelemetry();
-    const timer = setInterval(refreshTelemetry, 3000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(refreshTelemetry, 3000);
+    return () => window.clearInterval(timer);
   }, [refreshTelemetry]);
 
   // Refresh logs when Logs tab is active
   useEffect(() => {
     if (view !== "logs") return;
     refreshLogs();
-    const timer = setInterval(refreshLogs, 10000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(refreshLogs, 10000);
+    return () => window.clearInterval(timer);
   }, [view, refreshLogs]);
 
   // Listen for log sync status events from Rust
@@ -124,7 +124,7 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
     setSaving(true);
     try {
       await invoke("update_settings", {
-        heartbeatIntervalSeconds: interval,
+        heartbeatIntervalSeconds: heartbeatInterval,
         collectUsername,
         collectMacAddress: collectMac,
       });
@@ -341,8 +341,8 @@ export default function StatusDashboard({ config, agentOnline, onConfigChange }:
                 min={5}
                 max={3600}
                 className="field-input"
-                value={interval}
-                onChange={(e) => setInterval(Number(e.target.value))}
+                value={heartbeatInterval}
+                onChange={(e) => setHeartbeatInterval(Number(e.target.value))}
               />
               <p className="field-hint">How often to send system metrics. Minimum: 5 seconds.</p>
             </div>

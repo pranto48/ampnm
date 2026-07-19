@@ -563,7 +563,7 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'] . ($basePath === '/' ? '' : $base
                     <h4 class="text-white font-medium mb-3"><i class="fas fa-clock text-slate-400 mr-2"></i>Status Delay</h4>
                     <div>
                         <label class="block text-slate-400 text-xs mb-1">Seconds before a host is considered Offline</label>
-                        <input type="number" id="override-status-delay" min="30" max="86400" value="300" 
+                        <input type="number" id="override-status-delay" min="5" max="86400" value="300" 
                                class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm">
                     </div>
                 </div>
@@ -936,6 +936,13 @@ function createHostCard(host) {
                             title="View Detailed Dashboard">
                         <i class="fas fa-chart-line text-xs"></i>
                     </a>
+                    ${IS_ADMIN ? `
+                        <button onclick="event.stopPropagation(); deleteHost('${host.host_ip}', '${host.host_name || host.host_ip}')" 
+                                class="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors flex items-center justify-center" 
+                                title="Delete Host from Monitoring">
+                            <i class="fas fa-trash-alt text-xs"></i>
+                        </button>
+                    ` : ''}
                     <span class="px-2 py-1 text-xs rounded ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${statusText}</span>
                 </div>
             </div>
@@ -951,7 +958,7 @@ function createHostCard(host) {
                             <input
                                 id="status-delay-input-${idSafe}"
                                 type="number"
-                                min="30"
+                                min="5"
                                 max="86400"
                                 value="${statusDelaySeconds}"
                                 class="w-24 px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs text-slate-100 text-center"
@@ -1042,8 +1049,8 @@ async function quickSaveStatusDelay(hostIp, hostName, inputEl) {
         if (!inputEl) return;
         const raw = (inputEl.value || '').trim();
         const seconds = parseInt(raw, 10);
-        if (isNaN(seconds) || seconds < 30 || seconds > 86400) {
-            notyf.error('Status Delay must be between 30 and 86400 seconds');
+        if (isNaN(seconds) || seconds < 5 || seconds > 86400) {
+            notyf.error('Status Delay must be between 5 and 86400 seconds');
             return;
         }
 
@@ -1063,6 +1070,30 @@ async function quickSaveStatusDelay(hostIp, hostName, inputEl) {
         notyf.error('Failed to save Status Delay');
     } finally {
         if (inputEl) inputEl.disabled = false;
+    }
+}
+
+async function deleteHost(hostIp, hostName) {
+    if (!confirm(`Are you sure you want to delete host "${hostName || hostIp}"? This will delete all collected metrics, logs, and override configurations.`)) {
+        return;
+    }
+    try {
+        const res = await fetch('api.php?action=delete_host', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host_ip: hostIp, host_name: hostName })
+        });
+        const result = await res.json();
+        if (result.success) {
+            notyf.success('Host deleted successfully');
+            if (typeof loadHosts === 'function') loadHosts();
+            if (typeof loadHostOverridesTable === 'function') loadHostOverridesTable();
+        } else {
+            notyf.error(result.error || 'Failed to delete host');
+        }
+    } catch (e) {
+        console.error('Failed to delete host:', e);
+        notyf.error('Failed to delete host');
     }
 }
 
@@ -1894,7 +1925,7 @@ async function loadHostOverridesTable() {
                 </td>
                 <td class="px-3 py-2 text-center">
                     <div class="flex flex-col items-center gap-1">
-                        <input type="number" name="status_delay_seconds" min="30" max="86400" value="${o.status_delay_seconds !== null ? o.status_delay_seconds : ''}" class="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs md:text-sm text-slate-100 text-center" />
+                        <input type="number" name="status_delay_seconds" min="5" max="86400" value="${o.status_delay_seconds !== null ? o.status_delay_seconds : ''}" class="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs md:text-sm text-slate-100 text-center" />
                         ${formatStatusDelayLabel(o.status_delay_seconds)}
                     </div>
                 </td>

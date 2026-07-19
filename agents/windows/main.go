@@ -10,8 +10,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -52,6 +55,7 @@ type MetricsPayload struct {
 	DiskPercent   float64 `json:"disk_percent"`
 	DiskTotal     float64 `json:"disk_total_gb"`
 	DiskFree      float64 `json:"disk_free_gb"`
+	GPUPercent    float64 `json:"gpu_percent"`
 	NetworkIn     float64 `json:"network_in_mbps"`
 	NetworkOut    float64 `json:"network_out_mbps"`
 	OSVersion     string  `json:"os_version"`
@@ -138,26 +142,123 @@ func getLocalIP(cfg Config) string {
 	return "127.0.0.1"
 }
 
+var (
+	cpuUsageRing  []float64
+	cpuRingMutex  sync.Mutex
+	maxRingSize   = 30
+)
+
+func startCpuMonitor() {
+	_, _ = cpu.Percent(0, false)
+	ticker := time.NewTicker(1 * time.Second)
+	go func() {
+		for range ticker.C {
+			percents, err := cpu.Percent(0, false)
+			if err == nil && len(percents) > 0 {
+				cpuRingMutex.Lock()
+				cpuUsageRing = append(cpuUsageRing, percents[0])
+				if len(cpuUsageRing) > maxRingSize {
+					cpuUsageRing = cpuUsageRing[1:]
+				}
+				cpuRingMutex.Unlock()
+			}
+		}
+	}()
+}
+
+func getAverageCpuUsage() float64 {
+	cpuRingMutex.Lock()
+	defer cpuRingMutex.Unlock()
+	if len(cpuUsageRing) == 0 {
+		percents, err := cpu.Percent(500 * time.Millisecond, false)
+		if err == nil && len(percents) > 0 {
+			return percents[0]
+		}
+		return 0.0
+	}
+	var sum float64
+	for _, v := range cpuUsageRing {
+		sum += v
+	}
+	return sum / float64(len(cpuUsageRing))
+}
+
+func getDiskUsage() (float64, float64, float64) {
+	parts, err := disk.Partitions(false)
+	if err != nil {
+		du, err := disk.Usage("C:")
+		if err == nil {
+			return float64(du.Total) / 1024 / 1024 / 1024,
+				float64(du.Free) / 1024 / 1024 / 1024,
+				du.UsedPercent
+		}
+		du, err = disk.Usage("/")
+		if err == nil {
+			return float64(du.Total) / 1024 / 1024 / 1024,
+				float64(du.Free) / 1024 / 1024 / 1024,
+				du.UsedPercent
+		}
+		return 0, 0, 0
+	}
+
+	var totalSpace uint64
+	var freeSpace uint64
+	seenMounts := make(map[string]bool)
+
+	for _, part := range parts {
+		if part.Mountpoint == "" || seenMounts[part.Mountpoint] {
+			continue
+		}
+		usage, err := disk.Usage(part.Mountpoint)
+		if err == nil && usage.Total > 0 {
+			seenMounts[part.Mountpoint] = true
+			totalSpace += usage.Total
+			freeSpace += usage.Free
+		}
+	}
+
+	if totalSpace > 0 {
+		usedSpace := totalSpace - freeSpace
+		usedPercent := (float64(usedSpace) / float64(totalSpace)) * 100.0
+		return float64(totalSpace) / 1024 / 1024 / 1024,
+			float64(freeSpace) / 1024 / 1024 / 1024,
+			usedPercent
+	}
+
+	return 0, 0, 0
+}
+
+func getGPUUsage() float64 {
+	cmd := exec.Command("nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return 0.0
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) > 0 {
+		valStr := strings.TrimSpace(lines[0])
+		if val, err := strconv.ParseFloat(valStr, 64); err == nil {
+			return val
+		}
+	}
+	return 0.0
+}
+
 func collectMetrics(cfg Config) (MetricsPayload, error) {
 	var payload MetricsPayload
 
-	// Hostname
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "Unknown"
 	}
 	payload.HostName = hostname
 
-	// IP Address
 	payload.HostIP = getLocalIP(cfg)
 
-	// CPU
-	cpuPercents, err := cpu.Percent(time.Second, false)
-	if err == nil && len(cpuPercents) > 0 {
-		payload.CPUPercent = cpuPercents[0]
-	}
+	payload.CPUPercent = getAverageCpuUsage()
 
-	// Memory
 	vm, err := mem.VirtualMemory()
 	if err == nil {
 		payload.MemoryTotal = float64(vm.Total) / 1024 / 1024 / 1024
@@ -165,13 +266,12 @@ func collectMetrics(cfg Config) (MetricsPayload, error) {
 		payload.MemoryPercent = vm.UsedPercent
 	}
 
-	// Disk C:
-	du, err := disk.Usage("C:")
-	if err == nil {
-		payload.DiskTotal = float64(du.Total) / 1024 / 1024 / 1024
-		payload.DiskFree = float64(du.Free) / 1024 / 1024 / 1024
-		payload.DiskPercent = du.UsedPercent
-	}
+	diskTotal, diskFree, diskPercent := getDiskUsage()
+	payload.DiskTotal = diskTotal
+	payload.DiskFree = diskFree
+	payload.DiskPercent = diskPercent
+
+	payload.GPUPercent = getGPUUsage()
 
 	// Uptime and OS Version
 	info, err := host.Info()
@@ -450,6 +550,7 @@ func TestConnection(serverUrl, token string, cfg Config) error {
 }
 
 func main() {
+	startCpuMonitor()
 	var err error
 	debugFlag := flag.Bool("debug", false, "Run in debug mode (interactive console)")
 	flag.Parse()

@@ -107,7 +107,7 @@ fn collect_windows_event_logs(
 
     use windows::Win32::System::EventLog::{
         CloseEventLog, OpenEventLogW, ReadEventLogW,
-        EVENTLOGRECORD, EVENTLOG_BACKWARDS_READ, EVENTLOG_SEQUENTIAL_READ,
+        EVENTLOGRECORD, READ_EVENT_LOG_READ_FLAGS,
     };
 
     // Win32 EVENTLOG event type constants (raw u16 values)
@@ -136,7 +136,7 @@ fn collect_windows_event_logs(
         let ok = unsafe {
             ReadEventLogW(
                 log_handle,
-                EVENTLOG_BACKWARDS_READ | EVENTLOG_SEQUENTIAL_READ,
+                READ_EVENT_LOG_READ_FLAGS(0x0008 | 0x0001), // EVENTLOG_BACKWARDS_READ | EVENTLOG_SEQUENTIAL_READ
                 0,
                 buffer.as_mut_ptr() as *mut _,
                 buffer.len() as u32,
@@ -174,7 +174,7 @@ fn collect_windows_event_logs(
             }
 
             // Map event type to level
-            let level = match record.EventType {
+            let level = match record.EventType.0 {
                 EVENTLOG_ERROR       => LogLevel::Error,
                 EVENTLOG_WARNING     => LogLevel::Warning,
                 EVENTLOG_INFORMATION => LogLevel::Info,

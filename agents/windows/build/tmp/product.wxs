@@ -57,6 +57,8 @@
                         
                         >
                         
+                        <Icon Id="Icon0" SourceFile="..\..\app.ico" />
+                        
                   </Shortcut>
                   <RegistryValue Root="HKCU"
                     Key="Software\IT Support BD\AMPNM Agent"
