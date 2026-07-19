@@ -29,7 +29,7 @@ export default function DocsPage() {
   };
 
   const codeBlocks = {
-    pullStable: "docker pull itsupportbd/ampnm:V1.12",
+    pullStable: "docker pull itsupportbd/ampnm:V1.14",
     pullLatest: "docker pull itsupportbd/ampnm:latest",
     runLinux: `docker run -d \\
   --name ampnm_server \\

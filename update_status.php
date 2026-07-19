@@ -115,7 +115,7 @@ function getDockerHubUpdateStatus(): array {
         $httpCodeAll = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
-        $latestTag = 'v1.12';
+        $latestTag = 'v1.14';
         if ($httpCodeAll === 200 && $responseAll) {
             $dataAll = json_decode($responseAll, true);
             if (!empty($dataAll['results'])) {
@@ -129,7 +129,7 @@ function getDockerHubUpdateStatus(): array {
                 }
             }
         }
-        $currentTag = 'v1.12'; 
+        $currentTag = 'v1.14'; 
         $updateAvailable = ($latestTag !== $currentTag);
         $remoteDigest = $latestTag;
         $localDigest = $currentTag;
