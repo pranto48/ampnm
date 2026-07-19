@@ -181,8 +181,9 @@ CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
 GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'%';
 CREATE USER IF NOT EXISTS '$MYSQL_USER'@'localhost' IDENTIFIED BY '$MYSQL_PASSWORD';
 GRANT ALL PRIVILEGES ON \`$MYSQL_DATABASE\`.* TO '$MYSQL_USER'@'localhost';
-FLUSH PRIVILEGES;
 EOF
+    fi
+
     # Restore pre-update database backup if it exists
     if [ -f "/var/www/html/uploads/db_backup_pre_update.sql" ]; then
         echo "→ Pre-update database backup detected. Restoring database tables..."
