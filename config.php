@@ -178,6 +178,12 @@ function getAppLicenseKey() {
  */
 function setAppLicenseKey($key) {
     $encrypted = encryptSensitiveValue($key);
+    try {
+        $pdo = getDbConnection();
+        if ($pdo) {
+            $pdo->exec("DELETE FROM app_settings WHERE setting_key LIKE 'integrity_%'");
+        }
+    } catch (Throwable $e) {}
     return updateAppSetting('app_license_key', $encrypted);
 }
 

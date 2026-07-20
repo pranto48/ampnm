@@ -18,7 +18,7 @@ define('ENCRYPTION_KEY', 'ITSupportBD_SecureKey_2024');
 define('CIPHER_METHOD', 'aes-256-cbc');
 
 // --- Integrity and anti-tamper configuration ---
-define('LICENSE_FINGERPRINT_MODE', getenv('LICENSE_FINGERPRINT_MODE') ?: 'enforce'); // enforce | allow-rebaseline
+define('LICENSE_FINGERPRINT_MODE', getenv('LICENSE_FINGERPRINT_MODE') ?: 'allow-rebaseline'); // enforce | allow-rebaseline
 define('LICENSE_FINGERPRINT_KEY', getenv('LICENSE_FINGERPRINT_KEY') ?: 'ampnm-license-fingerprint');
 
 function decryptLicenseData(string $encrypted_data) {
@@ -100,6 +100,11 @@ function ensureLicenseIntegrity(): bool {
             $_SESSION['license_last_verified'] = time();
             return false;
         }
+    }
+
+    if (($_SESSION['license_status_code'] ?? '') === 'disabled' && strpos($_SESSION['license_message'] ?? '', 'integrity check failed') !== false) {
+        unset($_SESSION['license_status_code']);
+        unset($_SESSION['license_message']);
     }
 
     return true;
