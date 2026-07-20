@@ -37,9 +37,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (els.targetType.value === 'ftp') {
             els.ftpConfigGroup.classList.remove('hidden');
             els.nasConfigGroup.classList.add('hidden');
-        } else {
+        } else if (els.targetType.value === 'nas') {
             els.ftpConfigGroup.classList.add('hidden');
             els.nasConfigGroup.classList.remove('hidden');
+        } else {
+            els.ftpConfigGroup.classList.add('hidden');
+            els.nasConfigGroup.classList.add('hidden');
         }
     });
 

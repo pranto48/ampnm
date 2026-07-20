@@ -165,6 +165,39 @@ usort($menu_tree, function($a, $b) {
         .text-slate-400 {
             color: #94a3b8 !important;
         }
+
+        /* Map Page & UI Element Liquid Glass Optics */
+        #network-map-wrapper, #network-map {
+            background-color: rgba(15, 23, 42, 0.55) !important;
+            backdrop-filter: blur(28px) saturate(210%) !important;
+            -webkit-backdrop-filter: blur(28px) saturate(210%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.16) !important;
+            border-radius: 1.25rem !important;
+            box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.28), 0 20px 50px -10px rgba(0, 0, 0, 0.6) !important;
+        }
+        .vis-tooltip {
+            background: rgba(15, 23, 42, 0.92) !important;
+            backdrop-filter: blur(24px) saturate(200%) !important;
+            -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 1rem !important;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65) !important;
+        }
+        #status-legend {
+            background-color: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(24px) saturate(200%) !important;
+            -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.16) !important;
+            border-radius: 1rem !important;
+        }
+        .nav-group-items {
+            background-color: rgba(15, 23, 42, 0.88) !important;
+            backdrop-filter: blur(30px) saturate(220%) !important;
+            -webkit-backdrop-filter: blur(30px) saturate(220%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            border-radius: 1rem !important;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+        }
         <?php endif; ?>
     </style>
 </head>

@@ -136,21 +136,40 @@ function runSystemBackup(PDO $pdo, int $userId, array $schedule = null): array {
                 $err = 'FTP host or username missing';
             } else {
                 $conn = @ftp_connect($ftpHost, $ftpPort, 15);
+                if (!$conn && function_exists('ftp_ssl_connect')) {
+                    $conn = @ftp_ssl_connect($ftpHost, $ftpPort, 15);
+                }
                 if (!$conn) {
-                    $err = 'FTP connection failed';
+                    $err = 'FTP connection failed to ' . $ftpHost . ':' . $ftpPort;
                 } else {
                     if (!@ftp_login($conn, $ftpUser, $ftpPass)) {
-                        $err = 'FTP authentication failed';
-                        ftp_close($conn);
+                        $err = 'FTP authentication failed for user ' . $ftpUser;
+                        @ftp_close($conn);
                     } else {
                         @ftp_pasv($conn, true);
+                        
+                        // Recursively navigate or create remote path
+                        $parts = array_filter(explode('/', trim($ftpPath, '/')));
+                        @ftp_chdir($conn, '/');
+                        foreach ($parts as $part) {
+                            if (!@ftp_chdir($conn, $part)) {
+                                if (@ftp_mkdir($conn, $part)) {
+                                    @ftp_chdir($conn, $part);
+                                }
+                            }
+                        }
+
                         $remoteFile = rtrim($ftpPath, '/') . '/' . $archiveName;
-                        $uploaded = @ftp_put($conn, $remoteFile, $localDest, FTP_BINARY);
-                        ftp_close($conn);
+                        $uploaded = @ftp_put($conn, $archiveName, $localDest, FTP_BINARY);
+                        if (!$uploaded) {
+                            $uploaded = @ftp_put($conn, $remoteFile, $localDest, FTP_BINARY);
+                        }
+                        @ftp_close($conn);
+                        
                         if ($uploaded) {
                             $ok = true;
                         } else {
-                            $err = 'FTP upload failed';
+                            $err = 'FTP upload failed for file ' . $archiveName;
                         }
                     }
                 }
@@ -159,23 +178,28 @@ function runSystemBackup(PDO $pdo, int $userId, array $schedule = null): array {
             // Resolve NAS backup path (container-side mount path)
             $nasPath = rtrim((string)($cfg['mount_path'] ?? ''), '/');
             if ($nasPath === '') {
-                $err = 'NAS destination path is required';
+                $nasPath = __DIR__ . '/../../uploads/backups';
+            }
+            if (!is_dir($nasPath)) {
+                @mkdir($nasPath, 0777, true);
+                @chmod($nasPath, 0777);
+            }
+            if (!is_writable($nasPath)) {
+                $err = 'NAS path "' . $nasPath . '" is not writable inside the container. Verify your Docker volume bind-mount.';
             } else {
-                if (!is_dir($nasPath)) {
-                    @mkdir($nasPath, 0777, true);
-                    @chmod($nasPath, 0777);
-                }
-                if (!is_writable($nasPath)) {
-                    $err = 'NAS path "' . $nasPath . '" is not writable inside the container. Verify your Docker volume bind-mount.';
+                $dest = $nasPath . '/' . $archiveName;
+                if (@copy($localDest, $dest)) {
+                    @chmod($dest, 0666);
+                    $ok = true;
                 } else {
-                    $dest = $nasPath . '/' . $archiveName;
-                    if (@copy($localDest, $dest)) {
-                        @chmod($dest, 0666);
-                        $ok = true;
-                    } else {
-                        $err = 'Failed to copy archive to NAS path: ' . $nasPath;
-                    }
+                    $err = 'Failed to copy archive to NAS path: ' . $nasPath;
                 }
+            }
+        } elseif ($targetType === 'local') {
+            // Local storage backup target
+            $ok = file_exists($localDest);
+            if (!$ok) {
+                $err = 'Local backup storage file missing';
             }
         }
 
@@ -209,7 +233,7 @@ if ($action === 'save_system_backup_schedule' && $_SERVER['REQUEST_METHOD'] === 
     }
     $id = isset($input['id']) ? (int)$input['id'] : 0;
     $name = trim((string)($input['name'] ?? ''));
-    $targetType = in_array($input['target_type'] ?? '', ['ftp', 'nas'], true) ? $input['target_type'] : '';
+    $targetType = in_array($input['target_type'] ?? '', ['local', 'ftp', 'nas'], true) ? $input['target_type'] : 'local';
     $scheduleType = in_array($input['schedule_type'] ?? '', ['daily', 'weekly', 'monthly'], true) ? $input['schedule_type'] : 'daily';
     $scheduleTime = trim((string)($input['schedule_time'] ?? '00:15:00'));
     $dayOfWeek = isset($input['day_of_week']) && $input['day_of_week'] !== '' ? (int)$input['day_of_week'] : null;

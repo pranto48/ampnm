@@ -39,6 +39,7 @@ include 'header.php';
                     <div>
                         <label for="targetType" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Backup Target Destination</label>
                         <select id="targetType" class="w-full bg-slate-900/60 border border-slate-650 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors">
+                            <option value="local">Local Storage (/uploads/backups)</option>
                             <option value="nas">NAS (Local Folder / Mounted Share)</option>
                             <option value="ftp">FTP Server</option>
                         </select>
