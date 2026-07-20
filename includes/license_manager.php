@@ -21,7 +21,8 @@ define('CIPHER_METHOD', 'aes-256-cbc');
 define('LICENSE_FINGERPRINT_MODE', getenv('LICENSE_FINGERPRINT_MODE') ?: 'allow-rebaseline'); // enforce | allow-rebaseline
 define('LICENSE_FINGERPRINT_KEY', getenv('LICENSE_FINGERPRINT_KEY') ?: 'ampnm-license-fingerprint');
 
-function decryptLicenseData(string $encrypted_data) {
+function decryptLicenseData(string $encrypted_data)
+{
     $data = base64_decode($encrypted_data);
     $iv_length = openssl_cipher_iv_length(CIPHER_METHOD);
 
@@ -47,7 +48,8 @@ function decryptLicenseData(string $encrypted_data) {
     return $result;
 }
 
-function computeFileFingerprint(string $path): ?string {
+function computeFileFingerprint(string $path): ?string
+{
     if (!is_readable($path)) {
         return null;
     }
@@ -60,7 +62,8 @@ function computeFileFingerprint(string $path): ?string {
     return hash_hmac('sha256', $contents, getLicenseDataSecretKey() . '|' . LICENSE_FINGERPRINT_KEY);
 }
 
-function ensureLicenseIntegrity(): bool {
+function ensureLicenseIntegrity(): bool
+{
     $critical_files = [
         __DIR__ . '/license_manager.php',
         __DIR__ . '/auth_check.php',
@@ -124,7 +127,8 @@ if (!ensureLicenseIntegrity()) {
     return;
 }
 
-function hydrateCachedLicenseState(): void {
+function hydrateCachedLicenseState(): void
+{
     $cached = getAppSetting('license_cache');
     if (empty($cached)) {
         return;
@@ -145,7 +149,8 @@ function hydrateCachedLicenseState(): void {
 }
 
 // Function to generate a UUID (Universally Unique Identifier)
-function generateUuid() {
+function generateUuid()
+{
     $data = random_bytes(16);
     $data[6] = chr(ord($data[6]) & 0x0f | 0x40); // set version to 0100
     $data[8] = chr(ord(ord($data[8]) & 0x3f | 0x80)); // set bits 6-7 to 10
@@ -156,7 +161,8 @@ function generateUuid() {
  * Performs the actual license verification with the portal API using file_get_contents.
  * Caches results in session.
  */
-function verifyLicenseWithPortal(bool $force = false) {
+function verifyLicenseWithPortal(bool $force = false)
+{
     // Initialize session variables if they don't exist
     if (!isset($_SESSION['license_status_code'])) $_SESSION['license_status_code'] = 'unknown';
     if (!isset($_SESSION['license_message'])) $_SESSION['license_message'] = 'License status unknown.';
@@ -407,5 +413,3 @@ if (isset($_SESSION['user_id'])) {
 } else {
     $_SESSION['current_device_count'] = 0;
 }
-
-?>

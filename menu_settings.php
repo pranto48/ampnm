@@ -208,6 +208,24 @@ function syncColorPicker(pickerId, textId) {
     });
 }
 
+function applyThemePreset(preset) {
+    if (preset === 'default') {
+        document.getElementById('theme_accent_color').value = '#06b6d4';
+        document.getElementById('theme_accent_color_text').value = '#06b6d4';
+        document.getElementById('theme_navbar_bg').value = '#0f172a';
+        document.getElementById('theme_navbar_bg_text').value = '#0f172a';
+        document.getElementById('theme_text_color').value = '#cbd5e1';
+        document.getElementById('theme_text_color_text').value = '#cbd5e1';
+    } else if (preset === 'glass') {
+        document.getElementById('theme_accent_color').value = '#00f2fe';
+        document.getElementById('theme_accent_color_text').value = '#00f2fe';
+        document.getElementById('theme_navbar_bg').value = '#0f172a';
+        document.getElementById('theme_navbar_bg_text').value = 'rgba(15, 23, 42, 0.50)';
+        document.getElementById('theme_text_color').value = '#f8fafc';
+        document.getElementById('theme_text_color_text').value = '#f8fafc';
+    }
+}
+
 function initThemeSettings() {
     syncColorPicker('theme_accent_color', 'theme_accent_color_text');
     syncColorPicker('theme_navbar_bg', 'theme_navbar_bg_text');

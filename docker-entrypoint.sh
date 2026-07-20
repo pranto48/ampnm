@@ -197,6 +197,59 @@ EOF
         fi
     fi
 
+    # Auto-restore maps, devices, and license key from JSON backup if available
+    if [ -f "/var/www/html/uploads/pre_update_map_license_backup.json" ]; then
+        echo "→ Restoring map settings, devices, and license key from backup JSON..."
+        php -r '
+          try {
+            require_once "/var/www/html/includes/bootstrap.php";
+            require_once "/var/www/html/config.php";
+            $json = @file_get_contents("/var/www/html/uploads/pre_update_map_license_backup.json");
+            $data = json_decode($json, true);
+            if (is_array($data)) {
+              $pdo = getDbConnection();
+              if ($pdo) {
+                if (!empty($data["license_key"])) {
+                  setAppLicenseKey($data["license_key"]);
+                }
+                if (!empty($data["installation_id"])) {
+                  updateAppSetting("installation_id", $data["installation_id"]);
+                }
+                $mapCount = $pdo->query("SELECT COUNT(*) FROM maps")->fetchColumn();
+                if ($mapCount == 0 && !empty($data["maps"])) {
+                  foreach ($data["maps"] as $m) {
+                    $stmt = $pdo->prepare("INSERT IGNORE INTO maps (id, name, description, user_id, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$m["id"], $m["name"], $m["description"] ?? "", $m["user_id"] ?? 1, $m["is_public"] ?? 0, $m["created_at"] ?? date("Y-m-d H:i:s"), $m["updated_at"] ?? date("Y-m-d H:i:s")]);
+                  }
+                }
+                $devCount = $pdo->query("SELECT COUNT(*) FROM devices")->fetchColumn();
+                if ($devCount == 0 && !empty($data["devices"])) {
+                  foreach ($data["devices"] as $d) {
+                    $stmt = $pdo->prepare("INSERT IGNORE INTO devices (id, user_id, map_id, name, ip, type, monitor_method, ping_interval, status, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$d["id"], $d["user_id"] ?? 1, $d["map_id"] ?? 1, $d["name"], $d["ip"], $d["type"] ?? "device", $d["monitor_method"] ?? "ping", $d["ping_interval"] ?? 60, $d["status"] ?? "unknown", $d["last_seen"] ?? null, $d["created_at"] ?? date("Y-m-d H:i:s")]);
+                  }
+                }
+              }
+            }
+          } catch (Throwable $e) {}
+        ' || true
+    fi
+
+    # Unconditionally restore environment APP_LICENSE_KEY if passed
+    if [ -n "${APP_LICENSE_KEY:-}" ]; then
+        echo "→ Restoring license key from container environment variable..."
+        php -r '
+          try {
+            require_once "/var/www/html/includes/bootstrap.php";
+            require_once "/var/www/html/config.php";
+            $envKey = trim(getenv("APP_LICENSE_KEY"));
+            if (!empty($envKey)) {
+                setAppLicenseKey($envKey);
+            }
+          } catch (Throwable $e) {}
+        ' || true
+    fi
+
     echo "  ✓ Internal database configuration complete"
     echo ""
 fi

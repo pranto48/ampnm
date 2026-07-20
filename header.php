@@ -95,10 +95,13 @@ usort($menu_tree, function($a, $b) {
         nav.bg-slate-800\/50 { background-color: var(--theme-nav-bg) !important; }
         #main-nav-wrapper { background-color: var(--theme-nav-bg) !important; }
 
-        /* Liquid Glass Theme Enhancements */
+        /* iOS 17 Real Liquid Glass Theme System */
         <?php if (strpos($theme_nav_bg, 'rgba') !== false || strpos($theme_nav_bg, 'hsla') !== false): ?>
         body {
-            background: radial-gradient(circle at top right, #0f172a, #020617, #090d16) !important;
+            background: radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.12), transparent 45%),
+                        radial-gradient(circle at 85% 20%, rgba(139, 92, 246, 0.12), transparent 40%),
+                        radial-gradient(circle at 50% 80%, rgba(59, 130, 246, 0.10), transparent 50%),
+                        #030712 !important;
             background-attachment: fixed !important;
         }
         .bg-slate-800, 
@@ -114,23 +117,50 @@ usort($menu_tree, function($a, $b) {
         #widget-recent-activity,
         #widget-device-explorer,
         .modal-panel,
-        .bg-slate-900\/30 {
-            background-color: rgba(30, 41, 59, 0.35) !important;
-            backdrop-filter: blur(16px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+        .bg-slate-900\/30,
+        .bg-slate-900\/40,
+        .bg-slate-900\/60 {
+            background-color: rgba(15, 23, 42, 0.45) !important;
+            backdrop-filter: blur(28px) saturate(210%) contrast(105%) !important;
+            -webkit-backdrop-filter: blur(28px) saturate(210%) contrast(105%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.14) !important;
+            border-radius: 1.25rem !important;
+            box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.25), 
+                        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.3), 
+                        0 20px 40px -12px rgba(0, 0, 0, 0.5) !important;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .bg-slate-800:hover, 
+        .host-card:hover, 
+        .device-card:hover,
+        #widget-server-metrics:hover,
+        #widget-device-overview:hover,
+        #widget-ping-test:hover,
+        #widget-recent-activity:hover,
+        #widget-device-explorer:hover {
+            border-color: rgba(255, 255, 255, 0.28) !important;
+            box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.4), 
+                        0 12px 36px -8px rgba(6, 182, 212, 0.25) !important;
         }
         nav, #main-nav-wrapper {
             background-color: <?= $theme_nav_bg ?> !important;
-            backdrop-filter: blur(20px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
+            backdrop-filter: blur(32px) saturate(220%) !important;
+            -webkit-backdrop-filter: blur(32px) saturate(220%) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: inset 0 -1px 1px 0 rgba(255, 255, 255, 0.1), 0 8px 32px rgba(0, 0, 0, 0.35) !important;
         }
         input, select, textarea {
-            background-color: rgba(15, 23, 42, 0.6) !important;
-            border-color: rgba(255, 255, 255, 0.15) !important;
+            background-color: rgba(15, 23, 42, 0.55) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            border-radius: 0.75rem !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+            color: #f8fafc !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--theme-accent) !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 15px rgba(6, 182, 212, 0.4) !important;
         }
         .text-slate-400 {
             color: #94a3b8 !important;

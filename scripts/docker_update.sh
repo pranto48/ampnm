@@ -46,6 +46,29 @@ docker exec "${CONTAINER_ID}" sh -c '
   mysqldump -h "$host" -u "$user" $passArg "$name" > /var/www/html/uploads/db_backup_pre_update.sql 2>/dev/null || true
 ' || true
 
+# Export pre-update JSON backup of map, devices, and license key
+echo "→ Creating JSON backup of maps, devices, and license key..."
+docker exec "${CONTAINER_ID}" php -r '
+  try {
+    require_once "/var/www/html/includes/bootstrap.php";
+    require_once "/var/www/html/config.php";
+    $pdo = getDbConnection();
+    if ($pdo) {
+      $data = [
+        "timestamp" => date("c"),
+        "license_key" => getAppLicenseKey(),
+        "installation_id" => getInstallationId(),
+        "maps" => $pdo->query("SELECT * FROM maps")->fetchAll(PDO::FETCH_ASSOC),
+        "map_nodes" => $pdo->query("SELECT * FROM map_nodes")->fetchAll(PDO::FETCH_ASSOC),
+        "map_links" => $pdo->query("SELECT * FROM map_links")->fetchAll(PDO::FETCH_ASSOC),
+        "devices" => $pdo->query("SELECT * FROM devices")->fetchAll(PDO::FETCH_ASSOC),
+        "app_settings" => $pdo->query("SELECT * FROM app_settings")->fetchAll(PDO::FETCH_ASSOC)
+      ];
+      file_put_contents("/var/www/html/uploads/pre_update_map_license_backup.json", json_encode($data, JSON_PRETTY_PRINT));
+    }
+  } catch (Throwable $e) {}
+' 2>/dev/null || true
+
 
 echo "Recreating container '${NAME}' with image '${TARGET_IMAGE}'..."
 
