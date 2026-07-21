@@ -31,6 +31,12 @@ const screenshots = [
     desc: "Real-time network dashboard showing device health, bandwidth charts, and alert summaries.",
   },
   {
+    id: "map",
+    label: "Network Map",
+    src: "/ampnm_map.png",
+    desc: "Interactive topology map featuring drag-and-drop node positioning, custom connection links, and real-time status indicators.",
+  },
+  {
     id: "license",
     label: "License Setup",
     src: "/ampnm_license.png",
