@@ -236,7 +236,20 @@ docker compose up -d --no-deps --force-recreate ampnm-app
 
 ---
 
-## 📝 License
+## ⚖️ License, Copyright & Trademark
+
+**AMPNM** is open-source software licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
+
+### 🛡️ Trademark & Brand Protection
+The source code is licensed under AGPLv3, but the **AMPNM** name, logo, and brand identity are strictly copyrighted and trademarked by **IT Support BD**. You may not use the AMPNM name or logo in any derivative works without explicit written permission. 
+
+If you fork or modify this project for your own public or commercial release, you must completely rebrand the software and remove all references to AMPNM, its logos, and IT Support BD.
+
+### 📜 Dual Licensing Model
+* **Community (Free) License:** You are free to use, modify, and distribute this software under the terms of the AGPLv3. If you modify the source code and make it available over a network or as a SaaS, you **must** publicly release your modified source code under the same AGPLv3 license.
+* **Commercial License:** If you wish to use, modify, or embed AMPNM in a commercial product, keep your modifications private, or bypass the AGPLv3 source-code sharing requirements, you must purchase a **Commercial License**.
+
+For enterprise features, pricing, and commercial licensing inquiries, please visit: **[https://ampnm.itsupport.com.bd/pricing](https://ampnm.itsupport.com.bd/pricing)**
 
 **MIT License** — Free to use, modify, and distribute.
 
