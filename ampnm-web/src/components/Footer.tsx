@@ -7,8 +7,7 @@
  * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
  */
 import Link from "next/link";
-import Image from "next/image";
-import { Mail, Phone, MapPin } from "lucide-react";
+import { Activity, Mail, Phone, MapPin } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -50,14 +49,8 @@ export function Footer() {
           {/* Logo & Info column */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2 group w-fit">
-              <div className="relative h-8 w-8 rounded-xl overflow-hidden shadow group-hover:scale-105 transition-transform bg-zinc-900 border border-blue-500/30 flex items-center justify-center p-0.5">
-                <Image
-                  src="/logo.png"
-                  alt="AMPNM Logo"
-                  width={32}
-                  height={32}
-                  className="h-full w-full object-contain rounded-lg"
-                />
+              <div className="p-2 bg-blue-600 text-white rounded-xl shadow group-hover:scale-105 transition-transform">
+                <Activity size={18} />
               </div>
               <span className="font-extrabold text-zinc-900 dark:text-zinc-50 text-base leading-none tracking-tight">
                 AMPNM

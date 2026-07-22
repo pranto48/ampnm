@@ -10,9 +10,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ArrowRight, Sun, Moon } from "lucide-react";
+import { Menu, X, ArrowRight, Activity, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 export function Navbar() {
@@ -38,15 +37,8 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo Brand */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="relative h-9 w-9 rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 bg-zinc-900 border border-blue-500/30 flex items-center justify-center p-0.5">
-              <Image
-                src="/logo.png"
-                alt="AMPNM Logo"
-                width={36}
-                height={36}
-                className="h-full w-full object-contain rounded-lg"
-                priority
-              />
+            <div className="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+              <Activity className="h-5 w-5 animate-pulse" />
             </div>
             <div className="flex flex-col">
               <span className="font-extrabold text-zinc-900 dark:text-zinc-50 text-base leading-tight tracking-tight flex items-center gap-1.5 transition-colors">
