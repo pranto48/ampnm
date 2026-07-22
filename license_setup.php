@@ -105,9 +105,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="bg-slate-900 flex items-center justify-center min-h-screen">
     <div class="w-full max-w-md">
         <div class="text-center mb-8">
-            <i class="fas fa-shield-halved text-cyan-400 text-6xl"></i>
-            <h1 class="text-3xl font-bold text-white mt-4">AMPNM License Setup</h1>
-            <p class="text-slate-400">Please enter your application license key to continue</p>
+            <div class="w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-500/30 mx-auto flex items-center justify-center mb-3">
+                <i class="fas fa-heartbeat text-2xl animate-pulse"></i>
+            </div>
+            <div class="flex items-center justify-center gap-2">
+                <h1 class="text-3xl font-extrabold text-white">AMPNM License Setup</h1>
+                <span class="text-xs bg-blue-900/80 text-blue-300 font-bold px-2 py-0.5 rounded border border-blue-700/50">v1.15</span>
+            </div>
+            <p class="text-xs font-semibold tracking-wider text-slate-400 uppercase mt-1">by IT Support BD</p>
         </div>
         <form method="POST" action="license_setup.php" class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-xl p-8 space-y-6">
             <?= $message ?>

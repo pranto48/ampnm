@@ -218,9 +218,21 @@ usort($menu_tree, function($a, $b) {
                     <button id="mobile-menu-button" class="md:hidden p-2 text-slate-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
                         <i class="fas fa-bars h-6 w-6"></i>
                     </button>
-                    <a href="index.php" class="flex items-center gap-2 text-white font-bold ml-3 md:ml-0 brand-3d">
-                        <i class="fas fa-shield-halved text-cyan-400 text-2xl brand-icon-3d"></i>
-                        <span>AMPNM</span>
+                    <a href="index.php" class="flex items-center gap-2.5 text-white font-bold ml-3 md:ml-0 brand-3d group">
+                        <div class="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 flex items-center justify-center">
+                            <i class="fas fa-heartbeat text-base animate-pulse"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-extrabold text-white text-base leading-tight tracking-tight flex items-center gap-1.5">
+                                AMPNM
+                                <span class="text-[10px] bg-blue-900/80 text-blue-300 font-bold px-1.5 py-0.5 rounded border border-blue-700/50">
+                                    v1.15
+                                </span>
+                            </span>
+                            <span class="text-[9px] text-slate-400 font-medium tracking-wide uppercase select-none">
+                                by IT Support BD
+                            </span>
+                        </div>
                     </a>
                 </div>
                 
@@ -228,9 +240,21 @@ usort($menu_tree, function($a, $b) {
                 <div id="main-nav-wrapper" class="fixed inset-y-0 left-0 w-64 bg-slate-800/95 backdrop-blur-lg z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:w-auto md:bg-transparent md:backdrop-blur-none md:transform-none md:transition-none md:flex md:items-center">
                     <!-- Close button for mobile sidebar -->
                     <div class="flex items-center justify-between p-4 border-b border-slate-700 md:hidden">
-                        <a href="index.php" class="flex items-center gap-2 text-white font-bold brand-3d">
-                            <i class="fas fa-shield-halved text-cyan-400 text-2xl brand-icon-3d"></i>
-                            <span>AMPNM</span>
+                        <a href="index.php" class="flex items-center gap-2.5 text-white font-bold brand-3d group">
+                            <div class="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 flex items-center justify-center">
+                                <i class="fas fa-heartbeat text-base animate-pulse"></i>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="font-extrabold text-white text-base leading-tight tracking-tight flex items-center gap-1.5">
+                                    AMPNM
+                                    <span class="text-[10px] bg-blue-900/80 text-blue-300 font-bold px-1.5 py-0.5 rounded border border-blue-700/50">
+                                        v1.15
+                                    </span>
+                                </span>
+                                <span class="text-[9px] text-slate-400 font-medium tracking-wide uppercase select-none">
+                                    by IT Support BD
+                                </span>
+                            </div>
                         </a>
                         <button id="close-mobile-menu-button" class="p-2 text-slate-300 hover:text-white focus:outline-none">
                             <i class="fas fa-times h-6 w-6"></i>
