@@ -1,3 +1,11 @@
+<#
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+#>
 # dev-agent.ps1
 # Starts the AMPNM Windows Usage Agent in hot-reload development mode
 # Run from the repo root: .\scripts\dev-agent.ps1

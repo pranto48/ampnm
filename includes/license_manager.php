@@ -1,4 +1,12 @@
 <?php
+/*
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+ */
 // This file is included by auth_check.php and assumes session is started and config.php is loaded.
 
 // Define how often to re-verify the license with the portal (in seconds)

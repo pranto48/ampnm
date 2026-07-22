@@ -1,3 +1,11 @@
+<#
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+#>
 # build-agent.ps1
 # Compiles the Go Windows Telemetry Agent and generates the MSI installer
 # Run from this folder: .\build-agent.ps1

@@ -1,4 +1,12 @@
 <?php
+/*
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+ */
 require_once 'includes/functions.php'; // Include functions early for DB connection and license checks
 require_once 'includes/auth_check.php'; // Auth check also needs to be early
 

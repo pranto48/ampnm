@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+ */
 const crypto = require("crypto");
 
 const base64Str = "QUFBQUFBQUFBQUFBQUFBQTFTZm9SeGdaaUpZUTJibGovK2s3UFRueUh2REwxRUR6MUVLZFFCR054MkFyYnBtS2NvQmZUQzdJZFI2MWNzVWZKZzhCRUw1SHZDa2ZHbW0yL2c1cVZJTWJEV3d4SStWM2FvSEkyUkJhRDFFRFBzUWh2enVWMWtrKzZwTytDWlEwMXJWM2lSU3g2MGYzaW9JckdKNEhKNUhwSTZJTWtZMmluenNlamZhSUEvbz0=";

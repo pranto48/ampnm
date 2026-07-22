@@ -1,4 +1,11 @@
 @echo off
+REM Copyright (c) IT Support BD. All rights reserved.
+REM This file is part of AMPNM.
+REM 
+REM This program is free software: you can redistribute it and/or modify
+REM it under the terms of the GNU Affero General Public License...
+REM (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+
 REM ============================================================
 REM AMPNM Windows Monitoring Agent (Simple Batch Version)
 REM ============================================================

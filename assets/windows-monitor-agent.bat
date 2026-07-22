@@ -1,4 +1,11 @@
 @echo off
+REM Copyright (c) IT Support BD. All rights reserved.
+REM This file is part of AMPNM.
+REM 
+REM This program is free software: you can redistribute it and/or modify
+REM it under the terms of the GNU Affero General Public License...
+REM (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+
 REM AMPNM lightweight Windows metrics agent
 REM Customize the Docker server URL (include port if not 80) and the shared token
 set SERVER_URL=http://localhost:3001/api/agent/windows-metrics

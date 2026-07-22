@@ -1,4 +1,12 @@
 <?php
+/*
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+ */
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role

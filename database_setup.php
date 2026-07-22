@@ -1,4 +1,12 @@
 <?php
+/*
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+ */
 // Database configuration using environment variables for Docker compatibility
 $servername = getenv('DB_HOST') ?: '127.0.0.1'; // Use environment variable if present
 $username = 'root'; // Setup script needs root privileges to create DB and tables

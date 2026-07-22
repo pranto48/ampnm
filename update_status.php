@@ -1,4 +1,12 @@
 <?php
+/*
+ * Copyright (c) IT Support BD. All rights reserved.
+ * This file is part of AMPNM.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License...
+ * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+ */
 // Force minimum supported API version for compatibility with newer host engines (e.g. Docker 25/26/28+)
 putenv('DOCKER_API_VERSION=1.44');
 require_once 'includes/auth_check.php';
