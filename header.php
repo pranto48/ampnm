@@ -218,8 +218,8 @@ usort($menu_tree, function($a, $b) {
                     <button id="mobile-menu-button" class="md:hidden p-2 text-slate-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
                         <i class="fas fa-bars h-6 w-6"></i>
                     </button>
-                    <a href="index.php" class="flex items-center gap-2 text-white font-bold ml-3 md:ml-0 brand-3d">
-                        <i class="fas fa-shield-halved text-cyan-400 text-2xl brand-icon-3d"></i>
+                    <a href="index.php" class="flex items-center gap-2.5 text-white font-bold ml-3 md:ml-0 brand-3d">
+                        <img src="assets/images/logo.png" alt="AMPNM Logo" class="h-8 w-8 object-contain rounded-lg shadow-md brand-icon-3d">
                         <span>AMPNM</span>
                     </a>
                 </div>
@@ -228,8 +228,8 @@ usort($menu_tree, function($a, $b) {
                 <div id="main-nav-wrapper" class="fixed inset-y-0 left-0 w-64 bg-slate-800/95 backdrop-blur-lg z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:w-auto md:bg-transparent md:backdrop-blur-none md:transform-none md:transition-none md:flex md:items-center">
                     <!-- Close button for mobile sidebar -->
                     <div class="flex items-center justify-between p-4 border-b border-slate-700 md:hidden">
-                        <a href="index.php" class="flex items-center gap-2 text-white font-bold brand-3d">
-                            <i class="fas fa-shield-halved text-cyan-400 text-2xl brand-icon-3d"></i>
+                        <a href="index.php" class="flex items-center gap-2.5 text-white font-bold brand-3d">
+                            <img src="assets/images/logo.png" alt="AMPNM Logo" class="h-8 w-8 object-contain rounded-lg shadow-md brand-icon-3d">
                             <span>AMPNM</span>
                         </a>
                         <button id="close-mobile-menu-button" class="p-2 text-slate-300 hover:text-white focus:outline-none">
