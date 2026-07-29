@@ -401,9 +401,9 @@ if (empty($installation_id)) {
     $installation_id = $new_uuid;
 }
 
-// 2. Check if license key is configured (prioritize environment-provided key for anti-tamper)
+// 2. Check if license key is configured (only use env fallback if DB key is empty)
 $app_license_key = getAppLicenseKey();
-if (!empty(APP_LICENSE_KEY_ENV) && APP_LICENSE_KEY_ENV !== $app_license_key) {
+if (empty($app_license_key) && !empty(APP_LICENSE_KEY_ENV)) {
     setAppLicenseKey(APP_LICENSE_KEY_ENV);
     $app_license_key = APP_LICENSE_KEY_ENV;
 }

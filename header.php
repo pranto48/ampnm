@@ -384,7 +384,8 @@ usort($menu_tree, function($a, $b) {
             case 'free':
                 $status_class = 'bg-green-500/20 text-green-400 border-green-500/30';
                 $status_icon = '<i class="fas fa-check-circle mr-1"></i>';
-                $display_message = "License Active ({$current_devices}/{$max_devices} devices)";
+                $max_dev_str = ($max_devices <= 0 || $max_devices >= 99999) ? 'Unlimited' : $max_devices;
+                $display_message = "License Active ({$current_devices}/{$max_dev_str} devices)";
                 if ($expires_at) {
                     $display_message .= " - Expires: " . date('Y-m-d', strtotime($expires_at));
                 }

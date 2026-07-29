@@ -188,11 +188,11 @@ $current_devices = $_SESSION['current_device_count'] ?? 0;
                             <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Device Limit Usage</label>
                             <div class="flex items-center justify-between text-sm text-slate-300 mb-1">
                                 <span>Used Devices</span>
-                                <span class="font-semibold text-white"><?= htmlspecialchars($current_devices) ?> / <?= $max_devices > 0 ? htmlspecialchars($max_devices) : 'Unlimited' ?></span>
+                                <span class="font-semibold text-white"><?= htmlspecialchars($current_devices) ?> / <?= ($max_devices > 0 && $max_devices < 99999) ? htmlspecialchars($max_devices) : 'Unlimited' ?></span>
                             </div>
                             <?php
                             $percentage = 0;
-                            if ($max_devices > 0) {
+                            if ($max_devices > 0 && $max_devices < 99999) {
                                 $percentage = min(100, round(($current_devices / $max_devices) * 100));
                             }
                             $barColor = 'bg-cyan-500';
@@ -205,7 +205,7 @@ $current_devices = $_SESSION['current_device_count'] ?? 0;
                             <div class="w-full bg-slate-900 rounded-full h-3.5 border border-slate-700 overflow-hidden">
                                 <div class="<?= $barColor ?> h-full transition-all duration-500" style="width: <?= $percentage ?>%"></div>
                             </div>
-                            <p class="text-xs text-slate-500 mt-1.5">Your license allows monitoring up to <?= $max_devices > 0 ? htmlspecialchars($max_devices) : 'unlimited' ?> devices on this installation.</p>
+                            <p class="text-xs text-slate-500 mt-1.5">Your license allows monitoring <?= ($max_devices > 0 && $max_devices < 99999) ? 'up to ' . htmlspecialchars($max_devices) . ' devices' : 'unlimited devices' ?> on this installation.</p>
                         </div>
                     </div>
                 </div>
