@@ -332,11 +332,16 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 <div class="bg-slate-900/50 p-3 rounded-lg mb-4">
                     <p class="text-xs text-slate-400"><i class="fas fa-info-circle mr-1 text-cyan-400"></i><strong>Tip:</strong> Each connection type has a unique color. Select ports to show which interface is used (e.g., G0/1 ↔ SFP01).</p>
                 </div>
-                <div class="flex justify-end gap-3 mt-6">
-                    <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">
-                        <i class="fas fa-save mr-2"></i>Save Connection
+                <div class="flex items-center justify-between mt-6">
+                    <button type="button" id="deleteEdgeModalBtn" class="px-4 py-2 bg-red-600/30 text-red-300 border border-red-500/40 rounded-lg hover:bg-red-600 hover:text-white transition flex items-center gap-2">
+                        <i class="fas fa-trash-alt"></i>Delete Connection
                     </button>
+                    <div class="flex gap-3">
+                        <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">
+                            <i class="fas fa-save mr-2"></i>Save Connection
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>

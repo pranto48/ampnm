@@ -154,10 +154,32 @@ switch ($action) {
     case 'delete_edge':
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can delete edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $id = $input['id'] ?? null;
-            if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
-            $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ? AND user_id IN ($groupIdsStr)");
-            $stmt->execute([$id]);
+            $id = $input['id'] ?? $_GET['id'] ?? null;
+            $source_id = $input['source_id'] ?? null;
+            $target_id = $input['target_id'] ?? null;
+
+            if (!$id && (!$source_id || !$target_id)) {
+                http_response_code(400); echo json_encode(['error' => 'Edge ID or source/target IDs required']); exit;
+            }
+
+            $deleted = false;
+            if ($id && is_numeric($id)) {
+                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ? AND user_id IN ($groupIdsStr)");
+                $stmt->execute([$id]);
+                if ($stmt->rowCount() > 0) $deleted = true;
+            }
+
+            if (!$deleted && $source_id && $target_id) {
+                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE ((source_id = ? AND target_id = ?) OR (source_id = ? AND target_id = ?)) AND user_id IN ($groupIdsStr)");
+                $stmt->execute([$source_id, $target_id, $target_id, $source_id]);
+                if ($stmt->rowCount() > 0) $deleted = true;
+            }
+
+            if (!$deleted && $id) {
+                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ?");
+                $stmt->execute([$id]);
+            }
+
             echo json_encode(['success' => true]);
         }
         break;

@@ -722,6 +722,33 @@ function initMap() {
     }
 
     els.cancelEdgeBtn.addEventListener('click', () => closeModal('edgeModal'));
+    const deleteEdgeModalBtn = document.getElementById('deleteEdgeModalBtn');
+    if (deleteEdgeModalBtn) {
+        deleteEdgeModalBtn.addEventListener('click', async () => {
+            const id = document.getElementById('edgeId').value;
+            if (!id) return;
+            if (confirm('Are you sure you want to delete this connection?')) {
+                try {
+                    const edge = state.edges.get(id);
+                    const result = await api.post('delete_edge', { 
+                        id, 
+                        source_id: edge ? edge.from : null, 
+                        target_id: edge ? edge.to : null 
+                    });
+                    if (result.success || result.status === 'success') {
+                        state.edges.remove(id);
+                        closeModal('edgeModal');
+                        window.notyf.success('Connection deleted.');
+                    } else {
+                        window.notyf.error(result.error || 'Failed to delete connection.');
+                    }
+                } catch (err) {
+                    console.error('Error deleting edge:', err);
+                    window.notyf.error(err.message || 'Failed to delete connection.');
+                }
+            }
+        });
+    }
     els.scanNetworkBtn.addEventListener('click', () => openModal('scanModal'));
     els.closeScanModal.addEventListener('click', () => closeModal('scanModal'));
 

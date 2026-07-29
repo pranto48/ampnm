@@ -102,17 +102,46 @@ MapApp.network = {
                 enabled: window.userRole === 'admin', // Enable manipulation only for admin
                 addEdge: async (edgeData, callback) => { 
                     if (window.userRole !== 'admin') {
-                        // No error message needed, as the button is disabled for viewers
-                        callback(null); // Cancel adding edge
+                        callback(null);
                         return;
                     }
-                    const newEdge = await MapApp.api.post('create_edge', { source_id: edgeData.from, target_id: edgeData.to, map_id: MapApp.state.currentMapId, connection_type: 'cat6' }); 
-                    edgeData.id = newEdge.id; 
-                    edgeData.connection_type = 'cat6';
-                    edgeData.label = 'cat6'; 
-                    callback(edgeData); 
-                    MapApp.ui.updateStaticEdgeColors();
-                    window.notyf.success('Connection added.');
+                    try {
+                        const newEdge = await MapApp.api.post('create_edge', { source_id: edgeData.from, target_id: edgeData.to, map_id: MapApp.state.currentMapId, connection_type: 'cat6' }); 
+                        edgeData.id = newEdge.id; 
+                        edgeData.connection_type = 'cat6';
+                        edgeData.label = 'cat6'; 
+                        callback(edgeData); 
+                        MapApp.ui.updateStaticEdgeColors();
+                        window.notyf.success('Connection added.');
+                    } catch (err) {
+                        window.notyf.error(err.message || 'Failed to create connection.');
+                        callback(null);
+                    }
+                },
+                deleteEdge: async (edgeData, callback) => {
+                    if (window.userRole !== 'admin') {
+                        callback(null);
+                        return;
+                    }
+                    if (edgeData && edgeData.edges && edgeData.edges.length > 0) {
+                        try {
+                            for (const edgeId of edgeData.edges) {
+                                const edge = MapApp.state.edges.get(edgeId);
+                                await MapApp.api.post('delete_edge', { 
+                                    id: edgeId,
+                                    source_id: edge ? edge.from : null,
+                                    target_id: edge ? edge.to : null
+                                });
+                            }
+                            window.notyf.success('Connection deleted.');
+                            callback(edgeData);
+                        } catch (err) {
+                            window.notyf.error(err.message || 'Failed to delete connection.');
+                            callback(null);
+                        }
+                    } else {
+                        callback(edgeData);
+                    }
                 }
             } 
         };
@@ -816,8 +845,13 @@ MapApp.network = {
                     } else if (action === 'delete-edge') {
                         if (confirm('Are you sure you want to delete this connection?')) {
                             try {
-                                const result = await MapApp.api.post('delete_edge', { id });
-                                if (result.success) {
+                                const edge = MapApp.state.edges.get(id);
+                                const result = await MapApp.api.post('delete_edge', { 
+                                    id, 
+                                    source_id: edge ? edge.from : null, 
+                                    target_id: edge ? edge.to : null 
+                                });
+                                if (result.success || result.status === 'success') {
                                     window.notyf.success('Connection deleted.');
                                     MapApp.state.edges.remove(id);
                                 } else {
