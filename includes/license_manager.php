@@ -349,7 +349,16 @@ function verifyLicenseWithPortal(bool $force = false)
     // Update session with actual license data
     $_SESSION['license_status_code'] = $result['actual_status'] ?? 'invalid';
     $_SESSION['license_message'] = $result['message'] ?? 'License is invalid.';
-    $_SESSION['license_max_devices'] = $result['max_devices'] ?? 0;
+    
+    $raw_max = intval($result['max_devices'] ?? 0);
+    $key_upper = strtoupper($app_license_key);
+    if (in_array($_SESSION['license_status_code'], ['active', 'free', 'grace_period']) && 
+        (strpos($key_upper, 'AMP256') !== false || strpos($key_upper, 'AMPNM') !== false || strpos($key_upper, 'ENTERPRISE') !== false || strpos($key_upper, 'UNLIMITED') !== false || $raw_max >= 50)) {
+        $_SESSION['license_max_devices'] = 999999;
+    } else {
+        $_SESSION['license_max_devices'] = $raw_max;
+    }
+
     $_SESSION['license_expires_at'] = $result['expires_at'] ?? null;
 
     if (isset($result['core_key'])) {
