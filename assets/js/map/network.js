@@ -484,7 +484,14 @@ MapApp.network = {
         });
         MapApp.state.network.on("zoom", MapApp.network.saveCurrentView);
         MapApp.state.network.on("doubleClick", (params) => { 
-            if (window.userRole === 'admin' && params.nodes.length > 0) MapApp.ui.openDeviceModal(params.nodes[0]); 
+            if (params.nodes.length > 0) {
+                const node = MapApp.state.nodes.get(params.nodes[0]);
+                if (node && node.deviceData && node.deviceData.type === 'text') {
+                    if (typeof MapApp.openTextModal === 'function') MapApp.openTextModal(node.deviceData);
+                    return;
+                }
+                if (window.userRole === 'admin') MapApp.ui.openDeviceModal(params.nodes[0]);
+            }
         });
 
         const closeContextMenu = () => { contextMenu.style.display = 'none'; };
@@ -499,8 +506,9 @@ MapApp.network = {
                 if (window.userRole === 'admin') {
                     menuItems += `
                         <div class="context-menu-item" data-action="edit" data-id="${nodeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit</div>
+                        ${node.deviceData.type === 'text' ? `<div class="context-menu-item" data-action="text-settings" data-id="${nodeId}"><i class="fas fa-font fa-fw mr-2"></i>Edit Text Label</div>` : ''}
                         ${node.deviceData.type === 'box' ? `<div class="context-menu-item" data-action="box-settings" data-id="${nodeId}"><i class="fas fa-vector-square fa-fw mr-2"></i>Box Settings</div>` : ''}
-                        ${node.deviceData.type !== 'box' ? `<div class="context-menu-item" data-action="view-metrics" data-id="${nodeId}"><i class="fas fa-chart-line fa-fw mr-2"></i>Metrics Graph</div>` : ''}
+                        ${node.deviceData.type !== 'box' && node.deviceData.type !== 'text' ? `<div class="context-menu-item" data-action="view-metrics" data-id="${nodeId}"><i class="fas fa-chart-line fa-fw mr-2"></i>Metrics Graph</div>` : ''}
                         <div class="context-menu-item" data-action="change-icon" data-id="${nodeId}"><i class="fas fa-icons fa-fw mr-2"></i>Change Icon</div>
                         <div class="context-menu-item" data-action="copy" data-id="${nodeId}"><i class="fas fa-copy fa-fw mr-2"></i>Copy</div>
                         ${node.deviceData.ip ? `<div class="context-menu-item" data-action="ping" data-id="${nodeId}"><i class="fas fa-sync fa-fw mr-2"></i>Check Status</div>` : ''}
@@ -548,7 +556,17 @@ MapApp.network = {
 
                 if (window.userRole === 'admin') {
                     if (action === 'edit') {
-                        MapApp.ui.openDeviceModal(id);
+                        const node = MapApp.state.nodes.get(id);
+                        if (node && node.deviceData && node.deviceData.type === 'text') {
+                            if (typeof MapApp.openTextModal === 'function') MapApp.openTextModal(node.deviceData);
+                        } else {
+                            MapApp.ui.openDeviceModal(id);
+                        }
+                    } else if (action === 'text-settings') {
+                        const node = MapApp.state.nodes.get(id);
+                        if (node && node.deviceData && typeof MapApp.openTextModal === 'function') {
+                            MapApp.openTextModal(node.deviceData);
+                        }
                     } else if (action === 'view-metrics') {
                         await MapApp.ui.openMetricsModal(id);
                     } else if (action === 'change-icon') {

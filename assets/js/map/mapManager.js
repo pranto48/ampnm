@@ -389,6 +389,11 @@ MapApp.mapManager = {
                 return MapApp.utils.buildVisBoxNode(baseNode, d);
             }
 
+            // Text type
+            if (d.type === 'text') {
+                return MapApp.utils.buildVisTextNode(baseNode, d);
+            }
+
             // Resolve visuals for normal nodes
             const visuals = MapApp.utils.resolveNodeVisuals(d);
             return {
@@ -516,6 +521,8 @@ MapApp.mapManager = {
                 visNode = { ...baseNode, shape: 'image', image: createdDevice.icon_url, size: (parseInt(createdDevice.icon_size) || 50) / 2, color: { border: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' }, borderWidth: 3 };
             } else if (createdDevice.type === 'box') {
                 visNode = MapApp.utils.buildVisBoxNode(baseNode, createdDevice);
+            } else if (createdDevice.type === 'text') {
+                visNode = MapApp.utils.buildVisTextNode(baseNode, createdDevice);
             } else {
                 const iconCode = MapApp.mapManager.getDeviceIconUnicode(createdDevice);
                 visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: iconCode, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown } };

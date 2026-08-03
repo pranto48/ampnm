@@ -240,6 +240,33 @@ function buildVisNode(device) {
         return { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
     }
 
+    if (device.type === 'text') {
+        const textStyle = (() => {
+            try {
+                const pc = typeof device.port_config === 'string' ? JSON.parse(device.port_config) : device.port_config;
+                return pc?.text_style || {};
+            } catch (e) { return {}; }
+        })();
+        const color = device.name_text_color || textStyle.color || '#22d3ee';
+        const size = device.name_text_size ? Number(device.name_text_size) : (textStyle.size || 16);
+        const container = textStyle.containerStyle || 'transparent';
+        const isBox = container === 'card' || container === 'badge' || container === 'custom';
+        return {
+            ...baseNode,
+            shape: isBox ? 'box' : 'text',
+            color: {
+                background: container === 'card' ? 'rgba(15, 23, 42, 0.85)' : (textStyle.fillColor || 'transparent'),
+                border: container === 'card' ? '#334155' : (textStyle.borderColor || 'transparent')
+            },
+            borderWidth: isBox ? 1 : 0,
+            font: {
+                color: color,
+                size: size,
+                multi: true
+            }
+        };
+    }
+
     let imagePath = null;
     const name = device.name || "";
 

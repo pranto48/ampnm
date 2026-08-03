@@ -108,6 +108,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <button id="placeDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Place Existing Device" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-download"></i></button>
                             <a href="create-device.php" id="addDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add New Device" <?= $is_admin ? '' : 'style="display:none;"' ?>><i class="fas fa-plus"></i></a>
                             <button id="addGroupBoxBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Group Box" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-vector-square"></i></button>
+                            <button id="addTextBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Text Label" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-font"></i></button>
                             <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
                             <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
@@ -218,7 +219,151 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
     </div>
 
     <!-- Modals -->
-    <!-- The old deviceModal HTML is removed as it's replaced by React components -->
+    <!-- Text Label & Annotation System Modal -->
+    <div id="textModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-lg border border-slate-700">
+            <div class="flex items-center justify-between mb-4 border-b border-slate-700/80 pb-3">
+                <h2 id="textModalTitle" class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-font text-cyan-400"></i> Add Text Label
+                </h2>
+                <button type="button" class="text-slate-400 hover:text-white text-lg modal-close-btn" onclick="closeModal('textModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="textForm" onsubmit="return false;">
+                <input type="hidden" id="textLabelDeviceId" value="">
+
+                <!-- Text Content Input -->
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-300 mb-1.5">Text Content</label>
+                    <textarea id="textLabelContent" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm font-medium" placeholder="e.g. CORE SERVER ZONE" required></textarea>
+                </div>
+
+                <!-- Font Size & Styles Row -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Font Size (px)</label>
+                        <select id="textLabelSize" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                            <option value="12">12px (Small)</option>
+                            <option value="14">14px (Medium)</option>
+                            <option value="16" selected>16px (Normal)</option>
+                            <option value="18">18px (Large)</option>
+                            <option value="20">20px (X-Large)</option>
+                            <option value="24">24px (2X-Large)</option>
+                            <option value="28">28px (Title)</option>
+                            <option value="32">32px (Header)</option>
+                            <option value="36">36px (Banner)</option>
+                            <option value="48">48px (Hero)</option>
+                            <option value="64">64px (Giant)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Font Style</label>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="textLabelBoldToggle" class="flex-1 py-2 px-3 bg-slate-900 border border-slate-700 text-slate-300 rounded-lg font-bold hover:bg-slate-700 transition flex items-center justify-center gap-1">
+                                <i class="fas fa-bold"></i> Bold
+                            </button>
+                            <button type="button" id="textLabelItalicToggle" class="flex-1 py-2 px-3 bg-slate-900 border border-slate-700 text-slate-300 rounded-lg italic hover:bg-slate-700 transition flex items-center justify-center gap-1">
+                                <i class="fas fa-italic"></i> Italic
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alignment & Font Family -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Text Alignment</label>
+                        <select id="textLabelAlign" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                            <option value="center" selected>Center</option>
+                            <option value="left">Left</option>
+                            <option value="right">Right</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Font Family</label>
+                        <select id="textLabelFontFamily" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                            <option value="sans" selected>Sans-Serif (Inter)</option>
+                            <option value="mono">Monospace (Code)</option>
+                            <option value="serif">Serif (Classic)</option>
+                            <option value="display">Display (Impact)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Text Color & Swatches -->
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-xs font-medium text-slate-400">Text Color</label>
+                        <span id="textLabelColorVal" class="text-xs font-mono text-cyan-400 font-semibold">#22d3ee</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="textLabelColorPicker" value="#22d3ee" class="w-10 h-10 bg-transparent rounded border border-slate-600 cursor-pointer p-0.5">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#22d3ee" data-color="#22d3ee" title="Cyan"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#ffffff" data-color="#ffffff" title="White"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#22c55e" data-color="#22c55e" title="Emerald"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#f59e0b" data-color="#f59e0b" title="Amber"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#ef4444" data-color="#ef4444" title="Red"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#a855f7" data-color="#a855f7" title="Purple"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#3b82f6" data-color="#3b82f6" title="Blue"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#94a3b8" data-color="#94a3b8" title="Slate"></button>
+                            <button type="button" class="w-6 h-6 rounded-full border border-slate-600 text-color-swatch hover:scale-110 transition" style="background:#f43f5e" data-color="#f43f5e" title="Rose"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Container Background & Badge Style -->
+                <div class="border border-slate-700/80 bg-slate-900/40 rounded-lg p-3.5 mb-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
+                            <i class="fas fa-layer-group"></i> Container & Badge Style
+                        </label>
+                        <select id="textLabelContainerStyle" class="bg-slate-900 border border-slate-600 rounded px-2.5 py-1 text-white text-xs">
+                            <option value="transparent" selected>Transparent (Clean)</option>
+                            <option value="card">Dark Glass Card</option>
+                            <option value="badge">Custom Badge / Box</option>
+                        </select>
+                    </div>
+
+                    <div id="textLabelBadgeCustomControls" class="grid grid-cols-2 gap-3 pt-1 hidden">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">Fill Color</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="textLabelBgColorPicker" value="#0f172a" class="w-7 h-7 bg-transparent rounded border border-slate-600 cursor-pointer p-0.5">
+                                <span id="textLabelBgColorHex" class="text-xs text-slate-300 font-mono">#0f172a</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">Border Color</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="textLabelBorderColorPicker" value="#334155" class="w-7 h-7 bg-transparent rounded border border-slate-600 cursor-pointer p-0.5">
+                                <span id="textLabelBorderColorHex" class="text-xs text-slate-300 font-mono">#334155</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Preview Card -->
+                <div class="mb-5 p-4 bg-slate-950 border border-slate-800 rounded-lg">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-2">Live Preview</span>
+                    <div class="flex items-center justify-center p-3 rounded overflow-hidden min-h-[60px]" id="textLabelPreviewBox">
+                        <span id="textLabelPreviewText" class="text-cyan-400 font-medium">Text Preview</span>
+                    </div>
+                </div>
+
+                <!-- Form Action Buttons -->
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/80">
+                    <button type="button" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm font-medium transition" onclick="closeModal('textModal')">Cancel</button>
+                    <button type="submit" id="saveTextLabelBtn" class="px-5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-sm font-semibold shadow-lg transition flex items-center gap-2">
+                        <i class="fas fa-check"></i> Save Label
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <div id="edgeModal" class="modal-backdrop hidden">
         <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">

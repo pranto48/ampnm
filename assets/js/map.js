@@ -716,9 +716,338 @@ function initMap() {
                 window.notyf.error(error.message || 'Failed to create group box.');
             }
         });
+
+        // Add Text Label button
+        if (els.addTextBtn) {
+            els.addTextBtn.addEventListener('click', () => {
+                MapApp.openTextModal();
+            });
+        }
     } else {
         if (els.addEdgeBtn) els.addEdgeBtn.disabled = true;
         if (els.addGroupBoxBtn) els.addGroupBoxBtn.disabled = true;
+        if (els.addTextBtn) els.addTextBtn.disabled = true;
+    }
+
+    // Text Label & Annotation System Controller
+    let textModalBoldState = false;
+    let textModalItalicState = false;
+
+    function updateTextLabelPreview() {
+        const textContent = document.getElementById('textLabelContent')?.value || 'Text Preview';
+        const color = document.getElementById('textLabelColorPicker')?.value || '#22d3ee';
+        const size = document.getElementById('textLabelSize')?.value || '16';
+        const align = document.getElementById('textLabelAlign')?.value || 'center';
+        const fontFam = document.getElementById('textLabelFontFamily')?.value || 'sans';
+        const container = document.getElementById('textLabelContainerStyle')?.value || 'transparent';
+        const fill = document.getElementById('textLabelBgColorPicker')?.value || '#0f172a';
+        const border = document.getElementById('textLabelBorderColorPicker')?.value || '#334155';
+
+        const fontFaceMap = {
+            sans: "Inter, system-ui, -apple-system, sans-serif",
+            mono: "'JetBrains Mono', 'SFMono-Regular', Consolas, monospace",
+            serif: "Georgia, Cambria, 'Times New Roman', serif",
+            display: "Outfit, Impact, sans-serif"
+        };
+
+        const previewText = document.getElementById('textLabelPreviewText');
+        const previewBox = document.getElementById('textLabelPreviewBox');
+
+        if (previewText) {
+            previewText.textContent = textContent;
+            previewText.style.color = color;
+            previewText.style.fontSize = size + 'px';
+            previewText.style.fontWeight = textModalBoldState ? 'bold' : 'normal';
+            previewText.style.fontStyle = textModalItalicState ? 'italic' : 'normal';
+            previewText.style.fontFamily = fontFaceMap[fontFam] || fontFaceMap.sans;
+            previewText.style.textAlign = align;
+        }
+
+        if (previewBox) {
+            if (container === 'card') {
+                previewBox.style.backgroundColor = 'rgba(15, 23, 42, 0.85)';
+                previewBox.style.border = '1px solid #334155';
+            } else if (container === 'badge') {
+                previewBox.style.backgroundColor = fill;
+                previewBox.style.border = '1px solid ' + border;
+            } else {
+                previewBox.style.backgroundColor = 'transparent';
+                previewBox.style.border = '1px solid transparent';
+            }
+        }
+    }
+
+    MapApp.openTextModal = function(deviceData = null) {
+        if (!state.currentMapId) {
+            if (window.notyf) window.notyf.error('No map selected.');
+            return;
+        }
+
+        const titleEl = document.getElementById('textModalTitle');
+        const idInput = document.getElementById('textLabelDeviceId');
+        const contentInput = document.getElementById('textLabelContent');
+        const sizeInput = document.getElementById('textLabelSize');
+        const boldToggle = document.getElementById('textLabelBoldToggle');
+        const italicToggle = document.getElementById('textLabelItalicToggle');
+        const alignInput = document.getElementById('textLabelAlign');
+        const fontInput = document.getElementById('textLabelFontFamily');
+        const colorPicker = document.getElementById('textLabelColorPicker');
+        const colorVal = document.getElementById('textLabelColorVal');
+        const containerInput = document.getElementById('textLabelContainerStyle');
+        const customControls = document.getElementById('textLabelBadgeCustomControls');
+        const bgPicker = document.getElementById('textLabelBgColorPicker');
+        const borderPicker = document.getElementById('textLabelBorderColorPicker');
+
+        if (deviceData) {
+            // Edit Mode
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-font text-cyan-400"></i> Edit Text Label';
+            if (idInput) idInput.value = deviceData.id;
+            if (contentInput) contentInput.value = deviceData.name || '';
+
+            const style = MapApp.utils.getTextStyleFromDevice(deviceData);
+            if (sizeInput) sizeInput.value = style.size || 16;
+            textModalBoldState = !!style.bold;
+            textModalItalicState = !!style.italic;
+            if (alignInput) alignInput.value = style.align || 'center';
+            if (fontInput) fontInput.value = style.fontFamily || 'sans';
+            if (colorPicker) colorPicker.value = style.color || '#22d3ee';
+            if (colorVal) colorVal.textContent = style.color || '#22d3ee';
+            if (containerInput) containerInput.value = style.containerStyle || 'transparent';
+            if (bgPicker) bgPicker.value = style.fillColor || '#0f172a';
+            if (borderPicker) borderPicker.value = style.borderColor || '#334155';
+        } else {
+            // Create Mode
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-font text-cyan-400"></i> Add Text Label';
+            if (idInput) idInput.value = '';
+            if (contentInput) contentInput.value = '';
+            if (sizeInput) sizeInput.value = '16';
+            textModalBoldState = false;
+            textModalItalicState = false;
+            if (alignInput) alignInput.value = 'center';
+            if (fontInput) fontInput.value = 'sans';
+            if (colorPicker) colorPicker.value = '#22d3ee';
+            if (colorVal) colorVal.textContent = '#22d3ee';
+            if (containerInput) containerInput.value = 'transparent';
+            if (bgPicker) bgPicker.value = '#0f172a';
+            if (borderPicker) borderPicker.value = '#334155';
+        }
+
+        // Update Bold / Italic toggle UI
+        if (boldToggle) {
+            if (textModalBoldState) {
+                boldToggle.classList.add('bg-cyan-600', 'border-cyan-500', 'text-white');
+                boldToggle.classList.remove('bg-slate-900', 'text-slate-300');
+            } else {
+                boldToggle.classList.remove('bg-cyan-600', 'border-cyan-500', 'text-white');
+                boldToggle.classList.add('bg-slate-900', 'text-slate-300');
+            }
+        }
+        if (italicToggle) {
+            if (textModalItalicState) {
+                italicToggle.classList.add('bg-cyan-600', 'border-cyan-500', 'text-white');
+                italicToggle.classList.remove('bg-slate-900', 'text-slate-300');
+            } else {
+                italicToggle.classList.remove('bg-cyan-600', 'border-cyan-500', 'text-white');
+                italicToggle.classList.add('bg-slate-900', 'text-slate-300');
+            }
+        }
+
+        if (customControls) {
+            if (containerInput && containerInput.value === 'badge') {
+                customControls.classList.remove('hidden');
+            } else {
+                customControls.classList.add('hidden');
+            }
+        }
+
+        updateTextLabelPreview();
+        openModal('textModal');
+        if (contentInput) contentInput.focus();
+    };
+
+    // Bold / Italic toggle buttons
+    const textLabelBoldToggle = document.getElementById('textLabelBoldToggle');
+    if (textLabelBoldToggle) {
+        textLabelBoldToggle.addEventListener('click', () => {
+            textModalBoldState = !textModalBoldState;
+            if (textModalBoldState) {
+                textLabelBoldToggle.classList.add('bg-cyan-600', 'border-cyan-500', 'text-white');
+                textLabelBoldToggle.classList.remove('bg-slate-900', 'text-slate-300');
+            } else {
+                textLabelBoldToggle.classList.remove('bg-cyan-600', 'border-cyan-500', 'text-white');
+                textLabelBoldToggle.classList.add('bg-slate-900', 'text-slate-300');
+            }
+            updateTextLabelPreview();
+        });
+    }
+    const textLabelItalicToggle = document.getElementById('textLabelItalicToggle');
+    if (textLabelItalicToggle) {
+        textLabelItalicToggle.addEventListener('click', () => {
+            textModalItalicState = !textModalItalicState;
+            if (textModalItalicState) {
+                textLabelItalicToggle.classList.add('bg-cyan-600', 'border-cyan-500', 'text-white');
+                textLabelItalicToggle.classList.remove('bg-slate-900', 'text-slate-300');
+            } else {
+                textLabelItalicToggle.classList.remove('bg-cyan-600', 'border-cyan-500', 'text-white');
+                textLabelItalicToggle.classList.add('bg-slate-900', 'text-slate-300');
+            }
+            updateTextLabelPreview();
+        });
+    }
+
+    // Color Swatches
+    document.querySelectorAll('.text-color-swatch').forEach(swatch => {
+        swatch.addEventListener('click', (e) => {
+            const color = e.target.dataset.color;
+            const colorPicker = document.getElementById('textLabelColorPicker');
+            const colorVal = document.getElementById('textLabelColorVal');
+            if (colorPicker) colorPicker.value = color;
+            if (colorVal) colorVal.textContent = color;
+            updateTextLabelPreview();
+        });
+    });
+
+    // Inputs change handlers for preview
+    ['textLabelContent', 'textLabelSize', 'textLabelAlign', 'textLabelFontFamily', 'textLabelColorPicker', 'textLabelContainerStyle', 'textLabelBgColorPicker', 'textLabelBorderColorPicker'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', () => {
+                if (id === 'textLabelColorPicker') {
+                    const colorVal = document.getElementById('textLabelColorVal');
+                    if (colorVal) colorVal.textContent = input.value;
+                }
+                if (id === 'textLabelBgColorPicker') {
+                    const bgHex = document.getElementById('textLabelBgColorHex');
+                    if (bgHex) bgHex.textContent = input.value;
+                }
+                if (id === 'textLabelBorderColorPicker') {
+                    const borderHex = document.getElementById('textLabelBorderColorHex');
+                    if (borderHex) borderHex.textContent = input.value;
+                }
+                if (id === 'textLabelContainerStyle') {
+                    const customControls = document.getElementById('textLabelBadgeCustomControls');
+                    if (customControls) {
+                        if (input.value === 'badge') customControls.classList.remove('hidden');
+                        else customControls.classList.add('hidden');
+                    }
+                }
+                updateTextLabelPreview();
+            });
+        }
+    });
+
+    // Form submit handler
+    const textForm = document.getElementById('textForm');
+    if (textForm) {
+        textForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const deviceId = document.getElementById('textLabelDeviceId')?.value;
+            const textContent = document.getElementById('textLabelContent')?.value?.trim();
+            if (!textContent) {
+                if (window.notyf) window.notyf.error('Please enter text content.');
+                return;
+            }
+
+            const size = parseInt(document.getElementById('textLabelSize')?.value, 10) || 16;
+            const color = document.getElementById('textLabelColorPicker')?.value || '#22d3ee';
+            const align = document.getElementById('textLabelAlign')?.value || 'center';
+            const fontFamily = document.getElementById('textLabelFontFamily')?.value || 'sans';
+            const containerStyle = document.getElementById('textLabelContainerStyle')?.value || 'transparent';
+            const fillColor = document.getElementById('textLabelBgColorPicker')?.value || '#0f172a';
+            const borderColor = document.getElementById('textLabelBorderColorPicker')?.value || '#334155';
+
+            const nextStyle = {
+                size,
+                color,
+                bold: textModalBoldState,
+                italic: textModalItalicState,
+                align,
+                fontFamily,
+                containerStyle,
+                fillColor,
+                borderColor
+            };
+
+            const saveBtn = document.getElementById('saveTextLabelBtn');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
+            }
+
+            try {
+                if (deviceId) {
+                    // Update existing text label
+                    const existingNode = state.nodes.get(deviceId);
+                    const deviceData = existingNode?.deviceData || {};
+                    const portConfigStr = MapApp.utils.withUpdatedTextStyle(deviceData, nextStyle);
+
+                    const updated = await api.post('update_device', {
+                        id: deviceId,
+                        updates: {
+                            name: textContent,
+                            name_text_size: size,
+                            name_text_color: color,
+                            name_text_bold: textModalBoldState ? 1 : 0,
+                            name_text_italic: textModalItalicState ? 1 : 0,
+                            port_config: portConfigStr
+                        }
+                    });
+
+                    const pos = state.network.getPositions([updated.id])[updated.id] || { x: existingNode?.x || 0, y: existingNode?.y || 0 };
+                    const baseNode = {
+                        id: updated.id,
+                        label: updated.name,
+                        title: MapApp.utils.buildNodeTitle(updated),
+                        x: pos.x,
+                        y: pos.y,
+                        deviceData: updated
+                    };
+
+                    state.nodes.update(MapApp.utils.buildVisTextNode(baseNode, updated));
+                    if (window.notyf) window.notyf.success(`Text label "${textContent}" updated.`);
+                } else {
+                    // Create new text label
+                    const viewPosition = state.network.getViewPosition();
+                    const canvasPosition = state.network.canvas.DOMtoCanvas(viewPosition);
+                    const portConfigStr = MapApp.utils.withUpdatedTextStyle({}, nextStyle);
+
+                    const newDevice = await api.post('create_device', {
+                        name: textContent,
+                        type: 'text',
+                        map_id: state.currentMapId,
+                        x: canvasPosition.x,
+                        y: canvasPosition.y,
+                        name_text_size: size,
+                        name_text_color: color,
+                        name_text_bold: textModalBoldState ? 1 : 0,
+                        name_text_italic: textModalItalicState ? 1 : 0,
+                        port_config: portConfigStr
+                    });
+
+                    const baseNode = {
+                        id: newDevice.id,
+                        label: newDevice.name,
+                        title: newDevice.name,
+                        x: newDevice.x,
+                        y: newDevice.y,
+                        deviceData: newDevice
+                    };
+
+                    const visNode = MapApp.utils.buildVisTextNode(baseNode, newDevice);
+                    state.nodes.add(visNode);
+                    if (window.notyf) window.notyf.success(`Text label "${textContent}" added to map.`);
+                }
+                closeModal('textModal');
+            } catch (error) {
+                console.error('Failed to save text label:', error);
+                if (window.notyf) window.notyf.error(error.message || 'Failed to save text label.');
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fas fa-check"></i> Save Label';
+                }
+            }
+        });
     }
 
     els.cancelEdgeBtn.addEventListener('click', () => closeModal('edgeModal'));

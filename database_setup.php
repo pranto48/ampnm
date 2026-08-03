@@ -987,6 +987,18 @@ try {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `port_config` TEXT NULL AFTER `subchoice`;");
         message("Migrated 'devices' table: added 'port_config' column for custom port layouts.");
     }
+    if (!columnExists($pdo, $dbname, 'devices', 'name_text_color')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_color` VARCHAR(20) DEFAULT '#ffffff' AFTER `name_text_size`;");
+        message("Upgraded 'devices' table: added 'name_text_color' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'name_text_bold')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_bold` TINYINT(1) DEFAULT 0 AFTER `name_text_color`;");
+        message("Upgraded 'devices' table: added 'name_text_bold' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'name_text_italic')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_italic` TINYINT(1) DEFAULT 0 AFTER `name_text_bold`;");
+        message("Upgraded 'devices' table: added 'name_text_italic' column.");
+    }
     // MIGRATION: Rename cat5 to cat6 in device_edges
     $pdo->exec("UPDATE `device_edges` SET `connection_type` = 'cat6' WHERE `connection_type` = 'cat5'");
     message("Migrated 'device_edges': renamed 'cat5' connections to 'cat6'.");

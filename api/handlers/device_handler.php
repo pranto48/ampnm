@@ -888,13 +888,15 @@ switch ($action) {
                 exit;
             }
 
-            // Check duplicate name
-            $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND user_id IN ($groupIdsStr)");
-            $stmtDupName->execute([$input['name']]);
-            if ((int)$stmtDupName->fetchColumn() > 0) {
-                http_response_code(400);
-                echo json_encode(['error' => 'A device with this name already exists in your group.']);
-                exit;
+            // Check duplicate name (skip for text label nodes)
+            if (($input['type'] ?? '') !== 'text') {
+                $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND user_id IN ($groupIdsStr)");
+                $stmtDupName->execute([$input['name']]);
+                if ((int)$stmtDupName->fetchColumn() > 0) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'A device with this name already exists in your group.']);
+                    exit;
+                }
             }
 
             // Check duplicate IP
@@ -908,13 +910,13 @@ switch ($action) {
                 }
             }
 
-            $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $portConfigValue = isset($input['port_config']) ? (is_string($input['port_config']) ? $input['port_config'] : json_encode($input['port_config'])) : null;
             $stmt->execute([
                 $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['subchoice'] ?? 0, $input['description'] ?? null, $input['map_id'] ?? null,
                 $input['x'] ?? null, $input['y'] ?? null,
-                $input['ping_interval'] ?? null, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['icon_url'] ?? null,
+                $input['ping_interval'] ?? null, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
                 $input['router_api_username'] ?? null, $input['router_api_password'] ?? null, $input['router_api_port'] ?? null,
                 $input['warning_latency_threshold'] ?? null, $input['warning_packetloss_threshold'] ?? null,
                 $input['critical_latency_threshold'] ?? null, $input['critical_packetloss_threshold'] ?? null,

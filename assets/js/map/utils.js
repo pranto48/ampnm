@@ -190,6 +190,116 @@ MapApp.utils = {
         };
     },
 
+    getDefaultTextStyle: () => ({
+        size: 16,
+        color: '#22d3ee',
+        bold: false,
+        italic: false,
+        align: 'center', // left | center | right
+        fontFamily: 'sans', // sans | mono | serif | display
+        containerStyle: 'transparent', // transparent | card | badge | custom
+        fillColor: 'rgba(15, 23, 42, 0.85)',
+        borderColor: '#334155',
+        borderWidth: 1
+    }),
+
+    getTextStyleFromDevice: (deviceData) => {
+        const defaults = MapApp.utils.getDefaultTextStyle();
+        if (!deviceData) return defaults;
+        let portConfigStyle = {};
+        if (deviceData.port_config) {
+            try {
+                const parsed = typeof deviceData.port_config === 'string'
+                    ? JSON.parse(deviceData.port_config)
+                    : deviceData.port_config;
+                portConfigStyle = parsed?.text_style || {};
+            } catch (e) {}
+        }
+        return {
+            ...defaults,
+            size: parseInt(deviceData.name_text_size, 10) || defaults.size,
+            color: deviceData.name_text_color || defaults.color,
+            bold: !!parseInt(deviceData.name_text_bold, 10),
+            italic: !!parseInt(deviceData.name_text_italic, 10),
+            ...portConfigStyle
+        };
+    },
+
+    withUpdatedTextStyle: (deviceData, nextStyle) => {
+        const current = (deviceData && deviceData.port_config)
+            ? (typeof deviceData.port_config === 'string' ? (() => {
+                try { return JSON.parse(deviceData.port_config); } catch (e) { return {}; }
+            })() : { ...(deviceData.port_config || {}) })
+            : {};
+        current.text_style = {
+            ...MapApp.utils.getDefaultTextStyle(),
+            ...current.text_style,
+            ...(nextStyle || {})
+        };
+        return JSON.stringify(current);
+    },
+
+    buildVisTextNode: (baseNode, deviceData) => {
+        const style = MapApp.utils.getTextStyleFromDevice(deviceData);
+        const fontFaceMap = {
+            sans: "Inter, system-ui, -apple-system, sans-serif",
+            mono: "'JetBrains Mono', 'SFMono-Regular', Consolas, monospace",
+            serif: "Georgia, Cambria, 'Times New Roman', serif",
+            display: "Outfit, Impact, sans-serif"
+        };
+        const fontFace = fontFaceMap[style.fontFamily] || fontFaceMap.sans;
+        
+        let visShape = 'text';
+        let background = 'transparent';
+        let border = 'transparent';
+        let borderWidth = 0;
+
+        if (style.containerStyle === 'card') {
+            visShape = 'box';
+            background = 'rgba(15, 23, 42, 0.85)';
+            border = '#334155';
+            borderWidth = 1;
+        } else if (style.containerStyle === 'badge') {
+            visShape = 'box';
+            background = style.fillColor || 'rgba(30, 41, 59, 0.9)';
+            border = style.borderColor || '#0284c7';
+            borderWidth = style.borderWidth || 1;
+        } else if (style.containerStyle === 'custom') {
+            visShape = 'box';
+            background = style.fillColor || 'transparent';
+            border = style.borderColor || 'transparent';
+            borderWidth = style.borderWidth || 1;
+        }
+
+        const formattedLabel = baseNode.label || deviceData.name || 'Text Label';
+        
+        return {
+            ...baseNode,
+            id: deviceData.id,
+            label: formattedLabel,
+            shape: visShape,
+            color: {
+                background: background,
+                border: border
+            },
+            borderWidth: borderWidth,
+            margin: visShape === 'box' ? 12 : 6,
+            font: {
+                color: style.color || '#22d3ee',
+                size: style.size || 16,
+                face: fontFace,
+                align: style.align || 'center',
+                bold: style.bold ? { color: style.color, size: style.size, face: fontFace } : false,
+                italic: style.italic ? { color: style.color, size: style.size, face: fontFace } : false,
+                multi: true
+            },
+            deviceData: {
+                ...deviceData,
+                type: 'text'
+            }
+        };
+    },
+
     getDefaultTooltipFields: () => ({
         ip: true,
         type: true,
