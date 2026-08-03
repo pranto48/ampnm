@@ -442,19 +442,45 @@ function renderMap({ map, devices, edges }) {
             nodes: { borderWidth: 1, shadow: true },
         });
 
-        // Continuous redraw loop so CSS-animated SVGs play on the public read-only canvas
+        // Throttled master animation loop (~25 FPS) with tab visibility pause
         (function startAnimationLoop() {
-            function loop() {
-                if (!visNetwork) return;
-                const hasAnimated = visNodesDataset.get().some(n =>
-                    n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
-                );
-                if (hasAnimated) {
-                    visNetwork.redraw();
+            let lastFrameTime = 0;
+            let animRafId = null;
+            const targetFPS = 25;
+            const fpsInterval = 1000 / targetFPS;
+
+            function loop(timestamp) {
+                if (document.hidden) {
+                    animRafId = null;
+                    return;
                 }
-                requestAnimationFrame(loop);
+                if (!visNetwork) {
+                    animRafId = requestAnimationFrame(loop);
+                    return;
+                }
+
+                const elapsed = timestamp - (lastFrameTime || timestamp);
+                if (elapsed >= fpsInterval) {
+                    lastFrameTime = timestamp - (elapsed % fpsInterval);
+
+                    const hasAnimated = visNodesDataset.get().some(n =>
+                        n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
+                    );
+                    if (hasAnimated) {
+                        visNetwork.redraw();
+                    }
+                }
+                animRafId = requestAnimationFrame(loop);
             }
-            requestAnimationFrame(loop);
+
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && !animRafId) {
+                    lastFrameTime = performance.now();
+                    animRafId = requestAnimationFrame(loop);
+                }
+            });
+
+            animRafId = requestAnimationFrame(loop);
         })();
 
         // Synchronize DOM Overlay for animated SVGs

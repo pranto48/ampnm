@@ -13,38 +13,16 @@ let globalProgress = 0.0;
 let globalSpeedMultiplier = 1.0; // Dynamic speed bound to slider
 
 function startEdgeAnimation() {
-    if (edgeAnimFrameId) {
-        cancelAnimationFrame(edgeAnimFrameId);
+    if (MapApp.ui && typeof MapApp.ui.startCanvasAnimationLoop === 'function') {
+        MapApp.ui.startCanvasAnimationLoop();
     }
-    const loop = () => {
-        const timelineSlider = document.getElementById('timelineSlider');
-        const isLive = timelineSlider ? parseInt(timelineSlider.value, 10) === 24 : true;
-
-        if (isLive) {
-            globalProgress = (globalProgress + 0.003 * globalSpeedMultiplier) % 1.0;
-            if (MapApp.state.network) {
-                MapApp.state.network.redraw();
-            }
-            edgeAnimFrameId = requestAnimationFrame(loop);
-        } else {
-            edgeAnimFrameId = null;
-        }
-    };
-    edgeAnimFrameId = requestAnimationFrame(loop);
 }
 
 function stopEdgeAnimation() {
-    if (edgeAnimFrameId) {
-        cancelAnimationFrame(edgeAnimFrameId);
-        edgeAnimFrameId = null;
+    if (MapApp.state && MapApp.state.animationFrameId) {
+        cancelAnimationFrame(MapApp.state.animationFrameId);
+        MapApp.state.animationFrameId = null;
     }
-}
-
-// Override MapApp.ui.startCanvasAnimationLoop to use our high-frequency loop
-if (MapApp.ui) {
-    MapApp.ui.startCanvasAnimationLoop = function() {
-        startEdgeAnimation();
-    };
 }
 
 MapApp.network = {
@@ -148,24 +126,7 @@ MapApp.network = {
         MapApp.state.network = new vis.Network(container, data, options);
         MapApp.network.restoreSavedView();
 
-        // Continuous redraw loop so CSS-animated SVGs play on vis.js canvas via DOM Overlay Engine
-        (function startAnimationLoop() {
-            let rafId = null;
-            function loop() {
-                if (!MapApp.state.network) return;
-                // Check if any node uses an animated SVG
-                const hasAnimated = MapApp.state.nodes.get().some(n =>
-                    n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
-                );
-                if (hasAnimated) {
-                    MapApp.state.network.redraw();
-                }
-                rafId = requestAnimationFrame(loop);
-            }
-            rafId = requestAnimationFrame(loop);
-            // Store so it can be cancelled if needed
-            MapApp.state._animationRafId = rafId;
-        })();
+        // Unified master animation loop handles both animated edges and nodes efficiently via MapApp.ui.startCanvasAnimationLoop()
 
         MapApp.state.network.on("afterDrawing", (ctx) => {
             if (!MapApp.state.network) return;

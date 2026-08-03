@@ -394,23 +394,52 @@ MapApp.ui = {
     },
 
     startCanvasAnimationLoop: () => {
-        const loop = () => {
+        let lastFrameTime = 0;
+        const targetFPS = 25;
+        const fpsInterval = 1000 / targetFPS; // ~40ms per frame
+
+        const loop = (timestamp) => {
+            if (document.hidden) {
+                // Pause animation loop when browser tab is inactive to save GPU/CPU
+                MapApp.state.animationFrameId = null;
+                return;
+            }
+
             if (!MapApp.state.network) {
                 MapApp.state.animationFrameId = requestAnimationFrame(loop);
                 return;
             }
 
-            const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
-            const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) ?? 100));
-            
-            const timelineSlider = document.getElementById('timelineSlider');
-            const isLive = timelineSlider ? parseInt(timelineSlider.value, 10) === 24 : true;
-            
-            const speedMultiplier = (speedPercent / 100) * (isLive ? 1 : 0);
+            const elapsed = timestamp - (lastFrameTime || timestamp);
+            if (elapsed >= fpsInterval) {
+                lastFrameTime = timestamp - (elapsed % fpsInterval);
 
-            if (speedMultiplier > 0) {
-                MapApp.state.edgeAnimProgress = (MapApp.state.edgeAnimProgress + 0.003 * speedMultiplier) % 1.0;
-                MapApp.state.network.redraw();
+                const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
+                const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) ?? 100));
+                
+                const timelineSlider = document.getElementById('timelineSlider');
+                const isLive = timelineSlider ? parseInt(timelineSlider.value, 10) === 24 : true;
+                
+                const speedMultiplier = (speedPercent / 100) * (isLive ? 1 : 0);
+
+                // Check if any nodes use animated SVG icons
+                const hasAnimatedNodes = MapApp.state.nodes ? MapApp.state.nodes.get().some(n =>
+                    n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
+                ) : false;
+
+                // Check if any edges have animated connection lines
+                const hasAnimatedEdges = speedMultiplier > 0 && MapApp.state.edges ? MapApp.state.edges.get().some(e =>
+                    e.dashes || e.connection_type === 'wifi' || e.connection_type === 'fiber' || e.connection_type === 'radio'
+                ) : false;
+
+                if (speedMultiplier > 0) {
+                    MapApp.state.edgeAnimProgress = (MapApp.state.edgeAnimProgress + 0.003 * speedMultiplier) % 1.0;
+                }
+
+                // Redraw canvas ONLY if there are active animated elements
+                if (hasAnimatedEdges || hasAnimatedNodes) {
+                    MapApp.state.network.redraw();
+                }
             }
 
             MapApp.state.animationFrameId = requestAnimationFrame(loop);
@@ -418,7 +447,20 @@ MapApp.ui = {
 
         if (MapApp.state.animationFrameId) {
             cancelAnimationFrame(MapApp.state.animationFrameId);
+            MapApp.state.animationFrameId = null;
         }
+
+        // Auto resume on visibility change if stopped
+        if (!MapApp.state._visibilityListenerAttached) {
+            MapApp.state._visibilityListenerAttached = true;
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && !MapApp.state.animationFrameId) {
+                    lastFrameTime = performance.now();
+                    MapApp.state.animationFrameId = requestAnimationFrame(loop);
+                }
+            });
+        }
+
         MapApp.state.animationFrameId = requestAnimationFrame(loop);
     },
 

@@ -174,14 +174,18 @@ usort($menu_tree, function($a, $b) {
             color: #94a3b8 !important;
         }
 
-        /* Map Page & UI Element Liquid Glass Optics */
-        #network-map-wrapper, #network-map {
-            background-color: rgba(15, 23, 42, 0.55) !important;
-            backdrop-filter: blur(28px) saturate(210%) !important;
-            -webkit-backdrop-filter: blur(28px) saturate(210%) !important;
+        /* Map Page & UI Element Optics - Hardware Accelerated & GPU Optimized */
+        #network-map-wrapper {
+            background-color: rgba(15, 23, 42, 0.85) !important;
             border: 1px solid rgba(255, 255, 255, 0.16) !important;
             border-radius: 1.25rem !important;
             box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.28), 0 20px 50px -10px rgba(0, 0, 0, 0.6) !important;
+            contain: layout paint;
+            transform: translateZ(0);
+        }
+        #network-map {
+            background-color: #0f172a !important;
+            border-radius: 1.25rem !important;
         }
         .vis-tooltip {
             background: rgba(15, 23, 42, 0.92) !important;
