@@ -723,10 +723,33 @@ function initMap() {
                 MapApp.openTextModal();
             });
         }
+        if (els.addMapTitleBtn) {
+            els.addMapTitleBtn.addEventListener('click', () => {
+                const currentMapName = document.getElementById('currentMapName')?.textContent?.trim() || 'NETWORK MAP';
+                MapApp.openTextModal({
+                    name: currentMapName.toUpperCase(),
+                    name_text_color: '#22d3ee',
+                    name_text_bold: 1,
+                    name_text_italic: 0,
+                    textStyle: {
+                        size: 32,
+                        bold: true,
+                        italic: false,
+                        align: 'center',
+                        fontFamily: 'sans',
+                        color: '#22d3ee',
+                        containerStyle: 'card',
+                        fillColor: '#0f172a',
+                        borderColor: '#06b6d4'
+                    }
+                });
+            });
+        }
     } else {
         if (els.addEdgeBtn) els.addEdgeBtn.disabled = true;
         if (els.addGroupBoxBtn) els.addGroupBoxBtn.disabled = true;
         if (els.addTextBtn) els.addTextBtn.disabled = true;
+        if (els.addMapTitleBtn) els.addMapTitleBtn.disabled = true;
     }
 
     // Text Label & Annotation System Controller
@@ -935,6 +958,133 @@ function initMap() {
             });
         }
     });
+
+    // Quick Text Presets apply logic
+    function applyTextPreset(preset) {
+        const contentInput = document.getElementById('textLabelContent');
+        const sizeInput = document.getElementById('textLabelSize');
+        const alignInput = document.getElementById('textLabelAlign');
+        const fontInput = document.getElementById('textLabelFontFamily');
+        const colorPicker = document.getElementById('textLabelColorPicker');
+        const colorVal = document.getElementById('textLabelColorVal');
+        const containerInput = document.getElementById('textLabelContainerStyle');
+        const bgPicker = document.getElementById('textLabelBgColorPicker');
+        const borderPicker = document.getElementById('textLabelBorderColorPicker');
+
+        if (contentInput) contentInput.value = preset.text;
+        if (sizeInput) sizeInput.value = preset.size;
+        textModalBoldState = !!preset.bold;
+        textModalItalicState = !!preset.italic;
+        if (alignInput) alignInput.value = preset.align || 'center';
+        if (fontInput) fontInput.value = preset.fontFamily || 'sans';
+        if (colorPicker) colorPicker.value = preset.color;
+        if (colorVal) colorVal.textContent = preset.color;
+        if (containerInput) containerInput.value = preset.containerStyle;
+        if (bgPicker) bgPicker.value = preset.fillColor || '#0f172a';
+        if (borderPicker) borderPicker.value = preset.borderColor || '#334155';
+
+        const boldToggle = document.getElementById('textLabelBoldToggle');
+        const italicToggle = document.getElementById('textLabelItalicToggle');
+        if (boldToggle) {
+            if (textModalBoldState) {
+                boldToggle.classList.add('bg-cyan-600', 'border-cyan-500', 'text-white');
+                boldToggle.classList.remove('bg-slate-900', 'text-slate-300');
+            } else {
+                boldToggle.classList.remove('bg-cyan-600', 'border-cyan-500', 'text-white');
+                boldToggle.classList.add('bg-slate-900', 'text-slate-300');
+            }
+        }
+        if (italicToggle) {
+            if (textModalItalicState) {
+                italicToggle.classList.add('bg-cyan-600', 'border-cyan-500', 'text-white');
+                italicToggle.classList.remove('bg-slate-900', 'text-slate-300');
+            } else {
+                italicToggle.classList.remove('bg-cyan-600', 'border-cyan-500', 'text-white');
+                italicToggle.classList.add('bg-slate-900', 'text-slate-300');
+            }
+        }
+
+        const customControls = document.getElementById('textLabelBadgeCustomControls');
+        if (customControls) {
+            if (preset.containerStyle === 'badge') customControls.classList.remove('hidden');
+            else customControls.classList.add('hidden');
+        }
+
+        updateTextLabelPreview();
+    }
+
+    const presetMapNameBtn = document.getElementById('presetMapNameBtn');
+    if (presetMapNameBtn) {
+        presetMapNameBtn.addEventListener('click', () => {
+            const currentMapName = document.getElementById('currentMapName')?.textContent?.trim() || 'NETWORK MAP';
+            applyTextPreset({
+                text: currentMapName.toUpperCase(),
+                size: '32',
+                bold: true,
+                italic: false,
+                align: 'center',
+                fontFamily: 'sans',
+                color: '#22d3ee',
+                containerStyle: 'card',
+                fillColor: '#0f172a',
+                borderColor: '#06b6d4'
+            });
+        });
+    }
+
+    const presetZoneBtn = document.getElementById('presetZoneBtn');
+    if (presetZoneBtn) {
+        presetZoneBtn.addEventListener('click', () => {
+            applyTextPreset({
+                text: 'DATACENTER ZONE A',
+                size: '24',
+                bold: true,
+                italic: false,
+                align: 'center',
+                fontFamily: 'display',
+                color: '#ffffff',
+                containerStyle: 'badge',
+                fillColor: '#1e293b',
+                borderColor: '#64748b'
+            });
+        });
+    }
+
+    const presetBackboneBtn = document.getElementById('presetBackboneBtn');
+    if (presetBackboneBtn) {
+        presetBackboneBtn.addEventListener('click', () => {
+            applyTextPreset({
+                text: '10G FIBER BACKBONE',
+                size: '18',
+                bold: true,
+                italic: true,
+                align: 'center',
+                fontFamily: 'mono',
+                color: '#22c55e',
+                containerStyle: 'badge',
+                fillColor: '#064e3b',
+                borderColor: '#10b981'
+            });
+        });
+    }
+
+    const presetNoteBtn = document.getElementById('presetNoteBtn');
+    if (presetNoteBtn) {
+        presetNoteBtn.addEventListener('click', () => {
+            applyTextPreset({
+                text: 'CRITICAL INFRASTRUCTURE - 24/7 MONITORED',
+                size: '14',
+                bold: true,
+                italic: false,
+                align: 'center',
+                fontFamily: 'sans',
+                color: '#f59e0b',
+                containerStyle: 'badge',
+                fillColor: '#451a03',
+                borderColor: '#f59e0b'
+            });
+        });
+    }
 
     // Form submit handler
     const textForm = document.getElementById('textForm');

@@ -109,6 +109,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <a href="create-device.php" id="addDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add New Device" <?= $is_admin ? '' : 'style="display:none;"' ?>><i class="fas fa-plus"></i></a>
                             <button id="addGroupBoxBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Group Box" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-vector-square"></i></button>
                             <button id="addTextBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Text Label" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-font"></i></button>
+                            <button id="addMapTitleBtn" class="px-3 py-2 bg-slate-700 text-cyan-400 rounded-lg hover:bg-slate-600 border border-cyan-500/30 flex items-center gap-1.5 font-medium text-xs" title="Add Map Title Banner to Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-heading"></i> Map Title</button>
                             <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
                             <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
@@ -233,6 +234,30 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
 
             <form id="textForm" onsubmit="return false;">
                 <input type="hidden" id="textLabelDeviceId" value="">
+
+                <!-- Quick Text Presets Row -->
+                <div class="mb-3.5 bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
+                            <i class="fas fa-magic"></i> Quick Presets
+                        </span>
+                        <span class="text-[10px] text-slate-400">Click to apply template</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <button type="button" id="presetMapNameBtn" class="px-2.5 py-1 text-xs bg-cyan-950/80 text-cyan-300 border border-cyan-700/80 rounded hover:bg-cyan-900 transition flex items-center gap-1 font-medium">
+                            <i class="fas fa-map-marker-alt"></i> Map Title
+                        </button>
+                        <button type="button" id="presetZoneBtn" class="px-2.5 py-1 text-xs bg-slate-800 text-slate-200 border border-slate-600 rounded hover:bg-slate-700 transition flex items-center gap-1 font-medium">
+                            <i class="fas fa-building"></i> Datacenter Zone
+                        </button>
+                        <button type="button" id="presetBackboneBtn" class="px-2.5 py-1 text-xs bg-emerald-950/80 text-emerald-300 border border-emerald-700/80 rounded hover:bg-emerald-900 transition flex items-center gap-1 font-medium">
+                            <i class="fas fa-network-wired"></i> Fiber Link
+                        </button>
+                        <button type="button" id="presetNoteBtn" class="px-2.5 py-1 text-xs bg-amber-950/80 text-amber-300 border border-amber-700/80 rounded hover:bg-amber-900 transition flex items-center gap-1 font-medium">
+                            <i class="fas fa-exclamation-triangle"></i> Status Note
+                        </button>
+                    </div>
+                </div>
 
                 <!-- Text Content Input -->
                 <div class="mb-4">
