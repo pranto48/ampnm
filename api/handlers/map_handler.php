@@ -15,7 +15,7 @@ $groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
 
 switch ($action) {
     case 'get_maps':
-        $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id IN ($groupIdsStr)) as deviceCount FROM maps m WHERE m.user_id IN ($groupIdsStr)";
+        $sql = "SELECT m.id, m.parent_map_id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id IN ($groupIdsStr)) as deviceCount FROM maps m WHERE m.user_id IN ($groupIdsStr)";
         $params = [];
         $sql .= " ORDER BY m.created_at ASC";
 
@@ -29,10 +29,11 @@ switch ($action) {
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can create maps.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = $input['name'] ?? ''; $type = $input['type'] ?? 'lan';
+            $parent_map_id = isset($input['parent_map_id']) ? intval($input['parent_map_id']) : null;
             if (empty($name)) { http_response_code(400); echo json_encode(['error' => 'Name is required']); exit; }
-            $stmt = $pdo->prepare("INSERT INTO maps (user_id, name, type) VALUES (?, ?, ?)"); $stmt->execute([$current_user_id, $name, $type]);
+            $stmt = $pdo->prepare("INSERT INTO maps (user_id, parent_map_id, name, type) VALUES (?, ?, ?, ?)"); $stmt->execute([$current_user_id, $parent_map_id, $name, $type]);
             $lastId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare("SELECT id, name, type, public_view_enabled, updated_at as lastModified, 0 as deviceCount FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT id, parent_map_id, name, type, public_view_enabled, updated_at as lastModified, 0 as deviceCount FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
             $map = $stmt->fetch(PDO::FETCH_ASSOC); echo json_encode($map);
         }
         break;
@@ -44,7 +45,7 @@ switch ($action) {
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Map ID and updates are required']); exit; }
             
-            $allowed_fields = ['name', 'background_color', 'background_image_url', 'public_view_enabled', 'offline_delay_seconds'];
+            $allowed_fields = ['name', 'parent_map_id', 'background_color', 'background_image_url', 'public_view_enabled', 'offline_delay_seconds'];
             $fields = []; $params = [];
             foreach ($updates as $key => $value) {
                 if (in_array($key, $allowed_fields)) {

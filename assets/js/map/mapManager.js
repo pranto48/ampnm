@@ -328,6 +328,38 @@ MapApp.mapManager = {
             // Update offline delay badge in toolbar
             const delayBadge = document.getElementById('offlineDelayValue');
             if (delayBadge) delayBadge.textContent = delaySeconds;
+
+            // Render Sub-Map Breadcrumbs
+            const breadcrumbBar = document.getElementById('mapBreadcrumbBar');
+            const breadcrumbLinks = document.getElementById('mapBreadcrumbLinks');
+            if (breadcrumbBar && breadcrumbLinks) {
+                const chain = [];
+                let curr = currentMap;
+                while (curr) {
+                    chain.unshift(curr);
+                    if (curr.parent_map_id) {
+                        curr = MapApp.state.maps.find(m => m.id == curr.parent_map_id);
+                    } else {
+                        break;
+                    }
+                }
+                if (chain.length > 1) {
+                    breadcrumbBar.classList.remove('hidden');
+                    breadcrumbBar.classList.add('flex');
+                    breadcrumbLinks.innerHTML = chain.map((m, idx) => {
+                        const isLast = idx === chain.length - 1;
+                        if (isLast) {
+                            return `<span class="text-white font-bold">${m.name}</span>`;
+                        } else {
+                            return `<a href="#" onclick="MapApp.mapManager.switchMap(${m.id}); return false;" class="text-cyan-400 hover:underline">${m.name}</a> <i class="fas fa-chevron-right text-[10px] text-slate-500 mx-0.5"></i>`;
+                        }
+                    }).join('');
+                } else {
+                    breadcrumbBar.classList.add('hidden');
+                    breadcrumbBar.classList.remove('flex');
+                    breadcrumbLinks.innerHTML = '';
+                }
+            }
         }
         
         // Correctly extract the 'devices' array from the API response
@@ -542,5 +574,74 @@ MapApp.mapManager = {
             MapApp.ui.els.publicViewLink.value = '';
             MapApp.ui.els.publicViewLinkContainer.classList.add('hidden');
         }
+    },
+
+    openRackVisualizer: (rackDevice) => {
+        const modal = document.getElementById('rackVisualizerModal');
+        const title = document.getElementById('rackModalTitle');
+        const slotsContainer = document.getElementById('rackSlotsContainer');
+        const installedList = document.getElementById('rackInstalledList');
+        const totalUnitsEl = document.getElementById('rackTotalUnits');
+        const mountedCountEl = document.getElementById('rackMountedCount');
+        const availableUnitsEl = document.getElementById('rackAvailableUnits');
+
+        if (!modal || !slotsContainer) return;
+
+        const totalUnits = parseInt(rackDevice.rack_units) || 42;
+        if (title) title.innerHTML = `<i class="fas fa-server text-cyan-400"></i> 19" Rack: ${rackDevice.name} (${totalUnits}U)`;
+        if (totalUnitsEl) totalUnitsEl.textContent = `${totalUnits}U`;
+
+        const allDevices = MapApp.state.nodes ? MapApp.state.nodes.get().map(n => n.deviceData).filter(Boolean) : [];
+        const rackDevices = allDevices.filter(d => d.rack_position && parseInt(d.rack_position) > 0);
+
+        const occupiedSlots = {};
+        rackDevices.forEach(d => {
+            const u = parseInt(d.rack_position);
+            occupiedSlots[u] = d;
+        });
+
+        let slotsHTML = '';
+        let mountedCount = 0;
+        for (let u = totalUnits; u >= 1; u--) {
+            const dev = occupiedSlots[u];
+            if (dev) {
+                mountedCount++;
+                const statusBg = dev.status === 'online' ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300' : 'bg-red-950/80 border-red-600 text-red-300';
+                slotsHTML += `
+                    <div class="flex items-center gap-2 p-1.5 rounded border ${statusBg}">
+                        <span class="w-8 font-bold text-slate-400 border-r border-slate-700 pr-1 text-center">${u}U</span>
+                        <i class="fas fa-server text-cyan-400"></i>
+                        <span class="font-bold flex-1 truncate">${dev.name} (${dev.ip || 'DHCP'})</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-900 border border-slate-700">${dev.status || 'unknown'}</span>
+                    </div>
+                `;
+            } else {
+                slotsHTML += `
+                    <div class="flex items-center gap-2 p-1.5 rounded border border-slate-800/80 bg-slate-900/40 text-slate-600 hover:bg-slate-900/80 transition">
+                        <span class="w-8 font-bold text-slate-500 border-r border-slate-800 pr-1 text-center">${u}U</span>
+                        <span class="text-[10px] tracking-wider uppercase">--- Empty Slot ---</span>
+                    </div>
+                `;
+            }
+        }
+
+        slotsContainer.innerHTML = slotsHTML;
+        if (mountedCountEl) mountedCountEl.textContent = `${mountedCount} Units`;
+        if (availableUnitsEl) availableUnitsEl.textContent = `${totalUnits - mountedCount}U Free`;
+
+        if (installedList) {
+            if (rackDevices.length === 0) {
+                installedList.innerHTML = '<span class="text-slate-500 text-xs italic">No hardware mounted yet.</span>';
+            } else {
+                installedList.innerHTML = rackDevices.map(d => `
+                    <div class="flex items-center justify-between p-1.5 bg-slate-900 border border-slate-700 rounded text-xs">
+                        <span class="text-white font-medium truncate">${d.name}</span>
+                        <span class="text-cyan-400 font-mono font-bold">${d.rack_position}U</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        modal.classList.remove('hidden');
     }
 };

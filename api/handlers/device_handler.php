@@ -13,6 +13,7 @@ $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
 $current_group_user_ids = $GLOBALS['current_group_user_ids'] ?? [$current_user_id];
 $groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
 require_once __DIR__ . '/../../includes/smtp_mailer.php';
+require_once __DIR__ . '/../../includes/audit_logger.php';
 
 function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) {
     if (!in_array($newStatus, ['online', 'offline', 'warning', 'critical'], true)) {
@@ -924,6 +925,7 @@ switch ($action) {
                 $portConfigValue
             ]);
             $lastId = $pdo->lastInsertId();
+            log_audit($pdo, 'create_device', 'device', $lastId, "Created device '{$input['name']}' (type: {$input['type']})");
             $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id IN ($groupIdsStr)");
             $stmt->execute([$lastId]);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -979,7 +981,7 @@ switch ($action) {
                 exit;
             }
 
-            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'ping_interval', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config'];
+            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config'];
             if (!$hasSubchoice) {
                 $allowed_fields = array_values(array_diff($allowed_fields, ['subchoice']));
             }
@@ -1071,6 +1073,7 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
+            log_audit($pdo, 'delete_device', 'device', $id, "Deleted device #{$id}");
             $stmt = $pdo->prepare("DELETE FROM devices WHERE id = ? AND user_id IN ($groupIdsStr)"); $stmt->execute([$id]);
             echo json_encode(['success' => true, 'message' => 'Device deleted successfully']);
         }
@@ -1081,6 +1084,7 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ids = $input['ids'] ?? [];
             if (!is_array($ids) || empty($ids)) { http_response_code(400); echo json_encode(['error' => 'No device IDs provided']); exit; }
+            log_audit($pdo, 'bulk_delete_devices', 'device', null, "Bulk deleted devices: " . implode(',', $ids));
             $in = implode(',', array_fill(0, count($ids), '?'));
             $stmt = $pdo->prepare("DELETE FROM devices WHERE id IN ($in) AND user_id IN ($groupIdsStr)");
             $stmt->execute($ids);

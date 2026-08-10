@@ -999,6 +999,71 @@ try {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_italic` TINYINT(1) DEFAULT 0 AFTER `name_text_bold`;");
         message("Upgraded 'devices' table: added 'name_text_italic' column.");
     }
+    // v1.19 MIGRATION: Sub-Maps & 19" Rack Support
+    if (!columnExists($pdo, $dbname, 'maps', 'parent_map_id')) {
+        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `parent_map_id` INT NULL DEFAULT NULL AFTER `id`;");
+        message("Upgraded 'maps' table: added 'parent_map_id' column for drill-down sub-maps.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'target_map_id')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `target_map_id` INT NULL DEFAULT NULL AFTER `name_text_italic`;");
+        message("Upgraded 'devices' table: added 'target_map_id' column for sub-map links.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'is_rack')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `is_rack` TINYINT(1) DEFAULT 0 AFTER `target_map_id`;");
+        message("Upgraded 'devices' table: added 'is_rack' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'rack_units')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `rack_units` INT DEFAULT 42 AFTER `is_rack`;");
+        message("Upgraded 'devices' table: added 'rack_units' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'rack_position')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `rack_position` INT NULL AFTER `rack_units`;");
+        message("Upgraded 'devices' table: added 'rack_position' column.");
+    }
+
+    // v1.19 MIGRATION: Bandwidth Flow & Link Traffic Analytics
+    if (!columnExists($pdo, $dbname, 'device_edges', 'bandwidth_speed_mbps')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `bandwidth_speed_mbps` INT DEFAULT 1000 AFTER `target_port_label`;");
+        message("Upgraded 'device_edges' table: added 'bandwidth_speed_mbps' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'device_edges', 'utilization_percent')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `utilization_percent` FLOAT DEFAULT 0 AFTER `bandwidth_speed_mbps`;");
+        message("Upgraded 'device_edges' table: added 'utilization_percent' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'device_edges', 'rx_bytes')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `rx_bytes` BIGINT DEFAULT 0 AFTER `utilization_percent`;");
+        message("Upgraded 'device_edges' table: added 'rx_bytes' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'device_edges', 'tx_bytes')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `tx_bytes` BIGINT DEFAULT 0 AFTER `rx_bytes`;");
+        message("Upgraded 'device_edges' table: added 'tx_bytes' column.");
+    }
+
+    // v1.19 MIGRATION: Audit Logs Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `audit_logs` (
+        `id` INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `user_id` INT(11) NULL,
+        `username` VARCHAR(100) NOT NULL,
+        `action` VARCHAR(100) NOT NULL,
+        `entity_type` VARCHAR(50) NOT NULL,
+        `entity_id` INT(11) NULL,
+        `details` TEXT NULL,
+        `ip_address` VARCHAR(45) NULL,
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Created or verified 'audit_logs' table.");
+
+    // v1.19 MIGRATION: Map Permissions Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `map_permissions` (
+        `id` INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `map_id` INT(11) NOT NULL,
+        `user_id` INT(11) NOT NULL,
+        `permission` ENUM('read', 'write', 'admin') DEFAULT 'read',
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY `map_user_unique` (`map_id`, `user_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Created or verified 'map_permissions' table.");
+
     // MIGRATION: Rename cat5 to cat6 in device_edges
     $pdo->exec("UPDATE `device_edges` SET `connection_type` = 'cat6' WHERE `connection_type` = 'cat5'");
     message("Migrated 'device_edges': renamed 'cat5' connections to 'cat6'.");

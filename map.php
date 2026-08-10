@@ -43,6 +43,12 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <span id="offlineDelayValue">5</span>s delay
                         </span>
                     </div>
+
+                    <!-- Sub-Map Breadcrumbs Bar -->
+                    <div id="mapBreadcrumbBar" class="hidden items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-700/60">
+                        <i class="fas fa-sitemap text-cyan-400"></i>
+                        <div id="mapBreadcrumbLinks" class="flex items-center gap-1.5 flex-wrap"></div>
+                    </div>
                     <div class="flex items-center gap-2">
                         <button id="scanNetworkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Scan Network" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-search"></i></button>
                         <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses"><i class="fas fa-sync-alt"></i></button>
@@ -1088,7 +1094,72 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         }
     });
 })();
-</script>
+    <!-- 19-inch Server Rack Visualizer Modal -->
+    <div id="rackVisualizerModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-4xl border border-slate-700 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <h2 id="rackModalTitle" class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-server text-cyan-400"></i> 19" Server Rack Cabinet Visualizer
+                </h2>
+                <button type="button" class="text-slate-400 hover:text-white text-lg modal-close-btn" onclick="closeModal('rackVisualizerModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Rack Cabinet Frame -->
+                <div class="md:col-span-2 bg-slate-950 p-4 rounded-lg border-2 border-slate-800 flex flex-col">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-800 text-xs font-mono text-cyan-400 font-bold mb-3">
+                        <span>TOP OF RACK (42U)</span>
+                        <span id="rackCabinetStatus">STATUS: ACTIVE</span>
+                    </div>
+
+                    <!-- 42U Unit Slots Container -->
+                    <div id="rackSlotsContainer" class="space-y-1 font-mono text-xs overflow-y-auto max-h-[500px] pr-1"></div>
+
+                    <div class="pt-2 border-t border-slate-800 text-xs font-mono text-slate-500 text-center mt-3">
+                        BOTTOM OF RACK (1U)
+                    </div>
+                </div>
+
+                <!-- Mounted Devices & Info Panel -->
+                <div class="bg-slate-800/60 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-1.5">
+                            <i class="fas fa-info-circle text-cyan-400"></i> Rack Specifications
+                        </h3>
+                        <div class="space-y-2.5 text-xs">
+                            <div class="flex justify-between border-b border-slate-700/60 pb-1.5">
+                                <span class="text-slate-400">Total Rack Units:</span>
+                                <span class="text-white font-mono font-bold" id="rackTotalUnits">42U</span>
+                            </div>
+                            <div class="flex justify-between border-b border-slate-700/60 pb-1.5">
+                                <span class="text-slate-400">Mounted Equipment:</span>
+                                <span class="text-cyan-400 font-mono font-bold" id="rackMountedCount">0 Units</span>
+                            </div>
+                            <div class="flex justify-between border-b border-slate-700/60 pb-1.5">
+                                <span class="text-slate-400">Available Space:</span>
+                                <span class="text-emerald-400 font-mono font-bold" id="rackAvailableUnits">42U Free</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-5">
+                            <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Installed Hardware</h4>
+                            <div id="rackInstalledList" class="space-y-1.5 max-h-[220px] overflow-y-auto"></div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-700/80">
+                        <button type="button" class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-semibold transition" onclick="closeModal('rackVisualizerModal')">
+                            Close Rack View
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
 
 <?php include 'footer.php'; ?>
 

@@ -252,8 +252,16 @@ MapApp.network = {
                 const isAnimated = rawEdge && rawEdge.custom_animated !== undefined ? (rawEdge.custom_animated == 1) : true;
                 if (!isAnimated) continue;
 
-                // Match edge color with glow
-                const edgeColor = edge.options?.color?.color || '#00F2FE';
+                // Bandwidth Utilization Dynamic Link Color (v1.19 Feature)
+                let edgeColor = edge.options?.color?.color || '#00F2FE';
+                const util = rawEdge && rawEdge.utilization_percent !== undefined ? parseFloat(rawEdge.utilization_percent) : 0;
+                if (util >= 80) {
+                    edgeColor = '#ef4444'; // Red - Overload Alert
+                } else if (util >= 50) {
+                    edgeColor = '#f59e0b'; // Amber - Moderate Load
+                } else if (util > 0) {
+                    edgeColor = '#22c55e'; // Green - Healthy Link
+                }
 
                 if (runStyle === 'data-flow') {
                     // Draw flowing packets
@@ -451,9 +459,19 @@ MapApp.network = {
         MapApp.state.network.on("doubleClick", (params) => { 
             if (params.nodes.length > 0) {
                 const node = MapApp.state.nodes.get(params.nodes[0]);
-                if (node && node.deviceData && node.deviceData.type === 'text') {
-                    if (typeof MapApp.openTextModal === 'function') MapApp.openTextModal(node.deviceData);
-                    return;
+                if (node && node.deviceData) {
+                    if (node.deviceData.target_map_id) {
+                        MapApp.mapManager.switchMap(node.deviceData.target_map_id);
+                        return;
+                    }
+                    if (node.deviceData.is_rack == 1 || node.deviceData.type === 'rack') {
+                        MapApp.mapManager.openRackVisualizer(node.deviceData);
+                        return;
+                    }
+                    if (node.deviceData.type === 'text') {
+                        if (typeof MapApp.openTextModal === 'function') MapApp.openTextModal(node.deviceData);
+                        return;
+                    }
                 }
                 if (window.userRole === 'admin') MapApp.ui.openDeviceModal(params.nodes[0]);
             }
@@ -468,6 +486,14 @@ MapApp.network = {
             if (nodeId) {
                 const node = MapApp.state.nodes.get(nodeId);
                 let menuItems = ``;
+                if (node && node.deviceData) {
+                    if (node.deviceData.target_map_id) {
+                        menuItems += `<div class="context-menu-item text-cyan-400 font-bold" data-action="open-submap" data-id="${nodeId}"><i class="fas fa-sitemap fa-fw mr-2"></i>Open Sub-Map</div>`;
+                    }
+                    if (node.deviceData.is_rack == 1 || node.deviceData.type === 'rack') {
+                        menuItems += `<div class="context-menu-item text-cyan-400 font-bold" data-action="open-rack" data-id="${nodeId}"><i class="fas fa-server fa-fw mr-2"></i>Open 19" Rack Visualizer</div>`;
+                    }
+                }
                 if (window.userRole === 'admin') {
                     menuItems += `
                         <div class="context-menu-item" data-action="edit" data-id="${nodeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit</div>
@@ -516,8 +542,20 @@ MapApp.network = {
             if (target) {
                 const { action } = target.dataset;
                 // Parse ID as number to match vis.js integer node IDs from MySQL AUTO_INCREMENT
-                const id = isNaN(target.dataset.id) ? target.dataset.id : Number(target.dataset.id);
-                closeContextMenu();
+                if (action === 'open-submap') {
+                    const node = MapApp.state.nodes.get(id);
+                    if (node && node.deviceData && node.deviceData.target_map_id) {
+                        MapApp.mapManager.switchMap(node.deviceData.target_map_id);
+                    }
+                    return;
+                }
+                if (action === 'open-rack') {
+                    const node = MapApp.state.nodes.get(id);
+                    if (node && node.deviceData) {
+                        MapApp.mapManager.openRackVisualizer(node.deviceData);
+                    }
+                    return;
+                }
 
                 if (window.userRole === 'admin') {
                     if (action === 'edit') {
