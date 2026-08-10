@@ -432,16 +432,14 @@ MapApp.ui = {
                     n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
                 ) : false;
 
-                // Check if any edges have animated connection lines
-                const hasAnimatedEdges = speedMultiplier > 0 && MapApp.state.edges ? MapApp.state.edges.get().some(e =>
-                    e.dashes || e.connection_type === 'wifi' || e.connection_type === 'fiber' || e.connection_type === 'radio'
-                ) : false;
+                // Check if any edges exist on map to animate connections
+                const hasAnimatedEdges = speedMultiplier > 0 && MapApp.state.edges ? MapApp.state.edges.length > 0 : false;
 
                 if (speedMultiplier > 0) {
                     MapApp.state.edgeAnimProgress = (MapApp.state.edgeAnimProgress + 0.003 * speedMultiplier) % 1.0;
                 }
 
-                // Redraw canvas ONLY if there are active animated elements
+                // Redraw canvas if active animated elements or edges exist
                 if (hasAnimatedEdges || hasAnimatedNodes) {
                     MapApp.state.network.redraw();
                 }

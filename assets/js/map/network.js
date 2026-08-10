@@ -213,6 +213,13 @@ MapApp.network = {
             const animSpeed = displaySettings.connection_animation_speed !== undefined ? (displaySettings.connection_animation_speed / 100) : 1.0;
             globalSpeedMultiplier = animSpeed;
 
+            // Sync globalProgress with MapApp.state.edgeAnimProgress on every frame
+            if (MapApp.state && MapApp.state.edgeAnimProgress !== undefined) {
+                globalProgress = MapApp.state.edgeAnimProgress;
+            } else {
+                globalProgress = (globalProgress + 0.003 * globalSpeedMultiplier) % 1.0;
+            }
+
             ctx.save();
             
             function getPointAlongEdge(edge, t) {
@@ -234,17 +241,14 @@ MapApp.network = {
                 if (edge.options?.hidden === true || edge.hidden === true) continue;
                 if (edge.from?.options?.hidden === true || edge.to?.options?.hidden === true) continue;
 
-                const sourceStatus = deviceStatuses[edge.from.id];
-                const targetStatus = deviceStatuses[edge.to.id];
-                
-                // Skip if nodes are deleted/not in statuses map
-                if (!sourceStatus || !targetStatus) continue;
+                const sourceStatus = deviceStatuses[edge.from.id] || 'online';
+                const targetStatus = deviceStatuses[edge.to.id] || 'online';
 
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 if (isOffline) continue;
 
                 // Check if animation is disabled for this specific edge
-                const rawEdge = MapApp.state.edges.get(edgeId);
+                const rawEdge = (MapApp.state && MapApp.state.edges) ? MapApp.state.edges.get(edgeId) : null;
                 const isAnimated = rawEdge && rawEdge.custom_animated !== undefined ? (rawEdge.custom_animated == 1) : true;
                 if (!isAnimated) continue;
 
