@@ -62,7 +62,10 @@ require_once __DIR__ . '/header.php';
                             <i class="fas fa-heartbeat mr-2"></i>Monitoring
                         </a>
                         <a href="#windows-agent" class="block px-3 py-2 rounded transition">
-                            <i class="fas fa-microchip mr-2"></i>Windows Agent
+                            <i class="fas fa-microchip mr-2"></i>Windows Agent & Auto-Update
+                        </a>
+                        <a href="#snmp-monitoring" class="block px-3 py-2 rounded transition">
+                            <i class="fas fa-network-wired mr-2"></i>SNMP Deep Monitoring
                         </a>
                         <a href="#notifications" class="block px-3 py-2 rounded transition">
                             <i class="fas fa-bell mr-2"></i>Notifications
@@ -395,12 +398,50 @@ powershell -NoProfile -Command "# Collect CPU/memory/disk/network/GPU and POST J
                         </div>
 
                         <div class="bg-slate-700 p-4 rounded mt-4">
-                            <h3 class="font-semibold text-lg mb-2"><i class="fas fa-project-diagram mr-2 text-cyan-400"></i>Show Windows status on the Docker map</h3>
-                            <ol class="list-decimal list-inside space-y-2 text-sm">
-                                <li>Add the Windows host in AMPNM (Topology tab) with the same <strong>Host Name</strong> or IP that the .bat script reports.</li>
-                                <li>When the agent posts metrics, the map ring turns <span class="text-amber-300">amber</span> if the feed is stale and <span class="text-green-300">green</span> when fresh, and the CPU/RAM/Disk/Net values render under the node.</li>
-                                <li>If you haven’t created the host yet, the newest agent report still appears as a virtual Windows node so you can spot it on the map.</li>
-                                <li>Keep the <code>WINDOWS_AGENT_TOKEN</code> the same across your Windows hosts and Docker server; the UI automatically fetches the latest per-host metrics every time you open the map.</li>
+                            <h3 class="font-semibold text-lg mb-2"><i class="fas fa-sync text-cyan-400 mr-2"></i>Secure Agent Auto-Update & Remote Control</h3>
+                            <p class="text-sm text-slate-200 mb-2">AMPNM Go Agent supports zero-downtime, secure self-updating and local REST control:</p>
+                            <ul class="list-disc list-inside space-y-1 text-sm text-slate-300">
+                                <li><strong>Trigger Remote Update:</strong> Click <em>Trigger Remote Agent Update</em> on the Agent Onboarding page or hit <code>POST http://127.0.0.1:22660/api/update</code>.</li>
+                                <li><strong>Self-Replacement Staging:</strong> Downloads verified <code>ampnm-agent.exe</code> update, stages a temporary batch installer, stops the agent service, replaces the binary, and restarts the service automatically.</li>
+                                <li><strong>Local Agent API:</strong> Exposes local dashboard and log stream on <code>http://127.0.0.1:22660</code> for local diagnostic checks.</li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <!-- SNMP Deep Monitoring -->
+                    <section id="snmp-monitoring" class="doc-section">
+                        <h2 class="text-3xl font-bold text-cyan-400 mb-4">
+                            <i class="fas fa-network-wired mr-2"></i>SNMP (v1 / v2c / v3) Deep Switch & Router Monitoring
+                        </h2>
+
+                        <p class="mb-4">Monitor enterprise switches, routers (Cisco, MikroTik, HP/Aruba), NAS devices, and UPS systems without installing software agents.</p>
+
+                        <div class="grid md:grid-cols-2 gap-4 mb-4">
+                            <div class="bg-slate-700 p-4 rounded">
+                                <h3 class="font-semibold text-lg mb-2"><i class="fas fa-sliders-h mr-2 text-cyan-400"></i>Supported SNMP Versions</h3>
+                                <ul class="list-disc list-inside space-y-2 text-sm text-slate-200">
+                                    <li><strong>SNMP v1 & v2c:</strong> Standard community string authentication (e.g. <code>public</code>).</li>
+                                    <li><strong>SNMP v3:</strong> Secure encrypted queries with User Security Model (USM) supporting SHA/MD5 authentication and AES/DES privacy.</li>
+                                </ul>
+                            </div>
+                            <div class="bg-slate-700 p-4 rounded">
+                                <h3 class="font-semibold text-lg mb-2"><i class="fas fa-list-ol mr-2 text-cyan-400"></i>Extracted Metrics & OIDs</h3>
+                                <ul class="list-disc list-inside space-y-1 text-sm text-slate-200">
+                                    <li><strong>System Info:</strong> System Name, System Description, System Location.</li>
+                                    <li><strong>System Uptime:</strong> High-precision timeticks converting to human-readable uptime.</li>
+                                    <li><strong>CPU Usage:</strong> Standard Host Resources CPU, Cisco 5-min CPU, and MikroTik CPU OIDs.</li>
+                                    <li><strong>Interface Tables:</strong> Active port status, Inbound octets (<code>ifInOctets</code>), and Outbound octets (<code>ifOutOctets</code>).</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-700 p-4 rounded">
+                            <h3 class="font-semibold text-lg mb-2"><i class="fas fa-play-circle text-cyan-400 mr-2"></i>Using the SNMP Diagnostic Tool</h3>
+                            <ol class="list-decimal list-inside space-y-2 text-sm text-slate-200">
+                                <li>Navigate to <strong>Host Metrics</strong> from the top navigation menu.</li>
+                                <li>Click the <strong>SNMP Monitor</strong> button in the top action bar.</li>
+                                <li>Enter the IP address of your target Switch/Router, choose SNMP Version (v2c/v3), and enter the Community string.</li>
+                                <li>Click <strong>Poll SNMP Metrics</strong> to perform real-time OID extraction.</li>
                             </ol>
                         </div>
                     </section>
@@ -686,12 +727,17 @@ docker-compose up -d</code>
                             </div>
 
                             <div class="bg-slate-700 p-4 rounded">
-                                <h3 class="font-bold text-lg mb-2"><i class="fab fa-docker text-cyan-400 mr-2"></i>Docker Hub-Based Updates</h3>
+                                <h3 class="font-bold text-lg mb-2"><i class="fab fa-docker text-cyan-400 mr-2"></i>Docker Hub-Based Updates & Automatic Rollback</h3>
                                 <p class="text-sm mb-2">Triggers live container self-recreation to upgrade to the latest official release directly from Docker Hub.</p>
                                 <div class="bg-blue-900/30 border-l-4 border-blue-500 p-3 text-xs text-slate-200 mt-2">
                                     <p class="font-semibold mb-1">Docker Socket Bind Requirement:</p>
                                     <p>To let the container recreate itself from the web dashboard, start your container with the host's Docker socket mounted:</p>
                                     <code class="block bg-slate-800 p-2 rounded mt-2 text-cyan-400">docker run -d --name ampnm_server -p 2266:2266 -v /var/run/docker.sock:/var/run/docker.sock arifmahmudpranto/ampnm:latest</code>
+                                </div>
+                                <div class="bg-slate-800 p-3 rounded mt-3 border border-slate-600 text-xs text-slate-300">
+                                    <p class="font-semibold text-cyan-400 mb-1"><i class="fas fa-shield-alt mr-1"></i> Automated Post-Update Health-Check & Auto-Rollback:</p>
+                                    <p class="mb-1">When running <code>./scripts/auto-update.sh</code>, AMPNM automatically dumps a database backup into <code>.update-state/</code> and pulls new images.</p>
+                                    <p>It executes up to 12 automated health checks against <code>AMPNM_HEALTH_URL</code>. If the update fails or times out, the system automatically triggers <code>./scripts/rollback-update.sh</code> to restore previous images and state safely!</p>
                                 </div>
                             </div>
                         </div>
