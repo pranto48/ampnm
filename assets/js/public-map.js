@@ -466,7 +466,8 @@ function renderMap({ map, devices, edges }) {
                     const hasAnimated = visNodesDataset.get().some(n =>
                         n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
                     );
-                    if (hasAnimated) {
+                    const hasEdges = visEdgesDataset ? visEdgesDataset.get().length > 0 : false;
+                    if (hasAnimated || hasEdges) {
                         visNetwork.redraw();
                     }
                 }

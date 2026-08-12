@@ -198,11 +198,13 @@ MapApp.network = {
             
             // Build a lookup map of node statuses
             const deviceStatuses = {};
-            MapApp.state.nodes.forEach(node => {
-                if (node.deviceData) {
-                    deviceStatuses[node.id] = node.deviceData.status;
-                }
-            });
+            if (MapApp.state.nodes && typeof MapApp.state.nodes.forEach === 'function') {
+                MapApp.state.nodes.forEach(node => {
+                    if (node && node.id) {
+                        deviceStatuses[String(node.id)] = node.deviceData ? node.deviceData.status : 'online';
+                    }
+                });
+            }
 
             // Load dynamic connection line style preferences
             const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function') 
@@ -241,19 +243,22 @@ MapApp.network = {
                 if (edge.options?.hidden === true || edge.hidden === true) continue;
                 if (edge.from?.options?.hidden === true || edge.to?.options?.hidden === true) continue;
 
-                const sourceStatus = deviceStatuses[edge.from.id] || 'online';
-                const targetStatus = deviceStatuses[edge.to.id] || 'online';
+                const fromId = edge.from ? (edge.from.id !== undefined ? String(edge.from.id) : String(edge.from)) : '';
+                const toId = edge.to ? (edge.to.id !== undefined ? String(edge.to.id) : String(edge.to)) : '';
+
+                const sourceStatus = deviceStatuses[fromId] || 'online';
+                const targetStatus = deviceStatuses[toId] || 'online';
 
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 if (isOffline) continue;
 
                 // Check if animation is disabled for this specific edge
-                const rawEdge = (MapApp.state && MapApp.state.edges) ? MapApp.state.edges.get(edgeId) : null;
+                const rawEdge = (MapApp.state && MapApp.state.edges && typeof MapApp.state.edges.get === 'function') ? MapApp.state.edges.get(edgeId) : null;
                 const isAnimated = rawEdge && rawEdge.custom_animated !== undefined ? (rawEdge.custom_animated == 1) : true;
                 if (!isAnimated) continue;
 
                 // Bandwidth Utilization Dynamic Link Color (v1.19 Feature)
-                let edgeColor = edge.options?.color?.color || '#00F2FE';
+                let edgeColor = (typeof edge.options?.color === 'string' ? edge.options.color : edge.options?.color?.color) || rawEdge?.custom_color || '#00F2FE';
                 const util = rawEdge && rawEdge.utilization_percent !== undefined ? parseFloat(rawEdge.utilization_percent) : 0;
                 if (util >= 80) {
                     edgeColor = '#ef4444'; // Red - Overload Alert

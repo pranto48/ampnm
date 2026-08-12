@@ -352,9 +352,11 @@ MapApp.ui = {
 
     updateStaticEdgeColors: () => {
         const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
-        const allEdges = MapApp.state.edges.get();
-        if (MapApp.state.nodes.length > 0 && allEdges.length > 0) {
-            const deviceStatusMap = new Map(MapApp.state.nodes.get({ fields: ['id', 'deviceData'] }).map(d => [String(d.id), d.deviceData.status]));
+        if (!MapApp.state.nodes || !MapApp.state.edges) return;
+        const allEdges = typeof MapApp.state.edges.get === 'function' ? MapApp.state.edges.get() : [];
+        const nodeCount = typeof MapApp.state.nodes.get === 'function' ? MapApp.state.nodes.get().length : (MapApp.state.nodes.length || 0);
+        if (nodeCount > 0 && allEdges.length > 0) {
+            const deviceStatusMap = new Map(MapApp.state.nodes.get({ fields: ['id', 'deviceData'] }).map(d => [String(d.id), d.deviceData ? d.deviceData.status : 'online']));
             const updates = [];
             allEdges.forEach(edge => {
                 const sourceStatus = deviceStatusMap.get(String(edge.from));
@@ -433,10 +435,11 @@ MapApp.ui = {
                 ) : false;
 
                 // Check if any edges exist on map to animate connections
-                const hasAnimatedEdges = speedMultiplier > 0 && MapApp.state.edges ? MapApp.state.edges.length > 0 : false;
+                const edgeCount = MapApp.state.edges ? (typeof MapApp.state.edges.get === 'function' ? MapApp.state.edges.get().length : (MapApp.state.edges.length || 0)) : 0;
+                const hasAnimatedEdges = speedMultiplier > 0 && edgeCount > 0;
 
                 if (speedMultiplier > 0) {
-                    MapApp.state.edgeAnimProgress = (MapApp.state.edgeAnimProgress + 0.003 * speedMultiplier) % 1.0;
+                    MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.003 * speedMultiplier) % 1.0;
                 }
 
                 // Redraw canvas if active animated elements or edges exist
