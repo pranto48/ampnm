@@ -39,11 +39,23 @@ func startWebServer() {
 	mux.HandleFunc("/api/interfaces", handleInterfaces)
 	mux.HandleFunc("/api/test", handleTest)
 	mux.HandleFunc("/api/logs", handleLogs)
+	mux.HandleFunc("/api/update", handleRemoteUpdate)
 
 	addLog("Local web server starting on http://127.0.0.1:22660")
 	if err := http.ListenAndServe("127.0.0.1:22660", mux); err != nil {
 		addLog(fmt.Sprintf("Failed to start web server: %v", err))
 	}
+}
+
+func handleRemoteUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	addLog("Remote update check triggered via local API endpoint.")
+	go checkForAgentUpdate(loadConfig())
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "update_initiated", "message": "Agent update sequence started in background"})
 }
 
 func handleLogs(w http.ResponseWriter, r *http.Request) {

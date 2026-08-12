@@ -144,6 +144,23 @@ Get-Content "$env:ProgramData\AMPNM-Agent\logs\agent.log" -Tail 50</pre>
                     <i class="fas fa-copy mr-1"></i>Copy Verify Commands
                 </button>
             </div>
+
+            <!-- Remote Agent Management & Auto-Update -->
+            <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-5 mt-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-md font-semibold text-white flex items-center gap-2">
+                            <i class="fas fa-sync-alt text-cyan-400"></i> Secure Agent Auto-Update & Remote Controls
+                        </h3>
+                        <p class="text-slate-400 text-xs mt-1">Trigger background self-update or dispatch remote diagnostic ping to active Windows/Linux agents.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="triggerLocalAgentUpdate()" class="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-medium transition-all shadow-md">
+                            <i class="fas fa-cloud-download-alt mr-1"></i> Trigger Remote Agent Update
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="platform-panel-linux" class="platform-panel hidden space-y-4">
@@ -256,6 +273,20 @@ function copyText(text, successMessage) {
             document.execCommand('copy');
             document.body.removeChild(ta);
         });
+}
+
+async function triggerLocalAgentUpdate() {
+    try {
+        const res = await fetch('http://127.0.0.1:22660/api/update', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            window.notyf ? window.notyf.success('Agent update initiated in background!') : alert('Agent update initiated!');
+        } else {
+            window.notyf ? window.notyf.error(data.message || 'Agent update trigger failed') : alert('Update failed');
+        }
+    } catch(err) {
+        window.notyf ? window.notyf.error('Could not connect to local Agent API (http://127.0.0.1:22660). Is the agent running?') : alert('Could not connect to local Agent API');
+    }
 }
 
 platformTabs.forEach((tab) => tab.addEventListener('click', () => setPlatformTab(tab.dataset.platformTab)));

@@ -48,6 +48,9 @@ $serverUrl = $protocol . $_SERVER['HTTP_HOST'] . ($basePath === '/' ? '' : $base
             <button onclick="openTokenModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors">
                 <i class="fas fa-key mr-2"></i>Manage Tokens
             </button>
+            <button onclick="openSNMPModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+                <i class="fas fa-network-wired mr-2"></i>SNMP Monitor
+            </button>
         </div>
         <?php endif; ?>
     </div>
@@ -2132,6 +2135,51 @@ async function importHostOverridesCsv(input) {
     }
 }
 
+function openSNMPModal() {
+    document.getElementById('snmp-modal').classList.remove('hidden');
+}
+
+function closeSNMPModal() {
+    document.getElementById('snmp-modal').classList.add('hidden');
+}
+
+async function runSNMPPoll(event) {
+    event.preventDefault();
+    const host = document.getElementById('snmp-host').value;
+    const community = document.getElementById('snmp-community').value || 'public';
+    const version = document.getElementById('snmp-version').value || '2c';
+    const resultDiv = document.getElementById('snmp-result');
+    
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<p class="text-xs text-cyan-400 animate-pulse"><i class="fas fa-spinner fa-spin mr-1"></i> Querying SNMP OIDs from target device...</p>';
+
+    try {
+        const res = await fetch(`api.php?action=poll_snmp&host=${encodeURIComponent(host)}&community=${encodeURIComponent(community)}&version=${encodeURIComponent(version)}`);
+        const data = await res.json();
+        
+        if (data.success && data.metrics) {
+            const m = data.metrics;
+            let html = `
+                <div class="space-y-2 text-xs">
+                    <p class="text-green-400 font-semibold flex items-center"><i class="fas fa-check-circle mr-1.5"></i> Device Response Success (${m.host})</p>
+                    <div class="grid grid-cols-2 gap-2 text-slate-300">
+                        <div><strong class="text-slate-400">System Name:</strong> ${m.sys_name}</div>
+                        <div><strong class="text-slate-400">System Uptime:</strong> ${m.uptime_raw}</div>
+                        <div><strong class="text-slate-400">CPU Usage:</strong> ${m.cpu_percent !== null ? m.cpu_percent + '%' : 'N/A'}</div>
+                        <div><strong class="text-slate-400">Active Interfaces:</strong> ${m.interface_count}</div>
+                    </div>
+                    <div class="mt-2 text-slate-400"><strong class="text-slate-300">Description:</strong> ${m.sys_descr}</div>
+                </div>
+            `;
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.innerHTML = `<p class="text-xs text-red-400"><i class="fas fa-exclamation-triangle mr-1"></i> SNMP Query Failed: ${data.error || 'Timeout or Invalid Community string'}</p>`;
+        }
+    } catch(err) {
+        resultDiv.innerHTML = `<p class="text-xs text-red-400"><i class="fas fa-exclamation-triangle mr-1"></i> Connection Error to API endpoint</p>`;
+    }
+}
+
 loadHosts();
 checkAgentApiHealth();
 updateNotificationToggle();
@@ -2141,5 +2189,48 @@ loadHostOverridesTable();
 setInterval(loadHosts, 10000);
 setInterval(checkAgentApiHealth, 15000);
 </script>
+
+<!-- SNMP Monitor Modal -->
+<div id="snmp-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full p-6 shadow-2xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                <i class="fas fa-network-wired text-indigo-400"></i> SNMP Switch/Router Diagnostic
+            </h3>
+            <button onclick="closeSNMPModal()" class="text-slate-400 hover:text-white transition-colors">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+
+        <form onsubmit="runSNMPPoll(event)" class="space-y-4 mt-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Target Host IP / Domain</label>
+                <input id="snmp-host" type="text" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="192.168.1.1">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">SNMP Version</label>
+                    <select id="snmp-version" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="2c" selected>v2c (Standard)</option>
+                        <option value="1">v1 (Legacy)</option>
+                        <option value="3">v3 (Encrypted)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Community String</label>
+                    <input id="snmp-community" type="text" value="public" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" onclick="closeSNMPModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">Poll SNMP Metrics</button>
+            </div>
+        </form>
+
+        <div id="snmp-result" class="mt-4 p-3 bg-slate-950 rounded-lg border border-slate-800 hidden"></div>
+    </div>
+</div>
 
 <?php require_once 'footer.php'; ?>

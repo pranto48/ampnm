@@ -228,6 +228,19 @@ try {
     } elseif ($handler === 'floor_plan') {
         require __DIR__ . '/api/handlers/floor_plan_handler.php';
         echo json_encode(handleFloorPlanAction($action, $input, $pdo));
+    } elseif ($action === 'poll_snmp') {
+        require_once __DIR__ . '/includes/snmp_monitor.php';
+        $host = $_GET['host'] ?? '';
+        $community = $_GET['community'] ?? 'public';
+        $version = $_GET['version'] ?? '2c';
+        if (empty($host)) {
+            echo json_encode(['success' => false, 'error' => 'Host IP required']);
+            exit;
+        }
+        $monitor = new SNMPMonitor($host, $community, $version);
+        $metrics = $monitor->getMetrics();
+        echo json_encode(['success' => true, 'metrics' => $metrics]);
+        exit;
     } elseif ($action === 'health') {
         echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
     } else {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -619,3 +620,77 @@ func main() {
 		}
 	}
 }
+
+func checkForAgentUpdate(cfg Config) {
+	if cfg.ServerUrl == "" {
+		addLog("Agent update aborted: ServerUrl is empty.")
+		return
+	}
+
+	// Resolve update download URL from server endpoint
+	baseURL := cfg.ServerUrl
+	if strings.Contains(baseURL, "/api/") {
+		baseURL = strings.Split(baseURL, "/api/")[0]
+	}
+	downloadURL := strings.TrimRight(baseURL, "/") + "/download-agent.php?file=ampnm-agent.exe"
+
+	addLog(fmt.Sprintf("Downloading agent update binary from: %s", downloadURL))
+
+	req, err := http.NewRequest("GET", downloadURL, nil)
+	if err != nil {
+		addLog(fmt.Sprintf("Update failed to construct request: %v", err))
+		return
+	}
+	if cfg.AgentToken != "" {
+		req.Header.Set("X-Agent-Token", cfg.AgentToken)
+	}
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		addLog(fmt.Sprintf("Update download failed (HTTP %d): %v", resp.StatusCode, err))
+		return
+	}
+	defer resp.Body.Close()
+
+	execPath, err := os.Executable()
+	if err != nil {
+		addLog(fmt.Sprintf("Failed to resolve current executable path: %v", err))
+		return
+	}
+
+	tempDir := os.TempDir()
+	newExePath := filepath.Join(tempDir, "ampnm-agent-new.exe")
+	out, err := os.Create(newExePath)
+	if err != nil {
+		addLog(fmt.Sprintf("Failed to create temporary file: %v", err))
+		return
+	}
+	_, err = io.Copy(out, resp.Body)
+	out.Close()
+	if err != nil {
+		addLog(fmt.Sprintf("Failed to write downloaded binary: %v", err))
+		return
+	}
+
+	addLog("Downloaded new binary successfully. Staging self-replacement batch script...")
+	batchScript := filepath.Join(tempDir, "update-ampnm-agent.bat")
+	scriptContent := fmt.Sprintf(`@echo off
+timeout /t 2 /nobreak > NUL
+net stop AMPNMAgent > NUL 2>&1
+copy /Y "%s" "%s" > NUL
+net start AMPNMAgent > NUL 2>&1
+del "%s" > NUL 2>&1
+del "%%~f0" > NUL 2>&1
+`, newExePath, execPath, newExePath)
+
+	if err := os.WriteFile(batchScript, []byte(scriptContent), 0644); err != nil {
+		addLog(fmt.Sprintf("Failed to create update script: %v", err))
+		return
+	}
+
+	addLog("Executing agent update process and restarting...")
+	cmd := exec.Command("cmd.exe", "/C", batchScript)
+	_ = cmd.Start()
+}
+
