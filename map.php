@@ -1094,6 +1094,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         }
     });
 })();
+</script>
     <!-- 19-inch Server Rack Visualizer Modal -->
     <div id="rackVisualizerModal" class="modal-backdrop hidden">
         <div class="modal-panel bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-4xl border border-slate-700 max-h-[90vh] flex flex-col">
