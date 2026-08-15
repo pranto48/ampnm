@@ -128,7 +128,31 @@ try {
     }
 
     // --- Authenticated Actions (AUTH REQUIRED) ---
+    // Support Bearer Token Authentication for REST API & Telemetry Agents
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if (preg_match('/Bearer\s+(.+)$/i', $authHeader, $matches)) {
+        $bearerToken = trim($matches[1]);
+        try {
+            $stmtToken = $pdo->prepare("SELECT user_id, role FROM agent_tokens WHERE token = ? AND is_active = 1");
+            $stmtToken->execute([$bearerToken]);
+            $tokenInfo = $stmtToken->fetch(PDO::FETCH_ASSOC);
+            if ($tokenInfo) {
+                if (session_status() !== PHP_SESSION_ACTIVE) {
+                    @session_start();
+                }
+                $_SESSION['user_id'] = $tokenInfo['user_id'] ?? 'api_agent';
+                $_SESSION['user_role'] = $tokenInfo['role'] ?? 'admin';
+            }
+        } catch (Exception $e) {
+            // Log & continue to session auth
+        }
+    }
+
     require_once 'includes/auth_check.php'; // This will now only run if the above public action didn't exit.
+
+    // Broadcast API event to WebSocket broadcaster
+    require_once __DIR__ . '/includes/websocket_server.php';
+    AMPNM_WebSocketBroadcaster::getInstance()->broadcastEvent('api_action', ['action' => $action, 'user' => $_SESSION['user_id'] ?? 'anonymous']);
 
     // Release session write lock early for concurrent API performance, except for session-modifying actions
     if ($action !== 'force_license_recheck') {
