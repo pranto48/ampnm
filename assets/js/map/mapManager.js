@@ -28,7 +28,8 @@ MapApp.mapManager = {
         try {
             const newMap = await MapApp.api.post('create_map', { name: trimmedName }); 
             await MapApp.mapManager.loadMaps(); 
-            MapApp.ui.els.mapSelector.value = newMap.id; 
+            const selector = MapApp.ui.getEl('mapSelector');
+            if (selector) selector.value = newMap.id; 
             await MapApp.mapManager.switchMap(newMap.id); 
             window.notyf.success(`Map "${trimmedName}" created.`);
         } catch (error) {
@@ -39,21 +40,26 @@ MapApp.mapManager = {
 
     loadMaps: async () => {
         const maps = await MapApp.api.get('get_maps');
-        MapApp.state.maps = maps;
-        MapApp.ui.els.mapSelector.innerHTML = '';
-        if (maps.length > 0) {
+        MapApp.state.maps = maps || [];
+        const selector = MapApp.ui.getEl('mapSelector');
+        const mapContainer = MapApp.ui.getEl('mapContainer');
+        const noMapsContainer = MapApp.ui.getEl('noMapsContainer');
+        if (selector) selector.innerHTML = '';
+        if (Array.isArray(maps) && maps.length > 0) {
             maps.forEach(map => { 
-                const option = document.createElement('option'); 
-                option.value = map.id; 
-                option.textContent = map.name; 
-                MapApp.ui.els.mapSelector.appendChild(option); 
+                if (selector) {
+                    const option = document.createElement('option'); 
+                    option.value = map.id; 
+                    option.textContent = map.name; 
+                    selector.appendChild(option); 
+                }
             });
-            MapApp.ui.els.mapContainer.classList.remove('hidden'); 
-            MapApp.ui.els.noMapsContainer.classList.add('hidden'); 
+            if (mapContainer) mapContainer.classList.remove('hidden'); 
+            if (noMapsContainer) noMapsContainer.classList.add('hidden'); 
             return maps[0].id;
         } else { 
-            MapApp.ui.els.mapContainer.classList.add('hidden'); 
-            MapApp.ui.els.noMapsContainer.classList.remove('hidden'); 
+            if (mapContainer) mapContainer.classList.add('hidden'); 
+            if (noMapsContainer) noMapsContainer.classList.remove('hidden'); 
             return null; 
         }
     },
@@ -300,8 +306,10 @@ MapApp.mapManager = {
             MapApp.state.network = null; 
             MapApp.state.nodes.clear(); 
             MapApp.state.edges.clear(); 
-            MapApp.ui.els.mapContainer.classList.add('hidden'); 
-            MapApp.ui.els.noMapsContainer.classList.remove('hidden'); 
+            const mapContainer = MapApp.ui.getEl('mapContainer');
+            const noMapsContainer = MapApp.ui.getEl('noMapsContainer');
+            if (mapContainer) mapContainer.classList.add('hidden'); 
+            if (noMapsContainer) noMapsContainer.classList.remove('hidden'); 
             return; 
         }
         
@@ -314,7 +322,8 @@ MapApp.mapManager = {
 
         const currentMap = MapApp.state.maps.find(m => m.id == mapId);
         if (currentMap) {
-            MapApp.ui.els.currentMapName.textContent = currentMap.name;
+            const currentMapNameEl = MapApp.ui.getEl('currentMapName');
+            if (currentMapNameEl) currentMapNameEl.textContent = currentMap.name;
             const mapEl = document.getElementById('network-map');
             mapEl.style.backgroundColor = currentMap.background_color || '';
             mapEl.style.backgroundImage = currentMap.background_image_url ? `url(${currentMap.background_image_url})` : '';
@@ -497,10 +506,20 @@ MapApp.mapManager = {
         console.log('Edges in dataset after load:', MapApp.state.edges.get());
         
         MapApp.deviceManager.setupAutoPing(deviceData);
+        const mapContainer = MapApp.ui.getEl('mapContainer');
+        if (mapContainer) mapContainer.classList.remove('hidden');
+        const noMapsContainer = MapApp.ui.getEl('noMapsContainer');
+        if (noMapsContainer) noMapsContainer.classList.add('hidden');
+
         if (!MapApp.state.network) MapApp.network.initializeMap();
         else MapApp.network.restoreSavedView();
         MapApp.ui.updateStaticEdgeColors();
         MapApp.ui.startCanvasAnimationLoop();
+        setTimeout(() => {
+            if (MapApp.state.network) {
+                MapApp.state.network.redraw();
+            }
+        }, 100);
     },
 
     copyDevice: async (deviceId) => {
@@ -567,12 +586,14 @@ MapApp.mapManager = {
     },
 
     updatePublicViewLink: (mapId, isEnabled) => {
+        const linkEl = MapApp.ui.getEl('publicViewLink');
+        const containerEl = MapApp.ui.getEl('publicViewLinkContainer');
         if (isEnabled) {
-            MapApp.ui.els.publicViewLink.value = MapApp.utils.buildPublicMapUrl(mapId);
-            MapApp.ui.els.publicViewLinkContainer.classList.remove('hidden');
+            if (linkEl) linkEl.value = MapApp.utils.buildPublicMapUrl(mapId);
+            if (containerEl) containerEl.classList.remove('hidden');
         } else {
-            MapApp.ui.els.publicViewLink.value = '';
-            MapApp.ui.els.publicViewLinkContainer.classList.add('hidden');
+            if (linkEl) linkEl.value = '';
+            if (containerEl) containerEl.classList.add('hidden');
         }
     },
 

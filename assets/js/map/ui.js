@@ -12,6 +12,21 @@ MapApp.ui = {
     // DOM Elements
     els: {},
 
+    getEl: (id) => {
+        if (!MapApp.ui.els || Object.keys(MapApp.ui.els).length === 0) {
+            MapApp.ui.cacheElements();
+        }
+        if (MapApp.ui.els && MapApp.ui.els[id]) {
+            return MapApp.ui.els[id];
+        }
+        const fallbackId = id === 'mapContainer' ? 'map-container' : (id === 'noMapsContainer' ? 'no-maps' : (id === 'mapWrapper' ? 'network-map-wrapper' : id));
+        const domEl = document.getElementById(fallbackId);
+        if (domEl && MapApp.ui.els) {
+            MapApp.ui.els[id] = domEl;
+        }
+        return domEl;
+    },
+
     // Cache DOM elements
     cacheElements: () => {
         MapApp.ui.els = {

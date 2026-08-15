@@ -8,3 +8,7 @@
 
 ## Pre-Update Data Backup Directive (ডকার আপডেট পূর্ববর্তী ব্যাকআপ নির্দেশিকা)
 - **CRITICAL DIRECTIVE**: Before making any code deployments, container rebuilds, or server updates to the Docker server (e.g. `192.168.9.9`), the agent MUST first generate and verify a full backup of all network devices (`devices`), topology maps (`maps`), and device connections (`device_edges`). Only after saving the backup may the server update proceed.
+
+## DockerHub Image Creation Threshold Directive (ডকারহাব ইমেজ তৈরি থ্রেশহোল্ড নির্দেশিকা)
+- **CRITICAL DIRECTIVE**: A new DockerHub image with an incremented version tag MUST be built and pushed ONLY after every 20 code modifications/commits have accumulated, or when explicitly requested by the user. For routine bug fixes, quick hotfixes, and minor updates, deploy code directly to Git and Docker server without pushing a new image to DockerHub.
+
