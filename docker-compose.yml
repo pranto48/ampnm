@@ -73,7 +73,7 @@ services:
       - db_data:/var/lib/mysql
     ports:
       # Expose the database port to the host for external tools if needed
-      - "3306:3306"
+      - "3307:3306"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
