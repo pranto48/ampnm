@@ -526,133 +526,150 @@ function initMap() {
     }
 
     // Refresh Status button logic (now for all roles)
-    els.refreshStatusBtn.addEventListener('click', async () => {
-        els.refreshStatusBtn.disabled = true;
-        await deviceManager.performBulkRefresh();
-        if (!els.liveRefreshToggle.checked) els.refreshStatusBtn.disabled = false;
-    });
+    if (els.refreshStatusBtn) {
+        els.refreshStatusBtn.addEventListener('click', async () => {
+            els.refreshStatusBtn.disabled = true;
+            await deviceManager.performBulkRefresh();
+            if (els.liveRefreshToggle && !els.liveRefreshToggle.checked) els.refreshStatusBtn.disabled = false;
+        });
+    }
 
     // Live Refresh toggle logic (now for all roles)
-    els.liveRefreshToggle.addEventListener('change', (e) => {
-        if (e.target.checked) {
-            window.notyf.info(`Live status enabled. Updating every ${MapApp.config.REFRESH_INTERVAL_SECONDS} seconds.`);
-            els.refreshStatusBtn.disabled = true;
-            deviceManager.performBulkRefresh();
-            state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
-        } else {
-            if (state.globalRefreshIntervalId) clearInterval(state.globalRefreshIntervalId);
-            state.globalRefreshIntervalId = null;
-            els.refreshStatusBtn.disabled = false;
-            window.notyf.info('Live status disabled.');
-        }
-    });
+    if (els.liveRefreshToggle) {
+        els.liveRefreshToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                window.notyf.info(`Live status enabled. Updating every ${MapApp.config.REFRESH_INTERVAL_SECONDS} seconds.`);
+                if (els.refreshStatusBtn) els.refreshStatusBtn.disabled = true;
+                deviceManager.performBulkRefresh();
+                state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
+            } else {
+                if (state.globalRefreshIntervalId) clearInterval(state.globalRefreshIntervalId);
+                state.globalRefreshIntervalId = null;
+                if (els.refreshStatusBtn) els.refreshStatusBtn.disabled = false;
+                window.notyf.info('Live status disabled.');
+            }
+        });
+    }
 
     // Only admin can export/import map
     if (window.userRole === 'admin') {
-        els.exportBtn.addEventListener('click', async () => {
-            if (!state.currentMapId) {
-                window.notyf.error('No map selected to export.');
-                return;
-            }
-            const mapName = els.mapSelector.options[els.mapSelector.selectedIndex]?.text || 'map';
-            try {
-                const exportData = await api.get('export_map', { map_id: state.currentMapId });
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", `${mapName.replace(/\s+/g, '_')}_export.json`);
-                document.body.appendChild(downloadAnchorNode);
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-                window.notyf.success('Map exported successfully (devices, links, ports, cables).');
-            } catch (error) {
-                window.notyf.error(error.message || 'Failed to export map.');
-            }
-        });
+        if (els.exportBtn) {
+            els.exportBtn.addEventListener('click', async () => {
+                if (!state.currentMapId) {
+                    window.notyf.error('No map selected to export.');
+                    return;
+                }
+                const mapName = els.mapSelector?.options[els.mapSelector.selectedIndex]?.text || 'map';
+                try {
+                    const exportData = await api.get('export_map', { map_id: state.currentMapId });
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+                    const downloadAnchorNode = document.createElement('a');
+                    downloadAnchorNode.setAttribute("href", dataStr);
+                    downloadAnchorNode.setAttribute("download", `${mapName.replace(/\s+/g, '_')}_export.json`);
+                    document.body.appendChild(downloadAnchorNode);
+                    downloadAnchorNode.click();
+                    downloadAnchorNode.remove();
+                    window.notyf.success('Map exported successfully (devices, links, ports, cables).');
+                } catch (error) {
+                    window.notyf.error(error.message || 'Failed to export map.');
+                }
+            });
+        }
 
-        els.importBtn.addEventListener('click', () => els.importFile.click());
-        els.importFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (confirm('This will overwrite the current map. Are you sure?')) {
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    try {
-                        const data = JSON.parse(event.target.result);
-                        if (!Array.isArray(data.devices) || !Array.isArray(data.edges)) {
-                            throw new Error('Invalid import file: missing devices/edges arrays.');
+        if (els.importBtn && els.importFile) {
+            els.importBtn.addEventListener('click', () => els.importFile.click());
+            els.importFile.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (confirm('This will overwrite the current map. Are you sure?')) {
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            if (!Array.isArray(data.devices) || !Array.isArray(data.edges)) {
+                                throw new Error('Invalid import file: missing devices/edges arrays.');
+                            }
+                            await api.post('import_map', {
+                                map_id: state.currentMapId,
+                                devices: data.devices,
+                                edges: data.edges,
+                                switch_ports: Array.isArray(data.switch_ports) ? data.switch_ports : [],
+                                cables: Array.isArray(data.cables) ? data.cables : []
+                            });
+                            await mapManager.switchMap(state.currentMapId);
+                            window.notyf.success('Map imported successfully with links, ports, and cables.');
+                        } catch (err) {
+                            window.notyf.error('Failed to import map: ' + err.message);
                         }
-                        await api.post('import_map', {
-                            map_id: state.currentMapId,
-                            devices: data.devices,
-                            edges: data.edges,
-                            switch_ports: Array.isArray(data.switch_ports) ? data.switch_ports : [],
-                            cables: Array.isArray(data.cables) ? data.cables : []
-                        });
-                        await mapManager.switchMap(state.currentMapId);
-                        window.notyf.success('Map imported successfully with links, ports, and cables.');
-                    } catch (err) {
-                        window.notyf.error('Failed to import map: ' + err.message);
-                    }
-                };
-                reader.readAsText(file);
-            }
-            els.importFile.value = '';
-        });
+                    };
+                    reader.readAsText(file);
+                }
+                els.importFile.value = '';
+            });
+        }
     } else {
         // Disable export/import buttons for viewers
         if (els.exportBtn) els.exportBtn.disabled = true;
         if (els.importBtn) els.importBtn.disabled = true;
     }
 
-    els.fullscreenBtn.addEventListener('click', () => {
-        if (!document.fullscreenElement) els.mapWrapper.requestFullscreen();
-        else document.exitFullscreen();
-    });
-    document.addEventListener('fullscreenchange', () => {
-        const icon = els.fullscreenBtn.querySelector('i');
-        icon.classList.toggle('fa-expand', !document.fullscreenElement);
-        icon.classList.toggle('fa-compress', !!document.fullscreenElement);
-    });
+    if (els.fullscreenBtn && els.mapWrapper) {
+        els.fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) els.mapWrapper.requestFullscreen();
+            else document.exitFullscreen();
+        });
+        document.addEventListener('fullscreenchange', () => {
+            const icon = els.fullscreenBtn.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-expand', !document.fullscreenElement);
+                icon.classList.toggle('fa-compress', !!document.fullscreenElement);
+            }
+        });
+    }
 
     // Only admin can create/rename/delete maps
     if (window.userRole === 'admin') {
-        els.newMapBtn.addEventListener('click', mapManager.createMap);
-        els.createFirstMapBtn.addEventListener('click', mapManager.createMap);
-        els.renameMapBtn.addEventListener('click', async () => {
-            if (!state.currentMapId) {
-                window.notyf.error('No map selected to rename.');
-                return;
-            }
-            const selectedOption = els.mapSelector.options[els.mapSelector.selectedIndex];
-            const currentName = selectedOption.text;
-            const newName = prompt('Enter a new name for the map:', currentName);
-        
-            if (newName && newName.trim() !== '' && newName !== currentName) {
-                try {
-                    await api.post('update_map', { id: state.currentMapId, updates: { name: newName } });
-                    selectedOption.text = newName;
-                    els.currentMapName.textContent = newName;
-                    window.notyf.success('Map renamed successfully.');
-                } catch (error) {
-                    console.error("Failed to rename map:", error);
-                    window.notyf.error(error.message || "Could not rename map.");
+        if (els.newMapBtn) els.newMapBtn.addEventListener('click', mapManager.createMap);
+        if (els.createFirstMapBtn) els.createFirstMapBtn.addEventListener('click', mapManager.createMap);
+        if (els.renameMapBtn) {
+            els.renameMapBtn.addEventListener('click', async () => {
+                if (!state.currentMapId || !els.mapSelector) {
+                    window.notyf.error('No map selected to rename.');
+                    return;
                 }
-            }
-        });
-        els.deleteMapBtn.addEventListener('click', async () => {
-            if (confirm(`Delete map "${els.mapSelector.options[els.mapSelector.selectedIndex].text}"?`)) {
-                try {
-                    await api.post('delete_map', { id: state.currentMapId });
-                    const firstMapId = await mapManager.loadMaps();
-                    await mapManager.switchMap(firstMapId);
-                    window.notyf.success('Map deleted.');
-                } catch (error) {
-                    console.error("Failed to delete map:", error);
-                    window.notyf.error(error.message || "Could not delete map.");
+                const selectedOption = els.mapSelector.options[els.mapSelector.selectedIndex];
+                const currentName = selectedOption ? selectedOption.text : '';
+                const newName = prompt('Enter a new name for the map:', currentName);
+            
+                if (newName && newName.trim() !== '' && newName !== currentName) {
+                    try {
+                        await api.post('update_map', { id: state.currentMapId, updates: { name: newName } });
+                        if (selectedOption) selectedOption.text = newName;
+                        if (els.currentMapName) els.currentMapName.textContent = newName;
+                        window.notyf.success('Map renamed successfully.');
+                    } catch (error) {
+                        console.error("Failed to rename map:", error);
+                        window.notyf.error(error.message || "Could not rename map.");
+                    }
                 }
-            }
-        });
+            });
+        }
+        if (els.deleteMapBtn) {
+            els.deleteMapBtn.addEventListener('click', async () => {
+                const mapText = els.mapSelector?.options[els.mapSelector.selectedIndex]?.text || '';
+                if (confirm(`Delete map "${mapText}"?`)) {
+                    try {
+                        await api.post('delete_map', { id: state.currentMapId });
+                        const firstMapId = await mapManager.loadMaps();
+                        await mapManager.switchMap(firstMapId);
+                        window.notyf.success('Map deleted.');
+                    } catch (error) {
+                        console.error("Failed to delete map:", error);
+                        window.notyf.error(error.message || "Could not delete map.");
+                    }
+                }
+            });
+        }
     } else {
         // Disable map management buttons for viewers
         if (els.newMapBtn) els.newMapBtn.disabled = true;
@@ -1552,14 +1569,18 @@ function initMap() {
 
         // Set live refresh to ON by default for viewers
         if (window.userRole === 'viewer') {
-            els.liveRefreshToggle.checked = true;
-            els.liveRefreshToggle.disabled = true; // Disable toggle for viewers
-            els.refreshStatusBtn.disabled = true; // Disable manual refresh button for viewers when live is on
+            if (els.liveRefreshToggle) {
+                els.liveRefreshToggle.checked = true;
+                els.liveRefreshToggle.disabled = true; // Disable toggle for viewers
+            }
+            if (els.refreshStatusBtn) els.refreshStatusBtn.disabled = true; // Disable manual refresh button for viewers when live is on
             deviceManager.performBulkRefresh(); // Initial refresh
             state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
         } else {
-            els.liveRefreshToggle.checked = false; // Default off for admin
-            els.liveRefreshToggle.disabled = false; // Enable toggle for admin
+            if (els.liveRefreshToggle) {
+                els.liveRefreshToggle.checked = false; // Default off for admin
+                els.liveRefreshToggle.disabled = false; // Enable toggle for admin
+            }
         }
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -1569,7 +1590,7 @@ function initMap() {
         const initialMapId = mapToLoad || firstMapId; // Prioritize URL param
         
         if (initialMapId) {
-            els.mapSelector.value = initialMapId;
+            if (els.mapSelector) els.mapSelector.value = initialMapId;
             state.tooltipFieldSettingsByMap[initialMapId] = loadTooltipFieldsForMap(initialMapId);
             state.connectionTooltipFieldSettingsByMap[initialMapId] = loadConnectionTooltipFieldsForMap(initialMapId);
             state.tooltipDisplaySettingsByMap[initialMapId] = loadTooltipDisplayForMap(initialMapId);
@@ -1585,16 +1606,16 @@ function initMap() {
 
         // Disable modification buttons for viewers after initial load
         if (window.userRole === 'viewer') {
-            els.newMapBtn.disabled = true;
-            els.renameMapBtn.disabled = true;
-            els.deleteMapBtn.disabled = true;
-            els.placeDeviceBtn.disabled = true;
-            els.addDeviceBtn.style.display = 'none'; // Hide link
-            els.addEdgeBtn.disabled = true;
-            els.exportBtn.disabled = true;
-            els.importBtn.disabled = true;
-            els.mapSettingsBtn.disabled = true;
-            els.scanNetworkBtn.disabled = true;
+            if (els.newMapBtn) els.newMapBtn.disabled = true;
+            if (els.renameMapBtn) els.renameMapBtn.disabled = true;
+            if (els.deleteMapBtn) els.deleteMapBtn.disabled = true;
+            if (els.placeDeviceBtn) els.placeDeviceBtn.disabled = true;
+            if (els.addDeviceBtn) els.addDeviceBtn.style.display = 'none'; // Hide link
+            if (els.addEdgeBtn) els.addEdgeBtn.disabled = true;
+            if (els.exportBtn) els.exportBtn.disabled = true;
+            if (els.importBtn) els.importBtn.disabled = true;
+            if (els.mapSettingsBtn) els.mapSettingsBtn.disabled = true;
+            if (els.scanNetworkBtn) els.scanNetworkBtn.disabled = true;
             if (els.createFirstMapBtn) els.createFirstMapBtn.disabled = true; // If no maps exist
             
             const mapSelectionControls = document.querySelector('#map-selection .flex.gap-4');

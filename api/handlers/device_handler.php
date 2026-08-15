@@ -837,12 +837,14 @@ switch ($action) {
             LEFT JOIN 
                 maps m ON d.map_id = m.id
             LEFT JOIN 
-                ping_results p ON p.id = (
-                    SELECT id 
-                    FROM ping_results 
-                    WHERE host = d.ip 
-                    ORDER BY created_at DESC 
-                    LIMIT 1
+                ping_results p ON (
+                    d.ip IS NOT NULL AND d.ip != '' AND p.id = (
+                        SELECT id 
+                        FROM ping_results 
+                        WHERE host = d.ip 
+                        ORDER BY created_at DESC 
+                        LIMIT 1
+                    )
                 )
             LEFT JOIN 
                 host_metrics hm ON (
