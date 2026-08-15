@@ -147,10 +147,15 @@ echo "[$(date -Iseconds)] Step 4/4: Restarting services"
 COMPOSE_DIR="${APP_DIR}"
 if [ -f "${COMPOSE_DIR}/docker-compose.yml" ] || [ -f "${COMPOSE_DIR}/docker-compose.yaml" ] || [ -f "${COMPOSE_DIR}/compose.yml" ] || [ -f "${COMPOSE_DIR}/compose.yaml" ]; then
   cd "${COMPOSE_DIR}"
-  if docker compose version >/dev/null 2>&1; then
-    docker compose restart
+  if command -v docker >/dev/null 2>&1 && [ -S /var/run/docker.sock ]; then
+    echo "Scheduling container restart in background..."
+    if docker compose version >/dev/null 2>&1; then
+      (nohup sh -c 'sleep 2 && docker compose restart app' >/dev/null 2>&1 &)
+    elif command -v docker-compose >/dev/null 2>&1; then
+      (nohup sh -c 'sleep 2 && docker-compose restart app' >/dev/null 2>&1 &)
+    fi
   else
-    docker-compose restart
+    echo "Docker socket/command not available inside container; skipping compose restart"
   fi
 else
   echo "No compose file found in ${COMPOSE_DIR}; skipping restart"

@@ -68,6 +68,14 @@ MapApp.network = {
 
     initializeMap: () => {
         const container = document.getElementById('network-map');
+        if (!container) return;
+
+        if (typeof vis === 'undefined' || typeof vis.Network === 'undefined') {
+            console.error('Vis.js library is not loaded.');
+            if (window.notyf) window.notyf.error('Network map library (Vis.js) failed to load.');
+            return;
+        }
+
         const contextMenu = document.getElementById('context-menu');
 
         MapApp.ui.populateLegend();
