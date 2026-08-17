@@ -20,6 +20,11 @@ class DeviceModel {
   final double? diskUsage;
   final int mapId;
   final bool showLivePing;
+  final double nameTextSize;
+  final String? nameTextColor;
+  final bool nameTextBold;
+  final bool nameTextItalic;
+  final String? iconUrl;
 
   DeviceModel({
     required this.id,
@@ -41,6 +46,11 @@ class DeviceModel {
     this.diskUsage,
     this.mapId = 1,
     this.showLivePing = true,
+    this.nameTextSize = 14,
+    this.nameTextColor,
+    this.nameTextBold = false,
+    this.nameTextItalic = false,
+    this.iconUrl,
   });
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) {
@@ -64,6 +74,11 @@ class DeviceModel {
       diskUsage: double.tryParse(json['disk_usage']?.toString() ?? ''),
       mapId: int.tryParse(json['map_id']?.toString() ?? '1') ?? 1,
       showLivePing: json['show_live_ping'] == 1 || json['show_live_ping'] == true || json['show_live_ping'] == '1',
+      nameTextSize: double.tryParse(json['name_text_size']?.toString() ?? '14') ?? 14,
+      nameTextColor: json['name_text_color']?.toString(),
+      nameTextBold: json['name_text_bold'] == 1 || json['name_text_bold'] == true || json['name_text_bold'] == '1',
+      nameTextItalic: json['name_text_italic'] == 1 || json['name_text_italic'] == true || json['name_text_italic'] == '1',
+      iconUrl: json['icon_url']?.toString(),
     );
   }
 
@@ -88,6 +103,11 @@ class DeviceModel {
       'disk_usage': diskUsage,
       'map_id': mapId,
       'show_live_ping': showLivePing ? 1 : 0,
+      'name_text_size': nameTextSize,
+      'name_text_color': nameTextColor,
+      'name_text_bold': nameTextBold ? 1 : 0,
+      'name_text_italic': nameTextItalic ? 1 : 0,
+      'icon_url': iconUrl,
     };
   }
 
@@ -95,6 +115,7 @@ class DeviceModel {
   bool get isOffline => status == 'offline' || status == 'down' || status == 'unknown';
   bool get isWarning => status == 'warning';
   bool get isCritical => status == 'critical';
+  bool get isTextNode => type.toLowerCase() == 'text';
 
   /// Colors matching Docker web `MapApp.config.statusColorMap`
   Color get statusColor {
@@ -112,28 +133,29 @@ class DeviceModel {
     }
   }
 
-  /// Icon mapping matching Docker web `MapApp.config.iconMap`
+  /// Icon mapping exactly matching Docker web `MapApp.config.iconMap` & `device_icons.php`
   IconData get typeIcon {
     final t = type.toLowerCase();
-    if (t.contains('router') || t == 'wifi-router') return Icons.router;
-    if (t.contains('switch')) return Icons.alt_route;
-    if (t.contains('server') || t.contains('host')) return Icons.dns;
-    if (t.contains('firewall')) return Icons.security;
-    if (t.contains('wifi') || t.contains('ap')) return Icons.wifi;
-    if (t.contains('camera') || t.contains('cctv')) return Icons.videocam;
-    if (t.contains('printer')) return Icons.print;
-    if (t.contains('nas') || t.contains('storage')) return Icons.storage;
-    if (t.contains('ipphone') || t.contains('phone')) return Icons.phone_in_talk;
-    if (t.contains('punchdevice') || t.contains('biometric')) return Icons.fingerprint;
-    if (t.contains('radio') || t.contains('tower')) return Icons.cell_tower;
-    if (t.contains('laptop')) return Icons.laptop;
-    if (t.contains('tablet')) return Icons.tablet_mac;
-    if (t.contains('mobile')) return Icons.smartphone;
-    if (t.contains('cloud') || t.contains('wan')) return Icons.cloud;
-    if (t.contains('database') || t.contains('db')) return Icons.storage_rounded;
-    if (t.contains('rack')) return Icons.shelves;
-    if (t.contains('box')) return Icons.check_box_outline_blank;
-    if (t.contains('desktop') || t.contains('pc')) return Icons.computer;
-    return Icons.devices_other;
+    if (t == 'router') return Icons.router_rounded;
+    if (t == 'wifi-router') return Icons.wifi_tethering_rounded;
+    if (t == 'switch') return Icons.alt_route_rounded;
+    if (t == 'server') return Icons.dns_rounded;
+    if (t == 'firewall') return Icons.shield_rounded;
+    if (t == 'camera') return Icons.videocam_rounded;
+    if (t == 'printer') return Icons.print_rounded;
+    if (t == 'nas') return Icons.save_rounded;
+    if (t == 'ipphone') return Icons.phone_in_talk_rounded;
+    if (t == 'punchdevice') return Icons.fingerprint_rounded;
+    if (t == 'radio' || t == 'radio-tower') return Icons.cell_tower_rounded;
+    if (t == 'rack') return Icons.view_headline_rounded;
+    if (t == 'laptop') return Icons.laptop_mac_rounded;
+    if (t == 'tablet') return Icons.tablet_mac_rounded;
+    if (t == 'mobile') return Icons.smartphone_rounded;
+    if (t == 'cloud') return Icons.cloud_rounded;
+    if (t == 'database') return Icons.storage_rounded;
+    if (t == 'box') return Icons.check_box_outline_blank_rounded;
+    if (t == 'text') return Icons.text_fields_rounded;
+    if (t == 'desktop' || t == 'pc' || t == 'other') return Icons.desktop_windows_rounded;
+    return Icons.devices_other_rounded;
   }
 }

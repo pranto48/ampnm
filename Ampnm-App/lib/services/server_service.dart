@@ -175,9 +175,17 @@ class ServerService {
 
       if (response.statusCode == 200) {
         final dynamic data = json.decode(response.body);
+        List<dynamic> list = [];
         if (data is List) {
-          return data.map((e) => MapModel.fromJson(e as Map<String, dynamic>)).toList();
+          list = data;
+        } else if (data is Map) {
+          if (data['maps'] is List) {
+            list = data['maps'];
+          } else if (data['data'] is List) {
+            list = data['data'];
+          }
         }
+        return list.map((e) => MapModel.fromJson(e as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (e) {
@@ -197,13 +205,23 @@ class ServerService {
       final response = await _client.get(
         uri,
         headers: _buildHeaders(sessionCookie),
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final dynamic data = json.decode(response.body);
+        List<dynamic> list = [];
         if (data is List) {
-          return data.map((e) => DeviceModel.fromJson(e as Map<String, dynamic>)).toList();
+          list = data;
+        } else if (data is Map) {
+          if (data['devices'] is List) {
+            list = data['devices'];
+          } else if (data['data'] is List) {
+            list = data['data'];
+          } else if (data['results'] is List) {
+            list = data['results'];
+          }
         }
+        return list.map((e) => DeviceModel.fromJson(e as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (e) {
@@ -228,13 +246,23 @@ class ServerService {
       final response = await _client.get(
         uri,
         headers: _buildHeaders(sessionCookie),
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final dynamic data = json.decode(response.body);
+        List<dynamic> list = [];
         if (data is List) {
-          return data.map((e) => DeviceModel.fromJson(e as Map<String, dynamic>)).toList();
+          list = data;
+        } else if (data is Map) {
+          if (data['devices'] is List) {
+            list = data['devices'];
+          } else if (data['data'] is List) {
+            list = data['data'];
+          } else if (data['results'] is List) {
+            list = data['results'];
+          }
         }
+        return list.map((e) => DeviceModel.fromJson(e as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (e) {
@@ -397,9 +425,17 @@ class ServerService {
 
       if (response.statusCode == 200) {
         final dynamic data = json.decode(response.body);
+        List<dynamic> list = [];
         if (data is List) {
-          return data.map((e) => EdgeModel.fromJson(e as Map<String, dynamic>)).toList();
+          list = data;
+        } else if (data is Map) {
+          if (data['edges'] is List) {
+            list = data['edges'];
+          } else if (data['data'] is List) {
+            list = data['data'];
+          }
         }
+        return list.map((e) => EdgeModel.fromJson(e as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (e) {
@@ -445,6 +481,42 @@ class ServerService {
       return null;
     }
   }
+
+  /// Updates an existing connection link (edge)
+  static Future<Map<String, dynamic>?> updateEdge({
+    required String serverUrl,
+    required String sessionCookie,
+    required int id,
+    required String connectionType,
+    String? label,
+    String? color,
+    double thickness = 2.0,
+  }) async {
+    final cleanUrl = sanitizeUrl(serverUrl);
+    final uri = Uri.parse('$cleanUrl/api.php?action=update_edge');
+
+    try {
+      final response = await _client.post(
+        uri,
+        headers: _buildHeaders(sessionCookie, isJson: true),
+        body: json.encode({
+          'id': id,
+          'connection_type': connectionType,
+          'label': label ?? '',
+          'color': color ?? '',
+          'thickness': thickness.toInt(),
+        }),
+      ).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
 
   /// Deletes a connection link (edge)
   static Future<bool> deleteEdge({
@@ -508,10 +580,12 @@ class ServerService {
   static Future<List<StatusLogModel>> getStatusLogs({
     required String serverUrl,
     required String sessionCookie,
+    int? mapId,
     int limit = 50,
   }) async {
     final cleanUrl = sanitizeUrl(serverUrl);
-    final uri = Uri.parse('$cleanUrl/api.php?action=get_status_logs&limit=$limit');
+    final mapParam = mapId != null ? '&map_id=$mapId' : '&map_id=1';
+    final uri = Uri.parse('$cleanUrl/api.php?action=get_dashboard_data$mapParam');
 
     try {
       final response = await _client.get(
@@ -521,9 +595,17 @@ class ServerService {
 
       if (response.statusCode == 200) {
         final dynamic data = json.decode(response.body);
+        List<dynamic> list = [];
         if (data is List) {
-          return data.map((e) => StatusLogModel.fromJson(e as Map<String, dynamic>)).toList();
+          list = data;
+        } else if (data is Map) {
+          if (data['recent_activity'] is List) {
+            list = data['recent_activity'];
+          } else if (data['logs'] is List) {
+            list = data['logs'];
+          }
         }
+        return list.map((e) => StatusLogModel.fromJson(e as Map<String, dynamic>)).toList();
       }
       return [];
     } catch (e) {
@@ -585,8 +667,10 @@ class ServerService {
   }
 
   static Map<String, String> _buildHeaders(String sessionCookie, {bool isJson = false}) {
+    final cleanCookie = sessionCookie.trim();
+    final cookieHeader = cleanCookie.startsWith('PHPSESSID=') ? cleanCookie : 'PHPSESSID=$cleanCookie';
     final headers = <String, String>{
-      'Cookie': sessionCookie.startsWith('PHPSESSID=') ? sessionCookie : 'PHPSESSID=$sessionCookie',
+      'Cookie': cookieHeader,
       'Accept': 'application/json',
     };
     if (isJson) {
@@ -608,10 +692,10 @@ class ServerService {
 
   static String? _extractSessionCookie(String rawCookie) {
     if (rawCookie.isEmpty) return null;
-    final match = RegExp(r'PHPSESSID=([^;]+)').firstMatch(rawCookie);
+    final match = RegExp(r'PHPSESSID=([^;,\s]+)').firstMatch(rawCookie);
     if (match != null) {
       return match.group(1);
     }
-    return rawCookie.split(';').firstOrNull;
+    return rawCookie.split(';').firstOrNull?.replaceFirst('PHPSESSID=', '');
   }
 }

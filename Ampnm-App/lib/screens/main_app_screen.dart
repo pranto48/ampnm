@@ -130,7 +130,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
   Future<void> _fetchAllData() async {
     if (!mounted) return;
     final serverUrl = _activeProfile.serverUrl;
-    final cookie = _activeProfile.sessionCookie ?? '';
+    String cookie = _activeProfile.sessionCookie ?? '';
 
     // Measure live latency to Docker server
     final testRes = await ServerService.testConnection(serverUrl);
@@ -146,19 +146,51 @@ class _MainAppScreenState extends State<MainAppScreen> {
     }
 
     try {
+      // Proactive authentication if cookie is missing but credentials exist
+      if (cookie.isEmpty && _activeProfile.savedPassword != null && _activeProfile.savedPassword!.isNotEmpty) {
+        final loginRes = await ServerService.login(
+          serverUrl: serverUrl,
+          username: _activeProfile.username,
+          password: _activeProfile.savedPassword!,
+        );
+        if (loginRes.isSuccess && loginRes.sessionCookie != null) {
+          cookie = loginRes.sessionCookie!;
+          _activeProfile = _activeProfile.copyWith(sessionCookie: cookie);
+          widget.storage.saveProfile(_activeProfile);
+        }
+      }
+
       // 1. Fetch All Maps from Docker Server
-      final maps = await ServerService.getMaps(serverUrl: serverUrl, sessionCookie: cookie);
+      var maps = await ServerService.getMaps(serverUrl: serverUrl, sessionCookie: cookie);
+
+      // 2. Fetch ALL devices on Docker Server
+      var allDevices = await ServerService.getAllDevices(
+        serverUrl: serverUrl,
+        sessionCookie: cookie,
+      );
+
+      // If both maps and devices are empty and we have saved credentials, session might have expired in PHP
+      if (maps.isEmpty && allDevices.isEmpty && _activeProfile.savedPassword != null && _activeProfile.savedPassword!.isNotEmpty) {
+        final loginRes = await ServerService.login(
+          serverUrl: serverUrl,
+          username: _activeProfile.username,
+          password: _activeProfile.savedPassword!,
+        );
+        if (loginRes.isSuccess && loginRes.sessionCookie != null) {
+          cookie = loginRes.sessionCookie!;
+          _activeProfile = _activeProfile.copyWith(sessionCookie: cookie);
+          widget.storage.saveProfile(_activeProfile);
+
+          // Retry fetching with fresh session
+          maps = await ServerService.getMaps(serverUrl: serverUrl, sessionCookie: cookie);
+          allDevices = await ServerService.getAllDevices(serverUrl: serverUrl, sessionCookie: cookie);
+        }
+      }
 
       int mapIdToUse = _selectedMapId;
       if (maps.isNotEmpty && !maps.any((m) => m.id == mapIdToUse)) {
         mapIdToUse = maps.first.id;
       }
-
-      // 2. Fetch ALL devices on Docker Server (complete global inventory)
-      final allDevices = await ServerService.getAllDevices(
-        serverUrl: serverUrl,
-        sessionCookie: cookie,
-      );
 
       // 3. Fetch Map Specific devices & Edges
       final mapDevices = await ServerService.getDevices(
@@ -177,25 +209,28 @@ class _MainAppScreenState extends State<MainAppScreen> {
       final logs = await ServerService.getStatusLogs(
         serverUrl: serverUrl,
         sessionCookie: cookie,
+        mapId: mapIdToUse,
         limit: 50,
       );
 
       if (mounted) {
         setState(() {
-          _maps = maps;
+          if (maps.isNotEmpty) _maps = maps;
           _selectedMapId = mapIdToUse;
-          _allDevices = allDevices.isNotEmpty ? allDevices : mapDevices;
-          _mapDevices = mapDevices;
-          _edges = edges;
-          _logs = logs;
+          if (allDevices.isNotEmpty || mapDevices.isNotEmpty) {
+            _allDevices = allDevices.isNotEmpty ? allDevices : mapDevices;
+            _mapDevices = mapDevices.isNotEmpty ? mapDevices : _allDevices;
+          }
+          if (edges.isNotEmpty || mapDevices.isNotEmpty) _edges = edges;
+          if (logs.isNotEmpty) _logs = logs;
           _syncStatus = 'Connected';
         });
 
         // Save fresh snapshot to Local Disk Cache
-        widget.storage.saveCachedMaps(_activeProfile.id, maps);
-        widget.storage.saveCachedDevices(_activeProfile.id, mapIdToUse, _allDevices);
-        widget.storage.saveCachedEdges(_activeProfile.id, mapIdToUse, edges);
-        widget.storage.saveCachedLogs(_activeProfile.id, logs);
+        if (maps.isNotEmpty) widget.storage.saveCachedMaps(_activeProfile.id, maps);
+        if (_allDevices.isNotEmpty) widget.storage.saveCachedDevices(_activeProfile.id, mapIdToUse, _allDevices);
+        if (edges.isNotEmpty) widget.storage.saveCachedEdges(_activeProfile.id, mapIdToUse, edges);
+        if (logs.isNotEmpty) widget.storage.saveCachedLogs(_activeProfile.id, logs);
       }
     } catch (e) {
       if (mounted) {
@@ -228,19 +263,20 @@ class _MainAppScreenState extends State<MainAppScreen> {
       final logs = await ServerService.getStatusLogs(
         serverUrl: serverUrl,
         sessionCookie: cookie,
+        mapId: _selectedMapId,
         limit: 30,
       );
 
       if (mounted && (allDevices.isNotEmpty || mapDevices.isNotEmpty)) {
         setState(() {
           _allDevices = allDevices.isNotEmpty ? allDevices : mapDevices;
-          _mapDevices = mapDevices;
-          _logs = logs;
+          _mapDevices = mapDevices.isNotEmpty ? mapDevices : _allDevices;
+          if (logs.isNotEmpty) _logs = logs;
           _syncStatus = 'Connected';
         });
 
         widget.storage.saveCachedDevices(_activeProfile.id, _selectedMapId, _allDevices);
-        widget.storage.saveCachedLogs(_activeProfile.id, logs);
+        if (logs.isNotEmpty) widget.storage.saveCachedLogs(_activeProfile.id, logs);
       }
     } catch (_) {
       if (mounted) {
@@ -480,6 +516,40 @@ class _MainAppScreenState extends State<MainAppScreen> {
     }
   }
 
+  Future<void> _handleUpdateEdge(Map<String, dynamic> edgeData) async {
+    final res = await ServerService.updateEdge(
+      serverUrl: _activeProfile.serverUrl,
+      sessionCookie: _activeProfile.sessionCookie ?? '',
+      id: edgeData['id'],
+      connectionType: edgeData['connection_type'],
+      label: edgeData['label'],
+      thickness: edgeData['thickness'] ?? 2.0,
+    );
+    await _fetchAllData();
+    if (mounted && res != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Topology connection updated & synced!'), backgroundColor: AppTheme.success),
+      );
+    }
+  }
+
+  Future<void> _handleAddTextNode(Map<String, dynamic> textData) async {
+    final res = await ServerService.createDevice(
+      serverUrl: _activeProfile.serverUrl,
+      sessionCookie: _activeProfile.sessionCookie ?? '',
+      name: textData['name'],
+      ip: '',
+      type: 'text',
+      mapId: textData['map_id'] ?? _selectedMapId,
+    );
+    await _fetchAllData();
+    if (mounted && res != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Text label added to map!'), backgroundColor: AppTheme.success),
+      );
+    }
+  }
+
   Future<void> _handleDeleteEdge(int edgeId) async {
     final ok = await ServerService.deleteEdge(
       serverUrl: _activeProfile.serverUrl,
@@ -631,11 +701,16 @@ class _MainAppScreenState extends State<MainAppScreen> {
                             onRefresh: _initialLoadAllData,
                             onDeviceSelected: _showDeviceInspector,
                             onPingDevice: _handlePingDevice,
+                            onContinuousPing: _openContinuousPingModal,
+                            onEditDevice: _openEditDeviceModal,
+                            onDeleteDevice: _handleDeleteDevice,
                             onUpdatePosition: _handleUpdatePosition,
                             onCreateEdge: _handleCreateEdge,
+                            onUpdateEdge: _handleUpdateEdge,
                             onDeleteEdge: _handleDeleteEdge,
                             onOpenScanner: _openNetworkScanner,
                             onAddDevice: _openAddDeviceModal,
+                            onAddTextNode: _handleAddTextNode,
                             isLiveActive: _isLiveActive,
                             isTabVisible: _selectedNavIndex == 1,
                             onToggleLive: (val) {

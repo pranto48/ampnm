@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
+
 import '../app_theme.dart';
 import '../models/device_model.dart';
 import '../models/edge_model.dart';
 import '../models/map_model.dart';
+import '../widgets/add_edit_text_dialog.dart';
 import '../widgets/connect_nodes_dialog.dart';
+import '../widgets/edit_edge_dialog.dart';
 
 class NativeMapView extends StatefulWidget {
   final List<MapModel> maps;
@@ -14,11 +18,16 @@ class NativeMapView extends StatefulWidget {
   final VoidCallback onRefresh;
   final ValueChanged<DeviceModel> onDeviceSelected;
   final Function(DeviceModel) onPingDevice;
+  final Function(DeviceModel)? onContinuousPing;
+  final Function(DeviceModel)? onEditDevice;
+  final Function(DeviceModel)? onDeleteDevice;
   final Function(DeviceModel, double, double)? onUpdatePosition;
   final Function(Map<String, dynamic>)? onCreateEdge;
+  final Function(Map<String, dynamic>)? onUpdateEdge;
   final Function(int)? onDeleteEdge;
   final VoidCallback? onOpenScanner;
   final VoidCallback? onAddDevice;
+  final Function(Map<String, dynamic>)? onAddTextNode;
   final bool isLiveActive;
   final ValueChanged<bool>? onToggleLive;
   final bool isTabVisible;
@@ -33,11 +42,16 @@ class NativeMapView extends StatefulWidget {
     required this.onRefresh,
     required this.onDeviceSelected,
     required this.onPingDevice,
+    this.onContinuousPing,
+    this.onEditDevice,
+    this.onDeleteDevice,
     this.onUpdatePosition,
     this.onCreateEdge,
+    this.onUpdateEdge,
     this.onDeleteEdge,
     this.onOpenScanner,
     this.onAddDevice,
+    this.onAddTextNode,
     this.isLiveActive = true,
     this.onToggleLive,
     this.isTabVisible = true,
@@ -54,7 +68,9 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
   String _searchQuery = '';
   final String _selectedTypeFilter = 'all';
   final Map<int, Offset> _draggedPositions = {};
-  bool _showLegend = true;
+  bool _showConnectionLegend = true;
+  bool _showStatusLegend = true;
+  bool _isFullScreen = false;
 
   @override
   void initState() {
@@ -95,49 +111,105 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     _transformController.value = Matrix4.identity();
   }
 
-  void _applyAutoGridLayout() {
-    const cols = 5;
-    const startX = 160.0;
-    const startY = 160.0;
-    const spacingX = 280.0;
+  void _toggleFullScreen() async {
+    final isFull = await windowManager.isFullScreen();
+    await windowManager.setFullScreen(!isFull);
+    setState(() {
+      _isFullScreen = !isFull;
+    });
+  }
+
+  void _autoLayout() {
+    final total = widget.devices.length;
+    if (total == 0) return;
+
+    final cols = (total > 9) ? 4 : 3;
+    const spacingX = 320.0;
     const spacingY = 220.0;
+    const startX = 180.0;
+    const startY = 160.0;
 
-    for (int i = 0; i < widget.devices.length; i++) {
-      final d = widget.devices[i];
-      final col = i % cols;
-      final row = i ~/ cols;
-      final newX = startX + col * spacingX;
-      final newY = startY + row * spacingY;
-
-      setState(() {
-        _draggedPositions[d.id] = Offset(newX, newY);
-      });
-
-      if (widget.onUpdatePosition != null) {
-        widget.onUpdatePosition!(d, newX, newY);
+    setState(() {
+      for (int i = 0; i < total; i++) {
+        final d = widget.devices[i];
+        final col = i % cols;
+        final row = i ~/ cols;
+        final x = startX + col * spacingX;
+        final y = startY + row * spacingY;
+        _draggedPositions[d.id] = Offset(x, y);
+        if (widget.onUpdatePosition != null) {
+          widget.onUpdatePosition!(d, x, y);
+        }
       }
-    }
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Auto-grid layout synced with Docker server!'),
-        backgroundColor: AppTheme.success,
+        content: Text('Auto-arranged device nodes on map!'),
+        backgroundColor: AppTheme.primary,
         duration: Duration(seconds: 2),
       ),
     );
   }
 
-  void _openConnectDialog() {
+  void _openConnectDialog([DeviceModel? initialSource]) {
     showDialog(
       context: context,
-      builder: (_) => ConnectNodesDialog(
-        devices: widget.devices,
-        onSave: (edgeData) async {
+      builder: (context) => ConnectNodesDialog(
+        devices: widget.devices.where((d) => !d.isTextNode).toList(),
+        initialSourceId: initialSource?.id,
+        onSave: (edgeData) {
           if (widget.onCreateEdge != null) {
-            await widget.onCreateEdge!({
+            widget.onCreateEdge!({
               ...edgeData,
               'map_id': widget.selectedMapId,
             });
+          }
+        },
+      ),
+    );
+  }
+
+  void _openAddTextModal([DeviceModel? initialTextNode]) {
+    showDialog(
+      context: context,
+      builder: (context) => AddEditTextDialog(
+        initialTextNode: initialTextNode,
+        defaultMapId: widget.selectedMapId,
+        onSave: (data) {
+          if (initialTextNode != null) {
+            if (widget.onEditDevice != null) {
+              widget.onEditDevice!(DeviceModel(
+                id: initialTextNode.id,
+                name: data['name'],
+                ip: '',
+                type: 'text',
+                nameTextSize: data['name_text_size'] ?? 16.0,
+                nameTextColor: data['name_text_color'] ?? '#22D3EE',
+                nameTextBold: data['name_text_bold'] == 1,
+                nameTextItalic: data['name_text_italic'] == 1,
+                mapId: widget.selectedMapId,
+              ));
+            }
+          } else {
+            if (widget.onAddTextNode != null) {
+              widget.onAddTextNode!(data);
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  void _openEditEdgeModal(EdgeModel edge) {
+    showDialog(
+      context: context,
+      builder: (context) => EditEdgeDialog(
+        edge: edge,
+        devices: widget.devices,
+        onSave: (edgeData) {
+          if (widget.onUpdateEdge != null) {
+            widget.onUpdateEdge!(edgeData);
           }
         },
       ),
@@ -154,7 +226,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
           side: const BorderSide(color: Color(0xFF334155)),
         ),
         child: Container(
-          width: 560,
+          width: 580,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -223,15 +295,28 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                           '${edge.displayLabel} ${edge.label != null && edge.label!.isNotEmpty ? '• ${edge.label}' : ''}',
                           style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
-                          tooltip: 'Delete Link',
-                          onPressed: () {
-                            if (widget.onDeleteEdge != null) {
-                              widget.onDeleteEdge!(edge.id);
-                              Navigator.of(context).pop();
-                            }
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 16, color: Color(0xFF22D3EE)),
+                              tooltip: 'Edit Link',
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                _openEditEdgeModal(edge);
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                              tooltip: 'Delete Link',
+                              onPressed: () {
+                                if (widget.onDeleteEdge != null) {
+                                  widget.onDeleteEdge!(edge.id);
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -272,6 +357,126 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     if (left < 50) left = 120 + (device.id * 140.0) % 1900;
     if (top < 50) top = 120 + (device.id * 110.0) % 1300;
     return Offset(left, top);
+  }
+
+  void _showNodeContextMenu(BuildContext context, DeviceModel device, Offset tapPos) {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        tapPos & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      color: const Color(0xFF0F172A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: Color(0xFF334155)),
+      ),
+      items: [
+        if (device.isTextNode) ...[
+          const PopupMenuItem<String>(
+            value: 'edit_text',
+            child: Row(
+              children: [
+                Icon(Icons.edit, color: Color(0xFF22D3EE), size: 16),
+                SizedBox(width: 10),
+                Text('Edit Text Label', style: TextStyle(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+          const PopupMenuItem<String>(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                SizedBox(width: 10),
+                Text('Delete Label', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13)),
+              ],
+            ),
+          ),
+        ] else ...[
+          const PopupMenuItem<String>(
+            value: 'edit',
+            child: Row(
+              children: [
+                Icon(Icons.edit, color: Color(0xFF22D3EE), size: 16),
+                SizedBox(width: 10),
+                Text('Edit Device', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const PopupMenuItem<String>(
+            value: 'ping',
+            child: Row(
+              children: [
+                Icon(Icons.flash_on, color: Color(0xFF10B981), size: 16),
+                SizedBox(width: 10),
+                Text('Ping Now', style: TextStyle(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+          const PopupMenuItem<String>(
+            value: 'continuous_ping',
+            child: Row(
+              children: [
+                Icon(Icons.timeline, color: Color(0xFF38BDF8), size: 16),
+                SizedBox(width: 10),
+                Text('Continuous Ping', style: TextStyle(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+          const PopupMenuItem<String>(
+            value: 'details',
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 16),
+                SizedBox(width: 10),
+                Text('Device Details & Metrics', style: TextStyle(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+          const PopupMenuItem<String>(
+            value: 'connect',
+            child: Row(
+              children: [
+                Icon(Icons.cable, color: Color(0xFFA855F7), size: 16),
+                SizedBox(width: 10),
+                Text('Connect To...', style: TextStyle(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(height: 1),
+          const PopupMenuItem<String>(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                SizedBox(width: 10),
+                Text('Delete Device', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ],
+    ).then((action) {
+      if (action == null) return;
+      if (action == 'edit') {
+        if (widget.onEditDevice != null) widget.onEditDevice!(device);
+      } else if (action == 'edit_text') {
+        _openAddTextModal(device);
+      } else if (action == 'ping') {
+        widget.onPingDevice(device);
+      } else if (action == 'continuous_ping') {
+        if (widget.onContinuousPing != null) widget.onContinuousPing!(device);
+      } else if (action == 'details') {
+        widget.onDeviceSelected(device);
+      } else if (action == 'connect') {
+        _openConnectDialog(device);
+      } else if (action == 'delete') {
+        if (widget.onDeleteDevice != null) widget.onDeleteDevice!(device);
+      }
+    });
   }
 
   @override
@@ -425,9 +630,23 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                   onPressed: widget.onAddDevice,
                 ),
 
+                // Add Text Label Action
+                OutlinedButton.icon(
+                  onPressed: () => _openAddTextModal(),
+                  icon: const Icon(Icons.text_fields, size: 14),
+                  label: const Text('Add Text', style: TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF22D3EE),
+                    side: const BorderSide(color: Color(0xFF0891B2)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: const Size(0, 32),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
                 // Connect Connection Action
                 ElevatedButton.icon(
-                  onPressed: _openConnectDialog,
+                  onPressed: () => _openConnectDialog(),
                   icon: const Icon(Icons.cable, size: 14),
                   label: const Text('Add Connection', style: TextStyle(fontSize: 11)),
                   style: ElevatedButton.styleFrom(
@@ -453,174 +672,152 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                 const SizedBox(width: 8),
 
                 // Auto Layout
-                OutlinedButton.icon(
-                  onPressed: _applyAutoGridLayout,
-                  icon: const Icon(Icons.grid_goldenratio, size: 14),
-                  label: const Text('Auto Layout', style: TextStyle(fontSize: 11)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF22D3EE),
-                    side: const BorderSide(color: Color(0xFF0E7490)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    minimumSize: const Size(0, 32),
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome_mosaic, size: 18, color: Color(0xFFCBD5E1)),
+                  tooltip: 'Auto Arrange Nodes',
+                  onPressed: _autoLayout,
                 ),
-                const SizedBox(width: 10),
 
-                // Live Status Badge / Toggle
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF334155)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: widget.isLiveActive ? const Color(0xFF2ECC71) : const Color(0xFF95A5A6),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        widget.isLiveActive ? 'LIVE SYNC' : 'OFFLINE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: widget.isLiveActive ? const Color(0xFF2ECC71) : const Color(0xFF95A5A6),
-                        ),
-                      ),
-                    ],
-                  ),
+                // Refresh Status
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 18, color: Color(0xFFCBD5E1)),
+                  tooltip: 'Refresh Status',
+                  onPressed: widget.onRefresh,
                 ),
-                const SizedBox(width: 10),
 
-                // Zoom & Refresh Controls
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF334155)),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.zoom_in, size: 16, color: Color(0xFFCBD5E1)),
-                        tooltip: 'Zoom In',
-                        padding: const EdgeInsets.all(6),
-                        constraints: const BoxConstraints(),
-                        onPressed: () => _zoom(1.2),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.zoom_out, size: 16, color: Color(0xFFCBD5E1)),
-                        tooltip: 'Zoom Out',
-                        padding: const EdgeInsets.all(6),
-                        constraints: const BoxConstraints(),
-                        onPressed: () => _zoom(0.8),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.center_focus_strong, size: 16, color: Color(0xFFCBD5E1)),
-                        tooltip: 'Reset View',
-                        padding: const EdgeInsets.all(6),
-                        constraints: const BoxConstraints(),
-                        onPressed: _resetZoom,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF22D3EE)),
-                        tooltip: 'Refresh Server Status',
-                        padding: const EdgeInsets.all(6),
-                        constraints: const BoxConstraints(),
-                        onPressed: widget.onRefresh,
-                      ),
-                    ],
-                  ),
+                // Toggle Fullscreen
+                IconButton(
+                  icon: Icon(_isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen, size: 20, color: const Color(0xFF22D3EE)),
+                  tooltip: 'Toggle Fullscreen',
+                  onPressed: _toggleFullScreen,
                 ),
               ],
             ),
           ),
         ),
 
-        // 4. Bottom Left Connection Types Legend (Exact match to Docker web legend)
-        if (_showLegend)
+        // 4. Bottom-Left Docker Web Style Status Legend
+        if (_showStatusLegend)
           Positioned(
-            bottom: 14,
-            left: 14,
+            bottom: 16,
+            left: 16,
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withOpacity(0.92),
+                color: const Color(0xFF0F172A).withOpacity(0.92),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFF334155)),
-                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 8)],
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Connection Types', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                      const SizedBox(width: 20),
-                      InkWell(
-                        onTap: () => setState(() => _showLegend = false),
-                        child: const Text('Hide', style: TextStyle(fontSize: 10, color: Color(0xFF22D3EE))),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _buildLegendItem('🔌 CAT6', const Color(0xFFA78BFA)),
-                  _buildLegendItem('💡 Fiber Optic', const Color(0xFFF97316)),
-                  _buildLegendItem('📡 WiFi', const Color(0xFF38BDF8)),
-                  _buildLegendItem('📻 Radio', const Color(0xFF84CC16)),
-                  _buildLegendItem('🌐 LAN', const Color(0xFF60A5FA)),
-                  _buildLegendItem('🔒 Tunnel', const Color(0xFFC084FC)),
+                  _buildStatusLegendDot(const Color(0xFF2ECC71), 'Online'),
+                  const SizedBox(width: 14),
+                  _buildStatusLegendDot(const Color(0xFFF1C40F), 'Warning'),
+                  const SizedBox(width: 14),
+                  _buildStatusLegendDot(const Color(0xFFE74C3C), 'Critical'),
+                  const SizedBox(width: 14),
+                  _buildStatusLegendDot(const Color(0xFF95A5A6), 'Offline'),
                 ],
-              ),
-            ),
-          )
-        else
-          Positioned(
-            bottom: 14,
-            left: 14,
-            child: InkWell(
-              onTap: () => setState(() => _showLegend = true),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B).withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF334155)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.hub, size: 12, color: Color(0xFF22D3EE)),
-                    SizedBox(width: 6),
-                    Text('Show Legend', style: TextStyle(fontSize: 11, color: Colors.white)),
-                  ],
-                ),
               ),
             ),
           ),
 
-        // 5. Bottom Right Radar
+        // 5. Bottom-Right Docker Web Style Connection Types Legend
         Positioned(
-          bottom: 14,
-          right: 14,
-          child: Container(
-            width: 140,
-            height: 95,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A).withOpacity(0.85),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF334155)),
-              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 6)],
-            ),
-            child: CustomPaint(
-              painter: _MiniMapPainter(devices: widget.devices, positionGetter: _getDeviceOffset),
+          bottom: 16,
+          right: 16,
+          child: _showConnectionLegend
+              ? Container(
+                  width: 200,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF334155)),
+                    boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.cable, color: Color(0xFF22D3EE), size: 14),
+                              SizedBox(width: 6),
+                              Text(
+                                'Connection Types',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          InkWell(
+                            onTap: () => setState(() => _showConnectionLegend = false),
+                            child: const Icon(Icons.close, size: 14, color: Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildConnectionLegendItem(const Color(0xFFA78BFA), '🔌 CAT6 Cable'),
+                      _buildConnectionLegendItem(const Color(0xFFF97316), '💡 Fiber Optic'),
+                      _buildConnectionLegendItem(const Color(0xFF38BDF8), '📡 WiFi'),
+                      _buildConnectionLegendItem(const Color(0xFF84CC16), '📻 Radio'),
+                      _buildConnectionLegendItem(const Color(0xFF60A5FA), '🌐 LAN'),
+                      _buildConnectionLegendItem(const Color(0xFFC084FC), '🔒 Tunnel'),
+                    ],
+                  ),
+                )
+              : OutlinedButton.icon(
+                  onPressed: () => setState(() => _showConnectionLegend = true),
+                  icon: const Icon(Icons.cable, size: 14),
+                  label: const Text('Connection Types', style: TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A).withOpacity(0.92),
+                    foregroundColor: const Color(0xFF22D3EE),
+                    side: const BorderSide(color: Color(0xFF334155)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
+        ),
+
+        // 6. Floating Zoom & Viewport Controls (Bottom Center)
+        Positioned(
+          bottom: 16,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B).withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF334155)),
+                boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 8)],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove, size: 18, color: Colors.white),
+                    onPressed: () => _zoom(0.85),
+                    tooltip: 'Zoom Out',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.center_focus_strong, size: 18, color: Color(0xFF22D3EE)),
+                    onPressed: _resetZoom,
+                    tooltip: 'Reset Zoom (100%)',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add, size: 18, color: Colors.white),
+                    onPressed: () => _zoom(1.15),
+                    tooltip: 'Zoom In',
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -628,55 +825,146 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
+  Widget _buildStatusLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: color, blurRadius: 4)],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConnectionLegendItem(Color color, String label) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 18,
+            width: 24,
             height: 3,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(2),
-              boxShadow: [BoxShadow(color: color.withOpacity(0.6), blurRadius: 4)],
+              boxShadow: [BoxShadow(color: color.withOpacity(0.8), blurRadius: 4)],
             ),
           ),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFFCBD5E1))),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: Color(0xFFCBD5E1)),
+          ),
         ],
       ),
     );
   }
 
-  /// Node rendered matching Docker Web `map.php` style
   Widget _buildDockerStyleDeviceNode(DeviceModel device) {
     final pos = _getDeviceOffset(device);
 
+    // Render Text Annotation Label Node
+    if (device.isTextNode) {
+      Color textColor = const Color(0xFF22D3EE);
+      if (device.nameTextColor != null && device.nameTextColor!.isNotEmpty) {
+        String hex = device.nameTextColor!.replaceAll('#', '');
+        if (hex.length == 6) hex = 'FF$hex';
+        textColor = Color(int.tryParse(hex, radix: 16) ?? 0xFF22D3EE);
+      }
+
+      return Positioned(
+        left: pos.dx,
+        top: pos.dy,
+        child: GestureDetector(
+          onPanUpdate: (details) {
+            setState(() {
+              _draggedPositions[device.id] = Offset(pos.dx + details.delta.dx, pos.dy + details.delta.dy);
+            });
+          },
+          onPanEnd: (_) {
+            final finalPos = _draggedPositions[device.id] ?? pos;
+            if (widget.onUpdatePosition != null) {
+              widget.onUpdatePosition!(device, finalPos.dx, finalPos.dy);
+            }
+          },
+          onSecondaryTapUp: (details) {
+            _showNodeContextMenu(context, device, details.globalPosition);
+          },
+          onDoubleTap: () => _openAddTextModal(device),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withOpacity(0.85),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: textColor.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(color: textColor.withOpacity(0.2), blurRadius: 8),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  device.name,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: device.nameTextSize.clamp(12.0, 32.0),
+                    fontWeight: device.nameTextBold ? FontWeight.bold : FontWeight.normal,
+                    fontStyle: device.nameTextItalic ? FontStyle.italic : FontStyle.normal,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _openAddTextModal(device),
+                  child: Icon(Icons.edit, size: 12, color: textColor.withOpacity(0.7)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Standard Hardware Device Node
     return Positioned(
       left: pos.dx,
       top: pos.dy,
       child: GestureDetector(
-        onTap: () => widget.onDeviceSelected(device),
         onPanUpdate: (details) {
           setState(() {
-            final cur = _getDeviceOffset(device);
-            _draggedPositions[device.id] = Offset(cur.dx + details.delta.dx, cur.dy + details.delta.dy);
+            _draggedPositions[device.id] = Offset(pos.dx + details.delta.dx, pos.dy + details.delta.dy);
           });
         },
         onPanEnd: (_) {
-          final cur = _getDeviceOffset(device);
+          final finalPos = _draggedPositions[device.id] ?? pos;
           if (widget.onUpdatePosition != null) {
-            widget.onUpdatePosition!(device, cur.dx, cur.dy);
+            widget.onUpdatePosition!(device, finalPos.dx, finalPos.dy);
           }
+        },
+        onTap: () => widget.onDeviceSelected(device),
+        onDoubleTap: () {
+          if (widget.onEditDevice != null) widget.onEditDevice!(device);
+        },
+        onSecondaryTapUp: (details) {
+          _showNodeContextMenu(context, device, details.globalPosition);
         },
         child: MouseRegion(
           cursor: SystemMouseCursors.grab,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Glowing Circular Icon Node
+              // Circular Glowing Node
               Container(
                 width: 58,
                 height: 58,
@@ -705,7 +993,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
               ),
               const SizedBox(height: 6),
 
-              // Docker Web Style Info Card Label
+              // Docker Web Style Info Card Label with Edit Handle
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -716,13 +1004,25 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                 ),
                 child: Column(
                   children: [
-                    Text(
-                      device.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          device.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () {
+                            if (widget.onEditDevice != null) widget.onEditDevice!(device);
+                          },
+                          child: const Icon(Icons.edit, size: 10, color: Color(0xFF94A3B8)),
+                        ),
+                      ],
                     ),
                     Text(
                       device.ip + (device.checkPort > 0 ? ':${device.checkPort}' : ''),
@@ -784,21 +1084,78 @@ class _MapCanvasPainter extends CustomPainter {
 
       final isDown = src.isOffline || dst.isOffline;
       final edgeColor = isDown ? const Color(0xFFE74C3C) : edge.displayColor;
+      final baseThickness = edge.thickness.clamp(2.0, 5.0);
 
-      final paint = Paint()
-        ..color = edgeColor.withOpacity(isDown ? 0.7 : 0.8)
-        ..strokeWidth = edge.thickness.clamp(1.5, 6.0)
+      final p1 = Offset(srcX, srcY);
+      final p2 = Offset(dstX, dstY);
+
+      // Layer 1: Wide Radiant Outer Neon Aura
+      final outerGlowPaint = Paint()
+        ..color = edgeColor.withOpacity(isDown ? 0.35 : 0.45)
+        ..strokeWidth = (baseThickness * 4.8).clamp(9.0, 24.0)
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10.0);
+      canvas.drawLine(p1, p2, outerGlowPaint);
+
+      // Layer 2: Intense Medium Ambient Neon Beam
+      final mediumGlowPaint = Paint()
+        ..color = edgeColor.withOpacity(isDown ? 0.65 : 0.85)
+        ..strokeWidth = (baseThickness * 2.4).clamp(5.0, 14.0)
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+      canvas.drawLine(p1, p2, mediumGlowPaint);
+
+      // Layer 3: Solid Saturated Laser Core
+      final corePaint = Paint()
+        ..color = edgeColor
+        ..strokeWidth = baseThickness
+        ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke;
+      canvas.drawLine(p1, p2, corePaint);
 
-      canvas.drawLine(Offset(srcX, srcY), Offset(dstX, dstY), paint);
+      // Layer 4: Ultra-Bright White/Cyan Hotspot Filament
+      final centerHotspotPaint = Paint()
+        ..color = Colors.white.withOpacity(isDown ? 0.5 : 0.85)
+        ..strokeWidth = (baseThickness * 0.45).clamp(1.0, 2.5)
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(p1, p2, centerHotspotPaint);
 
+      // Layer 5: Dynamic Animated Energy Packets Flowing
       if (!isDown) {
-        final particleX = srcX + (dstX - srcX) * pulseValue;
-        final particleY = srcY + (dstY - srcY) * pulseValue;
-        final particlePaint = Paint()
-          ..color = const Color(0xFF22D3EE)
+        // Particle 1 (Primary Energy Packet)
+        final t1 = pulseValue;
+        final px1 = srcX + (dstX - srcX) * t1;
+        final py1 = srcY + (dstY - srcY) * t1;
+
+        final particle1Glow = Paint()
+          ..color = const Color(0xFF38BDF8).withOpacity(0.7)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0)
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(Offset(particleX, particleY), 4.0, particlePaint);
+        canvas.drawCircle(Offset(px1, py1), 7.5, particle1Glow);
+
+        final particle1Core = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset(px1, py1), 3.5, particle1Core);
+
+        // Particle 2 (Secondary Trailing Packet at 50% phase offset)
+        final t2 = (pulseValue + 0.5) % 1.0;
+        final px2 = srcX + (dstX - srcX) * t2;
+        final py2 = srcY + (dstY - srcY) * t2;
+
+        final particle2Glow = Paint()
+          ..color = edgeColor.withOpacity(0.8)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset(px2, py2), 6.0, particle2Glow);
+
+        final particle2Core = Paint()
+          ..color = const Color(0xFFE0F2FE)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset(px2, py2), 2.5, particle2Core);
       }
     }
   }
@@ -825,31 +1182,4 @@ class _GridBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _MiniMapPainter extends CustomPainter {
-  final List<DeviceModel> devices;
-  final Offset Function(DeviceModel) positionGetter;
-
-  _MiniMapPainter({required this.devices, required this.positionGetter});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scaleX = size.width / 3600;
-    final scaleY = size.height / 2600;
-
-    for (final d in devices) {
-      final pos = positionGetter(d);
-      final x = pos.dx * scaleX;
-      final y = pos.dy * scaleY;
-
-      final paint = Paint()
-        ..color = d.statusColor
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(x, y), 2.5, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
