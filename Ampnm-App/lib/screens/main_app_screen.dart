@@ -777,20 +777,22 @@ class _MainAppScreenState extends State<MainAppScreen> {
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
             child: Row(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.primary, AppTheme.primaryDark],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/ampnm-logo.png',
+                    width: 34,
+                    height: 34,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [AppTheme.primary, AppTheme.primaryDark]),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(child: Icon(Icons.hub, size: 18, color: Colors.black)),
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(color: AppTheme.primary.withOpacity(0.4), blurRadius: 8),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.hub, size: 18, color: Colors.black),
                   ),
                 ),
                 const SizedBox(width: 10),

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -82,6 +83,11 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     if (widget.isTabVisible) {
       _pulseAnimController.repeat();
     }
+
+    // Auto-fit nodes on initial mount
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fitToScreen();
+    });
   }
 
   @override
@@ -91,6 +97,12 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
       _pulseAnimController.repeat();
     } else if (!widget.isTabVisible && _pulseAnimController.isAnimating) {
       _pulseAnimController.stop();
+    }
+
+    if (widget.selectedMapId != oldWidget.selectedMapId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fitToScreen();
+      });
     }
   }
 
@@ -109,6 +121,48 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
 
   void _resetZoom() {
     _transformController.value = Matrix4.identity();
+  }
+
+  void _fitToScreen() {
+    if (widget.devices.isEmpty) {
+      _resetZoom();
+      return;
+    }
+
+    double minX = double.infinity;
+    double minY = double.infinity;
+    double maxX = double.negativeInfinity;
+    double maxY = double.negativeInfinity;
+
+    for (final d in widget.devices) {
+      final pos = _getDeviceOffset(d);
+      minX = math.min(minX, pos.dx);
+      minY = math.min(minY, pos.dy);
+      maxX = math.max(maxX, pos.dx + 120);
+      maxY = math.max(maxY, pos.dy + 120);
+    }
+
+    final boxW = math.max(200.0, maxX - minX + 200);
+    final boxH = math.max(200.0, maxY - minY + 200);
+
+    final viewSize = MediaQuery.of(context).size;
+    final scaleX = (viewSize.width - 320) / boxW;
+    final scaleY = (viewSize.height - 180) / boxH;
+    final scale = math.min(scaleX, scaleY).clamp(0.2, 1.2);
+
+    final centerX = (minX + maxX) / 2;
+    final centerY = (minY + maxY) / 2;
+
+    final targetX = (viewSize.width - 240) / 2 - centerX * scale;
+    final targetY = (viewSize.height - 80) / 2 - centerY * scale;
+
+    final matrix = Matrix4.identity()
+      ..translate(targetX, targetY)
+      ..scale(scale, scale);
+
+    setState(() {
+      _transformController.value = matrix;
+    });
   }
 
   void _toggleFullScreen() async {
@@ -143,6 +197,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
       }
     });
 
+    _fitToScreen();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Auto-arranged device nodes on map!'),
@@ -226,7 +281,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
           side: const BorderSide(color: Color(0xFF334155)),
         ),
         child: Container(
-          width: 580,
+          width: 600,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -283,9 +338,13 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                       return ListTile(
                         dense: true,
                         leading: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(color: edge.displayColor, shape: BoxShape.circle),
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: edge.displayColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: edge.displayColor.withOpacity(0.6), blurRadius: 6)],
+                          ),
                         ),
                         title: Text(
                           '${src.name} ⟷ ${dst.name}',
@@ -298,14 +357,20 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 16, color: Color(0xFF22D3EE)),
-                              tooltip: 'Edit Link',
+                            ElevatedButton.icon(
                               onPressed: () {
                                 Navigator.of(context).pop();
                                 _openEditEdgeModal(edge);
                               },
+                              icon: const Icon(Icons.edit, size: 12),
+                              label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0891B2),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                minimumSize: const Size(0, 30),
+                              ),
                             ),
+                            const SizedBox(width: 6),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
                               tooltip: 'Delete Link',
@@ -402,7 +467,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
               children: [
                 Icon(Icons.edit, color: Color(0xFF22D3EE), size: 16),
                 SizedBox(width: 10),
-                Text('Edit Device', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                Text('Edit Device & Icon', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -494,17 +559,17 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
 
     return Stack(
       children: [
-        // 1. Interactive Topology Canvas (Dark Slate theme matching Docker web)
+        // 1. Interactive Topology Canvas
         Container(
-          color: const Color(0xFF0B1120), // Docker web map dark slate background
+          color: const Color(0xFF0B1120),
           child: InteractiveViewer(
             transformationController: _transformController,
-            boundaryMargin: const EdgeInsets.all(3000),
-            minScale: 0.1,
-            maxScale: 4.0,
+            boundaryMargin: const EdgeInsets.all(3500),
+            minScale: 0.05,
+            maxScale: 5.0,
             child: SizedBox(
-              width: 3600,
-              height: 2600,
+              width: 3800,
+              height: 2800,
               child: AnimatedBuilder(
                 animation: _pulseAnimController,
                 builder: (context, _) {
@@ -592,8 +657,8 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
 
                 // Live Search Input
                 Container(
-                  width: 200,
-                  height: 36,
+                  width: 180,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F172A),
                     borderRadius: BorderRadius.circular(8),
@@ -625,7 +690,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
 
                 // Add Device Action
                 IconButton(
-                  icon: const Icon(Icons.add, size: 18, color: Color(0xFF22D3EE)),
+                  icon: const Icon(Icons.add_circle, size: 20, color: Color(0xFF22D3EE)),
                   tooltip: 'Add New Device',
                   onPressed: widget.onAddDevice,
                 ),
@@ -657,19 +722,25 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                 ),
                 const SizedBox(width: 8),
 
-                // Links Manager
+                // Links & Connection Manager
                 OutlinedButton.icon(
                   onPressed: _showLinksManager,
-                  icon: const Icon(Icons.hub, size: 14),
-                  label: Text('Links (${widget.edges.length})', style: const TextStyle(fontSize: 11)),
+                  icon: const Icon(Icons.hub, size: 14, color: Color(0xFF38BDF8)),
+                  label: Text('Links (${widget.edges.length}) • Edit', style: const TextStyle(fontSize: 11, color: Colors.white)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFF475569)),
+                    side: const BorderSide(color: Color(0xFF0284C7)),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     minimumSize: const Size(0, 32),
                   ),
                 ),
                 const SizedBox(width: 8),
+
+                // Fit to Screen Button
+                IconButton(
+                  icon: const Icon(Icons.filter_center_focus, size: 18, color: Color(0xFF22D3EE)),
+                  tooltip: 'Fit All Devices to Screen',
+                  onPressed: _fitToScreen,
+                ),
 
                 // Auto Layout
                 IconButton(
@@ -687,8 +758,8 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
 
                 // Toggle Fullscreen
                 IconButton(
-                  icon: Icon(_isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen, size: 20, color: const Color(0xFF22D3EE)),
-                  tooltip: 'Toggle Fullscreen',
+                  icon: Icon(_isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen, size: 22, color: const Color(0xFF22D3EE)),
+                  tooltip: _isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
                   onPressed: _toggleFullScreen,
                 ),
               ],
@@ -730,7 +801,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
           right: 16,
           child: _showConnectionLegend
               ? Container(
-                  width: 200,
+                  width: 210,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F172A).withOpacity(0.92),
@@ -764,10 +835,10 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                       const SizedBox(height: 8),
                       _buildConnectionLegendItem(const Color(0xFFA78BFA), '🔌 CAT6 Cable'),
                       _buildConnectionLegendItem(const Color(0xFFF97316), '💡 Fiber Optic'),
-                      _buildConnectionLegendItem(const Color(0xFF38BDF8), '📡 WiFi'),
-                      _buildConnectionLegendItem(const Color(0xFF84CC16), '📻 Radio'),
-                      _buildConnectionLegendItem(const Color(0xFF60A5FA), '🌐 LAN'),
-                      _buildConnectionLegendItem(const Color(0xFFC084FC), '🔒 Tunnel'),
+                      _buildConnectionLegendItem(const Color(0xFF38BDF8), '📡 WiFi Link'),
+                      _buildConnectionLegendItem(const Color(0xFF84CC16), '📻 Radio Link'),
+                      _buildConnectionLegendItem(const Color(0xFF60A5FA), '🌐 Standard LAN'),
+                      _buildConnectionLegendItem(const Color(0xFFC084FC), '🔒 VPN / Tunnel'),
                     ],
                   ),
                 )
@@ -784,7 +855,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                 ),
         ),
 
-        // 6. Floating Zoom & Viewport Controls (Bottom Center)
+        // 6. Floating Zoom & Fit-to-Screen Controls (Bottom Center)
         Positioned(
           bottom: 16,
           left: 0,
@@ -807,7 +878,12 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                     tooltip: 'Zoom Out',
                   ),
                   IconButton(
-                    icon: const Icon(Icons.center_focus_strong, size: 18, color: Color(0xFF22D3EE)),
+                    icon: const Icon(Icons.filter_center_focus, size: 18, color: Color(0xFF22D3EE)),
+                    onPressed: _fitToScreen,
+                    tooltip: 'Fit All Devices to Screen',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.center_focus_strong, size: 18, color: Colors.white),
                     onPressed: _resetZoom,
                     tooltip: 'Reset Zoom (100%)',
                   ),
@@ -1020,7 +1096,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                           onTap: () {
                             if (widget.onEditDevice != null) widget.onEditDevice!(device);
                           },
-                          child: const Icon(Icons.edit, size: 10, color: Color(0xFF94A3B8)),
+                          child: const Icon(Icons.edit, size: 11, color: Color(0xFF22D3EE)),
                         ),
                       ],
                     ),

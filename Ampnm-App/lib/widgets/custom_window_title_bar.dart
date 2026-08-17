@@ -93,24 +93,23 @@ class _CustomWindowTitleBarState extends State<CustomWindowTitleBar> with Window
                 child: Row(
                   children: [
                     // Brand Icon
-                    Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: AppTheme.secondary,
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.secondary.withOpacity(0.4),
-                            blurRadius: 6,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: Image.asset(
+                        'assets/images/ampnm-logo.png',
+                        width: 22,
+                        height: 22,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: AppTheme.secondary,
+                            borderRadius: BorderRadius.circular(5),
                           ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.monitor_heart,
-                          size: 14,
-                          color: Colors.white,
+                          child: const Center(
+                            child: Icon(Icons.monitor_heart, size: 14, color: Colors.white),
+                          ),
                         ),
                       ),
                     ),

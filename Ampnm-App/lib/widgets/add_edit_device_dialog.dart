@@ -33,17 +33,24 @@ class _AddEditDeviceDialogState extends State<AddEditDeviceDialog> {
   int _selectedMapId = 1;
   bool _isSaving = false;
 
-  final List<Map<String, dynamic>> _deviceTypes = [
-    {'type': 'router', 'label': 'Router / Gateway', 'icon': Icons.router},
-    {'type': 'switch', 'label': 'Network Switch', 'icon': Icons.alt_route},
-    {'type': 'server', 'label': 'Server / Host', 'icon': Icons.dns},
-    {'type': 'wifi', 'label': 'Access Point (Wi-Fi)', 'icon': Icons.wifi},
-    {'type': 'firewall', 'label': 'Firewall / Security', 'icon': Icons.security},
-    {'type': 'camera', 'label': 'IP Camera / CCTV', 'icon': Icons.videocam},
-    {'type': 'desktop', 'label': 'Workstation / PC', 'icon': Icons.computer},
-    {'type': 'nas', 'label': 'Storage / NAS', 'icon': Icons.storage},
-    {'type': 'cloud', 'label': 'Cloud / WAN', 'icon': Icons.cloud},
-    {'type': 'other', 'label': 'Other Device', 'icon': Icons.devices_other},
+  final List<Map<String, dynamic>> _deviceCategories = [
+    {'type': 'server', 'label': 'Server / Host', 'icon': Icons.dns_rounded},
+    {'type': 'router', 'label': 'Core Router', 'icon': Icons.router_rounded},
+    {'type': 'switch', 'label': 'Network Switch', 'icon': Icons.alt_route_rounded},
+    {'type': 'wifi-router', 'label': 'WiFi Router / AP', 'icon': Icons.wifi_tethering_rounded},
+    {'type': 'firewall', 'label': 'Firewall / Security', 'icon': Icons.shield_rounded},
+    {'type': 'database', 'label': 'Database Node', 'icon': Icons.storage_rounded},
+    {'type': 'cloud', 'label': 'Cloud / Gateway', 'icon': Icons.cloud_rounded},
+    {'type': 'camera', 'label': 'IP Camera / CCTV', 'icon': Icons.videocam_rounded},
+    {'type': 'nas', 'label': 'NAS / Storage', 'icon': Icons.save_rounded},
+    {'type': 'printer', 'label': 'Network Printer', 'icon': Icons.print_rounded},
+    {'type': 'ipphone', 'label': 'VoIP Phone', 'icon': Icons.phone_in_talk_rounded},
+    {'type': 'punchdevice', 'label': 'Biometric Punch', 'icon': Icons.fingerprint_rounded},
+    {'type': 'radio', 'label': 'Radio / Tower', 'icon': Icons.cell_tower_rounded},
+    {'type': 'rack', 'label': 'Server Rack', 'icon': Icons.view_headline_rounded},
+    {'type': 'desktop', 'label': 'PC / Workstation', 'icon': Icons.desktop_windows_rounded},
+    {'type': 'laptop', 'label': 'Laptop Device', 'icon': Icons.laptop_mac_rounded},
+    {'type': 'box', 'label': 'Custom Box Unit', 'icon': Icons.check_box_outline_blank_rounded},
   ];
 
   @override
@@ -73,6 +80,14 @@ class _AddEditDeviceDialogState extends State<AddEditDeviceDialog> {
     setState(() {
       _portController.text = port > 0 ? '$port' : '';
     });
+  }
+
+  IconData _getIconForType(String type) {
+    final match = _deviceCategories.firstWhere(
+      (c) => c['type'] == type,
+      orElse: () => {'icon': Icons.devices_other_rounded},
+    );
+    return match['icon'] as IconData;
   }
 
   Future<void> _handleSave() async {
@@ -108,299 +123,357 @@ class _AddEditDeviceDialogState extends State<AddEditDeviceDialog> {
     final isEdit = widget.initialDevice != null;
 
     return Dialog(
-      backgroundColor: AppTheme.surfaceCard,
+      backgroundColor: const Color(0xFF0F172A),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppTheme.border),
+        side: const BorderSide(color: Color(0xFF334155)),
       ),
       child: Container(
-        width: 540,
+        width: 620,
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Dialog Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(10),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22D3EE).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            isEdit ? Icons.edit_note : Icons.add_to_queue,
+                            color: const Color(0xFF22D3EE),
+                            size: 22,
+                          ),
                         ),
-                        child: Icon(
-                          isEdit ? Icons.edit_note : Icons.add_to_queue,
-                          color: AppTheme.primaryGlow,
-                          size: 22,
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isEdit ? 'Edit Monitored Device' : 'Add New Network Device',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const Text(
+                              'Configure network endpoint, icon and telemetry intervals',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 18),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Device Name & IP Row
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            isEdit ? 'Edit Monitored Device' : 'Add New Network Device',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          const Text('Device Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1))),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _nameController,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Core Switch 01 / Gateway',
+                              hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              prefixIcon: const Icon(Icons.label_outline, size: 16, color: Color(0xFF94A3B8)),
+                              filled: true,
+                              fillColor: const Color(0xFF1E293B),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
-                          ),
-                          Text(
-                            isEdit ? 'Update properties for ${widget.initialDevice!.name}' : 'Configure IP, port check and ping interval',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('IP Address / Hostname', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1))),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _ipController,
+                            style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
+                            decoration: InputDecoration(
+                              hintText: '192.168.1.1',
+                              hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              prefixIcon: const Icon(Icons.dns, size: 16, color: Color(0xFF94A3B8)),
+                              filled: true,
+                              fillColor: const Color(0xFF1E293B),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'IP is required' : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Device Type & Icon Selector Section
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B).withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.category, size: 14, color: Color(0xFF22D3EE)),
+                              SizedBox(width: 6),
+                              Text(
+                                'DEVICE TYPE & ICON',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF22D3EE), letterSpacing: 0.8),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Text('Selected: ', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                              Icon(_getIconForType(_selectedType), size: 14, color: const Color(0xFF22D3EE)),
+                              const SizedBox(width: 4),
+                              Text(_selectedType.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _deviceCategories.map((cat) {
+                          final isSel = _selectedType == cat['type'];
+                          return InkWell(
+                            onTap: () => setState(() => _selectedType = cat['type']),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSel ? const Color(0xFF0891B2).withOpacity(0.3) : const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSel ? const Color(0xFF22D3EE) : const Color(0xFF334155),
+                                  width: isSel ? 1.5 : 1,
+                                ),
+                                boxShadow: [
+                                  if (isSel) const BoxShadow(color: Color(0x3322D3EE), blurRadius: 6),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(cat['icon'], size: 16, color: isSel ? const Color(0xFF22D3EE) : const Color(0xFF94A3B8)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    cat['label'],
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isSel ? Colors.white : const Color(0xFFCBD5E1),
+                                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: AppTheme.textMuted, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Divider(color: AppTheme.border),
-              const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 14),
 
-              // Inputs Row 1: Name & Type
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _buildTextField(
-                      controller: _nameController,
-                      label: 'Device Name / Hostname *',
-                      hint: 'e.g. Core-Router-01, Web-Server',
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Device Type', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.border),
+                // Port & Map Selection Row
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('TCP Check Port (0 = ICMP Ping)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1))),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _portController,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: '0 (ICMP)',
+                              hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              prefixIcon: const Icon(Icons.settings_ethernet, size: 16, color: Color(0xFF94A3B8)),
+                              filled: true,
+                              fillColor: const Color(0xFF1E293B),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
                           ),
-                          child: DropdownButton<String>(
-                            value: _selectedType,
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            dropdownColor: AppTheme.surfaceCard,
-                            items: _deviceTypes.map((item) {
-                              return DropdownMenuItem<String>(
-                                value: item['type'] as String,
-                                child: Row(
-                                  children: [
-                                    Icon(item['icon'] as IconData, size: 16, color: AppTheme.primaryGlow),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      item['label'] as String,
-                                      style: const TextStyle(fontSize: 12, color: Colors.white),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) setState(() => _selectedType = val);
-                            },
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 4,
+                            children: [
+                              _portChip(0, 'ICMP'),
+                              _portChip(80, 'HTTP'),
+                              _portChip(443, 'HTTPS'),
+                              _portChip(22, 'SSH'),
+                              _portChip(53, 'DNS'),
+                              _portChip(3389, 'RDP'),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Inputs Row 2: IP Address & Check Port
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _buildTextField(
-                      controller: _ipController,
-                      label: 'IP Address / Domain *',
-                      hint: '192.168.9.1 or gateway.local',
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: _buildTextField(
-                      controller: _portController,
-                      label: 'Check Port (0=ICMP Ping)',
-                      hint: '0, 80, 443, 22',
-                      isNumber: true,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-
-              // Port Presets Row
-              Row(
-                children: [
-                  const Text('Port Presets: ', style: TextStyle(fontSize: 10, color: AppTheme.textMuted)),
-                  _buildPortPresetChip('ICMP (0)', 0),
-                  _buildPortPresetChip('HTTP (80)', 80),
-                  _buildPortPresetChip('HTTPS (443)', 443),
-                  _buildPortPresetChip('SSH (22)', 22),
-                  _buildPortPresetChip('Winbox (8291)', 8291),
-                  _buildPortPresetChip('RDP (3389)', 3389),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Inputs Row 3: Target Map & Ping Interval
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Assigned Map', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.border),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Network Map Assignment', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1))),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF334155)),
+                            ),
+                            child: DropdownButton<int>(
+                              value: widget.maps.any((m) => m.id == _selectedMapId) ? _selectedMapId : (widget.maps.isNotEmpty ? widget.maps.first.id : 1),
+                              isExpanded: true,
+                              dropdownColor: const Color(0xFF1E293B),
+                              underline: const SizedBox(),
+                              items: widget.maps.map((m) {
+                                return DropdownMenuItem<int>(
+                                  value: m.id,
+                                  child: Text(m.name, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _selectedMapId = val);
+                              },
+                            ),
                           ),
-                          child: DropdownButton<int>(
-                            value: widget.maps.any((m) => m.id == _selectedMapId)
-                                ? _selectedMapId
-                                : (widget.maps.isNotEmpty ? widget.maps.first.id : 1),
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            dropdownColor: AppTheme.surfaceCard,
-                            items: widget.maps.map((m) {
-                              return DropdownMenuItem<int>(
-                                value: m.id,
-                                child: Text(m.name, style: const TextStyle(fontSize: 12, color: Colors.white)),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) setState(() => _selectedMapId = val);
-                            },
+                          const SizedBox(height: 12),
+                          const Text('Ping Interval (Seconds)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1))),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _intervalController,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: '5',
+                              hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              prefixIcon: const Icon(Icons.timer, size: 16, color: Color(0xFF94A3B8)),
+                              filled: true,
+                              fillColor: const Color(0xFF1E293B),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Description
+                const Text('Notes / Description (Optional)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFCBD5E1))),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _descController,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Core distribution switch rack B2',
+                    hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                    filled: true,
+                    fillColor: const Color(0xFF1E293B),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: _buildTextField(
-                      controller: _intervalController,
-                      label: 'Ping Interval (Seconds)',
-                      hint: '5',
-                      isNumber: true,
+                ),
+                const SizedBox(height: 20),
+
+                // Dialog Action Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Description / Notes
-              _buildTextField(
-                controller: _descController,
-                label: 'Description / Location / Notes',
-                hint: 'e.g. Server Rack 2, 3rd Floor Switch, Uplink to ISP',
-              ),
-              const SizedBox(height: 24),
-
-              // Dialog Footer Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _handleSave,
-                    icon: _isSaving
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.check, size: 16),
-                    label: Text(_isSaving ? 'Saving...' : (isEdit ? 'Update Device' : 'Save Device')),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      onPressed: _isSaving ? null : _handleSave,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0891B2),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(isEdit ? 'Update Device' : 'Add Device'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildPortPresetChip(String label, int port) {
+  Widget _portChip(int port, String label) {
     return InkWell(
       onTap: () => _applyPortPreset(port),
-      borderRadius: BorderRadius.circular(4),
       child: Container(
-        margin: const EdgeInsets.only(right: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        margin: const EdgeInsets.only(top: 2),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: const Color(0xFF0F172A),
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: AppTheme.border),
+          border: Border.all(color: const Color(0xFF475569)),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.primaryGlow)),
+        child: Text('$port ($label)', style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
       ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    String? hint,
-    bool isNumber = false,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-          validator: validator,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
-            filled: true,
-            fillColor: AppTheme.surface,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.primary)),
-          ),
-        ),
-      ],
     );
   }
 }

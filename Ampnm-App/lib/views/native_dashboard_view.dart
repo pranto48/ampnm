@@ -26,18 +26,32 @@ class NativeDashboardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = devices.length;
-    final online = devices.where((d) => d.isOnline).length;
-    final offline = devices.where((d) => d.isOffline).length;
-    final warning = devices.where((d) => d.isWarning).length;
+    final hardwareDevices = devices.where((d) => !d.isTextNode).toList();
+    final total = hardwareDevices.length;
+    final online = hardwareDevices.where((d) => d.isOnline).length;
+    final offline = hardwareDevices.where((d) => d.isOffline).length;
+    final warning = hardwareDevices.where((d) => d.isWarning).length;
+    final critical = hardwareDevices.where((d) => d.isCritical).length;
 
     double avgLatency = 0;
-    final latencyDevices = devices.where((d) => d.lastAvgTime != null && d.lastAvgTime! > 0).toList();
+    final latencyDevices = hardwareDevices.where((d) => d.lastAvgTime != null && d.lastAvgTime! > 0).toList();
     if (latencyDevices.isNotEmpty) {
       avgLatency = latencyDevices.map((d) => d.lastAvgTime!).reduce((a, b) => a + b) / latencyDevices.length;
     }
 
     final availability = total > 0 ? ((online / total) * 100).toStringAsFixed(1) : '100.0';
+
+    // Device Category Distribution
+    final Map<String, int> categoryCounts = {};
+    for (final d in hardwareDevices) {
+      final t = d.type.toLowerCase();
+      categoryCounts[t] = (categoryCounts[t] ?? 0) + 1;
+    }
+
+    // Top Slowest / Highest Latency Devices
+    final sortedByLatency = List<DeviceModel>.from(latencyDevices)
+      ..sort((a, b) => (b.lastAvgTime ?? 0).compareTo(a.lastAvgTime ?? 0));
+    final topSlowest = sortedByLatency.take(5).toList();
 
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
@@ -65,7 +79,7 @@ class NativeDashboardView extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Real-time metrics and live telemetry from AMPNM server',
+                      'Real-time metrics, telemetry, and device diagnostics from AMPNM server',
                       style: TextStyle(fontSize: 13, color: AppTheme.textSecondary.withOpacity(0.8)),
                     ),
                   ],
@@ -83,9 +97,9 @@ class NativeDashboardView extends StatelessWidget {
                           : const Icon(Icons.refresh, size: 16),
                       label: Text(isLoading ? 'Syncing...' : 'Sync Live Data'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.surfaceCard,
-                        foregroundColor: AppTheme.primaryGlow,
-                        side: const BorderSide(color: AppTheme.border),
+                        backgroundColor: const Color(0xFF1E293B),
+                        foregroundColor: const Color(0xFF22D3EE),
+                        side: const BorderSide(color: Color(0xFF334155)),
                       ),
                     ),
                   ],
@@ -110,7 +124,7 @@ class NativeDashboardView extends StatelessWidget {
                       value: '$total',
                       subtitle: '$online Online • $offline Offline',
                       icon: Icons.devices,
-                      color: AppTheme.primary,
+                      color: const Color(0xFF3B82F6),
                       onTap: () => onNavigateToTab(2), // Devices
                     ),
                     _StatCard(
@@ -119,16 +133,16 @@ class NativeDashboardView extends StatelessWidget {
                       value: '$availability%',
                       subtitle: '$online of $total active nodes',
                       icon: Icons.check_circle_outline,
-                      color: AppTheme.success,
+                      color: const Color(0xFF10B981),
                       onTap: () => onNavigateToTab(2),
                     ),
                     _StatCard(
                       width: cardWidth,
                       title: 'Alerts / Offline',
-                      value: '$offline',
-                      subtitle: offline > 0 ? 'Action required immediately' : 'All systems operational',
+                      value: '${offline + warning + critical}',
+                      subtitle: (offline + warning + critical) > 0 ? '$offline Down • $warning Warn • $critical Crit' : 'All systems operational',
                       icon: Icons.error_outline,
-                      color: offline > 0 ? AppTheme.danger : AppTheme.textMuted,
+                      color: (offline + warning + critical) > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
                       pulse: offline > 0,
                       onTap: () => onNavigateToTab(3), // Logs
                     ),
@@ -136,18 +150,101 @@ class NativeDashboardView extends StatelessWidget {
                       width: cardWidth,
                       title: 'Avg Latency',
                       value: '${avgLatency.toStringAsFixed(1)} ms',
-                      subtitle: 'Across ${latencyDevices.length} responding devices',
+                      subtitle: 'Across ${latencyDevices.length} responding nodes',
                       icon: Icons.speed,
-                      color: avgLatency > 100 ? AppTheme.warning : AppTheme.info,
+                      color: avgLatency > 100 ? const Color(0xFFF59E0B) : const Color(0xFF22D3EE),
                       onTap: () => onNavigateToTab(1), // Map
                     ),
                   ],
                 );
               },
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
 
-            // Middle Section: Live Devices Grid & Recent Alerts
+            // Category Breakdown Row
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.pie_chart, size: 16, color: Color(0xFF22D3EE)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Network Device Categories Breakdown',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${maps.length} Maps • ${hardwareDevices.length} Endpoints',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
+                    children: categoryCounts.entries.map((e) {
+                      final type = e.key;
+                      final count = e.value;
+                      final catDevices = hardwareDevices.where((d) => d.type.toLowerCase() == type).toList();
+                      final catOnline = catDevices.where((d) => d.isOnline).length;
+                      final dummyDev = DeviceModel(id: 0, name: '', ip: '', type: type);
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF475569)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(dummyDev.typeIcon, size: 16, color: const Color(0xFF22D3EE)),
+                            const SizedBox(width: 8),
+                            Text(
+                              type.toUpperCase(),
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: catOnline == count ? const Color(0xFF10B981).withOpacity(0.2) : const Color(0xFFEF4444).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '$catOnline/$count',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: catOnline == count ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // Latency Leaders & Live Telemetry Stream
             LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth > 1000;
@@ -155,39 +252,25 @@ class NativeDashboardView extends StatelessWidget {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Left: Live Devices Grid
+                      // Left: Live Devices & Latency Leaders
                       Expanded(
                         flex: 3,
-                        child: _LiveDevicesCard(
-                          devices: devices,
-                          onDeviceSelected: onDeviceSelected,
-                          onViewAll: () => onNavigateToTab(2),
-                        ),
+                        child: _buildLatencyLeadersCard(topSlowest),
                       ),
-                      const SizedBox(width: 20),
-                      // Right: Recent Alerts
+                      const SizedBox(width: 24),
+                      // Right: Audit Logs & Events
                       Expanded(
                         flex: 2,
-                        child: _RecentAlertsCard(
-                          logs: logs,
-                          onViewAll: () => onNavigateToTab(3),
-                        ),
+                        child: _buildRecentLogsCard(),
                       ),
                     ],
                   );
                 } else {
                   return Column(
                     children: [
-                      _LiveDevicesCard(
-                        devices: devices,
-                        onDeviceSelected: onDeviceSelected,
-                        onViewAll: () => onNavigateToTab(2),
-                      ),
-                      const SizedBox(height: 20),
-                      _RecentAlertsCard(
-                        logs: logs,
-                        onViewAll: () => onNavigateToTab(3),
-                      ),
+                      _buildLatencyLeadersCard(topSlowest),
+                      const SizedBox(height: 24),
+                      _buildRecentLogsCard(),
                     ],
                   );
                 }
@@ -195,6 +278,189 @@ class NativeDashboardView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLatencyLeadersCard(List<DeviceModel> slowest) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.network_ping, size: 18, color: Color(0xFF22D3EE)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Node Response Times & Latency',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () => onNavigateToTab(2),
+                child: const Text('View All Nodes', style: TextStyle(color: Color(0xFF22D3EE), fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (slowest.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text('No active ICMP latency telemetry recorded yet.', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: slowest.length,
+              separatorBuilder: (_, __) => const Divider(color: Color(0xFF1E293B), height: 1),
+              itemBuilder: (context, idx) {
+                final d = slowest[idx];
+                final lat = d.lastAvgTime ?? 0;
+                Color latColor = const Color(0xFF10B981);
+                if (lat > 100) latColor = const Color(0xFFEF4444);
+                else if (lat > 40) latColor = const Color(0xFFF59E0B);
+
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  onTap: () => onDeviceSelected(d),
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: d.statusColor, width: 1.5),
+                    ),
+                    child: Icon(d.typeIcon, size: 18, color: d.statusColor),
+                  ),
+                  title: Text(
+                    d.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                  ),
+                  subtitle: Text(
+                    '${d.ip} • TTL: ${d.lastTtl ?? 64}',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontFamily: 'monospace'),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: latColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: latColor.withOpacity(0.4)),
+                    ),
+                    child: Text(
+                      '${lat.toStringAsFixed(1)} ms',
+                      style: TextStyle(color: latColor, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentLogsCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.history, size: 18, color: Color(0xFF22D3EE)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Live Event Logs',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () => onNavigateToTab(3),
+                child: const Text('View All Logs', style: TextStyle(color: Color(0xFF22D3EE), fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (logs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text('No recent network state changes logged.', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: logs.take(6).length,
+              separatorBuilder: (_, __) => const Divider(color: Color(0xFF1E293B), height: 1),
+              itemBuilder: (context, idx) {
+                final log = logs[idx];
+                final isDown = log.status.toLowerCase() == 'offline' || log.status.toLowerCase() == 'down';
+
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isDown ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  title: Text(
+                    log.deviceName ?? 'Unknown Node',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12),
+                  ),
+                  subtitle: Text(
+                    log.timestamp,
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isDown ? const Color(0xFFEF4444).withOpacity(0.15) : const Color(0xFF10B981).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      log.status.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isDown ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
     );
   }
@@ -223,329 +489,52 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(icon, size: 18, color: color),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                    shadows: pulse
-                        ? [
-                            Shadow(
-                              color: color.withOpacity(0.6),
-                              blurRadius: 12,
-                            ),
-                          ]
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveDevicesCard extends StatelessWidget {
-  final List<DeviceModel> devices;
-  final ValueChanged<DeviceModel> onDeviceSelected;
-  final VoidCallback onViewAll;
-
-  const _LiveDevicesCard({
-    required this.devices,
-    required this.onDeviceSelected,
-    required this.onViewAll,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final previewList = devices.take(8).toList();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.hub_outlined, color: AppTheme.primary, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Live Monitored Devices',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                TextButton(
-                  onPressed: onViewAll,
-                  child: const Text('View All Devices →', style: TextStyle(fontSize: 12)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (devices.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: Text(
-                    'No devices found on server.',
-                    style: TextStyle(color: AppTheme.textMuted),
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: previewList.length,
-                separatorBuilder: (_, __) => const Divider(color: AppTheme.border, height: 1),
-                itemBuilder: (context, index) {
-                  final d = previewList[index];
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    onTap: () => onDeviceSelected(d),
-                    leading: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: d.statusColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: d.statusColor.withOpacity(0.3)),
-                      ),
-                      child: Center(
-                        child: Icon(d.typeIcon, size: 18, color: d.statusColor),
-                      ),
-                    ),
-                    title: Row(
-                      children: [
-                        Text(
-                          d.name,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: d.statusColor.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            d.status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: d.statusColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      '${d.ip} ${d.description.isNotEmpty ? '• ${d.description}' : ''}',
-                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (d.lastAvgTime != null && d.lastAvgTime! > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppTheme.border),
-                            ),
-                            child: Text(
-                              '${d.lastAvgTime!.toStringAsFixed(1)} ms',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: d.lastAvgTime! > 100 ? AppTheme.warning : AppTheme.success,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
-                      ],
-                    ),
-                  );
-                },
-              ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: width,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: pulse ? color : const Color(0xFF334155), width: pulse ? 1.5 : 1),
+          boxShadow: [
+            if (pulse) BoxShadow(color: color.withOpacity(0.2), blurRadius: 10),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _RecentAlertsCard extends StatelessWidget {
-  final List<StatusLogModel> logs;
-  final VoidCallback onViewAll;
-
-  const _RecentAlertsCard({
-    required this.logs,
-    required this.onViewAll,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final previewLogs = logs.take(6).toList();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.notifications_active_outlined, color: AppTheme.warning, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Live Event Feed',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
+                Text(
+                  title.toUpperCase(),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 0.5),
                 ),
-                TextButton(
-                  onPressed: onViewAll,
-                  child: const Text('View All →', style: TextStyle(fontSize: 12)),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(icon, size: 16, color: color),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            if (logs.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: Text(
-                    'No recent alerts recorded.',
-                    style: TextStyle(color: AppTheme.textMuted),
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: previewLogs.length,
-                separatorBuilder: (_, __) => const Divider(color: AppTheme.border, height: 1),
-                itemBuilder: (context, index) {
-                  final log = previewLogs[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(top: 5),
-                          decoration: BoxDecoration(
-                            color: log.statusColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(color: log.statusColor.withOpacity(0.5), blurRadius: 6),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    log.deviceName ?? log.deviceIp ?? 'System Event',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                  ),
-                                  Text(
-                                    log.timestamp.length > 16
-                                        ? log.timestamp.substring(11, 16)
-                                        : log.timestamp,
-                                    style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                log.message,
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
