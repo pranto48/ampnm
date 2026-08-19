@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes pc-screen {
+      0%,100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    @keyframes pc-cursor {
+      0%,49% { opacity: 1; }
+      50%,100% { opacity: 0; }
+    }
+    @keyframes pc-activity {
+      0%,100% { fill: #00FF87; }
+      33% { fill: #00F2FE; }
+      66% { fill: #FFAA00; }
+    }
+    .screen-glow { animation: pc-screen 3s ease-in-out infinite; }
+    .cursor { animation: pc-cursor 1s step-end infinite; }
+    .hdd-led { animation: pc-activity 2s linear infinite; }
+  </style>
+  <!-- Monitor frame -->
+  <rect x="18" y="18" width="64" height="46" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Screen area -->
+  <rect x="22" y="22" width="56" height="38" rx="3" fill="#041830" class="screen-glow"/>
+  <!-- Screen content lines -->
+  <line x1="26" y1="30" x2="60" y2="30" stroke="#00F2FE" stroke-width="1.5" opacity="0.7"/>
+  <line x1="26" y1="36" x2="55" y2="36" stroke="#00FF87" stroke-width="1.5" opacity="0.6"/>
+  <line x1="26" y1="42" x2="70" y2="42" stroke="#00F2FE" stroke-width="1" opacity="0.5"/>
+  <line x1="26" y1="48" x2="48" y2="48" stroke="#00F2FE" stroke-width="1" opacity="0.5"/>
+  <!-- Blinking cursor -->
+  <rect x="50" y="46" width="2" height="5" fill="#00FF87" class="cursor"/>
+  <!-- Monitor stand -->
+  <rect x="44" y="64" width="12" height="8" rx="2" fill="#0b1e36" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Base -->
+  <rect x="32" y="72" width="36" height="5" rx="3" fill="#0b1e36" stroke="#00F2FE" stroke-width="2"/>
+  <!-- HDD activity LED on monitor bezel -->
+  <circle cx="72" cy="57" r="2.5" class="hdd-led"/>
+</svg>

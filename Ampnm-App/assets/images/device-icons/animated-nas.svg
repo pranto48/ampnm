@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes nas-disk {
+      0% { stroke-dashoffset: 60; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes nas-led {
+      0%,100% { fill: #00FF87; }
+      50% { fill: #00F2FE; }
+    }
+    @keyframes nas-led-r {
+      0%,100% { fill: #00F2FE; }
+      50% { fill: #FFAA00; }
+    }
+    @keyframes nas-transfer {
+      0% { stroke-dashoffset: 30; opacity: 0; }
+      30% { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 0; }
+    }
+    .disk-ring { animation: nas-disk 2s linear infinite; }
+    .l1 { animation: nas-led 1.2s ease-in-out 0s infinite; }
+    .l2 { animation: nas-led-r 1.2s ease-in-out 0.3s infinite; }
+    .l3 { animation: nas-led 1.2s ease-in-out 0.6s infinite; }
+    .t1 { animation: nas-transfer 1.5s linear 0s infinite; }
+    .t2 { animation: nas-transfer 1.5s linear 0.5s infinite; }
+    .t3 { animation: nas-transfer 1.5s linear 1s infinite; }
+  </style>
+  <!-- NAS chassis -->
+  <rect x="20" y="12" width="60" height="76" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Drive bays (3 drives) -->
+  <rect x="25" y="18" width="50" height="16" rx="3" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <rect x="25" y="38" width="50" height="16" rx="3" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <rect x="25" y="58" width="50" height="16" rx="3" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Drive 1 disk ring -->
+  <circle cx="38" cy="26" r="6" fill="none" stroke="#00F2FE" stroke-width="2" stroke-dasharray="8,4" class="disk-ring"/>
+  <circle cx="38" cy="26" r="2" fill="#00F2FE" opacity="0.5"/>
+  <!-- Drive 2 disk ring -->
+  <circle cx="38" cy="46" r="6" fill="none" stroke="#00FF87" stroke-width="2" stroke-dasharray="8,4" class="disk-ring"/>
+  <circle cx="38" cy="46" r="2" fill="#00FF87" opacity="0.5"/>
+  <!-- Drive 3 disk ring -->
+  <circle cx="38" cy="66" r="6" fill="none" stroke="#00F2FE" stroke-width="2" stroke-dasharray="8,4" class="disk-ring"/>
+  <circle cx="38" cy="66" r="2" fill="#00F2FE" opacity="0.5"/>
+  <!-- Activity LEDs per drive -->
+  <circle cx="67" cy="26" r="3" class="l1"/>
+  <circle cx="67" cy="46" r="3" class="l2"/>
+  <circle cx="67" cy="66" r="3" class="l3"/>
+  <!-- Data transfer lines from chassis -->
+  <line x1="80" y1="26" x2="95" y2="26" stroke="#00F2FE" stroke-width="1.5" stroke-dasharray="4,3" class="t1"/>
+  <line x1="80" y1="46" x2="95" y2="46" stroke="#00FF87" stroke-width="1.5" stroke-dasharray="4,3" class="t2"/>
+  <line x1="80" y1="66" x2="95" y2="66" stroke="#00F2FE" stroke-width="1.5" stroke-dasharray="4,3" class="t3"/>
+  <!-- Bottom status bar -->
+  <rect x="25" y="78" width="50" height="6" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="27" y="79" width="20" height="4" rx="1" fill="#00F2FE" opacity="0.7"/>
+</svg>

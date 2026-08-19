@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes wh-pulse {
+      0%, 100% { fill: #00FF87; opacity: 1; }
+      50% { fill: #00F2FE; opacity: 0.4; }
+    }
+    @keyframes wh-gear {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes wh-truck {
+      0% { transform: translateX(-15px); opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { transform: translateX(10px); opacity: 0; }
+    }
+    .bay-led { animation: wh-pulse 1.5s ease-in-out infinite; }
+    .gear { animation: wh-gear 6s linear infinite; transform-origin: 32px 35px; }
+    .gear-r { animation: wh-gear 6s linear infinite reverse; transform-origin: 46px 42px; }
+    .truck { animation: wh-truck 3s ease-in-out infinite; }
+  </style>
+  <!-- Warehouse building outline -->
+  <polygon points="12,48 50,15 88,48 88,88 12,88" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Skylight / roof structure -->
+  <polygon points="50,15 62,25 38,25" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Gears inside representing operation/manufacturing -->
+  <circle cx="32" cy="35" r="8" fill="none" stroke="#00FF87" stroke-width="1.5" stroke-dasharray="4,2" class="gear"/>
+  <circle cx="46" cy="42" r="6" fill="none" stroke="#00F2FE" stroke-width="1.5" stroke-dasharray="3,2" class="gear-r"/>
+  <!-- Loading bays (2 bays) -->
+  <rect x="20" y="60" width="22" height="24" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <rect x="58" y="60" width="22" height="24" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Rolldown shutter lines -->
+  <line x1="20" y1="66" x2="42" y2="66" stroke="#00F2FE" stroke-width="1"/>
+  <line x1="20" y1="72" x2="42" y2="72" stroke="#00F2FE" stroke-width="1"/>
+  <line x1="20" y1="78" x2="42" y2="78" stroke="#00F2FE" stroke-width="1"/>
+  <line x1="58" y1="66" x2="80" y2="66" stroke="#00F2FE" stroke-width="1"/>
+  <line x1="58" y1="72" x2="80" y2="72" stroke="#00F2FE" stroke-width="1"/>
+  <line x1="58" y1="78" x2="80" y2="78" stroke="#00F2FE" stroke-width="1"/>
+  <!-- Indicator lights above bays -->
+  <circle cx="31" cy="54" r="2.5" class="bay-led"/>
+  <circle cx="69" cy="54" r="2.5" class="bay-led" style="animation-delay: 0.75s;"/>
+  <!-- Moving cargo truck outline -->
+  <g class="truck" transform="translate(0, 72)">
+    <rect x="44" y="0" width="10" height="7" rx="1" fill="#FFAA00"/>
+    <rect x="52" y="2" width="4" height="5" rx="1" fill="#FFAA00"/>
+    <circle cx="47" cy="8" r="1.5" fill="#00F2FE"/>
+    <circle cx="53" cy="8" r="1.5" fill="#00F2FE"/>
+  </g>
+</svg>

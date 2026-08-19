@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes ap-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes ap-wave {
+      0% { opacity: 0; r: 6; }
+      50% { opacity: 1; }
+      100% { opacity: 0; r: 28; }
+    }
+    @keyframes ap-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+    .ap-ring1 { animation: ap-wave 2s ease-out infinite; }
+    .ap-ring2 { animation: ap-wave 2s ease-out 0.7s infinite; }
+    .ap-ring3 { animation: ap-wave 2s ease-out 1.4s infinite; }
+    .ap-led  { animation: ap-blink 1.5s ease-in-out infinite; }
+    .ap-led2 { animation: ap-blink 1.5s ease-in-out 0.5s infinite; }
+  </style>
+  <!-- AP Body -->
+  <rect x="20" y="55" width="60" height="14" rx="4" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- LEDs -->
+  <circle cx="30" cy="62" r="2.5" fill="#00FF87" class="ap-led"/>
+  <circle cx="38" cy="62" r="2.5" fill="#00F2FE" class="ap-led2"/>
+  <!-- Antenna -->
+  <line x1="50" y1="55" x2="50" y2="38" stroke="#00F2FE" stroke-width="2.5"/>
+  <circle cx="50" cy="36" r="3" fill="#00F2FE"/>
+  <!-- Signal rings from antenna top -->
+  <circle cx="50" cy="36" r="6"  fill="none" stroke="#00F2FE" stroke-width="2" class="ap-ring1"/>
+  <circle cx="50" cy="36" r="15" fill="none" stroke="#00F2FE" stroke-width="1.5" class="ap-ring2"/>
+  <circle cx="50" cy="36" r="25" fill="none" stroke="#00F2FE" stroke-width="1" class="ap-ring3"/>
+  <!-- Ethernet port lines -->
+  <line x1="55" y1="62" x2="75" y2="62" stroke="#00F2FE" stroke-width="1" opacity="0.5"/>
+</svg>

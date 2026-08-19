@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes sdwan-dash {
+      0% { stroke-dashoffset: 24; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes sdwan-switch {
+      0%, 100% { stroke: #00F2FE; }
+      50% { stroke: #00FF87; }
+    }
+    .path1 { stroke-dasharray: 6,4; animation: sdwan-dash 1.2s linear infinite; }
+    .path2 { stroke-dasharray: 6,4; animation: sdwan-dash 1.2s linear infinite reverse; }
+    .chassis { animation: sdwan-switch 3s ease-in-out infinite; }
+  </style>
+  <!-- Gateway Appliance Chassis -->
+  <rect class="chassis" x="14" y="32" width="72" height="36" rx="4" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Status LEDs -->
+  <circle cx="24" cy="50" r="3" fill="#00FF87"/>
+  <circle cx="34" cy="50" r="3" fill="#00FF87"/>
+  <!-- Policy Multipaths / SD-WAN tunnels -->
+  <path d="M44,42 Q58,34 72,42" fill="none" stroke="#00F2FE" stroke-width="1.8" class="path1"/>
+  <path d="M44,50 Q58,50 72,50" fill="none" stroke="#00FF87" stroke-width="1.8" class="path2"/>
+  <path d="M44,58 Q58,66 72,58" fill="none" stroke="#FFAA00" stroke-width="1.8" class="path1"/>
+  <!-- Core processor hub -->
+  <circle cx="58" cy="50" r="4.5" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+</svg>

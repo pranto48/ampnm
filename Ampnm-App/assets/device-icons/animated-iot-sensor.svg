@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes iot-pulse {
+      0%,100% { r: 4; opacity: 1; }
+      50% { r: 8; opacity: 0.4; }
+    }
+    @keyframes iot-ring {
+      0% { r: 6; opacity: 0.9; }
+      100% { r: 30; opacity: 0; }
+    }
+    @keyframes iot-blink {
+      0%,100% { fill: #00FF87; }
+      33% { fill: #00F2FE; }
+      66% { fill: #FFAA00; }
+    }
+    @keyframes iot-data {
+      0% { stroke-dashoffset: 20; opacity: 0; }
+      25% { opacity: 1; }
+      75% { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 0; }
+    }
+    .iot-core { animation: iot-pulse 2s ease-in-out infinite; }
+    .iot-ring1 { animation: iot-ring 2.5s ease-out 0s infinite; }
+    .iot-ring2 { animation: iot-ring 2.5s ease-out 0.8s infinite; }
+    .iot-led { animation: iot-blink 3s linear infinite; }
+    .iot-d1 { animation: iot-data 1.8s linear 0s infinite; }
+    .iot-d2 { animation: iot-data 1.8s linear 0.6s infinite; }
+    .iot-d3 { animation: iot-data 1.8s linear 1.2s infinite; }
+  </style>
+  <!-- Sensor body (rounded box) -->
+  <rect x="26" y="28" width="48" height="40" rx="8" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Antenna -->
+  <line x1="50" y1="28" x2="50" y2="16" stroke="#00F2FE" stroke-width="2.5"/>
+  <circle cx="50" cy="14" r="3" fill="#00F2FE"/>
+  <!-- Pulse rings from antenna -->
+  <circle cx="50" cy="14" r="6"  fill="none" stroke="#00F2FE" stroke-width="1.5" class="iot-ring1"/>
+  <circle cx="50" cy="14" r="6"  fill="none" stroke="#00F2FE" stroke-width="1" class="iot-ring2"/>
+  <!-- Sensor display (circle gauge) -->
+  <circle cx="50" cy="50" r="12" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <circle cx="50" cy="50" r="4" fill="#00F2FE" class="iot-core"/>
+  <!-- Status LED indicators -->
+  <circle cx="34" cy="60" r="3" class="iot-led"/>
+  <circle cx="50" cy="64" r="3" fill="#00F2FE" opacity="0.6"/>
+  <circle cx="66" cy="60" r="3" fill="#FFAA00" opacity="0.7"/>
+  <!-- Data pins / output lines at bottom -->
+  <line x1="36" y1="68" x2="36" y2="82" stroke="#00F2FE" stroke-width="1.5" stroke-dasharray="3,3" class="iot-d1"/>
+  <line x1="50" y1="68" x2="50" y2="82" stroke="#00FF87" stroke-width="1.5" stroke-dasharray="3,3" class="iot-d2"/>
+  <line x1="64" y1="68" x2="64" y2="82" stroke="#00F2FE" stroke-width="1.5" stroke-dasharray="3,3" class="iot-d3"/>
+</svg>

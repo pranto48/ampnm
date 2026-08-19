@@ -133,29 +133,116 @@ class DeviceModel {
     }
   }
 
+  /// Numerical IPv4 integer for proper ascending/descending IP sorting
+  int get ipNumeric {
+    if (ip.isEmpty) return 0;
+    try {
+      final cleanIp = ip.split(':').first.trim();
+      final parts = cleanIp.split('.');
+      if (parts.length == 4) {
+        final o1 = int.parse(parts[0]);
+        final o2 = int.parse(parts[1]);
+        final o3 = int.parse(parts[2]);
+        final o4 = int.parse(parts[3]);
+        return (o1 << 24) | (o2 << 16) | (o3 << 8) | o4;
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  /// Check if device likely supports MikroTik Winbox
+  bool get isMikrotikOrRouter =>
+      type.toLowerCase().contains('router') ||
+      type.toLowerCase().contains('mikrotik') ||
+      subchoice.toLowerCase().contains('mikrotik') ||
+      checkPort == 8291 ||
+      checkPort == 8728;
+
+  /// Check if device likely supports SSH
+  bool get isSshCapable =>
+      type.toLowerCase().contains('server') ||
+      type.toLowerCase().contains('linux') ||
+      type.toLowerCase().contains('router') ||
+      type.toLowerCase().contains('switch') ||
+      type.toLowerCase().contains('firewall') ||
+      checkPort == 22;
+
+  /// Check if device likely supports Windows Remote Desktop (RDP)
+  bool get isRdpCapable =>
+      type.toLowerCase().contains('desktop') ||
+      type.toLowerCase().contains('pc') ||
+      type.toLowerCase().contains('windows') ||
+      type.toLowerCase().contains('workstation') ||
+      checkPort == 3389;
+
+  /// Check if device has Web GUI
+  bool get isWebCapable =>
+      ip.isNotEmpty && !isTextNode &&
+      (checkPort == 80 || checkPort == 443 || checkPort == 8080 || checkPort == 8443 || checkPort == 0);
+
   /// Icon mapping exactly matching Docker web `MapApp.config.iconMap` & `device_icons.php`
   IconData get typeIcon {
-    final t = type.toLowerCase();
-    if (t == 'router') return Icons.router_rounded;
-    if (t == 'wifi-router') return Icons.wifi_tethering_rounded;
-    if (t == 'switch') return Icons.alt_route_rounded;
-    if (t == 'server') return Icons.dns_rounded;
-    if (t == 'firewall') return Icons.shield_rounded;
-    if (t == 'camera') return Icons.videocam_rounded;
-    if (t == 'printer') return Icons.print_rounded;
-    if (t == 'nas') return Icons.save_rounded;
-    if (t == 'ipphone') return Icons.phone_in_talk_rounded;
-    if (t == 'punchdevice') return Icons.fingerprint_rounded;
-    if (t == 'radio' || t == 'radio-tower') return Icons.cell_tower_rounded;
-    if (t == 'rack') return Icons.view_headline_rounded;
-    if (t == 'laptop') return Icons.laptop_mac_rounded;
-    if (t == 'tablet') return Icons.tablet_mac_rounded;
-    if (t == 'mobile') return Icons.smartphone_rounded;
-    if (t == 'cloud') return Icons.cloud_rounded;
-    if (t == 'database') return Icons.storage_rounded;
-    if (t == 'box') return Icons.check_box_outline_blank_rounded;
-    if (t == 'text') return Icons.text_fields_rounded;
-    if (t == 'desktop' || t == 'pc' || t == 'other') return Icons.desktop_windows_rounded;
+    final t = type.toLowerCase().trim();
+    if (t.contains('wifi') || t.contains('ap') || t.contains('wireless') || t.contains('access-point')) {
+      return Icons.wifi_tethering_rounded;
+    }
+    if (t.contains('router') || t.contains('mikrotik') || t.contains('gateway')) {
+      return Icons.router_rounded;
+    }
+    if (t.contains('switch') || t.contains('cisco') || t.contains('hub') || t.contains('vlan')) {
+      return Icons.alt_route_rounded;
+    }
+    if (t.contains('server') || t.contains('host') || t.contains('node') || t.contains('blade')) {
+      return Icons.dns_rounded;
+    }
+    if (t.contains('firewall') || t.contains('security') || t.contains('utm') || t.contains('pfsense') || t.contains('sophos')) {
+      return Icons.shield_rounded;
+    }
+    if (t.contains('camera') || t.contains('cctv') || t.contains('cam') || t.contains('dvr') || t.contains('nvr')) {
+      return Icons.videocam_rounded;
+    }
+    if (t.contains('print')) {
+      return Icons.print_rounded;
+    }
+    if (t.contains('nas') || t.contains('storage') || t.contains('san') || t.contains('synology') || t.contains('qnap')) {
+      return Icons.save_rounded;
+    }
+    if (t.contains('phone') || t.contains('voip') || t.contains('ipphone')) {
+      return Icons.phone_in_talk_rounded;
+    }
+    if (t.contains('punch') || t.contains('bio') || t.contains('finger') || t.contains('attendance')) {
+      return Icons.fingerprint_rounded;
+    }
+    if (t.contains('radio') || t.contains('tower') || t.contains('antenna') || t.contains('ptp')) {
+      return Icons.cell_tower_rounded;
+    }
+    if (t.contains('rack')) {
+      return Icons.view_headline_rounded;
+    }
+    if (t.contains('laptop') || t.contains('notebook')) {
+      return Icons.laptop_mac_rounded;
+    }
+    if (t.contains('tab') || t.contains('ipad')) {
+      return Icons.tablet_mac_rounded;
+    }
+    if (t.contains('mobile') || t.contains('phone_android')) {
+      return Icons.smartphone_rounded;
+    }
+    if (t.contains('cloud') || t.contains('wan') || t.contains('internet') || t.contains('isp')) {
+      return Icons.cloud_rounded;
+    }
+    if (t.contains('database') || t.contains('db') || t.contains('sql') || t.contains('oracle')) {
+      return Icons.storage_rounded;
+    }
+    if (t.contains('box') || t.contains('unit') || t.contains('group')) {
+      return Icons.check_box_outline_blank_rounded;
+    }
+    if (t.contains('text') || t.contains('label') || t.contains('note')) {
+      return Icons.text_fields_rounded;
+    }
+    if (t.contains('desktop') || t.contains('pc') || t.contains('computer') || t.contains('workstation')) {
+      return Icons.desktop_windows_rounded;
+    }
     return Icons.devices_other_rounded;
   }
 }

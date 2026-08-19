@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes patch-light {
+      0%,100%{ fill:#00FF87; }
+      33%{ fill:#00F2FE; }
+      66%{ fill:#FFAA00; }
+    }
+    @keyframes patch-flow {
+      0%{ stroke-dashoffset:24; opacity:0; }
+      20%{ opacity:1; }
+      80%{ opacity:1; }
+      100%{ stroke-dashoffset:0; opacity:0; }
+    }
+    @keyframes patch-cable {
+      0%,100%{ stroke:#00F2FE; }
+      50%{ stroke:#00FF87; }
+    }
+    .pl1{ animation:patch-light 1.2s linear 0s infinite; }
+    .pl2{ animation:patch-light 1.2s linear 0.15s infinite; }
+    .pl3{ animation:patch-light 1.2s linear 0.3s infinite; }
+    .pl4{ animation:patch-light 1.2s linear 0.45s infinite; }
+    .pl5{ animation:patch-light 1.2s linear 0.6s infinite; }
+    .pl6{ animation:patch-light 1.2s linear 0.75s infinite; }
+    .pf1{ animation:patch-flow 1.5s linear 0s infinite; }
+    .pf2{ animation:patch-flow 1.5s linear 0.5s infinite; }
+    .pf3{ animation:patch-flow 1.5s linear 1s infinite; }
+    .cable{ animation:patch-cable 2s ease-in-out infinite; }
+  </style>
+  <!-- Patch panel frame -->
+  <rect x="8" y="32" width="84" height="36" rx="4" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Port group 1 (6 ports) -->
+  <rect x="14" y="38" width="10" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="26" y="38" width="10" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="38" y="38" width="10" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="50" y="38" width="10" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="62" y="38" width="10" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="74" y="38" width="10" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <!-- LEDs above each port -->
+  <circle cx="19" cy="52" r="2.5" class="pl1"/>
+  <circle cx="31" cy="52" r="2.5" class="pl2"/>
+  <circle cx="43" cy="52" r="2.5" class="pl3"/>
+  <circle cx="55" cy="52" r="2.5" class="pl4"/>
+  <circle cx="67" cy="52" r="2.5" class="pl5"/>
+  <circle cx="79" cy="52" r="2.5" class="pl6"/>
+  <!-- Patch cables hanging below -->
+  <path d="M19 60 Q19 76 30 80" fill="none" stroke="#00F2FE" stroke-width="2" stroke-linecap="round" class="cable pf1"/>
+  <path d="M43 60 Q43 76 54 80" fill="none" stroke="#00FF87" stroke-width="2" stroke-linecap="round" class="cable pf2"/>
+  <path d="M67 60 Q67 76 56 80" fill="none" stroke="#00F2FE" stroke-width="2" stroke-linecap="round" class="cable pf3"/>
+  <!-- Port label strip -->
+  <rect x="14" y="58" width="72" height="6" rx="1" fill="#041830" opacity="0.6"/>
+</svg>

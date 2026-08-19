@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes cam-scan {
+      0% { transform: rotate(-30deg); }
+      50% { transform: rotate(30deg); }
+      100% { transform: rotate(-30deg); }
+    }
+    @keyframes cam-blink {
+      0%,100% { opacity: 1; fill: #ff4444; }
+      50% { opacity: 0.2; fill: #ff4444; }
+    }
+    @keyframes cam-beam {
+      0% { opacity: 0; }
+      20% { opacity: 0.4; }
+      80% { opacity: 0.4; }
+      100% { opacity: 0; }
+    }
+    .cam-lens { animation: cam-scan 4s ease-in-out infinite; transform-origin: 38px 50px; }
+    .rec-dot { animation: cam-blink 1s ease-in-out infinite; }
+    .cam-beam { animation: cam-beam 3s ease-in-out infinite; transform-origin: 38px 50px; }
+  </style>
+  <!-- Camera mount bracket -->
+  <rect x="10" y="22" width="6" height="56" rx="3" fill="#0b1e36" stroke="#00F2FE" stroke-width="2"/>
+  <!-- Scan beam (fan shape) -->
+  <path d="M 38 50 L 85 25 L 85 75 Z" fill="#00F2FE" opacity="0" class="cam-beam"/>
+  <!-- Camera body -->
+  <g class="cam-lens">
+    <rect x="16" y="42" width="44" height="16" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+    <!-- Lens -->
+    <circle cx="38" cy="50" r="8" fill="#0b2040" stroke="#00F2FE" stroke-width="2"/>
+    <circle cx="38" cy="50" r="5" fill="#00112b"/>
+    <circle cx="38" cy="50" r="2.5" fill="#00F2FE" opacity="0.5"/>
+    <!-- Iris highlight -->
+    <circle cx="36" cy="48" r="1" fill="white" opacity="0.6"/>
+    <!-- Housing -->
+    <rect x="16" y="42" width="44" height="16" rx="5" fill="none" stroke="#00F2FE" stroke-width="2.5"/>
+  </g>
+  <!-- REC indicator -->
+  <circle cx="70" cy="30" r="5" class="rec-dot"/>
+  <text x="77" y="34" fill="#ff4444" font-size="7" font-family="monospace">REC</text>
+</svg>

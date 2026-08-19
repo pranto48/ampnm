@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../app_theme.dart';
@@ -8,11 +11,13 @@ import '../models/edge_model.dart';
 import '../models/map_model.dart';
 import '../widgets/add_edit_text_dialog.dart';
 import '../widgets/connect_nodes_dialog.dart';
+import '../widgets/device_icon_widget.dart';
 import '../widgets/edit_edge_dialog.dart';
 
 class NativeMapView extends StatefulWidget {
   final List<MapModel> maps;
   final List<DeviceModel> devices;
+  final List<DeviceModel>? allDevices;
   final List<EdgeModel> edges;
   final int selectedMapId;
   final ValueChanged<int> onMapChanged;
@@ -37,6 +42,7 @@ class NativeMapView extends StatefulWidget {
     super.key,
     required this.maps,
     required this.devices,
+    this.allDevices,
     required this.edges,
     required this.selectedMapId,
     required this.onMapChanged,
@@ -64,9 +70,15 @@ class NativeMapView extends StatefulWidget {
 
 class _NativeMapViewState extends State<NativeMapView> with SingleTickerProviderStateMixin {
   final TransformationController _transformController = TransformationController();
+  final TextEditingController _searchController = TextEditingController();
   late AnimationController _pulseAnimController;
 
+  static const double kNodeWidth = 140.0;
+  static const double kCircleRadius = 28.0;
+  static const Offset kCircleCenterOffset = Offset(kNodeWidth / 2, kCircleRadius + 2);
+
   String _searchQuery = '';
+  int? _highlightedDeviceId;
   final String _selectedTypeFilter = 'all';
   final Map<int, Offset> _draggedPositions = {};
   bool _showConnectionLegend = true;
@@ -99,7 +111,9 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
       _pulseAnimController.stop();
     }
 
-    if (widget.selectedMapId != oldWidget.selectedMapId) {
+    if (widget.selectedMapId != oldWidget.selectedMapId || 
+        widget.devices.length != oldWidget.devices.length ||
+        (widget.allDevices?.length ?? 0) != (oldWidget.allDevices?.length ?? 0)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _fitToScreen();
       });
@@ -109,8 +123,19 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
   @override
   void dispose() {
     _transformController.dispose();
+    _searchController.dispose();
     _pulseAnimController.dispose();
     super.dispose();
+  }
+
+  List<DeviceModel> get _effectiveDevices {
+    if (widget.devices.isNotEmpty) {
+      return widget.devices;
+    }
+    if (widget.allDevices != null && widget.allDevices!.isNotEmpty) {
+      return widget.allDevices!;
+    }
+    return [];
   }
 
   void _zoom(double factor) {
@@ -123,8 +148,56 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     _transformController.value = Matrix4.identity();
   }
 
+  Offset _getDeviceOffset(DeviceModel device) {
+    if (_draggedPositions.containsKey(device.id)) {
+      return _draggedPositions[device.id]!;
+    }
+    double rawX = device.x.toDouble();
+    double rawY = device.y.toDouble();
+
+    // If position is at default (0, 0), calculate a pleasant spread
+    if (rawX == 0 && rawY == 0) {
+      final allList = _effectiveDevices;
+      final index = allList.indexOf(device);
+      final idx = index >= 0 ? index : device.id;
+      const cols = 4;
+      final col = idx % cols;
+      final row = idx ~/ cols;
+      return Offset(1300.0 + col * 320.0, 950.0 + row * 240.0);
+    }
+
+    if (rawX.abs() < 1200 && rawY.abs() < 1200) {
+      return Offset(1900.0 + rawX * 1.8 - (kNodeWidth / 2), 1400.0 + rawY * 1.8 - 30.0);
+    }
+
+    return Offset(rawX.clamp(100.0, 3600.0), rawY.clamp(100.0, 2600.0));
+  }
+
+  void _centerOnDevice(DeviceModel device) {
+    final pos = _getDeviceOffset(device);
+    final viewSize = MediaQuery.of(context).size;
+    const targetScale = 1.1;
+
+    final targetX = (viewSize.width - 240) / 2 - (pos.dx + kNodeWidth / 2) * targetScale;
+    final targetY = (viewSize.height - 80) / 2 - (pos.dy + 30) * targetScale;
+
+    final matrix = Matrix4.identity()
+      ..translate(targetX, targetY)
+      ..scale(targetScale, targetScale);
+
+    setState(() {
+      _transformController.value = matrix;
+      _highlightedDeviceId = device.id;
+    });
+
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _highlightedDeviceId = null);
+    });
+  }
+
   void _fitToScreen() {
-    if (widget.devices.isEmpty) {
+    final devList = _effectiveDevices;
+    if (devList.isEmpty) {
       _resetZoom();
       return;
     }
@@ -134,21 +207,21 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     double maxX = double.negativeInfinity;
     double maxY = double.negativeInfinity;
 
-    for (final d in widget.devices) {
+    for (final d in devList) {
       final pos = _getDeviceOffset(d);
       minX = math.min(minX, pos.dx);
       minY = math.min(minY, pos.dy);
-      maxX = math.max(maxX, pos.dx + 120);
+      maxX = math.max(maxX, pos.dx + kNodeWidth);
       maxY = math.max(maxY, pos.dy + 120);
     }
 
-    final boxW = math.max(200.0, maxX - minX + 200);
-    final boxH = math.max(200.0, maxY - minY + 200);
+    final boxW = math.max(300.0, maxX - minX + 240);
+    final boxH = math.max(300.0, maxY - minY + 240);
 
     final viewSize = MediaQuery.of(context).size;
-    final scaleX = (viewSize.width - 320) / boxW;
-    final scaleY = (viewSize.height - 180) / boxH;
-    final scale = math.min(scaleX, scaleY).clamp(0.2, 1.2);
+    final scaleX = (viewSize.width - 340) / boxW;
+    final scaleY = (viewSize.height - 200) / boxH;
+    final scale = math.min(scaleX, scaleY).clamp(0.25, 1.4);
 
     final centerX = (minX + maxX) / 2;
     final centerY = (minY + maxY) / 2;
@@ -173,45 +246,126 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     });
   }
 
-  void _autoLayout() {
-    final total = widget.devices.length;
+  void _autoLayout(String layoutStyle) {
+    final hardwareNodes = _effectiveDevices.where((d) => !d.isTextNode).toList();
+    final total = hardwareNodes.length;
     if (total == 0) return;
 
-    final cols = (total > 9) ? 4 : 3;
-    const spacingX = 320.0;
-    const spacingY = 220.0;
-    const startX = 180.0;
-    const startY = 160.0;
-
     setState(() {
-      for (int i = 0; i < total; i++) {
-        final d = widget.devices[i];
-        final col = i % cols;
-        final row = i ~/ cols;
-        final x = startX + col * spacingX;
-        final y = startY + row * spacingY;
-        _draggedPositions[d.id] = Offset(x, y);
-        if (widget.onUpdatePosition != null) {
-          widget.onUpdatePosition!(d, x, y);
+      if (layoutStyle == 'tree') {
+        // Hierarchical Tree by type (Routers on top, switches mid, servers & clients below)
+        final routers = hardwareNodes.where((d) => d.type.contains('router')).toList();
+        final switches = hardwareNodes.where((d) => d.type.contains('switch')).toList();
+        final others = hardwareNodes.where((d) => !d.type.contains('router') && !d.type.contains('switch')).toList();
+
+        void placeRow(List<DeviceModel> list, double y) {
+          final count = list.length;
+          const spacing = 280.0;
+          final startX = 1900.0 - ((count - 1) * spacing) / 2;
+          for (int i = 0; i < count; i++) {
+            final x = startX + i * spacing;
+            _draggedPositions[list[i].id] = Offset(x, y);
+            if (widget.onUpdatePosition != null) {
+              final serverX = (x + (kNodeWidth / 2) - 1900) / 1.8;
+              final serverY = (y + 30 - 1400) / 1.8;
+              widget.onUpdatePosition!(list[i], serverX, serverY);
+            }
+          }
+        }
+
+        placeRow(routers, 1000.0);
+        placeRow(switches, 1300.0);
+        placeRow(others, 1650.0);
+      } else {
+        // Uniform Grid
+        final cols = (total > 15) ? 5 : ((total > 8) ? 4 : 3);
+        const spacingX = 300.0;
+        const spacingY = 220.0;
+        const startX = 1100.0;
+        const startY = 900.0;
+
+        for (int i = 0; i < total; i++) {
+          final d = hardwareNodes[i];
+          final col = i % cols;
+          final row = i ~/ cols;
+          final x = startX + col * spacingX;
+          final y = startY + row * spacingY;
+          _draggedPositions[d.id] = Offset(x, y);
+          if (widget.onUpdatePosition != null) {
+            final serverX = (x + (kNodeWidth / 2) - 1900) / 1.8;
+            final serverY = (y + 30 - 1400) / 1.8;
+            widget.onUpdatePosition!(d, serverX, serverY);
+          }
         }
       }
     });
 
     _fitToScreen();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Auto-arranged device nodes on map!'),
+      SnackBar(
+        content: Text('Auto-arranged map topology ($layoutStyle layout)!'),
         backgroundColor: AppTheme.primary,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  void _launchSSH(DeviceModel device) {
+    final ip = device.ip.split(':').first.trim();
+    if (ip.isEmpty) return;
+    try {
+      if (Platform.isWindows) {
+        Process.start('powershell.exe', ['-NoExit', '-Command', 'ssh $ip'], mode: ProcessStartMode.detached);
+      } else {
+        launchUrl(Uri.parse('ssh://$ip'));
+      }
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: 'ssh $ip'));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied "ssh $ip" to clipboard!'), backgroundColor: AppTheme.primary));
+    }
+  }
+
+  void _launchWinbox(DeviceModel device) {
+    final ip = device.ip.split(':').first.trim();
+    if (ip.isEmpty) return;
+    try {
+      if (Platform.isWindows) {
+        Process.start('winbox64.exe', [ip], mode: ProcessStartMode.detached).catchError((_) {
+          return Process.start('winbox.exe', [ip], mode: ProcessStartMode.detached);
+        });
+      } else {
+        launchUrl(Uri.parse('winbox://$ip'));
+      }
+    } catch (_) {}
+    Clipboard.setData(ClipboardData(text: ip));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied IP $ip for Winbox!'), backgroundColor: AppTheme.primary));
+  }
+
+  void _launchRDP(DeviceModel device) {
+    final ip = device.ip.split(':').first.trim();
+    if (ip.isEmpty) return;
+    try {
+      if (Platform.isWindows) {
+        Process.start('mstsc.exe', ['/v:$ip'], mode: ProcessStartMode.detached);
+      }
+    } catch (_) {}
+  }
+
+  void _launchWeb(DeviceModel device) {
+    final ip = device.ip;
+    if (ip.isEmpty) return;
+    final port = device.checkPort;
+    final protocol = (port == 443 || port == 8443) ? 'https' : 'http';
+    final portSuffix = (port > 0 && port != 80 && port != 443) ? ':$port' : '';
+    final uri = Uri.parse('$protocol://$ip$portSuffix');
+    launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   void _openConnectDialog([DeviceModel? initialSource]) {
     showDialog(
       context: context,
       builder: (context) => ConnectNodesDialog(
-        devices: widget.devices.where((d) => !d.isTextNode).toList(),
+        devices: _effectiveDevices.where((d) => !d.isTextNode).toList(),
         initialSourceId: initialSource?.id,
         onSave: (edgeData) {
           if (widget.onCreateEdge != null) {
@@ -261,7 +415,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
       context: context,
       builder: (context) => EditEdgeDialog(
         edge: edge,
-        devices: widget.devices,
+        devices: _effectiveDevices,
         onSave: (edgeData) {
           if (widget.onUpdateEdge != null) {
             widget.onUpdateEdge!(edgeData);
@@ -326,11 +480,11 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                     separatorBuilder: (_, __) => const Divider(color: Color(0xFF1E293B), height: 1),
                     itemBuilder: (context, idx) {
                       final edge = widget.edges[idx];
-                      final src = widget.devices.firstWhere(
+                      final src = _effectiveDevices.firstWhere(
                         (d) => d.id == edge.sourceId,
                         orElse: () => DeviceModel(id: 0, name: 'Node #${edge.sourceId}', ip: ''),
                       );
-                      final dst = widget.devices.firstWhere(
+                      final dst = _effectiveDevices.firstWhere(
                         (d) => d.id == edge.targetId,
                         orElse: () => DeviceModel(id: 0, name: 'Node #${edge.targetId}', ip: ''),
                       );
@@ -413,17 +567,6 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
     );
   }
 
-  Offset _getDeviceOffset(DeviceModel device) {
-    if (_draggedPositions.containsKey(device.id)) {
-      return _draggedPositions[device.id]!;
-    }
-    double left = (device.x != 0 ? device.x : 150 + (device.id * 240) % 2500).toDouble();
-    double top = (device.y != 0 ? device.y : 150 + (device.id * 180) % 1600).toDouble();
-    if (left < 50) left = 120 + (device.id * 140.0) % 1900;
-    if (top < 50) top = 120 + (device.id * 110.0) % 1300;
-    return Offset(left, top);
-  }
-
   void _showNodeContextMenu(BuildContext context, DeviceModel device, Offset tapPos) {
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
 
@@ -491,6 +634,50 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
               ],
             ),
           ),
+          if (device.isWebCapable)
+            const PopupMenuItem<String>(
+              value: 'web',
+              child: Row(
+                children: [
+                  Icon(Icons.open_in_browser, color: Color(0xFF38BDF8), size: 16),
+                  SizedBox(width: 10),
+                  Text('Open Web GUI', style: TextStyle(color: Colors.white, fontSize: 13)),
+                ],
+              ),
+            ),
+          if (device.isMikrotikOrRouter)
+            const PopupMenuItem<String>(
+              value: 'winbox',
+              child: Row(
+                children: [
+                  Icon(Icons.router, color: Color(0xFFA78BFA), size: 16),
+                  SizedBox(width: 10),
+                  Text('Open Winbox', style: TextStyle(color: Colors.white, fontSize: 13)),
+                ],
+              ),
+            ),
+          if (device.isSshCapable)
+            const PopupMenuItem<String>(
+              value: 'ssh',
+              child: Row(
+                children: [
+                  Icon(Icons.terminal, color: Color(0xFFF59E0B), size: 16),
+                  SizedBox(width: 10),
+                  Text('Open SSH Terminal', style: TextStyle(color: Colors.white, fontSize: 13)),
+                ],
+              ),
+            ),
+          if (device.isRdpCapable)
+            const PopupMenuItem<String>(
+              value: 'rdp',
+              child: Row(
+                children: [
+                  Icon(Icons.desktop_windows, color: Color(0xFFFB923C), size: 16),
+                  SizedBox(width: 10),
+                  Text('Remote Desktop (RDP)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                ],
+              ),
+            ),
           const PopupMenuItem<String>(
             value: 'details',
             child: Row(
@@ -534,6 +721,14 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
         widget.onPingDevice(device);
       } else if (action == 'continuous_ping') {
         if (widget.onContinuousPing != null) widget.onContinuousPing!(device);
+      } else if (action == 'web') {
+        _launchWeb(device);
+      } else if (action == 'winbox') {
+        _launchWinbox(device);
+      } else if (action == 'ssh') {
+        _launchSSH(device);
+      } else if (action == 'rdp') {
+        _launchRDP(device);
       } else if (action == 'details') {
         widget.onDeviceSelected(device);
       } else if (action == 'connect') {
@@ -546,7 +741,8 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final filteredDevices = widget.devices.where((d) {
+    final devList = _effectiveDevices;
+    final filteredDevices = devList.where((d) {
       if (_selectedTypeFilter != 'all' && d.type.toLowerCase() != _selectedTypeFilter) {
         return false;
       }
@@ -564,39 +760,46 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
           color: const Color(0xFF0B1120),
           child: InteractiveViewer(
             transformationController: _transformController,
-            boundaryMargin: const EdgeInsets.all(3500),
+            boundaryMargin: const EdgeInsets.all(3000),
             minScale: 0.05,
-            maxScale: 5.0,
+            maxScale: 4.0,
             child: SizedBox(
               width: 3800,
               height: 2800,
-              child: AnimatedBuilder(
-                animation: _pulseAnimController,
-                builder: (context, _) {
-                  return CustomPaint(
-                    painter: _MapCanvasPainter(
-                      devices: widget.devices,
-                      edges: widget.edges,
-                      pulseValue: _pulseAnimController.value,
-                      positionGetter: _getDeviceOffset,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Layer A: Grid Pattern
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _GridBackgroundPainter(),
                     ),
-                    child: Stack(
-                      children: filteredDevices.map((device) {
-                        return _buildDockerStyleDeviceNode(device);
-                      }).toList(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
+                  ),
 
-        // 2. Grid Lines Overlay
-        Positioned.fill(
-          child: IgnorePointer(
-            child: CustomPaint(
-              painter: _GridBackgroundPainter(),
+                  // Layer B: Connection Lines & Animated Glow Packets
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _pulseAnimController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: _MapCanvasPainter(
+                            devices: devList,
+                            edges: widget.edges,
+                            pulseValue: _pulseAnimController.value,
+                            positionGetter: _getDeviceOffset,
+                            circleOffset: kCircleCenterOffset,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Layer C: All Device Nodes (Positioned directly in 3800x2800 canvas)
+                  ...filteredDevices.map((device) {
+                    return _buildDockerStyleDeviceNode(device);
+                  }),
+                ],
+              ),
             ),
           ),
         ),
@@ -655,9 +858,9 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                 ),
                 const SizedBox(width: 10),
 
-                // Live Search Input
+                // Live Search Input with Instant Node Centering
                 Container(
-                  width: 180,
+                  width: 220,
                   height: 34,
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F172A),
@@ -665,26 +868,54 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                     border: Border.all(color: const Color(0xFF475569)),
                   ),
                   child: TextField(
+                    controller: _searchController,
                     style: const TextStyle(color: Colors.white, fontSize: 12),
-                    decoration: const InputDecoration(
-                      hintText: 'Search node or IP...',
-                      hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 11),
-                      prefixIcon: Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    decoration: InputDecoration(
+                      hintText: 'Search or jump to node/IP...',
+                      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                      prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 12, color: Color(0xFF94A3B8)),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
                       border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
                     ),
                     onChanged: (val) => setState(() => _searchQuery = val),
+                    onSubmitted: (val) {
+                      if (filteredDevices.isNotEmpty) {
+                        _centerOnDevice(filteredDevices.first);
+                      }
+                    },
                   ),
                 ),
 
                 const Spacer(),
 
+                // Device count badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Text(
+                    '${filteredDevices.length} Devices',
+                    style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
                 // Scan Network Action
                 IconButton(
-                  icon: const Icon(Icons.search, size: 18, color: Color(0xFFCBD5E1)),
-                  tooltip: 'Scan Network Subnet',
+                  icon: const Icon(Icons.radar, size: 18, color: Color(0xFFCBD5E1)),
+                  tooltip: 'Scan Subnet',
                   onPressed: widget.onOpenScanner,
                 ),
 
@@ -742,11 +973,34 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
                   onPressed: _fitToScreen,
                 ),
 
-                // Auto Layout
-                IconButton(
+                // Topology Auto Arrange Menu (Tree / Grid)
+                PopupMenuButton<String>(
                   icon: const Icon(Icons.auto_awesome_mosaic, size: 18, color: Color(0xFFCBD5E1)),
-                  tooltip: 'Auto Arrange Nodes',
-                  onPressed: _autoLayout,
+                  tooltip: 'Auto Layout Topology',
+                  color: const Color(0xFF0F172A),
+                  onSelected: _autoLayout,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'tree',
+                      child: Row(
+                        children: [
+                          Icon(Icons.account_tree, size: 16, color: Color(0xFF22D3EE)),
+                          SizedBox(width: 8),
+                          Text('Hierarchical Tree (Routers -> Switches -> Nodes)', style: TextStyle(color: Colors.white, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'grid',
+                      child: Row(
+                        children: [
+                          Icon(Icons.grid_view, size: 16, color: Color(0xFF38BDF8)),
+                          SizedBox(width: 8),
+                          Text('Clean Uniform Grid Layout', style: TextStyle(color: Colors.white, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
 
                 // Refresh Status
@@ -949,6 +1203,7 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
 
   Widget _buildDockerStyleDeviceNode(DeviceModel device) {
     final pos = _getDeviceOffset(device);
+    final isBeaconHighlighted = _highlightedDeviceId == device.id;
 
     // Render Text Annotation Label Node
     if (device.isTextNode) {
@@ -971,7 +1226,9 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
           onPanEnd: (_) {
             final finalPos = _draggedPositions[device.id] ?? pos;
             if (widget.onUpdatePosition != null) {
-              widget.onUpdatePosition!(device, finalPos.dx, finalPos.dy);
+              final serverX = (finalPos.dx + (kNodeWidth / 2) - 1900) / 1.8;
+              final serverY = (finalPos.dy + 30 - 1400) / 1.8;
+              widget.onUpdatePosition!(device, serverX, serverY);
             }
           },
           onSecondaryTapUp: (details) {
@@ -1025,7 +1282,9 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
         onPanEnd: (_) {
           final finalPos = _draggedPositions[device.id] ?? pos;
           if (widget.onUpdatePosition != null) {
-            widget.onUpdatePosition!(device, finalPos.dx, finalPos.dy);
+            final serverX = (finalPos.dx + (kNodeWidth / 2) - 1900) / 1.8;
+            final serverY = (finalPos.dy + 30 - 1400) / 1.8;
+            widget.onUpdatePosition!(device, serverX, serverY);
           }
         },
         onTap: () => widget.onDeviceSelected(device),
@@ -1037,90 +1296,116 @@ class _NativeMapViewState extends State<NativeMapView> with SingleTickerProvider
         },
         child: MouseRegion(
           cursor: SystemMouseCursors.grab,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Circular Glowing Node
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: device.statusColor,
-                    width: device.isOnline ? 2.5 : 2.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: device.statusColor.withOpacity(device.isOnline ? 0.45 : 0.25),
-                      blurRadius: device.isOnline ? 16 : 8,
-                      spreadRadius: device.isOnline ? 2 : 0,
+          child: SizedBox(
+            width: kNodeWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Circular Glowing Node with Pulse Radar
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (isBeaconHighlighted)
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF22D3EE), width: 2),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0xFF22D3EE), blurRadius: 20, spreadRadius: 4),
+                          ],
+                        ),
+                      ),
+                    Container(
+                      width: kCircleRadius * 2,
+                      height: kCircleRadius * 2,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: device.statusColor,
+                          width: device.isOnline ? 2.5 : 2.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: device.statusColor.withOpacity(device.isOnline ? 0.45 : 0.25),
+                            blurRadius: device.isOnline ? 16 : 8,
+                            spreadRadius: device.isOnline ? 2 : 0,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: DeviceIconWidget(
+                          device: device,
+                          size: 34,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: Center(
-                  child: Icon(
-                    device.typeIcon,
-                    size: 28,
-                    color: device.statusColor,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
+                const SizedBox(height: 6),
 
-              // Docker Web Style Info Card Label with Edit Handle
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF334155)),
-                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                // Docker Web Style Info Card Label with Edit Handle
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: isBeaconHighlighted ? const Color(0xFF22D3EE) : const Color(0xFF334155)),
+                    boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              device.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () {
+                              if (widget.onEditDevice != null) widget.onEditDevice!(device);
+                            },
+                            child: const Icon(Icons.edit, size: 11, color: Color(0xFF22D3EE)),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        device.ip + (device.checkPort > 0 ? ':${device.checkPort}' : ''),
+                        style: const TextStyle(
+                          color: Color(0xFF22D3EE),
+                          fontSize: 9,
+                          fontFamily: 'monospace',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (device.isOnline && device.lastAvgTime != null && device.lastAvgTime! > 0)
                         Text(
-                          device.name,
+                          '${device.lastAvgTime!.toStringAsFixed(1)}ms | TTL:${device.lastTtl ?? 64}',
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
+                            color: Color(0xFF2ECC71),
+                            fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        InkWell(
-                          onTap: () {
-                            if (widget.onEditDevice != null) widget.onEditDevice!(device);
-                          },
-                          child: const Icon(Icons.edit, size: 11, color: Color(0xFF22D3EE)),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      device.ip + (device.checkPort > 0 ? ':${device.checkPort}' : ''),
-                      style: const TextStyle(
-                        color: Color(0xFF22D3EE),
-                        fontSize: 9,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    if (device.isOnline && device.lastAvgTime != null && device.lastAvgTime! > 0)
-                      Text(
-                        '${device.lastAvgTime!.toStringAsFixed(1)}ms | TTL:${device.lastTtl ?? 64}',
-                        style: const TextStyle(
-                          color: Color(0xFF2ECC71),
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1133,12 +1418,14 @@ class _MapCanvasPainter extends CustomPainter {
   final List<EdgeModel> edges;
   final double pulseValue;
   final Offset Function(DeviceModel) positionGetter;
+  final Offset circleOffset;
 
   _MapCanvasPainter({
     required this.devices,
     required this.edges,
     required this.pulseValue,
     required this.positionGetter,
+    required this.circleOffset,
   });
 
   @override
@@ -1153,10 +1440,10 @@ class _MapCanvasPainter extends CustomPainter {
       final srcPos = positionGetter(src);
       final dstPos = positionGetter(dst);
 
-      final srcX = srcPos.dx + 29;
-      final srcY = srcPos.dy + 29;
-      final dstX = dstPos.dx + 29;
-      final dstY = dstPos.dy + 29;
+      final srcX = srcPos.dx + circleOffset.dx;
+      final srcY = srcPos.dy + circleOffset.dy;
+      final dstX = dstPos.dx + circleOffset.dx;
+      final dstY = dstPos.dy + circleOffset.dy;
 
       final isDown = src.isOffline || dst.isOffline;
       final edgeColor = isDown ? const Color(0xFFE74C3C) : edge.displayColor;

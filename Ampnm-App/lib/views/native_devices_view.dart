@@ -1,8 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app_theme.dart';
 import '../models/device_model.dart';
+import '../widgets/device_icon_widget.dart';
+
+enum DeviceSortField { name, ip, status, latency, type }
 
 class NativeDevicesView extends StatefulWidget {
   final List<DeviceModel> devices;
@@ -37,7 +42,13 @@ class NativeDevicesView extends StatefulWidget {
 class _NativeDevicesViewState extends State<NativeDevicesView> {
   String _searchQuery = '';
   String _statusFilter = 'all';
+  String _typeCategoryFilter = 'all';
   bool _isGridView = false;
+  final Set<int> _selectedIds = {};
+  bool _isBulkPinging = false;
+
+  DeviceSortField _sortField = DeviceSortField.ip;
+  bool _sortAscending = true;
 
   void _exportCsv() {
     final buffer = StringBuffer();
@@ -56,22 +67,97 @@ class _NativeDevicesViewState extends State<NativeDevicesView> {
     );
   }
 
+  void _launchSSH(DeviceModel device) {
+    final ip = device.ip.split(':').first.trim();
+    if (ip.isEmpty) return;
+    try {
+      if (Platform.isWindows) {
+        Process.start('powershell.exe', ['-NoExit', '-Command', 'ssh $ip'], mode: ProcessStartMode.detached);
+      } else {
+        launchUrl(Uri.parse('ssh://$ip'));
+      }
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: 'ssh $ip'));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied "ssh $ip" to clipboard!'), backgroundColor: AppTheme.primary));
+    }
+  }
+
+  void _launchWinbox(DeviceModel device) {
+    final ip = device.ip.split(':').first.trim();
+    if (ip.isEmpty) return;
+    try {
+      if (Platform.isWindows) {
+        Process.start('winbox64.exe', [ip], mode: ProcessStartMode.detached).catchError((_) {
+          return Process.start('winbox.exe', [ip], mode: ProcessStartMode.detached);
+        });
+      } else {
+        launchUrl(Uri.parse('winbox://$ip'));
+      }
+    } catch (_) {}
+    Clipboard.setData(ClipboardData(text: ip));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Copied IP $ip for Winbox!'), backgroundColor: AppTheme.primary));
+  }
+
+  void _launchRDP(DeviceModel device) {
+    final ip = device.ip.split(':').first.trim();
+    if (ip.isEmpty) return;
+    try {
+      if (Platform.isWindows) {
+        Process.start('mstsc.exe', ['/v:$ip'], mode: ProcessStartMode.detached);
+      }
+    } catch (_) {}
+  }
+
+  void _launchWeb(DeviceModel device) {
+    final ip = device.ip;
+    if (ip.isEmpty) return;
+    final port = device.checkPort;
+    final protocol = (port == 443 || port == 8443) ? 'https' : 'http';
+    final portSuffix = (port > 0 && port != 80 && port != 443) ? ':$port' : '';
+    final uri = Uri.parse('$protocol://$ip$portSuffix');
+    launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  void _bulkPingSelected() async {
+    final selectedDevices = widget.devices.where((d) => _selectedIds.contains(d.id)).toList();
+    if (selectedDevices.isEmpty) return;
+
+    setState(() => _isBulkPinging = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Running bulk ping on ${selectedDevices.length} nodes...'), backgroundColor: const Color(0xFF0891B2)),
+    );
+
+    for (final dev in selectedDevices) {
+      if (!mounted) break;
+      await widget.onPingDevice(dev);
+      await Future.delayed(const Duration(milliseconds: 150));
+    }
+
+    if (mounted) {
+      setState(() => _isBulkPinging = false);
+      widget.onRefresh();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bulk ping check completed!'), backgroundColor: AppTheme.success),
+      );
+    }
+  }
+
   void _confirmDelete(DeviceModel device) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppTheme.border)),
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFF334155))),
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 24),
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 24),
             const SizedBox(width: 10),
             Text('Delete ${device.name}?', style: const TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
         content: Text(
           'Are you sure you want to remove "${device.name}" (${device.ip}) from monitoring? This action cannot be undone.',
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
         ),
         actions: [
           TextButton(
@@ -85,12 +171,23 @@ class _NativeDevicesViewState extends State<NativeDevicesView> {
                 widget.onDeleteDevice!(device);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             child: const Text('Delete Device'),
           ),
         ],
       ),
     );
+  }
+
+  void _setSort(DeviceSortField field) {
+    setState(() {
+      if (_sortField == field) {
+        _sortAscending = !_sortAscending;
+      } else {
+        _sortField = field;
+        _sortAscending = true;
+      }
+    });
   }
 
   @override
@@ -99,176 +196,270 @@ class _NativeDevicesViewState extends State<NativeDevicesView> {
       if (_statusFilter == 'online' && !d.isOnline) return false;
       if (_statusFilter == 'offline' && !d.isOffline) return false;
       if (_statusFilter == 'warning' && !d.isWarning) return false;
+      if (_statusFilter == 'critical' && !d.isCritical) return false;
+
+      if (_typeCategoryFilter != 'all') {
+        if (!d.type.toLowerCase().contains(_typeCategoryFilter)) return false;
+      }
 
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         return d.name.toLowerCase().contains(q) ||
-            d.ip.contains(q) ||
+            d.ip.toLowerCase().contains(q) ||
             d.type.toLowerCase().contains(q) ||
+            d.subchoice.toLowerCase().contains(q) ||
             d.description.toLowerCase().contains(q);
       }
       return true;
     }).toList();
 
+    // Numerical IP and Smart Multi-field sorting
+    filtered.sort((a, b) {
+      int cmp = 0;
+      switch (_sortField) {
+        case DeviceSortField.name:
+          cmp = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          break;
+        case DeviceSortField.ip:
+          cmp = a.ipNumeric.compareTo(b.ipNumeric);
+          if (cmp == 0) cmp = a.ip.compareTo(b.ip);
+          break;
+        case DeviceSortField.status:
+          cmp = a.status.compareTo(b.status);
+          break;
+        case DeviceSortField.latency:
+          cmp = (a.lastAvgTime ?? 0).compareTo(b.lastAvgTime ?? 0);
+          break;
+        case DeviceSortField.type:
+          cmp = a.type.compareTo(b.type);
+          break;
+      }
+      return _sortAscending ? cmp : -cmp;
+    });
+
+    final totalCount = widget.devices.where((d) => !d.isTextNode).length;
+    final onlineCount = widget.devices.where((d) => d.isOnline).length;
+    final offlineCount = widget.devices.where((d) => d.isOffline && !d.isTextNode).length;
+
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Bar
+          // 1. Top Action Toolbar
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Device Inventory & Live Telemetry',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
+                    'Device Inventory & Management',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    'Showing ${filtered.length} of ${widget.devices.length} network nodes',
-                    style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                    '$totalCount Total Endpoints • $onlineCount Online • $offlineCount Offline',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  // Subnet Scanner Action
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenScanner,
-                    icon: const Icon(Icons.radar, size: 15),
-                    label: const Text('IP Scanner', style: TextStyle(fontSize: 12)),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Add New Device Action
-                  ElevatedButton.icon(
-                    onPressed: widget.onAddDevice,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Add Device', style: TextStyle(fontSize: 12)),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Export CSV
-                  OutlinedButton.icon(
-                    onPressed: _exportCsv,
-                    icon: const Icon(Icons.download, size: 15),
-                    label: const Text('Export CSV', style: TextStyle(fontSize: 12)),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // View Toggle
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceCard,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.table_rows,
-                            size: 18,
-                            color: !_isGridView ? AppTheme.primaryGlow : AppTheme.textSecondary,
-                          ),
-                          tooltip: 'Table List View',
-                          onPressed: () => setState(() => _isGridView = false),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.grid_view,
-                            size: 18,
-                            color: _isGridView ? AppTheme.primaryGlow : AppTheme.textSecondary,
-                          ),
-                          tooltip: 'Grid Cards View',
-                          onPressed: () => setState(() => _isGridView = true),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: widget.isLoading
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.refresh, size: 18, color: AppTheme.primaryGlow),
-                    tooltip: 'Refresh',
-                    onPressed: widget.onRefresh,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Filters & Search Row
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceCard,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: TextField(
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by device name, IP address, type or description...',
-                      prefixIcon: Icon(Icons.search, size: 18, color: AppTheme.textSecondary),
-                      contentPadding: EdgeInsets.symmetric(vertical: 10),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                    ),
-                    onChanged: (val) => setState(() => _searchQuery = val),
+              const Spacer(),
+              if (widget.onOpenScanner != null)
+                OutlinedButton.icon(
+                  onPressed: widget.onOpenScanner,
+                  icon: const Icon(Icons.radar, size: 16),
+                  label: const Text('Subnet Scanner'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF22D3EE),
+                    side: const BorderSide(color: Color(0xFF0891B2)),
                   ),
                 ),
+              const SizedBox(width: 10),
+              if (widget.onAddDevice != null)
+                ElevatedButton.icon(
+                  onPressed: widget.onAddDevice,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Add Device'),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0891B2)),
+                ),
+              const SizedBox(width: 10),
+              IconButton(
+                icon: const Icon(Icons.file_download_outlined, color: Color(0xFF94A3B8)),
+                tooltip: 'Export CSV Inventory',
+                onPressed: _exportCsv,
               ),
-              const SizedBox(width: 16),
-              _FilterChip(
-                label: 'All (${widget.devices.length})',
-                isSelected: _statusFilter == 'all',
-                onTap: () => setState(() => _statusFilter = 'all'),
-              ),
-              const SizedBox(width: 8),
-              _FilterChip(
-                label: 'Online (${widget.devices.where((d) => d.isOnline).length})',
-                color: AppTheme.success,
-                isSelected: _statusFilter == 'online',
-                onTap: () => setState(() => _statusFilter = 'online'),
-              ),
-              const SizedBox(width: 8),
-              _FilterChip(
-                label: 'Offline (${widget.devices.where((d) => d.isOffline).length})',
-                color: AppTheme.danger,
-                isSelected: _statusFilter == 'offline',
-                onTap: () => setState(() => _statusFilter = 'offline'),
+              IconButton(
+                icon: Icon(widget.isLoading ? Icons.hourglass_top : Icons.refresh, color: const Color(0xFF22D3EE)),
+                tooltip: 'Refresh & Sync',
+                onPressed: widget.onRefresh,
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Content: Table View or Grid View
+          // 2. Search, Status Filters & View Toggle Bar
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // Search Box
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF475569)),
+                        ),
+                        child: TextField(
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Search by hostname, IP address, type...',
+                            hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                            prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 14, color: Color(0xFF94A3B8)),
+                                    onPressed: () => setState(() => _searchQuery = ''),
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          onChanged: (val) => setState(() => _searchQuery = val),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Status Filters
+                    _buildStatusFilterChip('all', 'All (${widget.devices.length})'),
+                    const SizedBox(width: 6),
+                    _buildStatusFilterChip('online', 'Online ($onlineCount)', color: const Color(0xFF10B981)),
+                    const SizedBox(width: 6),
+                    _buildStatusFilterChip('offline', 'Offline ($offlineCount)', color: const Color(0xFFEF4444)),
+                    const SizedBox(width: 6),
+                    _buildStatusFilterChip('warning', 'Warn', color: const Color(0xFFF59E0B)),
+
+                    const Spacer(),
+
+                    // Grid / List Toggle
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.view_list, color: !_isGridView ? const Color(0xFF22D3EE) : const Color(0xFF64748B), size: 20),
+                            onPressed: () => setState(() => _isGridView = false),
+                            tooltip: 'Table List View',
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.grid_view, color: _isGridView ? const Color(0xFF22D3EE) : const Color(0xFF64748B), size: 20),
+                            onPressed: () => setState(() => _isGridView = true),
+                            tooltip: 'NOC Grid Cards View',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Category Quick Filter Pills
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      const Text('Category: ', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+                      _buildCategoryFilterChip('all', 'All Types'),
+                      _buildCategoryFilterChip('router', 'Routers'),
+                      _buildCategoryFilterChip('switch', 'Switches'),
+                      _buildCategoryFilterChip('server', 'Servers'),
+                      _buildCategoryFilterChip('wifi', 'WiFi / AP'),
+                      _buildCategoryFilterChip('firewall', 'Firewalls'),
+                      _buildCategoryFilterChip('camera', 'Cameras'),
+                      _buildCategoryFilterChip('nas', 'Storage / NAS'),
+                      _buildCategoryFilterChip('pc', 'Workstations'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 3. Multi-Select Bulk Actions Bar (if any selected)
+          if (_selectedIds.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0369A1).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF0284C7)),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '${_selectedIds.length} devices selected',
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _isBulkPinging ? null : _bulkPingSelected,
+                    icon: _isBulkPinging
+                        ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.flash_on, size: 14),
+                    label: Text(_isBulkPinging ? 'Bulk Pinging...' : 'Bulk Ping Selected'),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0891B2), minimumSize: const Size(0, 32)),
+                  ),
+                  const SizedBox(width: 10),
+                  TextButton.icon(
+                    onPressed: () {
+                      final selected = widget.devices.where((d) => _selectedIds.contains(d.id)).toList();
+                      final buffer = StringBuffer();
+                      buffer.writeln('ID,Name,IP,Type,Status,AvgLatency');
+                      for (final d in selected) {
+                        buffer.writeln('${d.id},"${d.name}","${d.ip}","${d.type}","${d.status}",${d.lastAvgTime ?? 0}');
+                      }
+                      final bytes = utf8.encode(buffer.toString());
+                      final base64Data = base64Encode(bytes);
+                      launchUrl(Uri.parse('data:text/csv;base64,$base64Data'));
+                    },
+                    icon: const Icon(Icons.download, size: 14, color: Color(0xFF38BDF8)),
+                    label: const Text('Export Selected', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _selectedIds.clear()),
+                    child: const Text('Clear Selection', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+
+          // 4. Device Items View (List or Grid)
           Expanded(
             child: filtered.isEmpty
                 ? const Center(
-                    child: Text(
-                      'No matching devices found.',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.devices_other, size: 48, color: Color(0xFF475569)),
+                        SizedBox(height: 12),
+                        Text('No matching devices found in inventory.', style: TextStyle(color: Color(0xFF94A3B8))),
+                      ],
                     ),
                   )
                 : _isGridView
@@ -280,199 +471,310 @@ class _NativeDevicesViewState extends State<NativeDevicesView> {
     );
   }
 
+  Widget _buildStatusFilterChip(String key, String label, {Color? color}) {
+    final isSelected = _statusFilter == key;
+    final chipColor = color ?? const Color(0xFF22D3EE);
+
+    return InkWell(
+      onTap: () => setState(() => _statusFilter = key),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? chipColor.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: isSelected ? chipColor : const Color(0xFF334155)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? chipColor : const Color(0xFF94A3B8),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilterChip(String key, String label) {
+    final isSelected = _typeCategoryFilter == key;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: InkWell(
+        onTap: () => setState(() => _typeCategoryFilter = key),
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF0284C7).withOpacity(0.25) : const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF334155)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTableView(List<DeviceModel> list) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: ListView.separated(
-          itemCount: list.length + 1,
-          separatorBuilder: (_, __) => const Divider(color: AppTheme.border, height: 1),
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return Container(
-                color: const Color(0xFF0F172A),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: const Row(
-                  children: [
-                    SizedBox(width: 90, child: Text('STATUS', style: _headerStyle)),
-                    Expanded(flex: 3, child: Text('DEVICE NAME & TYPE', style: _headerStyle)),
-                    Expanded(flex: 2, child: Text('IP ADDRESS', style: _headerStyle)),
-                    SizedBox(width: 110, child: Text('LATENCY', style: _headerStyle)),
-                    Expanded(flex: 2, child: Text('TELEMETRY', style: _headerStyle)),
-                    SizedBox(width: 170, child: Text('ACTIONS', style: _headerStyle)),
-                  ],
-                ),
-              );
-            }
-
-            final d = list[index - 1];
-            return InkWell(
-              onTap: () => widget.onDeviceSelected(d),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Row(
-                  children: [
-                    // Status Badge
-                    SizedBox(
-                      width: 90,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: d.statusColor,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(color: d.statusColor.withOpacity(0.5), blurRadius: 6),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            d.status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: d.statusColor,
-                            ),
-                          ),
-                        ],
-                      ),
+        child: Column(
+          children: [
+            // Table Header with Sort Arrows
+            Container(
+              color: const Color(0xFF1E293B),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _selectedIds.length == list.length && list.isNotEmpty,
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == true) {
+                          _selectedIds.addAll(list.map((d) => d.id));
+                        } else {
+                          _selectedIds.clear();
+                        }
+                      });
+                    },
+                    fillColor: MaterialStateProperty.resolveWith((states) => const Color(0xFF0891B2)),
+                  ),
+                  const SizedBox(width: 6),
+                  _buildSortHeader('DEVICE NAME', DeviceSortField.name, flex: 3),
+                  _buildSortHeader('IP ADDRESS', DeviceSortField.ip, flex: 2),
+                  _buildSortHeader('TYPE / ROLE', DeviceSortField.type, flex: 2),
+                  _buildSortHeader('STATUS', DeviceSortField.status, flex: 2),
+                  _buildSortHeader('LATENCY', DeviceSortField.latency, flex: 2),
+                  const Expanded(
+                    flex: 3,
+                    child: Text(
+                      'QUICK NOC ACTIONS',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                      textAlign: TextAlign.end,
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Color(0xFF334155), height: 1),
 
-                    // Device Name & Type
-                    Expanded(
-                      flex: 3,
+            // Table Rows
+            Expanded(
+              child: ListView.separated(
+                itemCount: list.length,
+                separatorBuilder: (_, __) => const Divider(color: Color(0xFF1E293B), height: 1),
+                itemBuilder: (context, idx) {
+                  final d = list[idx];
+                  final isSelected = _selectedIds.contains(d.id);
+
+                  return InkWell(
+                    onTap: () => widget.onDeviceSelected(d),
+                    hoverColor: const Color(0xFF1E293B).withOpacity(0.5),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       child: Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: d.statusColor.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Icon(d.typeIcon, size: 16, color: d.statusColor),
+                          Checkbox(
+                            value: isSelected,
+                            onChanged: (val) {
+                              setState(() {
+                                if (val == true) {
+                                  _selectedIds.add(d.id);
+                                } else {
+                                  _selectedIds.remove(d.id);
+                                }
+                              });
+                            },
+                            fillColor: MaterialStateProperty.resolveWith((states) => const Color(0xFF0891B2)),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 6),
+                          // Name & Icon
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            flex: 3,
+                            child: Row(
                               children: [
-                                Text(
-                                  d.name,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E293B),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: d.statusColor, width: 1.5),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  child: Center(
+                                    child: DeviceIconWidget(device: d, size: 20),
+                                  ),
                                 ),
-                                if (d.description.isNotEmpty)
-                                  Text(
-                                    d.description,
-                                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    d.name,
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // IP
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              d.ip + (d.checkPort > 0 ? ':${d.checkPort}' : ''),
+                              style: const TextStyle(color: Color(0xFF22D3EE), fontSize: 12, fontFamily: 'monospace'),
+                            ),
+                          ),
+                          // Type
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              d.type.toUpperCase(),
+                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                            ),
+                          ),
+                          // Status Badge
+                          Expanded(
+                            flex: 2,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: d.statusColor.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: d.statusColor.withOpacity(0.4)),
+                                ),
+                                child: Text(
+                                  d.status.toUpperCase(),
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: d.statusColor),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Latency
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              d.isOnline && d.lastAvgTime != null && d.lastAvgTime! > 0
+                                  ? '${d.lastAvgTime!.toStringAsFixed(1)} ms'
+                                  : (d.isOnline ? 'Online' : 'Down'),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: d.isOnline ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                              ),
+                            ),
+                          ),
+                          // Quick Actions Row
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.flash_on, size: 16, color: Color(0xFF10B981)),
+                                  tooltip: 'Ping Now',
+                                  onPressed: () => widget.onPingDevice(d),
+                                ),
+                                if (widget.onOpenContinuousPing != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.timeline, size: 16, color: Color(0xFF38BDF8)),
+                                    tooltip: 'Continuous Ping',
+                                    onPressed: () => widget.onOpenContinuousPing!(d),
+                                  ),
+                                if (d.isWebCapable)
+                                  IconButton(
+                                    icon: const Icon(Icons.open_in_browser, size: 16, color: Color(0xFF22D3EE)),
+                                    tooltip: 'Open Web GUI',
+                                    onPressed: () => _launchWeb(d),
+                                  ),
+                                if (d.isMikrotikOrRouter)
+                                  IconButton(
+                                    icon: const Icon(Icons.router, size: 16, color: Color(0xFFA78BFA)),
+                                    tooltip: 'Open Winbox',
+                                    onPressed: () => _launchWinbox(d),
+                                  ),
+                                if (d.isSshCapable)
+                                  IconButton(
+                                    icon: const Icon(Icons.terminal, size: 16, color: Color(0xFFF59E0B)),
+                                    tooltip: 'Open SSH Terminal',
+                                    onPressed: () => _launchSSH(d),
+                                  ),
+                                if (d.isRdpCapable)
+                                  IconButton(
+                                    icon: const Icon(Icons.desktop_windows, size: 16, color: Color(0xFFFB923C)),
+                                    tooltip: 'Open Remote Desktop (RDP)',
+                                    onPressed: () => _launchRDP(d),
+                                  ),
+                                if (widget.onEditDevice != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 15, color: Color(0xFF94A3B8)),
+                                    tooltip: 'Edit Device',
+                                    onPressed: () => widget.onEditDevice!(d),
+                                  ),
+                                if (widget.onDeleteDevice != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 15, color: Color(0xFFEF4444)),
+                                    tooltip: 'Delete Device',
+                                    onPressed: () => _confirmDelete(d),
+                                  ),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
-
-                    // IP Address & Port
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        d.ip + (d.checkPort > 0 ? ':${d.checkPort}' : ''),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                          color: AppTheme.primaryGlow,
-                        ),
-                      ),
-                    ),
-
-                    // Latency
-                    SizedBox(
-                      width: 110,
-                      child: d.lastAvgTime != null && d.lastAvgTime! > 0
-                          ? Text(
-                              '${d.lastAvgTime!.toStringAsFixed(1)} ms',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: d.lastAvgTime! > 100 ? AppTheme.warning : AppTheme.success,
-                              ),
-                            )
-                          : const Text('—', style: TextStyle(color: AppTheme.textMuted)),
-                    ),
-
-                    // Hardware Telemetry
-                    Expanded(
-                      flex: 2,
-                      child: (d.cpuUsage != null || d.memoryUsage != null)
-                          ? Row(
-                              children: [
-                                if (d.cpuUsage != null) ...[
-                                  Text(
-                                    'CPU ${d.cpuUsage!.toStringAsFixed(0)}%',
-                                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                if (d.memoryUsage != null)
-                                  Text(
-                                    'RAM ${d.memoryUsage!.toStringAsFixed(0)}%',
-                                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                  ),
-                              ],
-                            )
-                          : const Text('ICMP Node', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                    ),
-
-                    // Row Actions
-                    SizedBox(
-                      width: 170,
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.flash_on, size: 16, color: AppTheme.primaryGlow),
-                            tooltip: 'Single Ping',
-                            onPressed: () => widget.onPingDevice(d),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.show_chart, size: 16, color: AppTheme.info),
-                            tooltip: 'Continuous Ping Lab',
-                            onPressed: () {
-                              if (widget.onOpenContinuousPing != null) {
-                                widget.onOpenContinuousPing!(d);
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.textSecondary),
-                            tooltip: 'Edit Device',
-                            onPressed: () {
-                              if (widget.onEditDevice != null) {
-                                widget.onEditDevice!(d);
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 16, color: AppTheme.danger),
-                            tooltip: 'Delete Device',
-                            onPressed: () => _confirmDelete(d),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortHeader(String title, DeviceSortField field, {required int flex}) {
+    final isCurrent = _sortField == field;
+
+    return Expanded(
+      flex: flex,
+      child: InkWell(
+        onTap: () => _setSort(field),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isCurrent ? const Color(0xFF22D3EE) : const Color(0xFF94A3B8),
+              ),
+            ),
+            if (isCurrent)
+              Icon(
+                _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 12,
+                color: const Color(0xFF22D3EE),
+              ),
+          ],
         ),
       ),
     );
@@ -482,159 +784,127 @@ class _NativeDevicesViewState extends State<NativeDevicesView> {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 320,
-        mainAxisExtent: 200,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        mainAxisExtent: 180,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
       ),
       itemCount: list.length,
-      itemBuilder: (context, index) {
-        final d = list[index];
-        return Card(
-          child: InkWell(
-            onTap: () => widget.onDeviceSelected(d),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: d.statusColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(d.typeIcon, size: 20, color: d.statusColor),
+      itemBuilder: (context, idx) {
+        final d = list[idx];
+        final isSelected = _selectedIds.contains(d.id);
+
+        return InkWell(
+          onTap: () => widget.onDeviceSelected(d),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF334155), width: isSelected ? 1.5 : 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: d.statusColor, width: 1.5),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: d.statusColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: d.statusColor.withOpacity(0.3)),
-                        ),
-                        child: Text(
-                          d.status.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: d.statusColor,
-                          ),
-                        ),
+                      child: Center(
+                        child: DeviceIconWidget(device: d, size: 24),
                       ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        d.name,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        d.ip,
-                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: AppTheme.primaryGlow),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        d.lastAvgTime != null && d.lastAvgTime! > 0
-                            ? '${d.lastAvgTime!.toStringAsFixed(1)} ms'
-                            : 'Offline',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: d.statusColor,
-                        ),
-                      ),
-                      Row(
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.flash_on, size: 14, color: AppTheme.primaryGlow),
-                            tooltip: 'Ping',
-                            onPressed: () => widget.onPingDevice(d),
+                          Text(
+                            d.name,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.show_chart, size: 14, color: AppTheme.info),
-                            tooltip: 'Ping Lab',
-                            onPressed: () {
-                              if (widget.onOpenContinuousPing != null) {
-                                widget.onOpenContinuousPing!(d);
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 14, color: AppTheme.danger),
-                            tooltip: 'Delete',
-                            onPressed: () => _confirmDelete(d),
+                          Text(
+                            d.ip,
+                            style: const TextStyle(color: Color(0xFF22D3EE), fontSize: 11, fontFamily: 'monospace'),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: d.statusColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        d.status.toUpperCase(),
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: d.statusColor),
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      d.type.toUpperCase(),
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                    ),
+                    Text(
+                      d.isOnline && d.lastAvgTime != null && d.lastAvgTime! > 0 ? '${d.lastAvgTime!.toStringAsFixed(1)} ms' : '',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                    ),
+                  ],
+                ),
+                const Divider(color: Color(0xFF1E293B), height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.flash_on, size: 16, color: Color(0xFF10B981)),
+                      tooltip: 'Ping',
+                      onPressed: () => widget.onPingDevice(d),
+                    ),
+                    if (d.isWebCapable)
+                      IconButton(
+                        icon: const Icon(Icons.open_in_browser, size: 16, color: Color(0xFF22D3EE)),
+                        tooltip: 'Web GUI',
+                        onPressed: () => _launchWeb(d),
+                      ),
+                    if (d.isMikrotikOrRouter)
+                      IconButton(
+                        icon: const Icon(Icons.router, size: 16, color: Color(0xFFA78BFA)),
+                        tooltip: 'Winbox',
+                        onPressed: () => _launchWinbox(d),
+                      ),
+                    if (d.isSshCapable)
+                      IconButton(
+                        icon: const Icon(Icons.terminal, size: 16, color: Color(0xFFF59E0B)),
+                        tooltip: 'SSH',
+                        onPressed: () => _launchSSH(d),
+                      ),
+                    if (widget.onEditDevice != null)
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 15, color: Color(0xFF94A3B8)),
+                        tooltip: 'Edit',
+                        onPressed: () => widget.onEditDevice!(d),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-const TextStyle _headerStyle = TextStyle(
-  fontSize: 11,
-  fontWeight: FontWeight.bold,
-  color: AppTheme.textSecondary,
-  letterSpacing: 0.5,
-);
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final Color? color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _FilterChip({
-    required this.label,
-    this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final activeColor = color ?? AppTheme.primary;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? activeColor.withOpacity(0.18) : AppTheme.surfaceCard,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? activeColor : AppTheme.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? Colors.white : AppTheme.textSecondary,
-          ),
-        ),
-      ),
     );
   }
 }

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes vlan-rotate {
+      0%{ transform:rotate(0deg); }
+      100%{ transform:rotate(360deg); }
+    }
+    @keyframes vlan-segment {
+      0%,100%{ opacity:0.3; }
+      50%{ opacity:1; }
+    }
+    @keyframes vlan-pulse {
+      0%,100%{ r:3; opacity:1; }
+      50%{ r:5; opacity:0.5; }
+    }
+    @keyframes vlan-flow {
+      0%{ stroke-dashoffset:20; opacity:0; }
+      30%{ opacity:1; }
+      100%{ stroke-dashoffset:0; opacity:0; }
+    }
+    .ring-spin{ animation:vlan-rotate 6s linear infinite; transform-origin:50px 50px; }
+    .seg1{ animation:vlan-segment 2s ease-in-out 0s infinite; }
+    .seg2{ animation:vlan-segment 2s ease-in-out 0.5s infinite; }
+    .seg3{ animation:vlan-segment 2s ease-in-out 1s infinite; }
+    .seg4{ animation:vlan-segment 2s ease-in-out 1.5s infinite; }
+    .core-dot{ animation:vlan-pulse 2s ease-in-out infinite; }
+    .vf1{ animation:vlan-flow 1.8s linear 0s infinite; }
+    .vf2{ animation:vlan-flow 1.8s linear 0.6s infinite; }
+    .vf3{ animation:vlan-flow 1.8s linear 1.2s infinite; }
+  </style>
+  <!-- Outer spinning ring -->
+  <circle cx="50" cy="50" r="38" fill="none" stroke="#00F2FE" stroke-width="1.5" stroke-dasharray="10,5" class="ring-spin"/>
+  <!-- VLAN segments (pie-like sections) -->
+  <path d="M50 50 L50 14 A36 36 0 0 1 82 68 Z" fill="#00F2FE" opacity="0.3" class="seg1"/>
+  <path d="M50 50 L82 68 A36 36 0 0 1 18 68 Z" fill="#00FF87" opacity="0.3" class="seg2"/>
+  <path d="M50 50 L18 68 A36 36 0 0 1 50 14 Z" fill="#FFAA00" opacity="0.3" class="seg3"/>
+  <!-- Inner circle hub -->
+  <circle cx="50" cy="50" r="16" fill="#0b1e36" stroke="#00F2FE" stroke-width="2"/>
+  <!-- Core dot -->
+  <circle cx="50" cy="50" r="3" fill="#00F2FE" class="core-dot"/>
+  <!-- VLAN node dots on segments -->
+  <circle cx="50" cy="20" r="5" fill="#00F2FE" stroke="#041830" stroke-width="1.5" class="seg1"/>
+  <circle cx="74" cy="66" r="5" fill="#00FF87" stroke="#041830" stroke-width="1.5" class="seg2"/>
+  <circle cx="26" cy="66" r="5" fill="#FFAA00" stroke="#041830" stroke-width="1.5" class="seg3"/>
+  <!-- Lines from hub to node -->
+  <line x1="50" y1="34" x2="50" y2="25" stroke="#00F2FE" stroke-width="1.5" stroke-dasharray="3,2" class="vf1"/>
+  <line x1="60" y1="56" x2="70" y2="62" stroke="#00FF87" stroke-width="1.5" stroke-dasharray="3,2" class="vf2"/>
+  <line x1="40" y1="56" x2="30" y2="62" stroke="#FFAA00" stroke-width="1.5" stroke-dasharray="3,2" class="vf3"/>
+</svg>

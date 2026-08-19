@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes ups-charge {
+      0%   { width: 0px; }
+      70%  { width: 28px; }
+      100% { width: 28px; }
+    }
+    @keyframes ups-bolt {
+      0%,40% { opacity: 0; }
+      50%,60% { opacity: 1; }
+      70%,100% { opacity: 0; }
+    }
+    @keyframes ups-glow {
+      0%,100% { box-shadow: 0 0 4px #00FF87; fill: #00FF87; }
+      50% { fill: #FFAA00; }
+    }
+    @keyframes ups-led {
+      0%,100% { fill: #00FF87; }
+      50% { fill: #00F2FE; }
+    }
+    @keyframes ups-wave {
+      0% { d: path("M 20 62 Q 28 56 36 62 Q 44 68 52 62 Q 60 56 68 62 Q 76 68 80 62"); }
+      50% { d: path("M 20 62 Q 28 68 36 62 Q 44 56 52 62 Q 60 68 68 62 Q 76 56 80 62"); }
+      100% { d: path("M 20 62 Q 28 56 36 62 Q 44 68 52 62 Q 60 56 68 62 Q 76 68 80 62"); }
+    }
+    .ups-bolt { animation: ups-bolt 2s ease-in-out infinite; }
+    .ups-bar { animation: ups-charge 2s ease-in-out infinite; transform-origin: left; }
+    .ups-led { animation: ups-led 1.5s ease-in-out infinite; }
+    .ups-wave { animation: ups-wave 1s linear infinite; }
+  </style>
+  <!-- UPS chassis -->
+  <rect x="14" y="18" width="72" height="60" rx="6" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Battery indicator frame -->
+  <rect x="20" y="24" width="38" height="16" rx="3" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <rect x="58" y="29" width="4" height="6" rx="1" fill="#00F2FE"/>
+  <!-- Animated charge bar -->
+  <rect x="22" y="26" width="0" height="12" rx="2" fill="#00FF87" class="ups-bar">
+    <animate attributeName="width" values="0;28;28;0" dur="2.5s" repeatCount="indefinite"/>
+  </rect>
+  <!-- Lightning bolt symbol -->
+  <path d="M46 22 L41 32 L44 32 L39 42 L48 29 L45 29 Z" fill="#FFAA00" class="ups-bolt"/>
+  <!-- Output AC wave -->
+  <path d="M 20 62 Q 28 56 36 62 Q 44 68 52 62 Q 60 56 68 62 Q 76 68 80 62" fill="none" stroke="#00F2FE" stroke-width="2" class="ups-wave"/>
+  <!-- Status LEDs bottom row -->
+  <circle cx="28" cy="72" r="3" class="ups-led"/>
+  <circle cx="38" cy="72" r="3" fill="#00F2FE" opacity="0.6"/>
+  <circle cx="48" cy="72" r="3" fill="#00FF87" opacity="0.6"/>
+  <!-- Load level -->
+  <rect x="58" y="65" width="22" height="8" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1"/>
+  <rect x="59" y="66" width="14" height="6" rx="1" fill="#00F2FE" opacity="0.7"/>
+  <!-- Power port circles -->
+  <circle cx="28" cy="52" r="4" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <circle cx="42" cy="52" r="4" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <circle cx="56" cy="52" r="4" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <circle cx="70" cy="52" r="4" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+</svg>

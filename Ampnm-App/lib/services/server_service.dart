@@ -279,6 +279,7 @@ class ServerService {
     int checkPort = 0,
     String type = 'server',
     String subchoice = '',
+    String? iconUrl,
     String description = '',
     double x = 300,
     double y = 300,
@@ -289,21 +290,26 @@ class ServerService {
     final uri = Uri.parse('$cleanUrl/api.php?action=create_device');
 
     try {
+      final payload = <String, dynamic>{
+        'name': name,
+        'ip': ip,
+        'check_port': checkPort,
+        'type': type,
+        'subchoice': subchoice,
+        'description': description,
+        'x': x,
+        'y': y,
+        'ping_interval': pingInterval,
+        'map_id': mapId,
+      };
+      if (iconUrl != null && iconUrl.isNotEmpty) {
+        payload['icon_url'] = iconUrl;
+      }
+
       final response = await _client.post(
         uri,
         headers: _buildHeaders(sessionCookie, isJson: true),
-        body: json.encode({
-          'name': name,
-          'ip': ip,
-          'check_port': checkPort,
-          'type': type,
-          'subchoice': subchoice,
-          'description': description,
-          'x': x,
-          'y': y,
-          'ping_interval': pingInterval,
-          'map_id': mapId,
-        }),
+        body: json.encode(payload),
       ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
@@ -325,6 +331,7 @@ class ServerService {
     int checkPort = 0,
     String type = 'server',
     String subchoice = '',
+    String? iconUrl,
     String description = '',
     int pingInterval = 5,
     int mapId = 1,
@@ -333,19 +340,26 @@ class ServerService {
     final uri = Uri.parse('$cleanUrl/api.php?action=update_device');
 
     try {
+      final updates = <String, dynamic>{
+        'name': name,
+        'ip': ip,
+        'check_port': checkPort,
+        'type': type,
+        'subchoice': subchoice,
+        'description': description,
+        'ping_interval': pingInterval,
+        'map_id': mapId,
+      };
+      if (iconUrl != null) {
+        updates['icon_url'] = iconUrl;
+      }
+
       final response = await _client.post(
         uri,
         headers: _buildHeaders(sessionCookie, isJson: true),
         body: json.encode({
           'id': id,
-          'name': name,
-          'ip': ip,
-          'check_port': checkPort,
-          'type': type,
-          'subchoice': subchoice,
-          'description': description,
-          'ping_interval': pingInterval,
-          'map_id': mapId,
+          'updates': updates,
         }),
       ).timeout(const Duration(seconds: 6));
 
@@ -375,8 +389,10 @@ class ServerService {
         headers: _buildHeaders(sessionCookie, isJson: true),
         body: json.encode({
           'id': id,
-          'x': x,
-          'y': y,
+          'updates': {
+            'x': x,
+            'y': y,
+          }
         }),
       ).timeout(const Duration(seconds: 4));
 

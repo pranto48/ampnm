@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes sinewave {
+      0% { stroke-dashoffset: 40; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes capacity {
+      0%, 100% { height: 4px; fill: #ef4444; }
+      33% { height: 12px; fill: #FFAA00; }
+      66% { height: 22px; fill: #00FF87; }
+    }
+    @keyframes currentflow {
+      0% { stroke-dashoffset: 20; opacity: 0.2; }
+      50% { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 0.2; }
+    }
+    .wave { stroke-dasharray: 6,3; animation: sinewave 1s linear infinite; }
+    .cap-bar { animation: capacity 4s steps(3, end) infinite; }
+    .flow-line { stroke-dasharray: 4,4; animation: currentflow 1.2s linear infinite; }
+    @keyframes led-flash {
+      0%, 100% { fill: #00FF87; }
+      50% { fill: #041830; }
+    }
+    .flash { animation: led-flash 1s ease-in-out infinite; }
+  </style>
+  <!-- Main online UPS tall tower cabinet -->
+  <rect x="25" y="10" width="50" height="80" rx="4" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Status LCD display screen -->
+  <rect x="32" y="18" width="36" height="24" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Sine wave line on LCD display representing Double Conversion online status -->
+  <path d="M35,30 Q40,22 45,30 T55,30 T65,30" fill="none" stroke="#00FF87" stroke-width="1.5" class="wave"/>
+  <!-- Battery capacity visualizer -->
+  <rect x="34" y="52" width="12" height="26" rx="1.5" fill="none" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Dynamic battery filling segments -->
+  <rect x="36" y="54" width="8" height="22" fill="#041830"/>
+  <rect x="36" y="54" width="8" height="22" fill="#00FF87" class="cap-bar" transform="rotate(180, 40, 65)"/>
+  <!-- Flow diagram elements -->
+  <line x1="54" y1="52" x2="66" y2="52" stroke="#00F2FE" stroke-width="1.5"/>
+  <line x1="54" y1="62" x2="66" y2="62" stroke="#00FF87" stroke-width="1.5" class="flow-line"/>
+  <line x1="54" y1="72" x2="66" y2="72" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- Grid/Inverter/Load light indicators -->
+  <circle cx="58" cy="52" r="1.5" fill="#00F2FE"/>
+  <circle cx="58" cy="62" r="1.5" fill="#00FF87" class="flash"/>
+  <circle cx="58" cy="72" r="1.5" fill="#FFAA00"/>
+  <!-- Air ventilation grill slats at bottom -->
+  <line x1="32" y1="82" x2="68" y2="82" stroke="#00F2FE" stroke-width="1.5"/>
+  <line x1="32" y1="85" x2="68" y2="85" stroke="#00F2FE" stroke-width="1.5"/>
+</svg>

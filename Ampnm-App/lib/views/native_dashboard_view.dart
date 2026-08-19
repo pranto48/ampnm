@@ -3,6 +3,7 @@ import '../app_theme.dart';
 import '../models/device_model.dart';
 import '../models/map_model.dart';
 import '../models/status_log_model.dart';
+import '../widgets/device_icon_widget.dart';
 
 class NativeDashboardView extends StatelessWidget {
   final List<DeviceModel> devices;
@@ -345,7 +346,9 @@ class NativeDashboardView extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: d.statusColor, width: 1.5),
                     ),
-                    child: Icon(d.typeIcon, size: 18, color: d.statusColor),
+                    child: Center(
+                      child: DeviceIconWidget(device: d, size: 24),
+                    ),
                   ),
                   title: Text(
                     d.name,

@@ -374,6 +374,9 @@ class _MainAppScreenState extends State<MainAppScreen> {
       builder: (context) => DeviceDetailsDialog(
         device: device,
         onPing: _handlePingDevice,
+        onContinuousPing: _openContinuousPingModal,
+        onEditDevice: _openEditDeviceModal,
+        onDeleteDevice: _handleDeleteDevice,
       ),
     );
   }
@@ -392,6 +395,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
             ip: data['ip'],
             checkPort: data['check_port'] ?? 0,
             type: data['type'] ?? 'server',
+            subchoice: data['subchoice']?.toString() ?? '',
+            iconUrl: data['icon_url'],
             description: data['description'] ?? '',
             pingInterval: data['ping_interval'] ?? 5,
             mapId: data['map_id'] ?? _selectedMapId,
@@ -423,6 +428,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
             ip: data['ip'],
             checkPort: data['check_port'] ?? 0,
             type: data['type'] ?? 'server',
+            subchoice: data['subchoice']?.toString() ?? '',
+            iconUrl: data['icon_url'],
             description: data['description'] ?? '',
             pingInterval: data['ping_interval'] ?? 5,
             mapId: data['map_id'] ?? _selectedMapId,
@@ -637,13 +644,14 @@ class _MainAppScreenState extends State<MainAppScreen> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyR, control: true): _initialLoadAllData,
+        const SingleActivator(LogicalKeyboardKey.f5): _initialLoadAllData,
         const SingleActivator(LogicalKeyboardKey.keyN, control: true): _openAddDeviceModal,
         const SingleActivator(LogicalKeyboardKey.keyP, control: true): _handleBulkPingAll,
-        const SingleActivator(LogicalKeyboardKey.digit1): () => setState(() => _selectedNavIndex = 0),
-        const SingleActivator(LogicalKeyboardKey.digit2): () => setState(() => _selectedNavIndex = 1),
-        const SingleActivator(LogicalKeyboardKey.digit3): () => setState(() => _selectedNavIndex = 2),
-        const SingleActivator(LogicalKeyboardKey.digit4): () => setState(() => _selectedNavIndex = 3),
-        const SingleActivator(LogicalKeyboardKey.digit5): () {
+        const SingleActivator(LogicalKeyboardKey.digit1, control: true): () => setState(() => _selectedNavIndex = 0),
+        const SingleActivator(LogicalKeyboardKey.digit2, control: true): () => setState(() => _selectedNavIndex = 1),
+        const SingleActivator(LogicalKeyboardKey.digit3, control: true): () => setState(() => _selectedNavIndex = 2),
+        const SingleActivator(LogicalKeyboardKey.digit4, control: true): () => setState(() => _selectedNavIndex = 3),
+        const SingleActivator(LogicalKeyboardKey.digit5, control: true): () {
           setState(() => _selectedNavIndex = 4);
           _ensureWebviewInitialized();
         },
@@ -694,7 +702,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
                           // 1: Native Interactive Topology Map (Docker-Matched)
                           NativeMapView(
                             maps: _maps,
-                            devices: _mapDevices,
+                            devices: _mapDevices.isNotEmpty ? _mapDevices : _allDevices,
+                            allDevices: _allDevices,
                             edges: _edges,
                             selectedMapId: _selectedMapId,
                             onMapChanged: _onMapChanged,

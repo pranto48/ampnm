@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes sweep {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(10px); }
+    }
+    @keyframes warning-blink {
+      0%, 100% { opacity: 0.15; fill: #ff4444; }
+      50% { opacity: 1; fill: #ff4444; }
+    }
+    @keyframes threat-radar {
+      0% { stroke-dashoffset: 20; }
+      100% { stroke-dashoffset: 0; }
+    }
+    .scanner { animation: sweep 2s ease-in-out infinite; }
+    .threat { animation: warning-blink 1s ease-in-out infinite; }
+    .threat-line { stroke-dasharray: 4,2; animation: threat-radar 0.8s linear infinite; }
+    @keyframes node-blink {
+      0%, 100% { fill: #00FF87; }
+      50% { fill: #00F2FE; }
+    }
+    .node-led { animation: node-blink 1.2s ease-in-out infinite; }
+  </style>
+  <!-- NextGen Firewall Stacked Appliance -->
+  <rect x="10" y="24" width="80" height="52" rx="5" fill="#0b1e36" stroke="#00F2FE" stroke-width="2.5"/>
+  <!-- Status segment split -->
+  <line x1="10" y1="50" x2="90" y2="50" stroke="#00F2FE" stroke-width="1.5"/>
+  <!-- IPS Threat Detection Shield Window -->
+  <rect x="18" y="30" width="28" height="14" rx="2" fill="#041830" stroke="#00F2FE" stroke-width="1.2"/>
+  <!-- Scanner bar inside IPS window representing deep packet inspection (DPI) -->
+  <line x1="20" y1="33" x2="44" y2="33" stroke="#00FF87" stroke-width="1.5" class="scanner"/>
+  <!-- Threat warning LED -->
+  <circle cx="24" cy="62" r="3" class="threat"/>
+  <text x="31" y="65" fill="#ff4444" font-size="8" font-family="monospace" font-weight="bold">IPS</text>
+  <!-- Interactive ports -->
+  <rect x="52" y="30" width="8" height="6" rx="1.5" fill="#041830" stroke="#00FF87" stroke-width="1"/>
+  <rect x="62" y="30" width="8" height="6" rx="1.5" fill="#041830" stroke="#00FF87" stroke-width="1"/>
+  <rect x="72" y="30" width="8" height="6" rx="1.5" fill="#041830" stroke="#00FF87" stroke-width="1"/>
+  <!-- Port LEDs -->
+  <circle cx="56" cy="38" r="1" class="node-led"/>
+  <circle cx="66" cy="38" r="1" class="node-led" style="animation-delay:0.3s;"/>
+  <circle cx="76" cy="38" r="1" class="node-led" style="animation-delay:0.6s;"/>
+  <!-- Network traffic flow representation -->
+  <path d="M50,62 L80,62" fill="none" stroke="#00F2FE" stroke-width="1.5" class="threat-line"/>
+  <circle cx="65" cy="62" r="2" fill="#00FF87" class="node-led"/>
+</svg>

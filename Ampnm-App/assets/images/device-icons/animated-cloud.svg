@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    @keyframes cloud-float {
+      0%,100% { transform: translateY(0px); }
+      50% { transform: translateY(-4px); }
+    }
+    @keyframes cloud-pulse {
+      0%,100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    @keyframes cloud-data {
+      0% { stroke-dashoffset: 24; opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 0; }
+    }
+    .cloud-body { animation: cloud-float 3s ease-in-out infinite; transform-origin: 50px 40px; }
+    .cloud-glow { animation: cloud-pulse 2s ease-in-out infinite; }
+    .d1 { animation: cloud-data 1.8s linear infinite; }
+    .d2 { animation: cloud-data 1.8s linear 0.6s infinite; }
+    .d3 { animation: cloud-data 1.8s linear 1.2s infinite; }
+  </style>
+  <!-- Cloud glow -->
+  <ellipse cx="50" cy="40" rx="36" ry="22" fill="#00F2FE" opacity="0.07" class="cloud-glow"/>
+  <!-- Cloud shape -->
+  <g class="cloud-body">
+    <circle cx="34" cy="44" r="14" fill="#0b1e36" stroke="#00F2FE" stroke-width="2"/>
+    <circle cx="50" cy="36" r="18" fill="#0b1e36" stroke="#00F2FE" stroke-width="2"/>
+    <circle cx="66" cy="44" r="14" fill="#0b1e36" stroke="#00F2FE" stroke-width="2"/>
+    <rect x="20" y="44" width="60" height="14" fill="#0b1e36"/>
+    <line x1="20" y1="44" x2="80" y2="44" stroke="none"/>
+  </g>
+  <!-- Data upload/download lines -->
+  <line x1="36" y1="60" x2="36" y2="78" stroke="#00F2FE" stroke-width="2" stroke-dasharray="5,4" class="d1"/>
+  <line x1="50" y1="60" x2="50" y2="78" stroke="#00FF87" stroke-width="2" stroke-dasharray="5,4" class="d2"/>
+  <line x1="64" y1="60" x2="64" y2="78" stroke="#00F2FE" stroke-width="2" stroke-dasharray="5,4" class="d3"/>
+  <!-- Arrow tips -->
+  <polyline points="33,74 36,78 39,74" fill="none" stroke="#00F2FE" stroke-width="1.5" class="d1"/>
+  <polyline points="47,74 50,78 53,74" fill="none" stroke="#00FF87" stroke-width="1.5" class="d2"/>
+  <polyline points="61,74 64,78 67,74" fill="none" stroke="#00F2FE" stroke-width="1.5" class="d3"/>
+</svg>
