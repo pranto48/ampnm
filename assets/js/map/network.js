@@ -214,11 +214,14 @@ MapApp.network = {
                 });
             }
 
-            // Load dynamic connection line style preferences
+            // Load dynamic connection line & glow style preferences
             const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function') 
                 ? MapApp.utils.getCurrentTooltipDisplaySettings() 
-                : { connection_run_style: 'auto', connection_animation_speed: 100 };
+                : { connection_enable_animation: true, connection_glow_mode: 'neon-laser', connection_glow_radius: 14, connection_run_style: 'auto', connection_animation_speed: 100, connection_enable_bandwidth_glow: true };
             
+            const isAnimEnabled = displaySettings.connection_enable_animation !== false && displaySettings.connection_enable_animation !== 'false';
+            const glowMode = displaySettings.connection_glow_mode || 'neon-laser';
+            const baseGlowRadius = parseInt(displaySettings.connection_glow_radius, 10) || 14;
             const runStyle = displaySettings.connection_run_style || 'auto';
             const animSpeed = displaySettings.connection_animation_speed !== undefined ? (displaySettings.connection_animation_speed / 100) : 1.0;
             globalSpeedMultiplier = animSpeed;
@@ -226,7 +229,7 @@ MapApp.network = {
             // Sync globalProgress with MapApp.state.edgeAnimProgress on every frame
             if (MapApp.state && MapApp.state.edgeAnimProgress !== undefined) {
                 globalProgress = MapApp.state.edgeAnimProgress;
-            } else {
+            } else if (isAnimEnabled) {
                 globalProgress = (globalProgress + 0.003 * globalSpeedMultiplier) % 1.0;
             }
 
@@ -262,63 +265,111 @@ MapApp.network = {
 
                 // Check if animation is disabled for this specific edge
                 const rawEdge = (MapApp.state && MapApp.state.edges && typeof MapApp.state.edges.get === 'function') ? MapApp.state.edges.get(edgeId) : null;
-                const isAnimated = rawEdge && rawEdge.custom_animated !== undefined ? (rawEdge.custom_animated == 1) : true;
-                if (!isAnimated) continue;
+                const isEdgeAnimated = rawEdge && rawEdge.custom_animated !== undefined ? (rawEdge.custom_animated == 1 || rawEdge.custom_animated === true || rawEdge.custom_animated === '1') : true;
 
                 // Bandwidth Utilization Dynamic Link Color (v1.19 Feature)
                 let edgeColor = (typeof edge.options?.color === 'string' ? edge.options.color : edge.options?.color?.color) || rawEdge?.custom_color || '#00F2FE';
-                const util = rawEdge && rawEdge.utilization_percent !== undefined ? parseFloat(rawEdge.utilization_percent) : 0;
-                if (util >= 80) {
-                    edgeColor = '#ef4444'; // Red - Overload Alert
-                } else if (util >= 50) {
-                    edgeColor = '#f59e0b'; // Amber - Moderate Load
-                } else if (util > 0) {
-                    edgeColor = '#22c55e'; // Green - Healthy Link
+                if (displaySettings.connection_enable_bandwidth_glow !== false) {
+                    const util = rawEdge && rawEdge.utilization_percent !== undefined ? parseFloat(rawEdge.utilization_percent) : 0;
+                    if (util >= 80) {
+                        edgeColor = '#ef4444'; // Red - Overload Alert
+                    } else if (util >= 50) {
+                        edgeColor = '#f59e0b'; // Amber - Moderate Load
+                    } else if (util > 0) {
+                        edgeColor = '#22c55e'; // Green - Healthy Link
+                    }
                 }
 
-                if (runStyle === 'data-flow') {
-                    // Draw flowing packets
+                // 🌟 LAYER 1: NEON LASER LINE GLOW OVERLAY
+                if (glowMode !== 'off' && edge.from && edge.to) {
+                    let glowBlur = baseGlowRadius;
+                    if (glowMode === 'cyber-pulse') {
+                        glowBlur = baseGlowRadius * (0.6 + 0.4 * Math.sin(globalProgress * Math.PI * 2));
+                    } else if (glowMode === 'high-bloom') {
+                        glowBlur = baseGlowRadius * 1.5;
+                    } else if (glowMode === 'subtle-flow') {
+                        glowBlur = Math.max(4, baseGlowRadius * 0.6);
+                    }
+
+                    const fx = edge.from.x, fy = edge.from.y;
+                    const tx = edge.to.x, ty = edge.to.y;
+
+                    if (fx !== undefined && fy !== undefined && tx !== undefined && ty !== undefined) {
+                        ctx.beginPath();
+                        ctx.moveTo(fx, fy);
+                        ctx.lineTo(tx, ty);
+                        ctx.strokeStyle = edgeColor;
+                        ctx.shadowColor = edgeColor;
+                        ctx.shadowBlur = glowBlur;
+                        ctx.lineWidth = Math.max(1, (edge.options?.width || 2) * 0.8);
+                        ctx.stroke();
+                    }
+                }
+
+                // 🌟 LAYER 2: ANIMATED CYBER PACKETS / PULSES
+                if (!isAnimEnabled || !isEdgeAnimated) continue;
+
+                const effectiveStyle = runStyle === 'auto' ? 'data-flow' : runStyle;
+
+                if (effectiveStyle === 'data-flow') {
+                    // Draw flowing quantum cyber packets
                     for (let i = 0; i < 4; i++) {
                         const t = (globalProgress + i / 4) % 1.0;
                         const pt = getPointAlongEdge(edge, t);
                         if (pt) {
+                            // Outer Neon Glow
+                            ctx.beginPath();
+                            ctx.arc(pt.x, pt.y, 4.5, 0, 2 * Math.PI);
                             ctx.fillStyle = edgeColor;
                             ctx.shadowColor = edgeColor;
-                            ctx.shadowBlur = 8;
-                            ctx.fillRect(pt.x - 4, pt.y - 2.5, 8, 5);
-                        }
-                    }
-                } else if (runStyle === 'data-stream') {
-                    // High-density stream
-                    for (let i = 0; i < 12; i++) {
-                        const t = (globalProgress + i / 12) % 1.0;
-                        const pt = getPointAlongEdge(edge, t);
-                        if (pt) {
+                            ctx.shadowBlur = 14;
+                            ctx.fill();
+
+                            // Bright Core Center
                             ctx.beginPath();
-                            ctx.arc(pt.x, pt.y, 2.5, 0, 2 * Math.PI);
-                            ctx.fillStyle = '#00FF87';
-                            ctx.shadowColor = '#00FF87';
-                            ctx.shadowBlur = 6;
+                            ctx.arc(pt.x, pt.y, 2.0, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.shadowColor = '#FFFFFF';
+                            ctx.shadowBlur = 4;
                             ctx.fill();
                         }
                     }
-                } else if (runStyle === 'pulse') {
-                    // Single sweep pulse
+                } else if (effectiveStyle === 'data-stream') {
+                    // High-density stream
+                    for (let i = 0; i < 10; i++) {
+                        const t = (globalProgress + i / 10) % 1.0;
+                        const pt = getPointAlongEdge(edge, t);
+                        if (pt) {
+                            ctx.beginPath();
+                            ctx.arc(pt.x, pt.y, 3, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#00FF87';
+                            ctx.shadowColor = edgeColor;
+                            ctx.shadowBlur = 8;
+                            ctx.fill();
+                        }
+                    }
+                } else if (effectiveStyle === 'pulse') {
+                    // Single sweep pulse orb
                     const pt = getPointAlongEdge(edge, globalProgress);
                     if (pt) {
                         ctx.beginPath();
                         ctx.arc(pt.x, pt.y, 7, 0, 2 * Math.PI);
                         ctx.fillStyle = edgeColor;
                         ctx.shadowColor = edgeColor;
-                        ctx.shadowBlur = 15;
+                        ctx.shadowBlur = 20;
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 3.5, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#FFFFFF';
                         ctx.fill();
                     }
-                } else if (runStyle === 'wave') {
+                } else if (effectiveStyle === 'wave') {
                     // Sinusoidal wave flow
                     for (let i = 0; i < 6; i++) {
                         const t = (globalProgress + i / 6) % 1.0;
                         const pt = getPointAlongEdge(edge, t);
-                        if (pt) {
+                        if (pt && edge.to && edge.from) {
                             const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI/2;
                             const waveOffset = Math.sin(t * Math.PI * 4) * 6;
                             const wx = pt.x + Math.cos(angle) * waveOffset;
@@ -328,44 +379,44 @@ MapApp.network = {
                             ctx.arc(wx, wy, 4, 0, 2 * Math.PI);
                             ctx.fillStyle = edgeColor;
                             ctx.shadowColor = edgeColor;
-                            ctx.shadowBlur = 8;
+                            ctx.shadowBlur = 10;
                             ctx.fill();
                         }
                     }
-                } else if (runStyle === 'morse') {
-                    // Morse code style (dash and dot)
+                } else if (effectiveStyle === 'morse') {
+                    // Morse code telemetry
                     for (let i = 0; i < 5; i++) {
                         const t = (globalProgress + i / 5) % 1.0;
                         const pt = getPointAlongEdge(edge, t);
                         if (pt) {
                             ctx.fillStyle = edgeColor;
                             ctx.shadowColor = edgeColor;
-                            ctx.shadowBlur = 8;
+                            ctx.shadowBlur = 10;
                             if (i % 2 === 0) {
                                 ctx.fillRect(pt.x - 6, pt.y - 2, 12, 4);
                             } else {
                                 ctx.beginPath();
-                                ctx.arc(pt.x, pt.y, 3, 0, 2 * Math.PI);
+                                ctx.arc(pt.x, pt.y, 3.5, 0, 2 * Math.PI);
                                 ctx.fill();
                             }
                         }
                     }
-                } else if (runStyle === 'zipper') {
+                } else if (effectiveStyle === 'zipper') {
                     // Zipper interlocking style
                     for (let i = 0; i < 8; i++) {
                         const t = (globalProgress + i / 8) % 1.0;
                         const pt = getPointAlongEdge(edge, t);
-                        if (pt) {
+                        if (pt && edge.to && edge.from) {
                             const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI/2;
                             const offsetSign = i % 2 === 0 ? 1 : -1;
                             const zx = pt.x + Math.cos(angle) * offsetSign * 3.5;
                             const zy = pt.y + Math.sin(angle) * offsetSign * 3.5;
 
                             ctx.beginPath();
-                            ctx.arc(zx, zy, 3, 0, 2 * Math.PI);
+                            ctx.arc(zx, zy, 3.5, 0, 2 * Math.PI);
                             ctx.fillStyle = edgeColor;
                             ctx.shadowColor = edgeColor;
-                            ctx.shadowBlur = 6;
+                            ctx.shadowBlur = 8;
                             ctx.fill();
                         }
                     }
@@ -377,10 +428,10 @@ MapApp.network = {
                         const pt = getPointAlongEdge(edge, t);
                         if (pt) {
                             ctx.beginPath();
-                            ctx.arc(pt.x, pt.y, 4.5, 0, 2 * Math.PI);
+                            ctx.arc(pt.x, pt.y, 5, 0, 2 * Math.PI);
                             ctx.fillStyle = edgeColor;
                             ctx.shadowColor = edgeColor;
-                            ctx.shadowBlur = 10;
+                            ctx.shadowBlur = 12;
                             ctx.fill();
                         }
                     }
@@ -487,6 +538,10 @@ MapApp.network = {
                     }
                 }
                 if (window.userRole === 'admin') MapApp.ui.openDeviceModal(params.nodes[0]);
+            } else if (params.edges && params.edges.length > 0) {
+                if (window.userRole === 'admin') {
+                    MapApp.ui.openEdgeModal(params.edges[0]);
+                }
             }
         });
 
@@ -531,7 +586,7 @@ MapApp.network = {
                 contextMenu.style.display = 'block';
                 document.addEventListener('click', closeContextMenu, { once: true });
             } else if (edgeId) {
-                console.log("Context menu opened for edge. Edge ID:", edgeId); // Added console.log
+                console.log("Context menu opened for edge. Edge ID:", edgeId);
                 let menuItems = ``;
                 if (window.userRole === 'admin') {
                     menuItems += `
@@ -553,7 +608,7 @@ MapApp.network = {
         contextMenu.addEventListener('click', async (e) => {
             const target = e.target.closest('.context-menu-item');
             if (target) {
-                const { action } = target.dataset;
+                const { action, id } = target.dataset;
                 // Parse ID as number to match vis.js integer node IDs from MySQL AUTO_INCREMENT
                 if (action === 'open-submap') {
                     const node = MapApp.state.nodes.get(id);

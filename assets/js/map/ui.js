@@ -488,5 +488,100 @@ MapApp.ui = {
     updateAndAnimateEdges: () => {
         MapApp.ui.updateStaticEdgeColors();
         MapApp.ui.startCanvasAnimationLoop();
+    },
+
+    openConnectionSettingsModal: () => {
+        const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function') 
+            ? MapApp.utils.getCurrentTooltipDisplaySettings() 
+            : {};
+        
+        const isAnim = displaySettings.connection_enable_animation !== false && displaySettings.connection_enable_animation !== 'false';
+        const animEl = document.getElementById('csEnableAnimation');
+        if (animEl) animEl.checked = isAnim;
+        
+        const glowModeEl = document.getElementById('csGlowMode');
+        if (glowModeEl) glowModeEl.value = displaySettings.connection_glow_mode || 'neon-laser';
+        
+        const glowRadius = parseInt(displaySettings.connection_glow_radius, 10) || 14;
+        const glowRadiusEl = document.getElementById('csGlowRadius');
+        const glowRadiusValEl = document.getElementById('csGlowRadiusVal');
+        if (glowRadiusEl) glowRadiusEl.value = glowRadius;
+        if (glowRadiusValEl) glowRadiusValEl.textContent = glowRadius + ' px';
+        
+        const flowStyleEl = document.getElementById('csFlowStyle');
+        if (flowStyleEl) flowStyleEl.value = displaySettings.connection_run_style || 'auto';
+        
+        const speedVal = displaySettings.connection_animation_speed !== undefined ? (displaySettings.connection_animation_speed / 100) : 1.0;
+        const speedEl = document.getElementById('csSpeed');
+        const speedValEl = document.getElementById('csSpeedVal');
+        if (speedEl) speedEl.value = speedVal.toFixed(1);
+        if (speedValEl) speedValEl.textContent = speedVal.toFixed(1) + 'x';
+        
+        const thickVal = parseInt(displaySettings.connection_line_thickness, 10) || 2;
+        const thickEl = document.getElementById('csThickness');
+        const thickValEl = document.getElementById('csThicknessVal');
+        if (thickEl) thickEl.value = thickVal;
+        if (thickValEl) thickValEl.textContent = thickVal + ' px';
+        
+        const bwGlowEl = document.getElementById('csEnableBandwidthGlow');
+        if (bwGlowEl) bwGlowEl.checked = displaySettings.connection_enable_bandwidth_glow !== false;
+        
+        MapApp.ui._updateConnectionSettingsPreview();
+        openModal('connectionSettingsModal');
+    },
+
+    _updateConnectionSettingsPreview: () => {
+        const mode = document.getElementById('csGlowMode')?.value || 'neon-laser';
+        const radius = parseInt(document.getElementById('csGlowRadius')?.value, 10) || 14;
+        const line = document.getElementById('csPreviewLine');
+        const dot = document.getElementById('csPreviewDot');
+        
+        if (!line || !dot) return;
+        
+        if (mode === 'off') {
+            line.style.boxShadow = 'none';
+            dot.style.boxShadow = 'none';
+        } else if (mode === 'high-bloom') {
+            line.style.boxShadow = `0 0 ${radius * 1.5}px #00f2fe, 0 0 ${radius * 3}px #00f2fe`;
+            dot.style.boxShadow = `0 0 ${radius * 2}px #00f2fe`;
+        } else if (mode === 'cyber-pulse') {
+            line.style.boxShadow = `0 0 ${radius}px #00f2fe, 0 0 ${radius * 2}px #00ff87`;
+            dot.style.boxShadow = `0 0 ${radius * 1.5}px #00ff87`;
+        } else if (mode === 'subtle-flow') {
+            line.style.boxShadow = `0 0 ${Math.max(4, radius * 0.6)}px #00f2fe`;
+            dot.style.boxShadow = `0 0 6px #00f2fe`;
+        } else {
+            line.style.boxShadow = `0 0 ${radius}px #00f2fe, 0 0 ${radius * 2}px #00f2fe`;
+            dot.style.boxShadow = `0 0 ${radius}px #00f2fe`;
+        }
+    },
+
+    saveConnectionSettings: () => {
+        const isAnim = document.getElementById('csEnableAnimation') ? document.getElementById('csEnableAnimation').checked : true;
+        const glowMode = document.getElementById('csGlowMode')?.value || 'neon-laser';
+        const glowRadius = parseInt(document.getElementById('csGlowRadius')?.value, 10) || 14;
+        const flowStyle = document.getElementById('csFlowStyle')?.value || 'auto';
+        const speed = parseFloat(document.getElementById('csSpeed')?.value) || 1.0;
+        const thickness = parseInt(document.getElementById('csThickness')?.value, 10) || 2;
+        const bandwidthGlow = document.getElementById('csEnableBandwidthGlow') ? document.getElementById('csEnableBandwidthGlow').checked : true;
+        
+        const stored = JSON.parse(localStorage.getItem('ampnm_tooltip_display_settings') || '{}');
+        const updated = {
+            ...stored,
+            connection_enable_animation: isAnim,
+            connection_glow_mode: glowMode,
+            connection_glow_radius: glowRadius,
+            connection_run_style: flowStyle,
+            connection_animation_speed: Math.round(speed * 100),
+            connection_line_thickness: thickness,
+            connection_enable_bandwidth_glow: bandwidthGlow
+        };
+        
+        localStorage.setItem('ampnm_tooltip_display_settings', JSON.stringify(updated));
+        closeModal('connectionSettingsModal');
+        
+        if (window.notyf) window.notyf.success('Connection glow & flow settings saved!');
+        MapApp.ui.updateStaticEdgeColors();
+        if (MapApp.state.network) MapApp.state.network.redraw();
     }
 };

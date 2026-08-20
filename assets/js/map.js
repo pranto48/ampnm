@@ -1245,8 +1245,89 @@ function initMap() {
             }
         });
     }
+
     els.scanNetworkBtn.addEventListener('click', () => openModal('scanModal'));
     els.closeScanModal.addEventListener('click', () => closeModal('scanModal'));
+
+    // Connection Glow & Flow Settings Modal Bindings
+    const connectionSettingsBtn = document.getElementById('connectionSettingsBtn');
+    const closeConnectionSettingsBtn = document.getElementById('closeConnectionSettingsBtn');
+    const connectionSettingsForm = document.getElementById('connectionSettingsForm');
+    const csGlowMode = document.getElementById('csGlowMode');
+    const csGlowRadius = document.getElementById('csGlowRadius');
+    const csGlowRadiusVal = document.getElementById('csGlowRadiusVal');
+    const csSpeed = document.getElementById('csSpeed');
+    const csSpeedVal = document.getElementById('csSpeedVal');
+    const csThickness = document.getElementById('csThickness');
+    const csThicknessVal = document.getElementById('csThicknessVal');
+    const csResetDefaultBtn = document.getElementById('csResetDefaultBtn');
+
+    if (connectionSettingsBtn) {
+        connectionSettingsBtn.addEventListener('click', () => {
+            if (MapApp.ui && typeof MapApp.ui.openConnectionSettingsModal === 'function') {
+                MapApp.ui.openConnectionSettingsModal();
+            }
+        });
+    }
+
+    if (closeConnectionSettingsBtn) {
+        closeConnectionSettingsBtn.addEventListener('click', () => closeModal('connectionSettingsModal'));
+    }
+
+    if (csGlowRadius && csGlowRadiusVal) {
+        csGlowRadius.addEventListener('input', (e) => {
+            csGlowRadiusVal.textContent = e.target.value + ' px';
+            if (MapApp.ui && typeof MapApp.ui._updateConnectionSettingsPreview === 'function') {
+                MapApp.ui._updateConnectionSettingsPreview();
+            }
+        });
+    }
+
+    if (csGlowMode) {
+        csGlowMode.addEventListener('change', () => {
+            if (MapApp.ui && typeof MapApp.ui._updateConnectionSettingsPreview === 'function') {
+                MapApp.ui._updateConnectionSettingsPreview();
+            }
+        });
+    }
+
+    if (csSpeed && csSpeedVal) {
+        csSpeed.addEventListener('input', (e) => {
+            csSpeedVal.textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+        });
+    }
+
+    if (csThickness && csThicknessVal) {
+        csThickness.addEventListener('input', (e) => {
+            csThicknessVal.textContent = e.target.value + ' px';
+        });
+    }
+
+    if (csResetDefaultBtn) {
+        csResetDefaultBtn.addEventListener('click', () => {
+            document.getElementById('csEnableAnimation').checked = true;
+            if (csGlowMode) csGlowMode.value = 'neon-laser';
+            if (csGlowRadius) { csGlowRadius.value = 14; csGlowRadiusVal.textContent = '14 px'; }
+            const flowStyle = document.getElementById('csFlowStyle');
+            if (flowStyle) flowStyle.value = 'auto';
+            if (csSpeed) { csSpeed.value = 1.0; csSpeedVal.textContent = '1.0x'; }
+            if (csThickness) { csThickness.value = 2; csThicknessVal.textContent = '2 px'; }
+            const bwGlow = document.getElementById('csEnableBandwidthGlow');
+            if (bwGlow) bwGlow.checked = true;
+            if (MapApp.ui && typeof MapApp.ui._updateConnectionSettingsPreview === 'function') {
+                MapApp.ui._updateConnectionSettingsPreview();
+            }
+        });
+    }
+
+    if (connectionSettingsForm) {
+        connectionSettingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (MapApp.ui && typeof MapApp.ui.saveConnectionSettings === 'function') {
+                MapApp.ui.saveConnectionSettings();
+            }
+        });
+    }
 
     // Place Device Modal Logic (Admin only)
     if (window.userRole === 'admin') {

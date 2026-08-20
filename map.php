@@ -117,6 +117,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <button id="addTextBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Text Label" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-font"></i></button>
                             <button id="addMapTitleBtn" class="px-3 py-2 bg-slate-700 text-cyan-400 rounded-lg hover:bg-slate-600 border border-cyan-500/30 flex items-center gap-1.5 font-medium text-xs" title="Add Map Title Banner to Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-heading"></i> Map Title</button>
                             <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
+                            <button id="connectionSettingsBtn" class="px-3 py-2 bg-slate-700 text-cyan-400 rounded-lg hover:bg-slate-600 border border-cyan-500/30 flex items-center gap-1.5" title="Connection Glow & Flow Settings"><i class="fas fa-bolt"></i><span class="hidden md:inline text-xs font-semibold">Glow Settings</span></button>
                             <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
                             <input type="file" id="importFile" class="hidden" accept=".json">
@@ -518,6 +519,124 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <i class="fas fa-save mr-2"></i>Save Connection
                         </button>
                     </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Connection & Flow Glow Settings Modal -->
+    <div id="connectionSettingsModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-xl border border-slate-700 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4 flex-shrink-0">
+                <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-bolt text-cyan-400"></i> Connection Glow & Flow Settings
+                </h2>
+                <button type="button" id="closeConnectionSettingsBtn" class="text-slate-400 hover:text-white text-lg modal-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="connectionSettingsForm" class="overflow-y-auto flex-1 pr-1 space-y-4" style="scrollbar-width:thin;scrollbar-color:#334155 transparent;">
+                <!-- Master Toggle -->
+                <div class="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-lg border border-slate-700">
+                    <div>
+                        <div class="text-sm font-semibold text-white">Connection Flow Animations</div>
+                        <div class="text-xs text-slate-400">Enable glowing real-time laser & packet flow on connection lines</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="csEnableAnimation" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                    </label>
+                </div>
+
+                <!-- Glow Intensity Mode -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Laser Glow Radiance Mode</label>
+                    <select id="csGlowMode" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                        <option value="neon-laser">⚡ Neon Laser Glow (High-Definition Radiant Bloom)</option>
+                        <option value="cyber-pulse">🌌 Cyber Pulse (Intense Periodic Pulse Glow)</option>
+                        <option value="high-bloom">✨ High-Intensity Cyber Bloom (Ultra Glow)</option>
+                        <option value="subtle-flow">💡 Subtle Flow (Clean Minimalist Glow)</option>
+                        <option value="off">🚫 Off (Standard Crisp Flat Lines)</option>
+                    </select>
+                </div>
+
+                <!-- Glow Blur Radius Slider -->
+                <div class="p-3 bg-slate-900/40 rounded-lg border border-slate-700/60 space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-semibold text-slate-300">Glow Blur Radius</span>
+                        <span id="csGlowRadiusVal" class="text-cyan-400 font-mono font-bold">14 px</span>
+                    </div>
+                    <input type="range" id="csGlowRadius" min="4" max="36" step="2" value="14" class="w-full h-2 bg-slate-950 border border-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                    <div class="flex justify-between text-[10px] text-slate-500">
+                        <span>Tight (4px)</span>
+                        <span>Balanced (14px)</span>
+                        <span>Ultra Radiant (36px)</span>
+                    </div>
+                </div>
+
+                <!-- Packet Flow Style -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Flow Packet Animation Style</label>
+                    <select id="csFlowStyle" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                        <option value="auto">⚡ Auto (Glowing Packets with Laser Trail)</option>
+                        <option value="data-flow">📦 Data Flow (Cyber Quantum Packets)</option>
+                        <option value="data-stream">💫 Data Stream (High-Density Particle Stream)</option>
+                        <option value="pulse">🔮 Cyber Pulse (Orb Sweep Beacon)</option>
+                        <option value="wave">🌊 Sinusoidal Wave (Oscillating Signal Flow)</option>
+                        <option value="morse">📡 Morse Code (Digital Telemetry Pulses)</option>
+                        <option value="zipper">⚡ Zipper Interlock (Dual-Rail Fiber Flow)</option>
+                    </select>
+                </div>
+
+                <!-- Flow Speed Slider -->
+                <div class="p-3 bg-slate-900/40 rounded-lg border border-slate-700/60 space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-semibold text-slate-300">Flow Animation Speed</span>
+                        <span id="csSpeedVal" class="text-cyan-400 font-mono font-bold">1.0x</span>
+                    </div>
+                    <input type="range" id="csSpeed" min="0.2" max="4.0" step="0.1" value="1.0" class="w-full h-2 bg-slate-950 border border-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                    <div class="flex justify-between text-[10px] text-slate-500">
+                        <span>Slow (0.2x)</span>
+                        <span>Default (1.0x)</span>
+                        <span>Ultra Fast (4.0x)</span>
+                    </div>
+                </div>
+
+                <!-- Global Line Thickness -->
+                <div class="p-3 bg-slate-900/40 rounded-lg border border-slate-700/60 space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-semibold text-slate-300">Default Connection Line Thickness</span>
+                        <span id="csThicknessVal" class="text-cyan-400 font-mono font-bold">2 px</span>
+                    </div>
+                    <input type="range" id="csThickness" min="1" max="8" step="1" value="2" class="w-full h-2 bg-slate-950 border border-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                </div>
+
+                <!-- Heatmap Dynamic Link Color -->
+                <div class="flex items-center justify-between p-3 bg-slate-900/60 rounded-lg border border-slate-700">
+                    <div>
+                        <div class="text-xs font-semibold text-white">Dynamic Bandwidth Load Glow</div>
+                        <div class="text-[11px] text-slate-400">Auto glow color based on link utilization (Green/Amber/Red)</div>
+                    </div>
+                    <input type="checkbox" id="csEnableBandwidthGlow" class="h-4 w-4 bg-slate-900 border-slate-600 rounded text-cyan-500 focus:ring-cyan-500" checked>
+                </div>
+
+                <!-- Live Line Glow Preview Box -->
+                <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                    <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Live Glow Preview</div>
+                    <div class="relative h-8 flex items-center justify-center bg-slate-900/80 rounded border border-slate-800 overflow-hidden">
+                        <div id="csPreviewLine" class="w-3/4 h-1 rounded-full" style="background-color: #00f2fe; box-shadow: 0 0 14px #00f2fe, 0 0 28px #00f2fe;"></div>
+                        <div id="csPreviewDot" class="absolute w-3 h-3 rounded-full bg-white animate-ping" style="box-shadow: 0 0 10px #00f2fe;"></div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" id="csResetDefaultBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-semibold rounded-lg transition">
+                        Reset Defaults
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold rounded-lg shadow-lg hover:shadow-cyan-500/25 transition">
+                        <i class="fas fa-check mr-1.5"></i>Apply & Save Settings
+                    </button>
                 </div>
             </form>
         </div>
