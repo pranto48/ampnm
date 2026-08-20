@@ -80,23 +80,23 @@ MapApp.network = {
 
         MapApp.ui.populateLegend();
         const data = { nodes: MapApp.state.nodes, edges: MapApp.state.edges };
-        const options = { 
-            physics: false, 
-            interaction: { hover: true }, 
-            edges: { smooth: true, width: 2, font: { color: '#ffffff', size: 12, align: 'top', strokeWidth: 0 } }, 
-            manipulation: { 
+        const options = {
+            physics: false,
+            interaction: { hover: true },
+            edges: { smooth: true, width: 2, font: { color: '#ffffff', size: 12, align: 'top', strokeWidth: 0 } },
+            manipulation: {
                 enabled: window.userRole === 'admin', // Enable manipulation only for admin
-                addEdge: async (edgeData, callback) => { 
+                addEdge: async (edgeData, callback) => {
                     if (window.userRole !== 'admin') {
                         callback(null);
                         return;
                     }
                     try {
-                        const newEdge = await MapApp.api.post('create_edge', { source_id: edgeData.from, target_id: edgeData.to, map_id: MapApp.state.currentMapId, connection_type: 'cat6' }); 
-                        edgeData.id = newEdge.id; 
+                        const newEdge = await MapApp.api.post('create_edge', { source_id: edgeData.from, target_id: edgeData.to, map_id: MapApp.state.currentMapId, connection_type: 'cat6' });
+                        edgeData.id = newEdge.id;
                         edgeData.connection_type = 'cat6';
-                        edgeData.label = 'cat6'; 
-                        callback(edgeData); 
+                        edgeData.label = 'cat6';
+                        callback(edgeData);
                         MapApp.ui.updateStaticEdgeColors();
                         window.notyf.success('Connection added.');
                     } catch (err) {
@@ -113,7 +113,7 @@ MapApp.network = {
                         try {
                             for (const edgeId of edgeData.edges) {
                                 const edge = MapApp.state.edges.get(edgeId);
-                                await MapApp.api.post('delete_edge', { 
+                                await MapApp.api.post('delete_edge', {
                                     id: edgeId,
                                     source_id: edge ? edge.from : null,
                                     target_id: edge ? edge.to : null
@@ -129,7 +129,7 @@ MapApp.network = {
                         callback(edgeData);
                     }
                 }
-            } 
+            }
         };
         MapApp.state.network = new vis.Network(container, data, options);
         MapApp.network.restoreSavedView();
@@ -203,7 +203,7 @@ MapApp.network = {
             }
 
             const edges = MapApp.state.network.body.edges;
-            
+
             // Build a lookup map of node statuses
             const deviceStatuses = {};
             if (MapApp.state.nodes && typeof MapApp.state.nodes.forEach === 'function') {
@@ -215,10 +215,10 @@ MapApp.network = {
             }
 
             // Load dynamic connection line & glow style preferences
-            const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function') 
-                ? MapApp.utils.getCurrentTooltipDisplaySettings() 
+            const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function')
+                ? MapApp.utils.getCurrentTooltipDisplaySettings()
                 : { connection_enable_animation: true, connection_glow_mode: 'neon-laser', connection_glow_radius: 14, connection_run_style: 'auto', connection_animation_speed: 100, connection_enable_bandwidth_glow: true };
-            
+
             const isAnimEnabled = displaySettings.connection_enable_animation !== false && displaySettings.connection_enable_animation !== 'false';
             const glowMode = displaySettings.connection_glow_mode || 'neon-laser';
             const baseGlowRadius = parseInt(displaySettings.connection_glow_radius, 10) || 14;
@@ -234,7 +234,7 @@ MapApp.network = {
             }
 
             ctx.save();
-            
+
             function getPointAlongEdge(edge, t) {
                 try {
                     if (edge.edgeType && typeof edge.edgeType.getPoint === 'function') {
@@ -242,7 +242,7 @@ MapApp.network = {
                     } else if (typeof edge.getPoint === 'function') {
                         return edge.getPoint(t);
                     }
-                } catch(e) {}
+                } catch (e) { }
                 return null;
             }
 
@@ -370,7 +370,7 @@ MapApp.network = {
                         const t = (globalProgress + i / 6) % 1.0;
                         const pt = getPointAlongEdge(edge, t);
                         if (pt && edge.to && edge.from) {
-                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI/2;
+                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI / 2;
                             const waveOffset = Math.sin(t * Math.PI * 4) * 6;
                             const wx = pt.x + Math.cos(angle) * waveOffset;
                             const wy = pt.y + Math.sin(angle) * waveOffset;
@@ -407,7 +407,7 @@ MapApp.network = {
                         const t = (globalProgress + i / 8) % 1.0;
                         const pt = getPointAlongEdge(edge, t);
                         if (pt && edge.to && edge.from) {
-                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI/2;
+                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI / 2;
                             const offsetSign = i % 2 === 0 ? 1 : -1;
                             const zx = pt.x + Math.cos(angle) * offsetSign * 3.5;
                             const zy = pt.y + Math.sin(angle) * offsetSign * 3.5;
@@ -440,7 +440,7 @@ MapApp.network = {
 
             ctx.restore();
         });
-        
+
         // Event Handlers
         let boxResizeState = null;
         MapApp.state.network.on("dragStart", (params) => {
@@ -484,16 +484,18 @@ MapApp.network = {
                 title: MapApp.utils.buildNodeTitle(updatedDeviceData),
                 x: boxResizeState.originalPos.x,
                 y: boxResizeState.originalPos.y,
-                font: { color: updatedDeviceData.name_text_color || 'white', size: parseInt(updatedDeviceData.name_text_size, 10) || 14, multi: true,
-                    face: (updatedDeviceData.name_text_bold == 1 && updatedDeviceData.name_text_italic == 1) ? 'bold italic Arial' : updatedDeviceData.name_text_bold == 1 ? 'bold Arial' : updatedDeviceData.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
+                font: {
+                    color: updatedDeviceData.name_text_color || 'white', size: parseInt(updatedDeviceData.name_text_size, 10) || 14, multi: true,
+                    face: (updatedDeviceData.name_text_bold == 1 && updatedDeviceData.name_text_italic == 1) ? 'bold italic Arial' : updatedDeviceData.name_text_bold == 1 ? 'bold Arial' : updatedDeviceData.name_text_italic == 1 ? 'italic Arial' : 'Arial'
+                },
                 deviceData: updatedDeviceData
             }, updatedDeviceData);
             MapApp.state.nodes.update(visNode);
         });
 
-        MapApp.state.network.on("dragEnd", async (params) => { 
-            if (params.nodes.length > 0) { 
-                const nodeId = params.nodes[0]; 
+        MapApp.state.network.on("dragEnd", async (params) => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
                 const node = MapApp.state.nodes.get(nodeId);
                 const position = MapApp.state.network.getPositions([nodeId])[nodeId];
 
@@ -513,14 +515,14 @@ MapApp.network = {
                 } else {
                     MapApp.network.saveNodePositionForUser(nodeId, position);
                     if (window.userRole === 'admin') {
-                        await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                        await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } });
                     }
                 }
-            } 
+            }
             MapApp.network.saveCurrentView();
         });
         MapApp.state.network.on("zoom", MapApp.network.saveCurrentView);
-        MapApp.state.network.on("doubleClick", (params) => { 
+        MapApp.state.network.on("doubleClick", (params) => {
             if (params.nodes.length > 0) {
                 const node = MapApp.state.nodes.get(params.nodes[0]);
                 if (node && node.deviceData) {
@@ -601,8 +603,8 @@ MapApp.network = {
                 contextMenu.style.top = `${params.pointer.DOM.y}px`;
                 contextMenu.style.display = 'block';
                 document.addEventListener('click', closeContextMenu, { once: true });
-            } else { 
-                closeContextMenu(); 
+            } else {
+                closeContextMenu();
             }
         });
         contextMenu.addEventListener('click', async (e) => {
@@ -824,8 +826,10 @@ MapApp.network = {
                                         title: MapApp.utils.buildNodeTitle(updated),
                                         x: pos.x,
                                         y: pos.y,
-                                        font: { color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
-                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
+                                        font: {
+                                            color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
+                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial'
+                                        },
                                         deviceData: updated
                                     };
                                     MapApp.state.nodes.update(MapApp.utils.buildVisBoxNode(baseNode, updated));
@@ -834,8 +838,10 @@ MapApp.network = {
                                         id: updated.id,
                                         label: updated.name,
                                         title: MapApp.utils.buildNodeTitle(updated),
-                                        font: { color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
-                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
+                                        font: {
+                                            color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
+                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial'
+                                        },
                                         deviceData: updated
                                     };
                                     const visuals = MapApp.utils.resolveNodeVisuals(updated);
@@ -896,8 +902,10 @@ MapApp.network = {
                                 title: MapApp.utils.buildNodeTitle(updated),
                                 x: pos.x,
                                 y: pos.y,
-                                font: { color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
-                                    face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial' },
+                                font: {
+                                    color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
+                                    face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial'
+                                },
                                 deviceData: updated
                             };
                             MapApp.state.nodes.update(MapApp.utils.buildVisBoxNode(baseNode, updated));
@@ -935,10 +943,10 @@ MapApp.network = {
                         if (confirm('Are you sure you want to delete this connection?')) {
                             try {
                                 const edge = MapApp.state.edges.get(id);
-                                const result = await MapApp.api.post('delete_edge', { 
-                                    id, 
-                                    source_id: edge ? edge.from : null, 
-                                    target_id: edge ? edge.to : null 
+                                const result = await MapApp.api.post('delete_edge', {
+                                    id,
+                                    source_id: edge ? edge.from : null,
+                                    target_id: edge ? edge.to : null
                                 });
                                 if (result.success || result.status === 'success') {
                                     window.notyf.success('Connection deleted.');
@@ -973,7 +981,7 @@ MapApp.network = {
         if (MapApp.network.websocket) {
             MapApp.network.websocket.connect();
         }
-        
+
         // Bind pulse speed controller
         const speedSelector = document.getElementById('animationSpeedSelector');
         if (speedSelector) {
@@ -1001,23 +1009,23 @@ MapApp.network = {
 MapApp.network.websocket = {
     socket: null,
     reconnectTimeout: null,
-    connect: function() {
+    connect: function () {
         if (this.socket) {
-            try { this.socket.close(); } catch(e) {}
+            try { this.socket.close(); } catch (e) { }
         }
-        
+
         // Connect to ws relative to current window location host
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws';
         const wsPort = '8080'; // central websocket notification port
         const wsUrl = `${wsProtocol}://${window.location.hostname}:${wsPort}/ws`;
-        
+
         console.log(`Connecting to WebSocket: ${wsUrl}`);
         this.socket = new WebSocket(wsUrl);
-        
+
         this.socket.onopen = () => {
             console.log("WebSocket connected.");
         };
-        
+
         this.socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -1026,39 +1034,39 @@ MapApp.network.websocket = {
                 console.error("Failed to parse WebSocket message:", e);
             }
         };
-        
+
         this.socket.onclose = () => {
             console.log("WebSocket disconnected. Retrying in 5s...");
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = setTimeout(() => this.connect(), 5000);
         };
-        
+
         this.socket.onerror = (err) => {
             console.error("WebSocket error:", err);
             this.socket.close();
         };
     },
-    
-    handleMessage: function(data) {
+
+    handleMessage: function (data) {
         // Only update if in Live view
         const slider = document.getElementById('timelineSlider');
         if (slider && parseInt(slider.value, 10) !== 24) {
             // Historical view active - ignore live updates
             return;
         }
-        
+
         if (data && data.device_id && data.status) {
             const nodeId = Number(data.device_id);
             const node = MapApp.state.nodes.get(nodeId);
             if (node && node.deviceData) {
                 const oldStatus = node.deviceData.status;
-                
+
                 // Store telemetry metrics if present
                 if (data.cpu_usage !== undefined) node.deviceData.cpu_usage = data.cpu_usage;
                 if (data.memory_usage !== undefined) node.deviceData.memory_usage = data.memory_usage;
                 if (data.network_in !== undefined) node.deviceData.network_in = data.network_in;
                 if (data.network_out !== undefined) node.deviceData.network_out = data.network_out;
-                
+
                 // Classify status based on metrics thresholds
                 let newStatus = data.status;
                 if (newStatus === 'online') {
@@ -1069,12 +1077,12 @@ MapApp.network.websocket = {
                     }
                 }
                 node.deviceData.status = newStatus;
-                
+
                 // Adjust animation speed multiplier dynamically based on CPU usage
                 if (data.cpu_usage !== undefined && data.cpu_usage !== null) {
                     const dynamicSpeed = 0.5 + (data.cpu_usage / 100.0) * 4.5;
                     globalSpeedMultiplier = dynamicSpeed;
-                    
+
                     const speedSelector = document.getElementById('animationSpeedSelector');
                     if (speedSelector) {
                         speedSelector.value = dynamicSpeed.toFixed(1);
@@ -1084,23 +1092,23 @@ MapApp.network.websocket = {
                         display.textContent = dynamicSpeed.toFixed(1) + 'x';
                     }
                 }
-                
+
                 if (data.last_avg_time !== undefined) node.deviceData.last_avg_time = data.last_avg_time;
                 if (data.last_ttl !== undefined) node.deviceData.last_ttl = data.last_ttl;
                 if (data.last_seen !== undefined) node.deviceData.last_seen = data.last_seen;
-                
+
                 let label = node.deviceData.name;
                 if (node.deviceData.show_live_ping && newStatus === 'online' && node.deviceData.last_avg_time !== null) {
                     label += `\n${node.deviceData.last_avg_time}ms | TTL:${node.deviceData.last_ttl || 'N/A'}`;
                 }
-                
+
                 const updatedProps = {
                     id: nodeId,
                     deviceData: node.deviceData,
                     title: MapApp.utils.buildNodeTitle(node.deviceData),
                     label: label
                 };
-                
+
                 if (node.shape === 'icon') {
                     updatedProps.icon = {
                         ...node.icon,
@@ -1118,9 +1126,9 @@ MapApp.network.websocket = {
                         border: style.borderColor
                     };
                 }
-                
+
                 MapApp.state.nodes.update(updatedProps);
-                
+
                 if (window.SoundManager && oldStatus !== newStatus) {
                     window.SoundManager.playForStatus(newStatus);
                 }
@@ -1133,15 +1141,15 @@ MapApp.network.websocket = {
 MapApp.network.timeline = {
     playInterval: null,
     isPlaying: false,
-    
-    init: function() {
+
+    init: function () {
         const slider = document.getElementById('timelineSlider');
         const playBtn = document.getElementById('timelinePlayBtn');
         const statusText = document.getElementById('timelineStatusText');
         const playIcon = document.getElementById('timelinePlayIcon');
-        
+
         if (!slider || !playBtn) return;
-        
+
         slider.addEventListener('input', () => {
             const val = parseInt(slider.value, 10);
             if (val === 24) {
@@ -1155,7 +1163,7 @@ MapApp.network.timeline = {
                 statusText.className = "text-amber-400 font-semibold bg-amber-950/40 border border-amber-800/30 px-2 py-0.5 rounded-full flex items-center gap-1.5";
             }
         });
-        
+
         slider.addEventListener('change', async () => {
             const val = parseInt(slider.value, 10);
             if (val === 24) {
@@ -1190,14 +1198,14 @@ MapApp.network.timeline = {
             } else {
                 Object.values(MapApp.state.pingIntervals).forEach(clearInterval);
                 MapApp.state.pingIntervals = {};
-                
+
                 const hoursAgo = 24 - val;
                 const currentMapId = MapApp.state.currentMapId;
                 if (currentMapId) {
                     try {
                         const res = await fetch(`api.php?action=get_historical_map_state&map_id=${currentMapId}&hours_ago=${hoursAgo}`);
                         const historicalStates = await res.json();
-                        
+
                         if (Array.isArray(historicalStates)) {
                             historicalStates.forEach(state => {
                                 const node = MapApp.state.nodes.get(state.id);
@@ -1210,7 +1218,7 @@ MapApp.network.timeline = {
                                         title: MapApp.utils.buildNodeTitle(updatedData),
                                         label: label
                                     };
-                                    
+
                                     if (node.shape === 'icon') {
                                         updatedProps.icon = {
                                             ...node.icon,
@@ -1228,7 +1236,7 @@ MapApp.network.timeline = {
                                             border: style.borderColor
                                         };
                                     }
-                                    
+
                                     MapApp.state.nodes.update(updatedProps);
                                 }
                             });
@@ -1239,7 +1247,7 @@ MapApp.network.timeline = {
                 }
             }
         });
-        
+
         playBtn.addEventListener('click', () => {
             if (this.isPlaying) {
                 this.stopPlay();
@@ -1248,25 +1256,25 @@ MapApp.network.timeline = {
             }
         });
     },
-    
-    startPlay: function() {
+
+    startPlay: function () {
         const playBtn = document.getElementById('timelinePlayBtn');
         const playIcon = document.getElementById('timelinePlayIcon');
         const slider = document.getElementById('timelineSlider');
-        
+
         if (!playBtn || !slider) return;
-        
+
         this.isPlaying = true;
         playIcon.className = 'fas fa-pause';
         playBtn.classList.remove('from-cyan-600', 'to-blue-600');
         playBtn.classList.add('from-amber-600', 'to-orange-600');
-        
+
         if (parseInt(slider.value, 10) === 24) {
             slider.value = 0;
             slider.dispatchEvent(new Event('input'));
             slider.dispatchEvent(new Event('change'));
         }
-        
+
         this.playInterval = setInterval(() => {
             let nextVal = parseInt(slider.value, 10) + 1;
             if (nextVal > 24) {
@@ -1277,25 +1285,25 @@ MapApp.network.timeline = {
             slider.dispatchEvent(new Event('change'));
         }, 1500);
     },
-    
-    stopPlay: function() {
+
+    stopPlay: function () {
         const playBtn = document.getElementById('timelinePlayBtn');
         const playIcon = document.getElementById('timelinePlayIcon');
-        
+
         if (!playBtn) return;
-        
+
         this.isPlaying = false;
         playIcon.className = 'fas fa-play';
         playBtn.classList.remove('from-amber-600', 'to-orange-600');
         playBtn.classList.add('from-cyan-600', 'to-blue-600');
-        
+
         if (this.playInterval) {
             clearInterval(this.playInterval);
             this.playInterval = null;
         }
     },
-    
-    reset: function() {
+
+    reset: function () {
         this.stopPlay();
         const slider = document.getElementById('timelineSlider');
         if (slider) {
