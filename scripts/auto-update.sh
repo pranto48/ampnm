@@ -47,6 +47,7 @@ if [ "${AMPNM_BACKUP_DB:-1}" = "1" ]; then
   "${COMPOSE[@]}" exec -T db sh -lc 'mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' > "$BACKUP_FILE" || {
     echo "Warning: database backup failed; continuing update" >&2
   }
+  "${COMPOSE[@]}" exec -T app php /var/www/html/scripts/backup_network_topology.php || true
 fi
 
 echo "Pulling latest images..."

@@ -134,7 +134,10 @@ MapApp.network = {
         MapApp.state.network = new vis.Network(container, data, options);
         MapApp.network.restoreSavedView();
 
-        // Unified master animation loop handles both animated edges and nodes efficiently via MapApp.ui.startCanvasAnimationLoop()
+        // Auto-start unified animation loop when network is initialized
+        if (MapApp.ui && typeof MapApp.ui.startCanvasAnimationLoop === 'function') {
+            MapApp.ui.startCanvasAnimationLoop();
+        }
 
         MapApp.state.network.on("afterDrawing", (ctx) => {
             if (!MapApp.state.network) return;
@@ -238,11 +241,26 @@ MapApp.network = {
             function getPointAlongEdge(edge, t) {
                 try {
                     if (edge.edgeType && typeof edge.edgeType.getPoint === 'function') {
-                        return edge.edgeType.getPoint(t);
-                    } else if (typeof edge.getPoint === 'function') {
-                        return edge.getPoint(t);
+                        const pt = edge.edgeType.getPoint(t);
+                        if (pt && typeof pt.x === 'number' && !isNaN(pt.x) && typeof pt.y === 'number' && !isNaN(pt.y)) {
+                            return pt;
+                        }
+                    }
+                    if (typeof edge.getPoint === 'function') {
+                        const pt = edge.getPoint(t);
+                        if (pt && typeof pt.x === 'number' && !isNaN(pt.x) && typeof pt.y === 'number' && !isNaN(pt.y)) {
+                            return pt;
+                        }
                     }
                 } catch (e) { }
+
+                // Fallback: direct linear interpolation between from and to nodes
+                if (edge.from && edge.to && typeof edge.from.x === 'number' && typeof edge.from.y === 'number' && typeof edge.to.x === 'number' && typeof edge.to.y === 'number') {
+                    return {
+                        x: edge.from.x + (edge.to.x - edge.from.x) * t,
+                        y: edge.from.y + (edge.to.y - edge.from.y) * t
+                    };
+                }
                 return null;
             }
 

@@ -449,16 +449,12 @@ MapApp.ui = {
                     n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
                 ) : false;
 
-                // Check if any edges exist on map to animate connections
                 const edgeCount = MapApp.state.edges ? (typeof MapApp.state.edges.get === 'function' ? MapApp.state.edges.get().length : (MapApp.state.edges.length || 0)) : 0;
-                const hasAnimatedEdges = speedMultiplier > 0 && edgeCount > 0;
+                const effSpeed = speedMultiplier > 0 ? speedMultiplier : 1.0;
+                MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.003 * effSpeed) % 1.0;
 
-                if (speedMultiplier > 0) {
-                    MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.003 * speedMultiplier) % 1.0;
-                }
-
-                // Redraw canvas if active animated elements or edges exist
-                if (hasAnimatedEdges || hasAnimatedNodes) {
+                // Redraw canvas if edges or active animated elements exist
+                if (edgeCount > 0 || hasAnimatedNodes) {
                     MapApp.state.network.redraw();
                 }
             }
