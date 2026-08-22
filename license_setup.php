@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="flex items-center justify-center gap-2">
                 <h1 class="text-3xl font-extrabold text-white">AMPNM License Setup</h1>
-                <span class="text-xs bg-blue-900/80 text-blue-300 font-bold px-2 py-0.5 rounded border border-blue-700/50">v1.16</span>
+                <span class="text-xs bg-blue-900/80 text-blue-300 font-bold px-2 py-0.5 rounded border border-blue-700/50">v1.19</span>
             </div>
             <p class="text-xs font-semibold tracking-wider text-slate-400 uppercase mt-1">by IT Support BD</p>
         </div>

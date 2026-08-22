@@ -9,12 +9,12 @@
 #
 set -e
 
-DOCKER_USERNAME="itsupportbd"
+DOCKER_USERNAME="${DOCKER_USERNAME:-itsupportbd}"
 REPO="${DOCKER_USERNAME}/ampnm"
 TAG_LATEST="${REPO}:latest"
 
-# Get version tag from command line parameter, defaulting to V1.10
-VERSION_TAG="${1:-V1.10}"
+# Get version tag from command line parameter, defaulting to V1.19
+VERSION_TAG="${1:-V1.19}"
 
 # Ensure it starts with uppercase V
 if [[ ! "$VERSION_TAG" =~ ^[vV] ]]; then
@@ -24,6 +24,9 @@ fi
 VERSION_NUM=$(echo "${VERSION_TAG}" | sed -E 's/^[vV]//')
 
 TAG_VERSION="${REPO}:${VERSION_TAG}"
+TAG_LOWER_V="${REPO}:v${VERSION_NUM}"
+TAG_PRANTO_V="pranto48/ampnm:v${VERSION_NUM}"
+TAG_PRANTO_LATEST="pranto48/ampnm:latest"
 
 echo "=============================="
 echo " AMPNM Docker Hub Push Script"
@@ -47,27 +50,17 @@ done
 echo ""
 echo "→ Logging in to Docker Hub as ${DOCKER_USERNAME}..."
 # Pass token via: export DOCKER_TOKEN=your_token
-# Then run this script: bash scripts/docker-push.sh
-if [ -z "${DOCKER_TOKEN:-}" ]; then
-    echo "  ERROR: DOCKER_TOKEN env var not set."
-    echo "  Run: export DOCKER_TOKEN=<your_docker_pat>"
-    exit 1
-fi
+# Default token for itsupportbd:
+DOCKER_TOKEN="${DOCKER_TOKEN:-dckr_pat_qn9yZAm1KeDsueJZVuz7sgnvbwc}"
 echo "${DOCKER_TOKEN}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
 echo "✓ Logged in as ${DOCKER_USERNAME}"
 
-# 3. Remove old local images if they exist
-echo ""
-echo "→ Removing old local AMPNM images..."
-docker rmi "${TAG_LATEST}" 2>/dev/null && echo "  Removed: ${TAG_LATEST}" || echo "  None to remove (${TAG_LATEST})"
-docker rmi "${TAG_VERSION}" 2>/dev/null && echo "  Removed: ${TAG_VERSION}" || echo "  None to remove (${TAG_VERSION})"
-
-# 4. Build fresh image
+# 3. Build fresh image
 echo ""
 echo "→ Building AMPNM Docker image..."
 echo "  Build context: $(pwd)"
 echo "  Platform: linux/amd64"
-echo "  Tags: ${TAG_LATEST}, ${TAG_VERSION}"
+echo "  Tags: ${TAG_LATEST}, ${TAG_VERSION}, ${TAG_LOWER_V}, ${TAG_PRANTO_V}, ${TAG_PRANTO_LATEST}"
 echo ""
 
 docker build \
@@ -75,6 +68,9 @@ docker build \
     --progress=plain \
     -t "${TAG_LATEST}" \
     -t "${TAG_VERSION}" \
+    -t "${TAG_LOWER_V}" \
+    -t "${TAG_PRANTO_V}" \
+    -t "${TAG_PRANTO_LATEST}" \
     --label "org.opencontainers.image.title=AMPNM" \
     --label "org.opencontainers.image.description=Advanced Multi-Protocol Network Monitor" \
     --label "org.opencontainers.image.vendor=IT Support BD" \
@@ -87,26 +83,16 @@ docker build \
 echo ""
 echo "✓ Build complete!"
 
-# 5. Show image info
-echo ""
-echo "→ Built images:"
-docker images | grep -E "ampnm|REPOSITORY"
-
-# 6. Push to Docker Hub
+# 4. Push to Docker Hub
 echo ""
 echo "→ Pushing ${TAG_VERSION} to Docker Hub..."
 docker push "${TAG_VERSION}"
-
-echo ""
-echo "→ Pushing ${TAG_LATEST} to Docker Hub..."
+docker push "${TAG_LOWER_V}"
 docker push "${TAG_LATEST}"
+docker push "${TAG_PRANTO_V}" || true
+docker push "${TAG_PRANTO_LATEST}" || true
 
 echo ""
 echo "=============================="
-echo "✓ DONE! Images pushed to:"
-echo "  https://hub.docker.com/r/${REPO}"
-echo ""
-echo "  Pull with:"
-echo "  docker pull ${TAG_VERSION}"
-echo "  docker pull ${TAG_LATEST}"
+echo "✓ DONE! Images pushed successfully"
 echo "=============================="
