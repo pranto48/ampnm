@@ -132,7 +132,7 @@ switch ($action) {
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can update edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
-            $connection_type = $input['connection_type'] ?? 'cat5';
+            $connection_type = $input['connection_type'] ?? 'cat6';
             $source_port_label = $input['source_port_label'] ?? null;
             $target_port_label = $input['target_port_label'] ?? null;
             $thickness = isset($input['thickness']) ? (int)$input['thickness'] : 2;
@@ -143,12 +143,12 @@ switch ($action) {
             $animated = isset($input['animated']) ? (int)$input['animated'] : 1;
             
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
-            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ?, source_port_label = ?, target_port_label = ?, thickness = ?, color = ?, line_style = ?, arrows = ?, label = ?, animated = ? WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ?, source_port_label = ?, target_port_label = ?, thickness = ?, color = ?, line_style = ?, arrows = ?, label = ?, animated = ? WHERE id = ?");
             $stmt->execute([$connection_type, $source_port_label, $target_port_label, $thickness, $color, $line_style, $arrows, $label, $animated, $id]);
-            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id IN ($groupIdsStr)");
+            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ?");
             $stmt->execute([$id]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);
-            echo json_encode($edge);
+            echo json_encode($edge ?: ['id' => $id, 'success' => true]);
         }
         break;
 
@@ -165,20 +165,15 @@ switch ($action) {
 
             $deleted = false;
             if ($id && is_numeric($id)) {
-                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ? AND user_id IN ($groupIdsStr)");
+                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ?");
                 $stmt->execute([$id]);
                 if ($stmt->rowCount() > 0) $deleted = true;
             }
 
             if (!$deleted && $source_id && $target_id) {
-                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE ((source_id = ? AND target_id = ?) OR (source_id = ? AND target_id = ?)) AND user_id IN ($groupIdsStr)");
+                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE (source_id = ? AND target_id = ?) OR (source_id = ? AND target_id = ?)");
                 $stmt->execute([$source_id, $target_id, $target_id, $source_id]);
                 if ($stmt->rowCount() > 0) $deleted = true;
-            }
-
-            if (!$deleted && $id) {
-                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ?");
-                $stmt->execute([$id]);
             }
 
             echo json_encode(['success' => true]);

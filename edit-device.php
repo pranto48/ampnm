@@ -35,9 +35,23 @@ if (!$device_id) {
     exit;
 }
 
+// Retrieve all users in the same user group
+$current_user_group = $_SESSION['user_group'] ?? 'default_group';
+$stmtGroup = $pdo->prepare("SELECT id FROM users WHERE user_group = ?");
+$stmtGroup->execute([$current_user_group]);
+$current_group_user_ids = $stmtGroup->fetchAll(PDO::FETCH_COLUMN) ?: [$current_user_id];
+$groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
+
+$user_role = $_SESSION['user_role'] ?? 'viewer';
+
 // Fetch existing device data
-$stmt_device = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?");
-$stmt_device->execute([$device_id, $current_user_id]);
+if ($user_role === 'admin') {
+    $stmt_device = $pdo->prepare("SELECT * FROM devices WHERE id = ?");
+    $stmt_device->execute([$device_id]);
+} else {
+    $stmt_device = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id IN ($groupIdsStr)");
+    $stmt_device->execute([$device_id]);
+}
 $device = $stmt_device->fetch(PDO::FETCH_ASSOC);
 
 $host_metric_id = null;
@@ -49,14 +63,16 @@ if ($device) {
 
 if (!$device) {
     $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Device not found or you do not have permission to edit it.</div>';
-    // Optionally redirect back to devices list if device not found
-    // header('Location: devices.php?message=' . urlencode($message));
-    // exit;
 }
 
 // Fetch all maps for the dropdown
-$stmt_maps = $pdo->prepare("SELECT id, name FROM maps WHERE user_id = ? ORDER BY name ASC");
-$stmt_maps->execute([$current_user_id]);
+if ($user_role === 'admin') {
+    $stmt_maps = $pdo->prepare("SELECT id, name FROM maps ORDER BY name ASC");
+    $stmt_maps->execute();
+} else {
+    $stmt_maps = $pdo->prepare("SELECT id, name FROM maps WHERE user_id IN ($groupIdsStr) ORDER BY name ASC");
+    $stmt_maps->execute();
+}
 $maps = $stmt_maps->fetchAll(PDO::FETCH_ASSOC);
 
 // Handle form submission for updates
@@ -137,32 +153,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $fields .= ", updated_at = CURRENT_TIMESTAMP";
                 $values[] = $device_id;
-                $values[] = $current_user_id;
-                $sql = "UPDATE devices SET $fields WHERE id = ? AND user_id = ?";
+                if ($user_role === 'admin') {
+                    $sql = "UPDATE devices SET $fields WHERE id = ?";
+                } else {
+                    $sql = "UPDATE devices SET $fields WHERE id = ? AND user_id IN ($groupIdsStr)";
+                }
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($values);
             } else {
-                $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, name_text_color = ?, name_text_bold = ?, name_text_italic = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
-                    $monitor_method, $type, empty($description) ? null : $description,
-                    empty($map_id) ? null : $map_id,
-                    empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
-                    $name_text_color, $name_text_bold, $name_text_italic,
-                    empty($icon_url) ? null : $icon_url,
-                    empty($warning_latency_threshold) ? null : $warning_latency_threshold,
-                    empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                    empty($critical_latency_threshold) ? null : $critical_latency_threshold,
-                    empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
-                    $show_live_ping, $device_id, $current_user_id
-                ]);
+                if ($user_role === 'admin') {
+                    $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, name_text_color = ?, name_text_bold = ?, name_text_italic = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                        $monitor_method, $type, empty($description) ? null : $description,
+                        empty($map_id) ? null : $map_id,
+                        empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                        $name_text_color, $name_text_bold, $name_text_italic,
+                        empty($icon_url) ? null : $icon_url,
+                        empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                        empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                        empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                        empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                        $show_live_ping, $device_id
+                    ]);
+                } else {
+                    $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, name_text_color = ?, name_text_bold = ?, name_text_italic = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id IN ($groupIdsStr)";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
+                        $monitor_method, $type, empty($description) ? null : $description,
+                        empty($map_id) ? null : $map_id,
+                        empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                        $name_text_color, $name_text_bold, $name_text_italic,
+                        empty($icon_url) ? null : $icon_url,
+                        empty($warning_latency_threshold) ? null : $warning_latency_threshold,
+                        empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
+                        empty($critical_latency_threshold) ? null : $critical_latency_threshold,
+                        empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                        $show_live_ping, $device_id
+                    ]);
+                }
                 $schemaWarning = '<div class="bg-amber-500/20 border border-amber-500/30 text-amber-200 text-sm rounded-lg p-3 text-center mb-3">'
                     . '<strong>Database update needed:</strong> Run database setup to add missing columns.'
                     . '</div>';
             }
-            $message = $schemaWarning . '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">Device "' . htmlspecialchars($name) . '" updated successfully!</div>';
-            $stmt_device->execute([$device_id, $current_user_id]);
+            $returnBtn = '';
+            if (isset($_GET['return']) && $_GET['return'] === 'map' && !empty($map_id)) {
+                $returnBtn = ' <a href="map.php?map_id=' . urlencode($map_id) . '" class="underline font-bold ml-2">Back to Map &rarr;</a>';
+            }
+            $message = $schemaWarning . '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">Device "' . htmlspecialchars($name) . '" updated successfully!' . $returnBtn . '</div>';
+            $stmt_device->execute($user_role === 'admin' ? [$device_id] : [$device_id]);
             $device = $stmt_device->fetch(PDO::FETCH_ASSOC);
         }
         } catch (PDOException $e) {

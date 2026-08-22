@@ -414,9 +414,15 @@ function initMap() {
                     }
                 }
 
-                const existingEdge = state.edges.get(id);
-                const srcDevice = state.nodes.get(existingEdge?.from)?.deviceData || null;
-                const tgtDevice = state.nodes.get(existingEdge?.to)?.deviceData || null;
+                let existingEdge = state.edges.get(id);
+                if (!existingEdge && !isNaN(id)) existingEdge = state.edges.get(Number(id));
+                if (!existingEdge && typeof id === 'number') existingEdge = state.edges.get(String(id));
+
+                const edgeIdToUpdate = existingEdge ? existingEdge.id : id;
+                const srcId = existingEdge?.from;
+                const tgtId = existingEdge?.to;
+                const srcDevice = (srcId ? state.nodes.get(srcId) : null)?.deviceData || (srcId && !isNaN(srcId) ? state.nodes.get(Number(srcId)) : null)?.deviceData || null;
+                const tgtDevice = (tgtId ? state.nodes.get(tgtId) : null)?.deviceData || (tgtId && !isNaN(tgtId) ? state.nodes.get(Number(tgtId)) : null)?.deviceData || null;
                 
                 const edgeTitle = MapApp.utils.buildEdgeTitle({
                     ...(existingEdge || {}),
@@ -445,7 +451,7 @@ function initMap() {
                 else if (arrowsVal === 'both') visArrows = { to: { enabled: true }, from: { enabled: true } };
 
                 state.edges.update({ 
-                    id, 
+                    id: edgeIdToUpdate, 
                     connection_type, 
                     source_port_label, 
                     target_port_label, 

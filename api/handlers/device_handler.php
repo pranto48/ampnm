@@ -1003,20 +1003,37 @@ switch ($action) {
             }
             if (empty($fields)) { http_response_code(400); echo json_encode(['error' => 'No valid fields to update']); exit; }
             
-            $updateSql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id IN ($groupIdsStr)";
-            $updateParams = $params;
-            $updateParams[] = $id;
+            if ($user_role === 'admin') {
+                $updateSql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+                $updateParams = $params;
+                $updateParams[] = $id;
 
-            $stmt = $pdo->prepare($updateSql); 
-            $stmt->execute($updateParams);
+                $stmt = $pdo->prepare($updateSql); 
+                $stmt->execute($updateParams);
 
-            // Re-fetch the device to return the updated data
-            $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id IN ($groupIdsStr)";
-            $fetchParams = [$id];
-            $stmt = $pdo->prepare($fetchSql); 
-            $stmt->execute($fetchParams);
-            $device = $stmt->fetch(PDO::FETCH_ASSOC); 
-            echo json_encode($device);
+                // Re-fetch the device to return the updated data
+                $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ?";
+                $fetchParams = [$id];
+                $stmt = $pdo->prepare($fetchSql); 
+                $stmt->execute($fetchParams);
+                $device = $stmt->fetch(PDO::FETCH_ASSOC); 
+                echo json_encode($device);
+            } else {
+                $updateSql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id IN ($groupIdsStr)";
+                $updateParams = $params;
+                $updateParams[] = $id;
+
+                $stmt = $pdo->prepare($updateSql); 
+                $stmt->execute($updateParams);
+
+                // Re-fetch the device to return the updated data
+                $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id IN ($groupIdsStr)";
+                $fetchParams = [$id];
+                $stmt = $pdo->prepare($fetchSql); 
+                $stmt->execute($fetchParams);
+                $device = $stmt->fetch(PDO::FETCH_ASSOC); 
+                echo json_encode($device);
+            }
         }
         break;
 
