@@ -65,7 +65,6 @@ echo ""
 
 docker build \
     --platform linux/amd64 \
-    --progress=plain \
     -t "${TAG_LATEST}" \
     -t "${TAG_VERSION}" \
     -t "${TAG_LOWER_V}" \
