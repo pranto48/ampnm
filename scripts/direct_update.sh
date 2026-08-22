@@ -33,7 +33,7 @@ fail(){ write_result STATUS failed; write_result ERROR "$1"; write_result LOG_FI
 
 [ -d "$TARGET_DIR" ] || fail "Target directory does not exist: $TARGET_DIR"
 mkdir -p "$BACKUP_DIR"
-rsync -a --delete --exclude='data' --exclude='storage' --exclude='logs' "$TARGET_DIR/" "$BACKUP_DIR/code/" || true
+rsync -a --delete --exclude='.env' --exclude='.git' --exclude='data' --exclude='storage' --exclude='logs' "$TARGET_DIR/" "$BACKUP_DIR/code/" || true
 write_result BACKUP_PATH "$BACKUP_DIR"
 
 TMP_DIR="$(mktemp -d)"
@@ -46,11 +46,13 @@ EXTRACTED_ROOT="$(find "$TMP_DIR" -maxdepth 1 -type d -name 'ampnm-*' | head -n1
 SOURCE_DIR="$EXTRACTED_ROOT/$SUBDIR_PATH"
 [ -d "$SOURCE_DIR" ] || fail "Could not find source subdir: $SOURCE_DIR"
 
-rsync -a --delete --exclude='data' --exclude='storage' --exclude='logs' "$SOURCE_DIR/" "$TARGET_DIR/"
+rsync -a --delete --exclude='.env' --exclude='.git' --exclude='data' --exclude='storage' --exclude='logs' "$SOURCE_DIR/" "$TARGET_DIR/"
 
 cd "$TARGET_DIR"
-if [ -f docker-compose.yml ] || [ -f compose.yml ]; then
-  if docker compose version >/dev/null 2>&1; then docker compose restart; else docker-compose restart; fi
+if command -v docker >/dev/null 2>&1 && [ -S /var/run/docker.sock ]; then
+  if [ -f docker-compose.yml ] || [ -f compose.yml ]; then
+    (docker compose restart || docker-compose restart || true) 2>/dev/null || true
+  fi
 fi
 
 write_result STATUS success
