@@ -450,11 +450,12 @@ MapApp.ui = {
                 ) : false;
 
                 const edgeCount = MapApp.state.edges ? (typeof MapApp.state.edges.get === 'function' ? MapApp.state.edges.get().length : (MapApp.state.edges.length || 0)) : 0;
+                const hasBodyEdges = MapApp.state.network?.body?.edges ? Object.keys(MapApp.state.network.body.edges).length > 0 : false;
                 const effSpeed = speedMultiplier > 0 ? speedMultiplier : 1.0;
                 MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.003 * effSpeed) % 1.0;
 
                 // Redraw canvas if edges or active animated elements exist
-                if (edgeCount > 0 || hasAnimatedNodes) {
+                if (edgeCount > 0 || hasBodyEdges || hasAnimatedNodes) {
                     MapApp.state.network.redraw();
                 }
             }

@@ -205,7 +205,30 @@ MapApp.network = {
                 });
             }
 
-            const edges = MapApp.state.network.body.edges;
+            // Get all edges from both vis.DataSet and vis.Network body
+            const datasetEdges = (MapApp.state && MapApp.state.edges && typeof MapApp.state.edges.get === 'function') ? MapApp.state.edges.get() : [];
+            const bodyEdges = MapApp.state.network.body?.edges || {};
+
+            // Build a unified list of edges to render
+            const edgesToRender = [];
+            const processedEdgeIds = new Set();
+
+            // First add edges from body
+            for (const edgeId in bodyEdges) {
+                const bEdge = bodyEdges[edgeId];
+                if (bEdge) {
+                    edgesToRender.push({ id: edgeId, bodyEdge: bEdge, rawEdge: (MapApp.state.edges && typeof MapApp.state.edges.get === 'function') ? MapApp.state.edges.get(edgeId) : null });
+                    processedEdgeIds.add(String(edgeId));
+                }
+            }
+
+            // Also add any dataset edges that might not be in bodyEdges yet
+            datasetEdges.forEach(dEdge => {
+                if (dEdge && dEdge.id && !processedEdgeIds.has(String(dEdge.id))) {
+                    edgesToRender.push({ id: String(dEdge.id), bodyEdge: null, rawEdge: dEdge });
+                    processedEdgeIds.add(String(dEdge.id));
+                }
+            });
 
             // Build a lookup map of node statuses
             const deviceStatuses = {};
@@ -238,15 +261,15 @@ MapApp.network = {
 
             ctx.save();
 
-            function getPointAlongEdge(edge, t) {
+            function getPointAlongEdge(edge, t, fx, fy, tx, ty) {
                 try {
-                    if (edge.edgeType && typeof edge.edgeType.getPoint === 'function') {
+                    if (edge && edge.edgeType && typeof edge.edgeType.getPoint === 'function') {
                         const pt = edge.edgeType.getPoint(t);
                         if (pt && typeof pt.x === 'number' && !isNaN(pt.x) && typeof pt.y === 'number' && !isNaN(pt.y)) {
                             return pt;
                         }
                     }
-                    if (typeof edge.getPoint === 'function') {
+                    if (edge && typeof edge.getPoint === 'function') {
                         const pt = edge.getPoint(t);
                         if (pt && typeof pt.x === 'number' && !isNaN(pt.x) && typeof pt.y === 'number' && !isNaN(pt.y)) {
                             return pt;
@@ -255,39 +278,68 @@ MapApp.network = {
                 } catch (e) { }
 
                 // Fallback: direct linear interpolation between from and to nodes
-                if (edge.from && edge.to && typeof edge.from.x === 'number' && typeof edge.from.y === 'number' && typeof edge.to.x === 'number' && typeof edge.to.y === 'number') {
+                if (typeof fx === 'number' && typeof fy === 'number' && typeof tx === 'number' && typeof ty === 'number') {
                     return {
-                        x: edge.from.x + (edge.to.x - edge.from.x) * t,
-                        y: edge.from.y + (edge.to.y - edge.from.y) * t
+                        x: fx + (tx - fx) * t,
+                        y: fy + (ty - fy) * t
                     };
                 }
                 return null;
             }
 
-            for (const edgeId in edges) {
-                const edge = edges[edgeId];
-                if (!edge.from || !edge.to) continue;
+            for (const item of edgesToRender) {
+                const bodyEdge = item.bodyEdge;
+                const rawEdge = item.rawEdge;
 
                 // Ensure invisible or hidden edges are ignored
-                if (edge.options?.hidden === true || edge.hidden === true) continue;
-                if (edge.from?.options?.hidden === true || edge.to?.options?.hidden === true) continue;
+                if (bodyEdge?.options?.hidden === true || bodyEdge?.hidden === true || rawEdge?.hidden === true) continue;
+                if (bodyEdge?.from?.options?.hidden === true || bodyEdge?.to?.options?.hidden === true) continue;
 
-                const fromId = edge.from ? (edge.from.id !== undefined ? String(edge.from.id) : String(edge.from)) : '';
-                const toId = edge.to ? (edge.to.id !== undefined ? String(edge.to.id) : String(edge.to)) : '';
+                const fromId = String(rawEdge?.from || bodyEdge?.from?.id || bodyEdge?.from || '');
+                const toId = String(rawEdge?.to || bodyEdge?.to?.id || bodyEdge?.to || '');
+                if (!fromId || !toId) continue;
+
+                // Robust coordinate extraction
+                let fx = bodyEdge?.from?.x;
+                let fy = bodyEdge?.from?.y;
+                let tx = bodyEdge?.to?.x;
+                let ty = bodyEdge?.to?.y;
+
+                if (typeof fx !== 'number' || typeof fy !== 'number') {
+                    const pos = MapApp.state.network.getPositions([fromId])[fromId];
+                    if (pos) { fx = pos.x; fy = pos.y; }
+                }
+                if (typeof tx !== 'number' || typeof ty !== 'number') {
+                    const pos = MapApp.state.network.getPositions([toId])[toId];
+                    if (pos) { tx = pos.x; ty = pos.y; }
+                }
+                if (typeof fx !== 'number' || typeof fy !== 'number') {
+                    const rawNode = MapApp.state.nodes ? MapApp.state.nodes.get(fromId) : null;
+                    if (rawNode && typeof rawNode.x === 'number') { fx = rawNode.x; fy = rawNode.y; }
+                }
+                if (typeof tx !== 'number' || typeof ty !== 'number') {
+                    const rawNode = MapApp.state.nodes ? MapApp.state.nodes.get(toId) : null;
+                    if (rawNode && typeof rawNode.x === 'number') { tx = rawNode.x; ty = rawNode.y; }
+                }
+
+                if (typeof fx !== 'number' || typeof fy !== 'number' || typeof tx !== 'number' || typeof ty !== 'number') {
+                    continue;
+                }
 
                 const sourceStatus = deviceStatuses[fromId] || 'online';
                 const targetStatus = deviceStatuses[toId] || 'online';
-
-                const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
-                if (isOffline) continue;
+                const isOffline = (sourceStatus === 'offline' || targetStatus === 'offline');
 
                 // Check if animation is disabled for this specific edge
-                const rawEdge = (MapApp.state && MapApp.state.edges && typeof MapApp.state.edges.get === 'function') ? MapApp.state.edges.get(edgeId) : null;
-                const isEdgeAnimated = rawEdge && rawEdge.custom_animated !== undefined ? (rawEdge.custom_animated == 1 || rawEdge.custom_animated === true || rawEdge.custom_animated === '1') : true;
+                const isEdgeAnimated = rawEdge && rawEdge.custom_animated !== undefined 
+                    ? (rawEdge.custom_animated == 1 || rawEdge.custom_animated === true || rawEdge.custom_animated === '1') 
+                    : true;
 
-                // Bandwidth Utilization Dynamic Link Color (v1.19 Feature)
-                let edgeColor = (typeof edge.options?.color === 'string' ? edge.options.color : edge.options?.color?.color) || rawEdge?.custom_color || '#00F2FE';
-                if (displaySettings.connection_enable_bandwidth_glow !== false) {
+                // Edge Color resolution
+                let edgeColor = (typeof bodyEdge?.options?.color === 'string' ? bodyEdge.options.color : bodyEdge?.options?.color?.color) || rawEdge?.custom_color || rawEdge?.color || '#00F2FE';
+                if (isOffline) {
+                    edgeColor = '#ef4444'; // Slower / diagnostic red alert pulse on offline links
+                } else if (displaySettings.connection_enable_bandwidth_glow !== false) {
                     const util = rawEdge && rawEdge.utilization_percent !== undefined ? parseFloat(rawEdge.utilization_percent) : 0;
                     if (util >= 80) {
                         edgeColor = '#ef4444'; // Red - Overload Alert
@@ -299,7 +351,7 @@ MapApp.network = {
                 }
 
                 // 🌟 LAYER 1: NEON LASER LINE GLOW OVERLAY
-                if (glowMode !== 'off' && edge.from && edge.to) {
+                if (glowMode !== 'off') {
                     let glowBlur = baseGlowRadius;
                     if (glowMode === 'cyber-pulse') {
                         glowBlur = baseGlowRadius * (0.6 + 0.4 * Math.sin(globalProgress * Math.PI * 2));
@@ -309,19 +361,14 @@ MapApp.network = {
                         glowBlur = Math.max(4, baseGlowRadius * 0.6);
                     }
 
-                    const fx = edge.from.x, fy = edge.from.y;
-                    const tx = edge.to.x, ty = edge.to.y;
-
-                    if (fx !== undefined && fy !== undefined && tx !== undefined && ty !== undefined) {
-                        ctx.beginPath();
-                        ctx.moveTo(fx, fy);
-                        ctx.lineTo(tx, ty);
-                        ctx.strokeStyle = edgeColor;
-                        ctx.shadowColor = edgeColor;
-                        ctx.shadowBlur = glowBlur;
-                        ctx.lineWidth = Math.max(1, (edge.options?.width || 2) * 0.8);
-                        ctx.stroke();
-                    }
+                    ctx.beginPath();
+                    ctx.moveTo(fx, fy);
+                    ctx.lineTo(tx, ty);
+                    ctx.strokeStyle = edgeColor;
+                    ctx.shadowColor = edgeColor;
+                    ctx.shadowBlur = glowBlur;
+                    ctx.lineWidth = Math.max(1, (bodyEdge?.options?.width || rawEdge?.width || 2) * 0.8);
+                    ctx.stroke();
                 }
 
                 // 🌟 LAYER 2: ANIMATED CYBER PACKETS / PULSES
@@ -333,7 +380,7 @@ MapApp.network = {
                     // Draw flowing quantum cyber packets
                     for (let i = 0; i < 4; i++) {
                         const t = (globalProgress + i / 4) % 1.0;
-                        const pt = getPointAlongEdge(edge, t);
+                        const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
                         if (pt) {
                             // Outer Neon Glow
                             ctx.beginPath();
@@ -356,7 +403,7 @@ MapApp.network = {
                     // High-density stream
                     for (let i = 0; i < 10; i++) {
                         const t = (globalProgress + i / 10) % 1.0;
-                        const pt = getPointAlongEdge(edge, t);
+                        const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
                         if (pt) {
                             ctx.beginPath();
                             ctx.arc(pt.x, pt.y, 3, 0, 2 * Math.PI);
@@ -368,7 +415,7 @@ MapApp.network = {
                     }
                 } else if (effectiveStyle === 'pulse') {
                     // Single sweep pulse orb
-                    const pt = getPointAlongEdge(edge, globalProgress);
+                    const pt = getPointAlongEdge(bodyEdge, globalProgress, fx, fy, tx, ty);
                     if (pt) {
                         ctx.beginPath();
                         ctx.arc(pt.x, pt.y, 7, 0, 2 * Math.PI);
@@ -386,9 +433,9 @@ MapApp.network = {
                     // Sinusoidal wave flow
                     for (let i = 0; i < 6; i++) {
                         const t = (globalProgress + i / 6) % 1.0;
-                        const pt = getPointAlongEdge(edge, t);
-                        if (pt && edge.to && edge.from) {
-                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI / 2;
+                        const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
+                        if (pt) {
+                            const angle = Math.atan2(ty - fy, tx - fx) + Math.PI / 2;
                             const waveOffset = Math.sin(t * Math.PI * 4) * 6;
                             const wx = pt.x + Math.cos(angle) * waveOffset;
                             const wy = pt.y + Math.sin(angle) * waveOffset;
@@ -405,7 +452,7 @@ MapApp.network = {
                     // Morse code telemetry
                     for (let i = 0; i < 5; i++) {
                         const t = (globalProgress + i / 5) % 1.0;
-                        const pt = getPointAlongEdge(edge, t);
+                        const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
                         if (pt) {
                             ctx.fillStyle = edgeColor;
                             ctx.shadowColor = edgeColor;
@@ -423,9 +470,9 @@ MapApp.network = {
                     // Zipper interlocking style
                     for (let i = 0; i < 8; i++) {
                         const t = (globalProgress + i / 8) % 1.0;
-                        const pt = getPointAlongEdge(edge, t);
-                        if (pt && edge.to && edge.from) {
-                            const angle = Math.atan2(edge.to.y - edge.from.y, edge.to.x - edge.from.x) + Math.PI / 2;
+                        const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
+                        if (pt) {
+                            const angle = Math.atan2(ty - fy, tx - fx) + Math.PI / 2;
                             const offsetSign = i % 2 === 0 ? 1 : -1;
                             const zx = pt.x + Math.cos(angle) * offsetSign * 3.5;
                             const zy = pt.y + Math.sin(angle) * offsetSign * 3.5;
@@ -443,7 +490,7 @@ MapApp.network = {
                     for (let i = 0; i < 3; i++) {
                         const offset = i / 3;
                         const t = (globalProgress + offset) % 1.0;
-                        const pt = getPointAlongEdge(edge, t);
+                        const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
                         if (pt) {
                             ctx.beginPath();
                             ctx.arc(pt.x, pt.y, 5, 0, 2 * Math.PI);

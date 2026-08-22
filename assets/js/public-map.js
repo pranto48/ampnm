@@ -542,6 +542,60 @@ function renderMap({ map, devices, edges }) {
                     child.remove();
                 }
             });
+
+            // Draw Edge Neon Laser Glow & Flowing Animated Cyber Packets
+            const ctx = visNetwork.canvas.getContext();
+            if (ctx && visEdgesDataset) {
+                ctx.save();
+                const edges = visEdgesDataset.get();
+                const progress = ((Date.now() % 3000) / 3000);
+
+                edges.forEach(edge => {
+                    const fromId = String(edge.from);
+                    const toId = String(edge.to);
+                    const positions = visNetwork.getPositions([fromId, toId]);
+                    const fromPos = positions[fromId];
+                    const toPos = positions[toId];
+
+                    if (!fromPos || !toPos) return;
+
+                    const fx = fromPos.x;
+                    const fy = fromPos.y;
+                    const tx = toPos.x;
+                    const ty = toPos.y;
+                    const edgeColor = edge.custom_color || (typeof edge.color === 'string' ? edge.color : edge.color?.color) || '#00F2FE';
+
+                    // Layer 1: Neon Glow
+                    ctx.beginPath();
+                    ctx.moveTo(fx, fy);
+                    ctx.lineTo(tx, ty);
+                    ctx.strokeStyle = edgeColor;
+                    ctx.shadowColor = edgeColor;
+                    ctx.shadowBlur = 10;
+                    ctx.lineWidth = Math.max(1, (edge.width || 2) * 0.8);
+                    ctx.stroke();
+
+                    // Layer 2: Moving Cyber Packets
+                    for (let i = 0; i < 4; i++) {
+                        const t = (progress + i / 4) % 1.0;
+                        const px = fx + (tx - fx) * t;
+                        const py = fy + (ty - fy) * t;
+
+                        ctx.beginPath();
+                        ctx.arc(px, py, 4, 0, 2 * Math.PI);
+                        ctx.fillStyle = edgeColor;
+                        ctx.shadowColor = edgeColor;
+                        ctx.shadowBlur = 12;
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(px, py, 1.8, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fill();
+                    }
+                });
+                ctx.restore();
+            }
         });
     }
 }
