@@ -1706,6 +1706,131 @@ switch ($action) {
 
         echo json_encode(['success' => true, 'message' => 'Command execution result recorded']);
         break;
+
+    case 'create_ssl_monitor':
+        require_once __DIR__ . '/../../includes/ssl_checker.php';
+        $domain = trim($input['domain'] ?? $_POST['domain'] ?? '');
+        $port = (int)($input['port'] ?? $_POST['port'] ?? 443);
+        if ($port <= 0 || $port > 65535) $port = 443;
+
+        if (empty($domain)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Domain is required']);
+            exit;
+        }
+
+        // Check if already monitored
+        $stmtCheck = $pdo->prepare("SELECT id FROM domain_ssl_monitors WHERE user_id = ? AND domain = ? AND port = ?");
+        $stmtCheck->execute([$current_user_id, $domain, $port]);
+        if ($stmtCheck->fetch()) {
+            http_response_code(400);
+            echo json_encode(['error' => 'This domain and port is already monitored']);
+            exit;
+        }
+
+        // Perform initial certificate check
+        $res = SSLChecker::checkCertificate($domain, $port);
+
+        $stmt = $pdo->prepare("INSERT INTO domain_ssl_monitors (user_id, domain, port, common_name, issuer, valid_from, valid_to, days_remaining, status, last_checked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([
+            $current_user_id,
+            $domain,
+            $port,
+            $res['common_name'] ?? null,
+            $res['issuer'] ?? null,
+            $res['valid_from'] ?? null,
+            $res['valid_to'] ?? null,
+            $res['days_remaining'] ?? null,
+            $res['status'] ?? 'pending'
+        ]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'SSL monitor added successfully',
+            'id' => (int)$pdo->lastInsertId(),
+            'certificate' => $res
+        ]);
+        break;
+
+    case 'check_ssl_monitor':
+        require_once __DIR__ . '/../../includes/ssl_checker.php';
+        $id = (int)($input['id'] ?? $_POST['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Monitor ID required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM domain_ssl_monitors WHERE id = ? AND user_id = ?");
+        $stmt->execute([$id, $current_user_id]);
+        $mon = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$mon) {
+            http_response_code(404);
+            echo json_encode(['error' => 'SSL monitor not found']);
+            exit;
+        }
+
+        $res = SSLChecker::checkCertificate($mon['domain'], (int)$mon['port']);
+
+        $stmtUp = $pdo->prepare("UPDATE domain_ssl_monitors SET common_name = ?, issuer = ?, valid_from = ?, valid_to = ?, days_remaining = ?, status = ?, last_checked_at = NOW() WHERE id = ?");
+        $stmtUp->execute([
+            $res['common_name'] ?? null,
+            $res['issuer'] ?? null,
+            $res['valid_from'] ?? null,
+            $res['valid_to'] ?? null,
+            $res['days_remaining'] ?? null,
+            $res['status'] ?? 'pending',
+            $id
+        ]);
+
+        echo json_encode(['success' => true, 'certificate' => $res]);
+        break;
+
+    case 'check_all_ssl_monitors':
+        require_once __DIR__ . '/../../includes/ssl_checker.php';
+        $stmt = $pdo->prepare("SELECT id, domain, port FROM domain_ssl_monitors WHERE user_id = ?");
+        $stmt->execute([$current_user_id]);
+        $monitors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtUp = $pdo->prepare("UPDATE domain_ssl_monitors SET common_name = ?, issuer = ?, valid_from = ?, valid_to = ?, days_remaining = ?, status = ?, last_checked_at = NOW() WHERE id = ?");
+
+        foreach ($monitors as $m) {
+            $res = SSLChecker::checkCertificate($m['domain'], (int)$m['port']);
+            $stmtUp->execute([
+                $res['common_name'] ?? null,
+                $res['issuer'] ?? null,
+                $res['valid_from'] ?? null,
+                $res['valid_to'] ?? null,
+                $res['days_remaining'] ?? null,
+                $res['status'] ?? 'pending',
+                $m['id']
+            ]);
+        }
+
+        echo json_encode(['success' => true, 'count' => count($monitors)]);
+        break;
+
+    case 'delete_ssl_monitor':
+        $id = (int)($input['id'] ?? $_POST['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Monitor ID required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM domain_ssl_monitors WHERE id = ? AND user_id = ?");
+        $stmt->execute([$id, $current_user_id]);
+
+        echo json_encode(['success' => true, 'message' => 'SSL monitor deleted']);
+        break;
+
+    case 'get_ssl_monitors':
+        $stmt = $pdo->prepare("SELECT * FROM domain_ssl_monitors WHERE user_id = ? ORDER BY days_remaining ASC, id DESC");
+        $stmt->execute([$current_user_id]);
+        $monitors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'monitors' => $monitors]);
+        break;
 }
 
 

@@ -225,7 +225,17 @@ try {
 
     // Group actions by handler
     $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
-    $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'bulk_delete_devices', 'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip']; // ping_all_devices removed
+    $deviceActions = [
+        'get_devices', 'create_device', 'update_device', 'delete_device', 'bulk_delete_devices',
+        'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally',
+        'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip',
+        // SNMP Actions
+        'test_snmp', 'poll_snmp', 'get_snmp_interfaces', 'get_snmp_history',
+        // Agent Remote Command Actions
+        'queue_agent_command', 'get_agent_command', 'list_agent_commands', 'agent_poll_commands', 'agent_report_command_result',
+        // SSL / TLS Certificate Monitor Actions
+        'create_ssl_monitor', 'check_ssl_monitor', 'check_all_ssl_monitors', 'delete_ssl_monitor', 'get_ssl_monitors'
+    ];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];

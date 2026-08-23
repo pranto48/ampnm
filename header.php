@@ -252,7 +252,7 @@ usort($menu_tree, function($a, $b) {
                                 <span class="font-extrabold text-white text-base leading-tight tracking-tight flex items-center gap-1.5">
                                     AMPNM
                                     <span class="text-[10px] bg-blue-900/80 text-blue-300 font-bold px-1.5 py-0.5 rounded border border-blue-700/50">
-                                        v1.19
+                                        v1.20
                                     </span>
                                 </span>
                                 <span class="text-[9px] text-slate-400 font-medium tracking-wide uppercase select-none">
@@ -286,6 +286,7 @@ usort($menu_tree, function($a, $b) {
                                 </button>
                                 <div class="nav-group-items">
                                     <a href="host_metrics.php" class="nav-link nav-sublink"><i class="fas fa-microchip fa-fw mr-2"></i>Host Metrics</a>
+                                    <a href="ssl_monitors.php" class="nav-link nav-sublink"><i class="fas fa-lock fa-fw mr-2 text-cyan-400"></i>SSL Expiry Tracker</a>
                                     <a href="agent_devices.php" class="nav-link nav-sublink"><i class="fas fa-desktop fa-fw mr-2"></i>Windows Agents</a>
                                     <a href="agent_enrollment.php" class="nav-link nav-sublink"><i class="fas fa-key fa-fw mr-2"></i>Agent Enrollment</a>
                                     <a href="agent_settings.php" class="nav-link nav-sublink"><i class="fas fa-sliders fa-fw mr-2"></i>Agent Settings</a>

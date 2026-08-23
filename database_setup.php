@@ -1257,6 +1257,27 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Created or verified 'agent_commands' table.");
 
+    // ==========================================
+    // v1.20 MIGRATION: SSL / TLS Certificate Expiry Monitors
+    // ==========================================
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `domain_ssl_monitors` (
+        `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `user_id` INT(11) NOT NULL,
+        `domain` VARCHAR(255) NOT NULL,
+        `port` INT UNSIGNED DEFAULT 443,
+        `common_name` VARCHAR(255) NULL,
+        `issuer` VARCHAR(255) NULL,
+        `valid_from` DATETIME NULL,
+        `valid_to` DATETIME NULL,
+        `days_remaining` INT NULL,
+        `status` ENUM('valid', 'expiring_soon', 'critical', 'expired', 'error', 'pending') DEFAULT 'pending',
+        `last_checked_at` DATETIME NULL,
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX `idx_status_days` (`status`, `days_remaining`),
+        INDEX `idx_user_domain` (`user_id`, `domain`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Created or verified 'domain_ssl_monitors' table.");
+
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
     $stmt->execute([$admin_id]);
