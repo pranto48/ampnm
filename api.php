@@ -224,7 +224,7 @@ try {
     }
 
     // Group actions by handler
-    $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
+    $pingActions = ['manual_ping', 'scan_network', 'bulk_import_scanned_devices', 'ping_device', 'get_ping_history'];
     $deviceActions = [
         'get_devices', 'create_device', 'update_device', 'delete_device', 'bulk_delete_devices',
         'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally',

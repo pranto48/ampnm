@@ -275,6 +275,7 @@ usort($menu_tree, function($a, $b) {
                                 </button>
                                 <div class="nav-group-items">
                                     <a href="map.php" class="nav-link nav-sublink"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
+                                    <a href="network_scanner.php" class="nav-link nav-sublink"><i class="fas fa-radar fa-fw mr-2 text-cyan-400"></i>Auto-Discovery</a>
                                     <a href="floor_plan.php" class="nav-link nav-sublink"><i class="fas fa-building fa-fw mr-2"></i>Floor Plan</a>
                                     <a href="network_graphs.php" class="nav-link nav-sublink"><i class="fas fa-chart-line fa-fw mr-2"></i>Network Graphs</a>
                                 </div>

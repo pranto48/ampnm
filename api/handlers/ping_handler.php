@@ -43,11 +43,76 @@ switch ($action) {
 
     case 'scan_network':
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can scan the network.']); exit; }
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $subnet = $input['subnet'] ?? ''; // e.g., '192.168.1.0/24'
-            $devices = scanNetwork($subnet);
-            echo json_encode(['devices' => $devices]);
+        require_once __DIR__ . '/../../includes/advanced_scanner.php';
+        $target = trim($input['subnet'] ?? $input['target'] ?? $_POST['subnet'] ?? '192.168.1.0/24');
+        $ips = AdvancedScanner::parseTargets($target);
+        if (empty($ips)) {
+            echo json_encode(['success' => false, 'error' => 'Invalid subnet or IP range provided', 'devices' => []]);
+            exit;
         }
+
+        $devices = AdvancedScanner::sweep($ips);
+        echo json_encode([
+            'success' => true,
+            'target' => $target,
+            'scanned_count' => count($ips),
+            'discovered_count' => count($devices),
+            'devices' => $devices
+        ]);
+        break;
+
+    case 'bulk_import_scanned_devices':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can import devices.']); exit; }
+        $devices = $input['devices'] ?? [];
+        $mapId = (int)($input['map_id'] ?? 0);
+
+        if (empty($devices) || !is_array($devices)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'No devices provided for import']);
+            exit;
+        }
+
+        $imported = 0;
+        $stmtCheck = $pdo->prepare("SELECT id FROM devices WHERE ip_address = ? AND user_id = ?");
+        $stmtInsert = $pdo->prepare("INSERT INTO devices (user_id, name, ip_address, type, icon, status, is_monitored) VALUES (?, ?, ?, ?, ?, 'online', 1)");
+        $stmtMap = $pdo->prepare("INSERT IGNORE INTO map_devices (map_id, device_id, x, y) VALUES (?, ?, ?, ?)");
+
+        // Stagger positions in grid
+        $gridX = 100;
+        $gridY = 100;
+
+        foreach ($devices as $idx => $d) {
+            $ip = trim($d['ip'] ?? '');
+            if (empty($ip) || !filter_var($ip, FILTER_VALIDATE_IP)) continue;
+
+            $name = trim($d['name'] ?? $d['device_name'] ?? $d['hostname'] ?? "Device {$ip}");
+            $type = trim($d['type'] ?? $d['device_type'] ?? 'generic');
+            $icon = trim($d['icon'] ?? $type);
+
+            $stmtCheck->execute([$ip, $current_user_id]);
+            $existingId = $stmtCheck->fetchColumn();
+
+            $devId = $existingId;
+            if (!$devId) {
+                $stmtInsert->execute([$current_user_id, $name, $ip, $type, $icon]);
+                $devId = $pdo->lastInsertId();
+                $imported++;
+            }
+
+            if ($mapId > 0 && $devId) {
+                $posX = $gridX + (($idx % 5) * 160);
+                $posY = $gridY + (floor($idx / 5) * 140);
+                try {
+                    $stmtMap->execute([$mapId, $devId, $posX, $posY]);
+                } catch (Exception $e) {}
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Successfully imported {$imported} new device(s)",
+            'imported_count' => $imported
+        ]);
         break;
 
     case 'get_ping_history':
