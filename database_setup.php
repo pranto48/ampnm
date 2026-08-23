@@ -7,10 +7,9 @@
  * it under the terms of the GNU Affero General Public License...
  * (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
  */
-// Database configuration using environment variables for Docker compatibility
-$servername = getenv('DB_HOST') ?: '127.0.0.1'; // Use environment variable if present
-$username = 'root'; // Setup script needs root privileges to create DB and tables
-$password = getenv('MYSQL_ROOT_PASSWORD') ?: ''; // Get root password from Docker env
+$servername = getenv('DB_HOST') ?: '127.0.0.1';
+$username = getenv('DB_USER') ?: (getenv('MYSQL_USER') ?: 'root');
+$password = getenv('DB_PASSWORD') ?: (getenv('MYSQL_ROOT_PASSWORD') ?: (getenv('MYSQL_PASSWORD') ?: ''));
 $dbname = getenv('DB_NAME') ?: 'network_monitor';
 
 function message($text, $is_error = false) {
