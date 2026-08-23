@@ -1236,6 +1236,27 @@ try {
         message("Upgraded 'smtp_settings' table: added 'allow_invalid_certs' column.");
     }
 
+    // ==========================================
+    // v1.20 MIGRATION: Agent Secure Remote Commanding
+    // ==========================================
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `agent_commands` (
+        `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `agent_token_id` VARCHAR(128) NOT NULL,
+        `user_id` INT(11) NOT NULL,
+        `command_type` VARCHAR(50) NOT NULL,
+        `command_payload` TEXT NULL,
+        `status` ENUM('pending', 'running', 'completed', 'failed', 'cancelled') DEFAULT 'pending',
+        `result_output` LONGTEXT NULL,
+        `exit_code` INT NULL,
+        `execution_time_ms` INT NULL,
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        `executed_at` DATETIME NULL,
+        `completed_at` DATETIME NULL,
+        INDEX `idx_token_status` (`agent_token_id`, `status`),
+        INDEX `idx_user_time` (`user_id`, `created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Created or verified 'agent_commands' table.");
+
     // Step 5: Check if the admin user has any maps
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
     $stmt->execute([$admin_id]);

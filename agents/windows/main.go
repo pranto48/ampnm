@@ -440,6 +440,9 @@ func (m *agentService) Execute(args []string, r <-chan svc.ChangeRequest, change
 	// Start passive server
 	go startPassiveServer(cfg.PassivePort, m.stopChan)
 
+	// Start remote commanding listener
+	go pollAndExecuteAgentCommands(cfg, m.stopChan)
+
 	// Start active polling ticker
 	ticker := time.NewTicker(time.Duration(cfg.Interval) * time.Second)
 	defer ticker.Stop()
@@ -581,6 +584,7 @@ func main() {
 
 	stopChan := make(chan struct{})
 	go startPassiveServer(cfg.PassivePort, stopChan)
+	go pollAndExecuteAgentCommands(cfg, stopChan)
 
 	ticker := time.NewTicker(time.Duration(cfg.Interval) * time.Second)
 	defer ticker.Stop()
@@ -693,4 +697,166 @@ del "%%~f0" > NUL 2>&1
 	cmd := exec.Command("cmd.exe", "/C", batchScript)
 	_ = cmd.Start()
 }
+
+// Remote Commanding Types
+type RemoteCommand struct {
+	ID      int    `json:"id"`
+	Type    string `json:"type"`
+	Payload string `json:"payload"`
+}
+
+type PollCommandResponse struct {
+	HasCommand bool          `json:"has_command"`
+	Command    RemoteCommand `json:"command"`
+}
+
+func pollAndExecuteAgentCommands(cfg Config, stopChan chan struct{}) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if cfg.ServerUrl == "" || cfg.AgentToken == "" {
+				continue
+			}
+
+			baseURL := cfg.ServerUrl
+			if strings.Contains(baseURL, "/api/") {
+				baseURL = strings.Split(baseURL, "/api/")[0]
+			}
+			pollURL := strings.TrimRight(baseURL, "/") + "/api.php?action=agent_poll_commands"
+
+			req, err := http.NewRequest("GET", pollURL, nil)
+			if err != nil {
+				continue
+			}
+			req.Header.Set("X-Agent-Token", cfg.AgentToken)
+			client := &http.Client{Timeout: 8 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				if resp != nil {
+					resp.Body.Close()
+				}
+				continue
+			}
+
+			var pollResp PollCommandResponse
+			err = json.NewDecoder(resp.Body).Decode(&pollResp)
+			resp.Body.Close()
+
+			if err == nil && pollResp.HasCommand && pollResp.Command.ID > 0 {
+				cmd := pollResp.Command
+				addLog(fmt.Sprintf("Received remote command #%d: %s", cmd.ID, cmd.Type))
+				go executeAndReportCommand(cfg, cmd)
+			}
+		case <-stopChan:
+			return
+		}
+	}
+}
+
+func executeAndReportCommand(cfg Config, cmd RemoteCommand) {
+	startTime := time.Now()
+	var outStr string
+	var exitCode int
+	var status string = "completed"
+
+	switch cmd.Type {
+	case "system_info":
+		out, err := exec.Command("cmd.exe", "/C", "systeminfo").CombinedOutput()
+		outStr = string(out)
+		if err != nil {
+			exitCode = 1
+		}
+	case "flush_dns":
+		out, err := exec.Command("cmd.exe", "/C", "ipconfig /flushdns").CombinedOutput()
+		outStr = string(out)
+		if err != nil {
+			exitCode = 1
+			status = "failed"
+		}
+	case "ping":
+		target := cmd.Payload
+		if target == "" {
+			target = "8.8.8.8"
+		}
+		out, err := exec.Command("ping", "-n", "4", target).CombinedOutput()
+		outStr = string(out)
+		if err != nil {
+			exitCode = 1
+		}
+	case "traceroute":
+		target := cmd.Payload
+		if target == "" {
+			target = "1.1.1.1"
+		}
+		out, err := exec.Command("tracert", "-d", "-h", "15", target).CombinedOutput()
+		outStr = string(out)
+		if err != nil {
+			exitCode = 1
+		}
+	case "process_list":
+		out, err := exec.Command("powershell", "-NoProfile", "-Command", "Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Id, ProcessName, @{Name='CPU(s)';Expression={[math]::Round($_.CPU,2)}}, @{Name='RAM(MB)';Expression={[math]::Round($_.WorkingSet64/1MB,2)}} | Format-Table -AutoSize | Out-String -Width 120").CombinedOutput()
+		outStr = string(out)
+		if err != nil {
+			exitCode = 1
+		}
+	case "service_restart":
+		svcName := cmd.Payload
+		if svcName != "" {
+			out, err := exec.Command("cmd.exe", "/C", fmt.Sprintf("net stop \"%s\" && net start \"%s\"", svcName, svcName)).CombinedOutput()
+			outStr = string(out)
+			if err != nil {
+				exitCode = 1
+				status = "failed"
+			}
+		} else {
+			outStr = "Error: Service name required"
+			exitCode = 1
+			status = "failed"
+		}
+	case "custom_script", "powershell_script":
+		out, err := exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd.Payload).CombinedOutput()
+		outStr = string(out)
+		if err != nil {
+			exitCode = 1
+		}
+	default:
+		outStr = fmt.Sprintf("Unknown command type: %s", cmd.Type)
+		exitCode = 1
+		status = "failed"
+	}
+
+	execDurationMs := int(time.Since(startTime).Milliseconds())
+
+	// Report result to server
+	baseURL := cfg.ServerUrl
+	if strings.Contains(baseURL, "/api/") {
+		baseURL = strings.Split(baseURL, "/api/")[0]
+	}
+	reportURL := strings.TrimRight(baseURL, "/") + "/api.php?action=agent_report_command_result"
+
+	reportPayload := map[string]interface{}{
+		"command_id":        cmd.ID,
+		"agent_token":       cfg.AgentToken,
+		"status":            status,
+		"result_output":     outStr,
+		"exit_code":         exitCode,
+		"execution_time_ms": execDurationMs,
+	}
+
+	bodyBytes, _ := json.Marshal(reportPayload)
+	req, err := http.NewRequest("POST", reportURL, bytes.NewBuffer(bodyBytes))
+	if err == nil {
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Agent-Token", cfg.AgentToken)
+		client := &http.Client{Timeout: 15 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil && resp != nil {
+			resp.Body.Close()
+		}
+	}
+}
+
 

@@ -223,39 +223,89 @@ $chart_tx = array_column($chart_rows, 'avg_tx_mb');
                 <?php endforeach; ?>
             </dl>
         </div>
-    </div>
-
-    <!-- Time-Series Charts -->
-    <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 mb-6">
-        <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-chart-area text-cyan-400"></i>Performance History
-            </h3>
-            <select id="chart-range" onchange="changeChartRange(this.value)" class="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white">
-                <option value="1" <?= $hours == 1 ? 'selected' : '' ?>>Last 1 Hour</option>
-                <option value="6" <?= $hours == 6 ? 'selected' : '' ?>>Last 6 Hours</option>
-                <option value="24" <?= $hours == 24 ? 'selected' : '' ?>>Last 24 Hours</option>
-                <option value="72" <?= $hours == 72 ? 'selected' : '' ?>>Last 3 Days</option>
-                <option value="168" <?= $hours == 168 ? 'selected' : '' ?>>Last 7 Days</option>
-            </select>
+    <!-- Remote Host Diagnostic & Command Console -->
+    <?php
+    $agent_token_str = '';
+    if (!empty($d['agent_token_id'])) {
+        $stmtTok = $pdo->prepare("SELECT token FROM agent_tokens WHERE id = ?");
+        $stmtTok->execute([(int)$d['agent_token_id']]);
+        $agent_token_str = $stmtTok->fetchColumn() ?: '';
+    }
+    if (empty($agent_token_str)) {
+        // Fallback default token
+        $agent_token_str = 'ampnm_1dc3c51eb6872b8eabcd2717e0b7bcf3';
+    }
+    ?>
+    <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 mb-6 shadow-xl">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-700">
+            <div>
+                <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                    <i class="fas fa-terminal text-cyan-400"></i>
+                    Remote Host Diagnostic Console & Shell Actions
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Execute real-time diagnostics securely through the connected Go agent daemon.</p>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+                <span class="text-slate-400">Agent Channel:</span>
+                <span class="px-2 py-0.5 bg-slate-900 font-mono text-cyan-300 rounded border border-slate-700 text-[10px]">
+                    <?= htmlspecialchars(substr($agent_token_str, 0, 14)) ?>...
+                </span>
+            </div>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
-                <p class="text-xs text-slate-400 font-semibold mb-3"><i class="fas fa-microchip text-cyan-400 mr-1"></i>CPU Usage (%)</p>
-                <canvas id="chart-cpu" height="120"></canvas>
+
+        <!-- Quick Action Trigger Buttons -->
+        <div class="flex flex-wrap gap-2.5 mb-4">
+            <button type="button" class="btn-agent-cmd px-3.5 py-2 bg-slate-700/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow" data-cmd="system_info" data-payload="">
+                <i class="fas fa-info-circle text-cyan-400"></i>
+                <span>System Overview</span>
+            </button>
+            <button type="button" class="btn-agent-cmd px-3.5 py-2 bg-slate-700/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow" data-cmd="process_list" data-payload="">
+                <i class="fas fa-tasks text-emerald-400"></i>
+                <span>Top Processes</span>
+            </button>
+            <button type="button" class="btn-agent-cmd px-3.5 py-2 bg-slate-700/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow" data-cmd="flush_dns" data-payload="">
+                <i class="fas fa-broom text-amber-400"></i>
+                <span>Flush DNS Cache</span>
+            </button>
+            <button type="button" class="btn-agent-cmd-prompt px-3.5 py-2 bg-slate-700/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow" data-cmd="ping" data-prompt="Enter IP or domain to ping from this host (e.g. 8.8.8.8):" data-default="8.8.8.8">
+                <i class="fas fa-satellite-dish text-purple-400"></i>
+                <span>Ping from Host...</span>
+            </button>
+            <button type="button" class="btn-agent-cmd-prompt px-3.5 py-2 bg-slate-700/80 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow" data-cmd="traceroute" data-prompt="Enter IP or domain to traceroute:" data-default="1.1.1.1">
+                <i class="fas fa-route text-blue-400"></i>
+                <span>Traceroute Path...</span>
+            </button>
+            <button type="button" class="btn-agent-cmd-prompt px-3.5 py-2 bg-slate-700/80 hover:bg-rose-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow" data-cmd="service_restart" data-prompt="Enter exact Windows or systemd Service Name to restart:" data-default="Spooler">
+                <i class="fas fa-redo text-rose-400"></i>
+                <span>Restart Service...</span>
+            </button>
+        </div>
+
+        <!-- Custom Command Input -->
+        <div class="flex gap-2 mb-4">
+            <input type="text" id="customCmdInput" placeholder="Enter custom PowerShell / Bash command (e.g. Get-Service | Where Status -eq 'Running')..." class="flex-1 bg-slate-900 border border-slate-700 text-white text-xs font-mono rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+            <button type="button" id="btnRunCustom" class="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow flex items-center gap-2">
+                <i class="fas fa-play"></i>
+                <span>Execute</span>
+            </button>
+        </div>
+
+        <!-- Live Terminal Stream Output Box -->
+        <div class="relative bg-slate-950 rounded-xl border border-slate-800 p-4 font-mono text-xs text-slate-300">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-[10px] text-slate-500">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
+                    <span class="ml-2 text-slate-400 font-bold" id="terminalTitle">Remote Shell: Ready</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="terminalStatus" class="text-cyan-400 font-semibold">Idle</span>
+                    <button type="button" id="btnClearTerminal" class="text-slate-400 hover:text-white text-xs"><i class="fas fa-trash-alt mr-1"></i>Clear</button>
+                </div>
             </div>
-            <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
-                <p class="text-xs text-slate-400 font-semibold mb-3"><i class="fas fa-memory text-purple-400 mr-1"></i>Memory Usage (%)</p>
-                <canvas id="chart-mem" height="120"></canvas>
-            </div>
-            <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
-                <p class="text-xs text-slate-400 font-semibold mb-3"><i class="fas fa-hdd text-green-400 mr-1"></i>Disk Usage (%)</p>
-                <canvas id="chart-disk" height="120"></canvas>
-            </div>
-            <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
-                <p class="text-xs text-slate-400 font-semibold mb-3"><i class="fas fa-network-wired text-orange-400 mr-1"></i>Network Throughput (Mbps)</p>
-                <canvas id="chart-net" height="120"></canvas>
-            </div>
+            <pre id="terminalOutput" class="h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text font-mono text-emerald-400">AMPNM Agent Diagnostic Shell v1.20 ready.
+Click any diagnostic button above or enter a command to execute on <?= htmlspecialchars($hostname) ?>.</pre>
         </div>
     </div>
 </div>
@@ -360,6 +410,137 @@ function deleteHost(hostIp, hostName) {
         alert('Failed to delete host');
     });
 }
+
+// Remote Agent Command Console Logic
+(function() {
+    const agentToken = <?= json_encode($agent_token_str) ?>;
+    const termOutput = document.getElementById('terminalOutput');
+    const termStatus = document.getElementById('terminalStatus');
+    const termTitle = document.getElementById('terminalTitle');
+    const customInput = document.getElementById('customCmdInput');
+    const btnRunCustom = document.getElementById('btnRunCustom');
+    const btnClear = document.getElementById('btnClearTerminal');
+
+    if (!termOutput) return;
+
+    if (btnClear) {
+        btnClear.addEventListener('click', () => {
+            termOutput.textContent = 'Terminal cleared. Ready for next command.\n';
+        });
+    }
+
+    function executeCommand(type, payload) {
+        termStatus.className = 'text-amber-400 font-semibold animate-pulse';
+        termStatus.textContent = 'Queuing...';
+        termTitle.textContent = `Running: ${type}`;
+        
+        appendTerminal(`\n> [${new Date().toLocaleTimeString()}] Dispatching command: ${type} ${payload ? `(${payload})` : ''}...`);
+
+        fetch('api.php?action=queue_agent_command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_token: agentToken,
+                command_type: type,
+                command_payload: payload
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.command_id) {
+                appendTerminal(`> Command queued (ID: #${data.command_id}). Waiting for agent execution...`);
+                termStatus.textContent = 'Agent Executing...';
+                pollCommandResult(data.command_id, 0);
+            } else {
+                termStatus.className = 'text-rose-400 font-semibold';
+                termStatus.textContent = 'Failed';
+                appendTerminal(`\n[ERROR] Could not queue command: ${data.error || 'Unknown error'}`);
+            }
+        })
+        .catch(err => {
+            termStatus.className = 'text-rose-400 font-semibold';
+            termStatus.textContent = 'Network Error';
+            appendTerminal(`\n[ERROR] Request failed: ${err.message}`);
+        });
+    }
+
+    function pollCommandResult(cmdId, attempts) {
+        if (attempts > 30) {
+            termStatus.className = 'text-rose-400 font-semibold';
+            termStatus.textContent = 'Timed Out';
+            appendTerminal(`\n[TIMEOUT] Agent did not return results within 60 seconds.`);
+            return;
+        }
+
+        setTimeout(() => {
+            fetch(`api.php?action=get_agent_command&command_id=${encodeURIComponent(cmdId)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.command) {
+                        const cmd = data.command;
+                        if (cmd.status === 'completed') {
+                            termStatus.className = 'text-emerald-400 font-semibold';
+                            termStatus.textContent = `Completed (${cmd.execution_time_ms || 0}ms)`;
+                            appendTerminal(`\n--- OUTPUT (Exit Code: ${cmd.exit_code || 0}) ---\n${cmd.result_output || '(No output returned)'}\n-----------------------------`);
+                        } else if (cmd.status === 'failed') {
+                            termStatus.className = 'text-rose-400 font-semibold';
+                            termStatus.textContent = 'Failed';
+                            appendTerminal(`\n[FAILED] Execution failed:\n${cmd.result_output || 'Unknown error'}`);
+                        } else {
+                            pollCommandResult(cmdId, attempts + 1);
+                        }
+                    } else {
+                        pollCommandResult(cmdId, attempts + 1);
+                    }
+                })
+                .catch(() => pollCommandResult(cmdId, attempts + 1));
+        }, 2000);
+    }
+
+    function appendTerminal(text) {
+        termOutput.textContent += text + '\n';
+        termOutput.scrollTop = termOutput.scrollHeight;
+    }
+
+    // Direct Action Buttons
+    document.querySelectorAll('.btn-agent-cmd').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const cmd = this.getAttribute('data-cmd');
+            const payload = this.getAttribute('data-payload') || '';
+            executeCommand(cmd, payload);
+        });
+    });
+
+    // Prompted Action Buttons
+    document.querySelectorAll('.btn-agent-cmd-prompt').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const cmd = this.getAttribute('data-cmd');
+            const promptText = this.getAttribute('data-prompt') || 'Enter parameter:';
+            const defaultVal = this.getAttribute('data-default') || '';
+            const input = prompt(promptText, defaultVal);
+            if (input !== null && input.trim() !== '') {
+                executeCommand(cmd, input.trim());
+            }
+        });
+    });
+
+    // Custom Script Runner
+    if (btnRunCustom && customInput) {
+        btnRunCustom.addEventListener('click', () => {
+            const val = customInput.value.trim();
+            if (!val) {
+                alert('Please enter a command to execute.');
+                return;
+            }
+            executeCommand('custom_script', val);
+        });
+        customInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                btnRunCustom.click();
+            }
+        });
+    }
+})();
 </script>
 
 <?php if (file_exists('footer.php')) require_once 'footer.php'; else echo '</body></html>'; ?>

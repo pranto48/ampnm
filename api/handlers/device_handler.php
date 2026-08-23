@@ -1578,5 +1578,134 @@ switch ($action) {
 
         echo json_encode(['success' => true, 'history' => $history]);
         break;
+
+    case 'queue_agent_command':
+        $token = trim($input['agent_token'] ?? $input['agent_token_id'] ?? $_POST['agent_token'] ?? '');
+        $cmdType = trim($input['command_type'] ?? $_POST['command_type'] ?? 'system_info');
+        $payload = trim($input['command_payload'] ?? $_POST['command_payload'] ?? '');
+
+        if (empty($token)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Agent token required']);
+            exit;
+        }
+
+        $allowedCommands = ['system_info', 'flush_dns', 'ping', 'traceroute', 'process_list', 'service_restart', 'powershell_script', 'bash_script', 'custom_script'];
+        if (!in_array($cmdType, $allowedCommands, true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Unsupported command type: ' . htmlspecialchars($cmdType)]);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO agent_commands (agent_token_id, user_id, command_type, command_payload, status) VALUES (?, ?, ?, ?, 'pending')");
+        $stmt->execute([$token, $current_user_id, $cmdType, $payload]);
+        $cmdId = $pdo->lastInsertId();
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Command queued for agent execution',
+            'command_id' => (int)$cmdId,
+            'command_type' => $cmdType
+        ]);
+        break;
+
+    case 'get_agent_command':
+        $cmdId = (int)($input['command_id'] ?? $_GET['command_id'] ?? 0);
+        if ($cmdId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Command ID required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM agent_commands WHERE id = ?");
+        $stmt->execute([$cmdId]);
+        $cmd = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$cmd) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Command not found']);
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'command' => $cmd]);
+        break;
+
+    case 'list_agent_commands':
+        $token = trim($input['agent_token'] ?? $input['agent_token_id'] ?? $_GET['agent_token'] ?? '');
+        $limit = min(50, max(5, (int)($_GET['limit'] ?? 15)));
+
+        if (empty($token)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Agent token required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM agent_commands WHERE agent_token_id = ? ORDER BY id DESC LIMIT ?");
+        $stmt->bindValue(1, $token, PDO::PARAM_STR);
+        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'commands' => $commands]);
+        break;
+
+    case 'agent_poll_commands':
+        // Authenticate agent
+        $rawToken = $_SESSION['agent_token'] ?? $_SERVER['HTTP_X_AGENT_TOKEN'] ?? $_GET['agent_token'] ?? $_POST['agent_token'] ?? '';
+        if (empty($rawToken)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Agent authentication token required']);
+            exit;
+        }
+
+        // Fetch oldest pending command for this agent token
+        $stmt = $pdo->prepare("SELECT * FROM agent_commands WHERE agent_token_id = ? AND status = 'pending' ORDER BY id ASC LIMIT 1");
+        $stmt->execute([$rawToken]);
+        $cmd = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$cmd) {
+            echo json_encode(['has_command' => false]);
+            exit;
+        }
+
+        // Lock command to 'running'
+        $lockStmt = $pdo->prepare("UPDATE agent_commands SET status = 'running', executed_at = NOW() WHERE id = ? AND status = 'pending'");
+        $lockStmt->execute([$cmd['id']]);
+
+        echo json_encode([
+            'has_command' => true,
+            'command' => [
+                'id' => (int)$cmd['id'],
+                'type' => $cmd['command_type'],
+                'payload' => $cmd['command_payload']
+            ]
+        ]);
+        break;
+
+    case 'agent_report_command_result':
+        $rawToken = $_SESSION['agent_token'] ?? $_SERVER['HTTP_X_AGENT_TOKEN'] ?? $input['agent_token'] ?? '';
+        $cmdId = (int)($input['command_id'] ?? $_POST['command_id'] ?? 0);
+        $status = in_array($input['status'] ?? '', ['completed', 'failed', 'cancelled'], true) ? $input['status'] : 'completed';
+        $output = $input['result_output'] ?? $_POST['result_output'] ?? '';
+        $exitCode = isset($input['exit_code']) ? (int)$input['exit_code'] : 0;
+        $execMs = isset($input['execution_time_ms']) ? (int)$input['execution_time_ms'] : 0;
+
+        if ($cmdId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Command ID required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("UPDATE agent_commands SET 
+            status = ?, 
+            result_output = ?, 
+            exit_code = ?, 
+            execution_time_ms = ?, 
+            completed_at = NOW() 
+            WHERE id = ?");
+        $stmt->execute([$status, $output, $exitCode, $execMs, $cmdId]);
+
+        echo json_encode(['success' => true, 'message' => 'Command execution result recorded']);
+        break;
 }
+
 

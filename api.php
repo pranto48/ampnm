@@ -128,23 +128,31 @@ try {
     }
 
     // --- Authenticated Actions (AUTH REQUIRED) ---
-    // Support Bearer Token Authentication for REST API & Telemetry Agents
+    // Support Bearer Token & X-Agent-Token Authentication for REST API & Telemetry Agents
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    $agentTokenHeader = $_SERVER['HTTP_X_AGENT_TOKEN'] ?? $_GET['agent_token'] ?? $_POST['agent_token'] ?? '';
+    $rawToken = '';
     if (preg_match('/Bearer\s+(.+)$/i', $authHeader, $matches)) {
-        $bearerToken = trim($matches[1]);
+        $rawToken = trim($matches[1]);
+    } elseif (!empty($agentTokenHeader)) {
+        $rawToken = trim($agentTokenHeader);
+    }
+
+    if (!empty($rawToken)) {
         try {
-            $stmtToken = $pdo->prepare("SELECT user_id, role FROM agent_tokens WHERE token = ? AND is_active = 1");
-            $stmtToken->execute([$bearerToken]);
+            $stmtToken = $pdo->prepare("SELECT user_id, name FROM agent_tokens WHERE token = ? AND enabled = 1");
+            $stmtToken->execute([$rawToken]);
             $tokenInfo = $stmtToken->fetch(PDO::FETCH_ASSOC);
             if ($tokenInfo) {
                 if (session_status() !== PHP_SESSION_ACTIVE) {
                     @session_start();
                 }
-                $_SESSION['user_id'] = $tokenInfo['user_id'] ?? 'api_agent';
-                $_SESSION['user_role'] = $tokenInfo['role'] ?? 'admin';
+                $_SESSION['user_id'] = $tokenInfo['user_id'] ?? 1;
+                $_SESSION['user_role'] = 'admin';
+                $_SESSION['agent_token'] = $rawToken;
             }
         } catch (Exception $e) {
-            // Log & continue to session auth
+            // Continue
         }
     }
 
@@ -165,15 +173,24 @@ try {
         'get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'get_device_details', 'get_device_uptime',
         'get_smtp_settings', 'get_all_devices_for_subscriptions', 'get_device_subscriptions',
         'health', 'get_current_license_info', 'get_historical_map_state',
-        // Host metrics viewing
+        // Host metrics & SNMP viewing
         'get_latest_metrics', 'get_metrics_history', 'get_all_hosts', 'get_server_metrics',
+        'get_snmp_interfaces', 'get_snmp_history', 'get_agent_command', 'list_agent_commands',
         // Floor plan viewing
-        'get_floor_plans', 'get_racks', 'get_panels', 'get_switch_ports', 'get_cables', 'get_devices',
-        'get_floor_plan_devices', 'get_annotations',
-        // Port usage
-        'get_device_used_ports',
-        // System Backup viewing
-        'get_system_backup_schedules', 'get_system_backup_runs',
+        'get_floor_plans', 'get_floor_plan', 'get_floor_plan_annotations',
+        // Maintenance viewing
+        'get_maintenance_windows', 'get_device_maintenance_status',
+        // Status page viewing (public/viewer)
+        'get_public_status_page', 'get_status_page_incidents',
+        // Notification channel reading
+        'get_sms_settings', 'get_device_sms_subscriptions', 'get_telegram_settings',
+        'get_device_telegram_subscriptions', 'get_whatsapp_settings', 'get_device_whatsapp_subscriptions',
+        'get_host_override', 'get_all_host_overrides',
+        'get_menu_items', 'get_theme_settings',
+        // Rack viewer
+        'get_rack_locations', 'get_rack_location', 'get_rack_units',
+        // IPAM viewer
+        'get_ipam_subnets', 'get_ipam_subnet', 'get_ipam_ips',
     ];
 
     // Define specific POST actions that 'viewer' role can perform
