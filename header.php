@@ -276,6 +276,7 @@ usort($menu_tree, function($a, $b) {
                                 <div class="nav-group-items">
                                     <a href="map.php" class="nav-link nav-sublink"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
                                     <a href="network_scanner.php" class="nav-link nav-sublink"><i class="fas fa-radar fa-fw mr-2 text-cyan-400"></i>Auto-Discovery</a>
+                                    <a href="device_config_backups.php" class="nav-link nav-sublink"><i class="fas fa-file-code fa-fw mr-2 text-indigo-400"></i>Config Vault</a>
                                     <a href="floor_plan.php" class="nav-link nav-sublink"><i class="fas fa-building fa-fw mr-2"></i>Floor Plan</a>
                                     <a href="network_graphs.php" class="nav-link nav-sublink"><i class="fas fa-chart-line fa-fw mr-2"></i>Network Graphs</a>
                                 </div>
@@ -293,6 +294,7 @@ usort($menu_tree, function($a, $b) {
                                     <a href="agent_settings.php" class="nav-link nav-sublink"><i class="fas fa-sliders fa-fw mr-2"></i>Agent Settings</a>
                                     <a href="agent_logs.php" class="nav-link nav-sublink"><i class="fas fa-file-lines fa-fw mr-2"></i>Agent Logs</a>
                                     <a href="alert_settings.php" class="nav-link nav-sublink"><i class="fas fa-bell fa-fw mr-2"></i>Alert Settings</a>
+                                    <a href="alert_escalation.php" class="nav-link nav-sublink"><i class="fas fa-layer-group fa-fw mr-2 text-cyan-400"></i>Escalation &amp; Webhooks</a>
                                     <a href="windows_agent.php" class="nav-link nav-sublink"><i class="fas fa-person-chalkboard fa-fw mr-2"></i>Agent Onboarding</a>
                                     <a href="download-agent.php" class="nav-link nav-sublink"><i class="fas fa-download fa-fw mr-2"></i>Download Agents</a>
                                     <a href="documentation.php#windows-agent" class="nav-link nav-sublink"><i class="fas fa-book-open fa-fw mr-2"></i>Windows Agent Guide</a>

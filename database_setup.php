@@ -1411,6 +1411,64 @@ try {
         message("Default menu items successfully seeded.");
     }
 
+    // 25. Webhook Endpoints table (Slack, Discord, MS Teams, PagerDuty, Custom)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `webhook_endpoints` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(100) NOT NULL,
+        `type` ENUM('slack', 'discord', 'msteams', 'pagerduty', 'custom') NOT NULL DEFAULT 'custom',
+        `url` TEXT NOT NULL,
+        `routing_key` VARCHAR(255) NULL,
+        `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `events` JSON NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'webhook_endpoints' created or already exists.");
+
+    // 26. Multi-Level Alert Escalation Rules table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `alert_escalation_rules` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `level` INT NOT NULL DEFAULT 1,
+        `delay_minutes` INT NOT NULL DEFAULT 0,
+        `channels` JSON NOT NULL,
+        `recipients` TEXT NULL,
+        `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_level (`level`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'alert_escalation_rules' created or already exists.");
+
+    // Seed default escalation tiers if empty
+    $chkRules = $pdo->query("SELECT COUNT(*) FROM alert_escalation_rules")->fetchColumn();
+    if ($chkRules == 0) {
+        $r1 = generateUuid();
+        $r2 = generateUuid();
+        $r3 = generateUuid();
+        $pdo->exec("INSERT INTO alert_escalation_rules (id, level, delay_minutes, channels, recipients, is_enabled) VALUES 
+            ('$r1', 1, 0, '[\"telegram\", \"sms\"]', 'On-Duty NOC Engineer', 1),
+            ('$r2', 2, 15, '[\"discord\", \"email\", \"slack\"]', 'NOC Lead / SysAdmin', 1),
+            ('$r3', 3, 30, '[\"pagerduty\", \"msteams\", \"sms\"]', 'IT Operations Manager', 1);");
+        message("Default multi-tier alert escalation rules seeded.");
+    }
+
+    // 27. Device Configuration Backups Vault table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `device_config_backups` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `device_id` VARCHAR(36) NOT NULL,
+        `backup_type` VARCHAR(50) NOT NULL DEFAULT 'generic',
+        `file_name` VARCHAR(255) NOT NULL,
+        `file_path` VARCHAR(255) NOT NULL,
+        `content_hash` VARCHAR(64) NULL,
+        `file_size_bytes` BIGINT NOT NULL DEFAULT 0,
+        `status` ENUM('success', 'failed', 'pending') NOT NULL DEFAULT 'success',
+        `notes` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_device (`device_id`),
+        INDEX idx_created (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'device_config_backups' created or already exists.");
+
 
 
     echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";

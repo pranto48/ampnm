@@ -1831,6 +1831,123 @@ switch ($action) {
 
         echo json_encode(['success' => true, 'monitors' => $monitors]);
         break;
+
+    // --- Escalation & Webhook Handlers ---
+    case 'get_escalation_settings':
+        $webhooks = $pdo->query("SELECT * FROM webhook_endpoints ORDER BY created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
+        $rules = $pdo->query("SELECT * FROM alert_escalation_rules ORDER BY level ASC")->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode([
+            'success' => true,
+            'webhooks' => $webhooks,
+            'rules' => $rules
+        ]);
+        break;
+
+    case 'save_escalation_settings':
+        if ($user_role !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Admin privileges required']);
+            exit;
+        }
+
+        $webhooks = $input['webhooks'] ?? [];
+        $rules = $input['rules'] ?? [];
+
+        // Save Webhooks
+        $pdo->exec("DELETE FROM webhook_endpoints");
+        $stmtW = $pdo->prepare("INSERT INTO webhook_endpoints (id, name, type, url, routing_key, is_enabled) VALUES (?, ?, ?, ?, ?, ?)");
+        foreach ($webhooks as $w) {
+            if (!empty($w['url']) || !empty($w['routing_key'])) {
+                $wid = !empty($w['id']) ? $w['id'] : generateUuid();
+                $stmtW->execute([
+                    $wid,
+                    $w['name'] ?? ucfirst($w['type'] ?? 'Webhook'),
+                    $w['type'] ?? 'custom',
+                    $w['url'] ?? '',
+                    $w['routing_key'] ?? '',
+                    !empty($w['is_enabled']) ? 1 : 0
+                ]);
+            }
+        }
+
+        // Save Escalation Rules
+        $pdo->exec("DELETE FROM alert_escalation_rules");
+        $stmtR = $pdo->prepare("INSERT INTO alert_escalation_rules (id, level, delay_minutes, channels, recipients, is_enabled) VALUES (?, ?, ?, ?, ?, ?)");
+        foreach ($rules as $r) {
+            $rid = !empty($r['id']) ? $r['id'] : generateUuid();
+            $channelsJson = is_array($r['channels']) ? json_encode($r['channels']) : (string)$r['channels'];
+            $stmtR->execute([
+                $rid,
+                (int)($r['level'] ?? 1),
+                (int)($r['delay_minutes'] ?? 0),
+                $channelsJson,
+                $r['recipients'] ?? '',
+                !empty($r['is_enabled']) ? 1 : 0
+            ]);
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Escalation & webhook settings saved successfully!']);
+        break;
+
+    case 'test_webhook_endpoint':
+        if ($user_role !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Admin privileges required']);
+            exit;
+        }
+        require_once __DIR__ . '/../../includes/webhook_dispatcher.php';
+        $type = $input['type'] ?? $_POST['type'] ?? 'custom';
+        $url = $input['url'] ?? $_POST['url'] ?? '';
+        $routingKey = $input['routing_key'] ?? $_POST['routing_key'] ?? '';
+
+        $testRes = AMPNM_WebhookDispatcher::testChannel($type, $url, $routingKey);
+        echo json_encode($testRes);
+        break;
+
+    // --- Config Backup Vault Handlers ---
+    case 'backup_device_config':
+        if ($user_role !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Admin privileges required']);
+            exit;
+        }
+        require_once __DIR__ . '/../../includes/config_backup_engine.php';
+        $deviceId = $input['device_id'] ?? $_POST['device_id'] ?? '';
+        $credentials = [
+            'username' => $input['username'] ?? $_POST['username'] ?? '',
+            'password' => $input['password'] ?? $_POST['password'] ?? '',
+            'port' => (int)($input['port'] ?? $_POST['port'] ?? 22)
+        ];
+        $res = AMPNM_ConfigBackupEngine::executeBackup($deviceId, $credentials);
+        echo json_encode($res);
+        break;
+
+    case 'get_device_config_history':
+        require_once __DIR__ . '/../../includes/config_backup_engine.php';
+        $deviceId = $input['device_id'] ?? $_GET['device_id'] ?? '';
+        $history = AMPNM_ConfigBackupEngine::getHistory($deviceId);
+        echo json_encode(['success' => true, 'history' => $history]);
+        break;
+
+    case 'get_device_config_content':
+        require_once __DIR__ . '/../../includes/config_backup_engine.php';
+        $backupId = $input['backup_id'] ?? $_GET['backup_id'] ?? '';
+        $content = AMPNM_ConfigBackupEngine::getBackupContent($backupId);
+        if ($content !== null) {
+            echo json_encode(['success' => true, 'content' => $content]);
+        } else {
+            http_response_code(404);
+            echo json_encode(['error' => 'Backup content not found']);
+        }
+        break;
+
+    case 'compare_device_configs':
+        require_once __DIR__ . '/../../includes/config_backup_engine.php';
+        $b1 = $input['backup_id_1'] ?? $_POST['backup_id_1'] ?? '';
+        $b2 = $input['backup_id_2'] ?? $_POST['backup_id_2'] ?? '';
+        $res = AMPNM_ConfigBackupEngine::compareConfigs($b1, $b2);
+        echo json_encode($res);
+        break;
 }
 
 

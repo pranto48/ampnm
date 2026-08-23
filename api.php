@@ -234,7 +234,11 @@ try {
         // Agent Remote Command Actions
         'queue_agent_command', 'get_agent_command', 'list_agent_commands', 'agent_poll_commands', 'agent_report_command_result',
         // SSL / TLS Certificate Monitor Actions
-        'create_ssl_monitor', 'check_ssl_monitor', 'check_all_ssl_monitors', 'delete_ssl_monitor', 'get_ssl_monitors'
+        'create_ssl_monitor', 'check_ssl_monitor', 'check_all_ssl_monitors', 'delete_ssl_monitor', 'get_ssl_monitors',
+        // Escalation & Webhook Actions
+        'get_escalation_settings', 'save_escalation_settings', 'test_webhook_endpoint',
+        // Config Backup Vault Actions
+        'backup_device_config', 'get_device_config_history', 'get_device_config_content', 'compare_device_configs'
     ];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];
