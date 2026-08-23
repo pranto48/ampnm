@@ -501,6 +501,43 @@ MapApp.network = {
                         }
                     }
                 }
+
+                // 🌟 LAYER 3: LIVE SNMP BANDWIDTH FLOW BADGE ON EDGE
+                const midX = (fx + tx) / 2;
+                const midY = (fy + ty) / 2;
+                const bwSpeed = rawEdge?.bandwidth_speed_mbps || rawEdge?.bandwidth_speed;
+                const speedText = bwSpeed ? (parseFloat(bwSpeed) >= 1000 ? (parseFloat(bwSpeed)/1000).toFixed(1) + ' Gbps' : parseFloat(bwSpeed).toFixed(1) + ' Mbps') : null;
+
+                if (speedText) {
+                    ctx.save();
+                    ctx.font = 'bold 9px "Inter", monospace';
+                    const textMetrics = ctx.measureText(speedText);
+                    const badgeW = textMetrics.width + 12;
+                    const badgeH = 16;
+
+                    // Futuristic pill badge
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 8);
+                    } else {
+                        ctx.rect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH);
+                    }
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                    ctx.strokeStyle = edgeColor;
+                    ctx.lineWidth = 1;
+                    ctx.shadowColor = edgeColor;
+                    ctx.shadowBlur = 8;
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Text
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.shadowBlur = 0;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(speedText, midX, midY);
+                    ctx.restore();
+                }
             }
 
             ctx.restore();

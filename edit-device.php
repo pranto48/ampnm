@@ -98,6 +98,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $critical_packetloss_threshold = $_POST['critical_packetloss_threshold'] ?? null;
     $show_live_ping = isset($_POST['show_live_ping']) ? 1 : 0;
     $port_config = trim($_POST['port_config'] ?? '');
+    
+    // SNMP Configuration fields
+    $snmp_enabled = isset($_POST['snmp_enabled']) ? 1 : 0;
+    $snmp_version = $_POST['snmp_version'] ?? 'v2c';
+    $snmp_community = trim($_POST['snmp_community'] ?? 'public');
+    $snmp_port = !empty($_POST['snmp_port']) ? (int)$_POST['snmp_port'] : 161;
+    $snmp_v3_user = trim($_POST['snmp_v3_user'] ?? '');
+    $snmp_v3_auth_proto = $_POST['snmp_v3_auth_proto'] ?? 'SHA';
+    $snmp_v3_auth_pass = trim($_POST['snmp_v3_auth_pass'] ?? '');
+    $snmp_v3_priv_proto = $_POST['snmp_v3_priv_proto'] ?? 'AES';
+    $snmp_v3_priv_pass = trim($_POST['snmp_v3_priv_pass'] ?? '');
+    $snmp_v3_sec_level = $_POST['snmp_v3_sec_level'] ?? 'authPriv';
 
     if (empty($name)) {
         $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Device name is required.</div>';
@@ -130,6 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
                 $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
+                $hasSnmp = dbColumnExists($pdo, 'devices', 'snmp_enabled');
                 $schemaWarning = '';
 
             if ($hasSubchoice) {
@@ -150,6 +163,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasPortConfig) {
                     $fields .= ", port_config = ?";
                     $values[] = empty($port_config) ? null : $port_config;
+                }
+                if ($hasSnmp) {
+                    $fields .= ", snmp_enabled = ?, snmp_version = ?, snmp_community = ?, snmp_port = ?, snmp_v3_user = ?, snmp_v3_auth_proto = ?, snmp_v3_auth_pass = ?, snmp_v3_priv_proto = ?, snmp_v3_priv_pass = ?, snmp_v3_sec_level = ?";
+                    $values[] = $snmp_enabled;
+                    $values[] = $snmp_version;
+                    $values[] = empty($snmp_community) ? 'public' : $snmp_community;
+                    $values[] = $snmp_port;
+                    $values[] = empty($snmp_v3_user) ? null : $snmp_v3_user;
+                    $values[] = $snmp_v3_auth_proto;
+                    $values[] = empty($snmp_v3_auth_pass) ? null : $snmp_v3_auth_pass;
+                    $values[] = $snmp_v3_priv_proto;
+                    $values[] = empty($snmp_v3_priv_pass) ? null : $snmp_v3_priv_pass;
+                    $values[] = $snmp_v3_sec_level;
                 }
                 $fields .= ", updated_at = CURRENT_TIMESTAMP";
                 $values[] = $device_id;
@@ -403,6 +429,103 @@ $form_data = $device ?? [];
                             </div>
                         </div>
                     </div>
+                <!-- SNMP Deep Monitoring & Port Telemetry Card -->
+                <fieldset class="border border-cyan-500/40 bg-slate-900/40 rounded-xl p-5 shadow-lg">
+                    <legend class="text-sm font-bold text-cyan-400 px-2.5 flex items-center gap-2">
+                        <i class="fas fa-network-wired text-cyan-400"></i>
+                        SNMP Deep Router / Switch Monitoring (v2c & v3)
+                    </legend>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+                            <div>
+                                <label for="snmp_enabled" class="flex items-center text-sm font-semibold text-white cursor-pointer">
+                                    <input type="checkbox" id="snmp_enabled" name="snmp_enabled" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-500 focus:ring-cyan-500" <?= ($form_data['snmp_enabled'] ?? 0) ? 'checked' : '' ?>>
+                                    <span class="ml-2.5">Enable SNMP Polling for this Device</span>
+                                </label>
+                                <p class="text-xs text-slate-400 ml-6.5 mt-0.5">Collects switch ports, interface bandwidth (In/Out Mbps), CPU, RAM, and system uptime.</p>
+                            </div>
+                            <?php if ($device_id): ?>
+                                <a href="snmp_device_view.php?id=<?= urlencode($device_id) ?>" target="_blank" class="px-3 py-1.5 bg-cyan-600/80 hover:bg-cyan-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span>Port Matrix Dashboard &rarr;</span>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+
+                        <div id="snmp_config_fields" class="space-y-4 <?= ($form_data['snmp_enabled'] ?? 0) ? '' : 'hidden' ?>">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="snmp_version" class="block text-xs font-semibold text-slate-300 mb-1">SNMP Version</label>
+                                    <select id="snmp_version" name="snmp_version" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
+                                        <option value="v2c" <?= ($form_data['snmp_version'] ?? 'v2c') === 'v2c' ? 'selected' : '' ?>>v2c (Recommended / Standard)</option>
+                                        <option value="v1" <?= ($form_data['snmp_version'] ?? '') === 'v1' ? 'selected' : '' ?>>v1 (Legacy)</option>
+                                        <option value="v3" <?= ($form_data['snmp_version'] ?? '') === 'v3' ? 'selected' : '' ?>>v3 (Encrypted / AuthPriv)</option>
+                                    </select>
+                                </div>
+                                <div id="snmp_community_wrap">
+                                    <label for="snmp_community" class="block text-xs font-semibold text-slate-300 mb-1">Community String</label>
+                                    <input type="text" id="snmp_community" name="snmp_community" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="public" value="<?= htmlspecialchars($form_data['snmp_community'] ?? 'public') ?>">
+                                </div>
+                                <div>
+                                    <label for="snmp_port" class="block text-xs font-semibold text-slate-300 mb-1">SNMP Port</label>
+                                    <input type="number" id="snmp_port" name="snmp_port" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="161" value="<?= htmlspecialchars($form_data['snmp_port'] ?? '161') ?>">
+                                </div>
+                            </div>
+
+                            <!-- SNMP v3 Specific Config -->
+                            <div id="snmp_v3_fields" class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/80 space-y-3 <?= ($form_data['snmp_version'] ?? '') === 'v3' ? '' : 'hidden' ?>">
+                                <h4 class="text-xs font-bold text-cyan-300 uppercase tracking-wider">SNMP v3 Security Credentials</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-slate-400 mb-1">v3 Username</label>
+                                        <input type="text" name="snmp_v3_user" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" value="<?= htmlspecialchars($form_data['snmp_v3_user'] ?? '') ?>">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-400 mb-1">Security Level</label>
+                                        <select name="snmp_v3_sec_level" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white">
+                                            <option value="authPriv" <?= ($form_data['snmp_v3_sec_level'] ?? '') === 'authPriv' ? 'selected' : '' ?>>authPriv (Auth + Encryption)</option>
+                                            <option value="authNoPriv" <?= ($form_data['snmp_v3_sec_level'] ?? '') === 'authNoPriv' ? 'selected' : '' ?>>authNoPriv (Auth Only)</option>
+                                            <option value="noAuthNoPriv" <?= ($form_data['snmp_v3_sec_level'] ?? '') === 'noAuthNoPriv' ? 'selected' : '' ?>>noAuthNoPriv</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-400 mb-1">Auth Protocol & Password</label>
+                                        <div class="flex gap-1">
+                                            <select name="snmp_v3_auth_proto" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-1.5 text-xs text-white w-20">
+                                                <option value="SHA" <?= ($form_data['snmp_v3_auth_proto'] ?? 'SHA') === 'SHA' ? 'selected' : '' ?>>SHA</option>
+                                                <option value="MD5" <?= ($form_data['snmp_v3_auth_proto'] ?? '') === 'MD5' ? 'selected' : '' ?>>MD5</option>
+                                            </select>
+                                            <input type="password" name="snmp_v3_auth_pass" placeholder="Auth Pass" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white" value="<?= htmlspecialchars($form_data['snmp_v3_auth_pass'] ?? '') ?>">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-slate-400 mb-1">Privacy Protocol (Encryption)</label>
+                                        <select name="snmp_v3_priv_proto" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white">
+                                            <option value="AES" <?= ($form_data['snmp_v3_priv_proto'] ?? 'AES') === 'AES' ? 'selected' : '' ?>>AES / AES128</option>
+                                            <option value="DES" <?= ($form_data['snmp_v3_priv_proto'] ?? '') === 'DES' ? 'selected' : '' ?>>DES</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-400 mb-1">Privacy Password</label>
+                                        <input type="password" name="snmp_v3_priv_pass" placeholder="Privacy Pass" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" value="<?= htmlspecialchars($form_data['snmp_v3_priv_pass'] ?? '') ?>">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Live Test Connection & Diagnostics Button -->
+                            <div class="flex items-center gap-3 pt-2">
+                                <button type="button" id="btn_test_snmp" class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg text-xs font-bold transition-all shadow flex items-center gap-2">
+                                    <i class="fas fa-plug"></i>
+                                    <span>Test SNMP Connection</span>
+                                </button>
+                                <span id="snmp_test_status" class="text-xs font-semibold"></span>
+                            </div>
+                            <div id="snmp_test_details" class="hidden bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs font-mono text-slate-300"></div>
+                        </div>
+                    </div>
                 </fieldset>
 
                 <fieldset class="border border-slate-600 rounded-lg p-4">
@@ -638,6 +761,97 @@ $form_data = $device ?? [];
     if (boldCheck) boldCheck.addEventListener('change', updatePreview);
     if (italicCheck) italicCheck.addEventListener('change', updatePreview);
     if (nameInput) nameInput.addEventListener('input', updatePreview);
+
+    // SNMP Live Controls & Diagnostics
+    const snmpEnabled = document.getElementById('snmp_enabled');
+    const snmpConfigFields = document.getElementById('snmp_config_fields');
+    const snmpVersion = document.getElementById('snmp_version');
+    const snmpV3Fields = document.getElementById('snmp_v3_fields');
+    const snmpCommWrap = document.getElementById('snmp_community_wrap');
+    const btnTestSnmp = document.getElementById('btn_test_snmp');
+    const snmpTestStatus = document.getElementById('snmp_test_status');
+    const snmpTestDetails = document.getElementById('snmp_test_details');
+
+    if (snmpEnabled && snmpConfigFields) {
+        snmpEnabled.addEventListener('change', function() {
+            snmpConfigFields.classList.toggle('hidden', !this.checked);
+        });
+    }
+
+    if (snmpVersion) {
+        snmpVersion.addEventListener('change', function() {
+            const isV3 = this.value === 'v3';
+            if (snmpV3Fields) snmpV3Fields.classList.toggle('hidden', !isV3);
+            if (snmpCommWrap) snmpCommWrap.classList.toggle('hidden', isV3);
+        });
+    }
+
+    if (btnTestSnmp) {
+        btnTestSnmp.addEventListener('click', function() {
+            const ip = (document.getElementById('ip')?.value || '').trim();
+            if (!ip) {
+                alert('Please enter an IP address above to test SNMP.');
+                return;
+            }
+
+            snmpTestStatus.className = 'text-xs font-semibold text-cyan-400 animate-pulse';
+            snmpTestStatus.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Testing SNMP connectivity...';
+            snmpTestDetails.classList.add('hidden');
+            btnTestSnmp.disabled = true;
+
+            const payload = {
+                ip: ip,
+                snmp_port: document.getElementById('snmp_port')?.value || 161,
+                snmp_version: document.getElementById('snmp_version')?.value || 'v2c',
+                snmp_community: document.getElementById('snmp_community')?.value || 'public',
+                snmp_v3_user: document.querySelector('[name="snmp_v3_user"]')?.value || '',
+                snmp_v3_sec_level: document.querySelector('[name="snmp_v3_sec_level"]')?.value || 'authPriv',
+                snmp_v3_auth_proto: document.querySelector('[name="snmp_v3_auth_proto"]')?.value || 'SHA',
+                snmp_v3_auth_pass: document.querySelector('[name="snmp_v3_auth_pass"]')?.value || '',
+                snmp_v3_priv_proto: document.querySelector('[name="snmp_v3_priv_proto"]')?.value || 'AES',
+                snmp_v3_priv_pass: document.querySelector('[name="snmp_v3_priv_pass"]')?.value || ''
+            };
+
+            fetch('api.php?action=test_snmp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                btnTestSnmp.disabled = false;
+                if (data.success) {
+                    snmpTestStatus.className = 'text-xs font-bold text-emerald-400 flex items-center gap-1.5';
+                    snmpTestStatus.innerHTML = '<i class="fas fa-check-circle"></i> Connected! (' + (data.interfaces_count || 0) + ' Interfaces Discovered)';
+                    
+                    const sys = data.system || {};
+                    snmpTestDetails.innerHTML = `
+                        <div class="font-bold text-emerald-300 mb-1">✓ SNMP Query Succeeded</div>
+                        <div><strong>System:</strong> ${escapeHtml(sys.sys_name || 'N/A')}</div>
+                        <div><strong>Description:</strong> ${escapeHtml(sys.sys_descr || 'N/A')}</div>
+                        <div><strong>Uptime:</strong> ${escapeHtml(sys.sys_uptime || 'N/A')}</div>
+                        ${sys.cpu_percent !== null && sys.cpu_percent !== undefined ? `<div><strong>CPU:</strong> ${sys.cpu_percent}%</div>` : ''}
+                        ${sys.temperature !== null && sys.temperature !== undefined ? `<div><strong>Temp:</strong> ${sys.temperature} °C</div>` : ''}
+                    `;
+                    snmpTestDetails.classList.remove('hidden');
+                } else {
+                    snmpTestStatus.className = 'text-xs font-bold text-rose-400 flex items-center gap-1.5';
+                    snmpTestStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Failed: ' + (data.message || 'Timeout / Unreachable');
+                    snmpTestDetails.innerHTML = `<div class="text-rose-400">${escapeHtml(data.message || 'Unknown error')}</div>`;
+                    snmpTestDetails.classList.remove('hidden');
+                }
+            })
+            .catch(err => {
+                btnTestSnmp.disabled = false;
+                snmpTestStatus.className = 'text-xs font-bold text-rose-400';
+                snmpTestStatus.innerHTML = '<i class="fas fa-times-circle"></i> Network Error';
+            });
+        });
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
+    }
 })();
 </script>
 

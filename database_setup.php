@@ -1149,6 +1149,84 @@ try {
         $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `connection_timeout_seconds` INT(5) UNSIGNED DEFAULT 20 AFTER `subject_prefix`;");
         message("Upgraded 'smtp_settings' table: added 'connection_timeout_seconds' column.");
     }
+
+    // ==========================================
+    // v1.20 MIGRATION: SNMP Deep Router & Switch Monitoring
+    // ==========================================
+    $snmpCols = [
+        'snmp_enabled' => "TINYINT(1) DEFAULT 0",
+        'snmp_version' => "ENUM('v1', 'v2c', 'v3') DEFAULT 'v2c'",
+        'snmp_community' => "VARCHAR(128) DEFAULT 'public'",
+        'snmp_port' => "INT DEFAULT 161",
+        'snmp_v3_user' => "VARCHAR(128) NULL",
+        'snmp_v3_auth_proto' => "VARCHAR(32) DEFAULT 'SHA'",
+        'snmp_v3_auth_pass' => "VARCHAR(128) NULL",
+        'snmp_v3_priv_proto' => "VARCHAR(32) DEFAULT 'AES'",
+        'snmp_v3_priv_pass' => "VARCHAR(128) NULL",
+        'snmp_v3_sec_level' => "VARCHAR(32) DEFAULT 'authPriv'",
+        'snmp_last_poll' => "DATETIME NULL",
+        'snmp_sys_descr' => "VARCHAR(500) NULL",
+        'snmp_sys_uptime' => "VARCHAR(120) NULL"
+    ];
+
+    foreach ($snmpCols as $col => $typeDef) {
+        if (!columnExists($pdo, $dbname, 'devices', $col)) {
+            $pdo->exec("ALTER TABLE `devices` ADD COLUMN `$col` $typeDef;");
+            message("Upgraded 'devices' table: added '$col' column for SNMP.");
+        }
+    }
+
+    // SNMP Interface Table for Switches/Routers
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `device_snmp_interfaces` (
+        `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `device_id` INT(6) UNSIGNED NOT NULL,
+        `if_index` INT NOT NULL,
+        `if_descr` VARCHAR(255) NOT NULL,
+        `if_alias` VARCHAR(255) NULL,
+        `if_type` VARCHAR(64) DEFAULT 'ethernet',
+        `if_speed` BIGINT UNSIGNED DEFAULT 0,
+        `if_mac` VARCHAR(32) NULL,
+        `if_admin_status` VARCHAR(20) DEFAULT 'up',
+        `if_oper_status` VARCHAR(20) DEFAULT 'up',
+        `if_in_octets` BIGINT UNSIGNED DEFAULT 0,
+        `if_out_octets` BIGINT UNSIGNED DEFAULT 0,
+        `if_in_errors` INT UNSIGNED DEFAULT 0,
+        `if_out_errors` INT UNSIGNED DEFAULT 0,
+        `in_rate_bps` BIGINT UNSIGNED DEFAULT 0,
+        `out_rate_bps` BIGINT UNSIGNED DEFAULT 0,
+        `last_poll_time` DATETIME NULL,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
+        UNIQUE KEY `uk_dev_if` (`device_id`, `if_index`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Created or verified 'device_snmp_interfaces' table.");
+
+    // SNMP Timeseries History for Traffic & Hardware Graphs
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `device_snmp_history` (
+        `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `device_id` INT(6) UNSIGNED NOT NULL,
+        `if_index` INT NOT NULL,
+        `in_rate_bps` BIGINT UNSIGNED DEFAULT 0,
+        `out_rate_bps` BIGINT UNSIGNED DEFAULT 0,
+        `cpu_usage` FLOAT NULL,
+        `memory_usage` FLOAT NULL,
+        `temperature` FLOAT NULL,
+        `uptime_seconds` BIGINT NULL,
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
+        INDEX `idx_dev_if_time` (`device_id`, `if_index`, `created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Created or verified 'device_snmp_history' table.");
+
+    // Tie map connection edges to specific SNMP switch port interface
+    if (!columnExists($pdo, $dbname, 'device_edges', 'snmp_source_if_index')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `snmp_source_if_index` INT NULL AFTER `tx_bytes`;");
+        message("Upgraded 'device_edges' table: added 'snmp_source_if_index' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'device_edges', 'snmp_target_if_index')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `snmp_target_if_index` INT NULL AFTER `snmp_source_if_index`;");
+        message("Upgraded 'device_edges' table: added 'snmp_target_if_index' column.");
+    }
     if (!columnExists($pdo, $dbname, 'smtp_settings', 'max_emails_per_hour')) {
         $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240 AFTER `connection_timeout_seconds`;");
         message("Upgraded 'smtp_settings' table: added 'max_emails_per_hour' column.");

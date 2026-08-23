@@ -983,7 +983,7 @@ switch ($action) {
                 exit;
             }
 
-            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config'];
+            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config', 'snmp_enabled', 'snmp_version', 'snmp_community', 'snmp_port', 'snmp_v3_user', 'snmp_v3_auth_proto', 'snmp_v3_auth_pass', 'snmp_v3_priv_proto', 'snmp_v3_priv_pass', 'snmp_v3_sec_level'];
             if (!$hasSubchoice) {
                 $allowed_fields = array_values(array_diff($allowed_fields, ['subchoice']));
             }
@@ -1342,4 +1342,241 @@ switch ($action) {
             }
         }
         break;
+
+    case 'test_snmp':
+        require_once __DIR__ . '/../../includes/snmp_monitor.php';
+        $devId = isset($input['device_id']) ? (int)$input['device_id'] : (isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0);
+        $config = [];
+
+        if ($devId > 0) {
+            $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ?");
+            $stmt->execute([$devId]);
+            $device = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$device) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Device not found']);
+                exit;
+            }
+            $config = $device;
+        } else {
+            $config = [
+                'ip' => $input['ip'] ?? $_GET['ip'] ?? '',
+                'snmp_port' => $input['snmp_port'] ?? $_GET['snmp_port'] ?? 161,
+                'snmp_version' => $input['snmp_version'] ?? $_GET['snmp_version'] ?? 'v2c',
+                'snmp_community' => $input['snmp_community'] ?? $_GET['snmp_community'] ?? 'public',
+                'snmp_v3_user' => $input['snmp_v3_user'] ?? null,
+                'snmp_v3_auth_proto' => $input['snmp_v3_auth_proto'] ?? 'SHA',
+                'snmp_v3_auth_pass' => $input['snmp_v3_auth_pass'] ?? null,
+                'snmp_v3_priv_proto' => $input['snmp_v3_priv_proto'] ?? 'AES',
+                'snmp_v3_priv_pass' => $input['snmp_v3_priv_pass'] ?? null,
+                'snmp_v3_sec_level' => $input['snmp_v3_sec_level'] ?? 'authPriv',
+            ];
+        }
+
+        if (empty($config['ip'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Device IP address is required for SNMP test.']);
+            exit;
+        }
+
+        $snmp = new SNMPMonitor($config);
+        $overview = $snmp->getSystemOverview();
+
+        if (empty($overview['online'])) {
+            echo json_encode([
+                'success' => false,
+                'message' => $overview['error'] ?? 'SNMP connection failed or timed out. Check IP, Port (161), and Community string.',
+                'raw_config' => ['ip' => $config['ip'], 'port' => $config['snmp_port'], 'version' => $config['snmp_version']]
+            ]);
+            exit;
+        }
+
+        $interfaces = $snmp->getInterfaces();
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'SNMP connection successful!',
+            'system' => $overview,
+            'interfaces_count' => count($interfaces),
+            'interfaces' => $interfaces
+        ]);
+        break;
+
+    case 'poll_snmp':
+        require_once __DIR__ . '/../../includes/snmp_monitor.php';
+        $devId = isset($input['device_id']) ? (int)$input['device_id'] : (isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0);
+        if ($devId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Device ID required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ?");
+        $stmt->execute([$devId]);
+        $device = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$device) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Device not found']);
+            exit;
+        }
+
+        $snmp = new SNMPMonitor($device);
+        $overview = $snmp->getSystemOverview();
+        if (empty($overview['online'])) {
+            echo json_encode(['success' => false, 'error' => $overview['error'] ?? 'Host unreachable']);
+            exit;
+        }
+
+        $interfaces = $snmp->getInterfaces();
+        $now = date('Y-m-d H:i:s');
+        $nowTs = time();
+
+        // Get prior interface readings to calculate delta bitrate
+        $stmtOld = $pdo->prepare("SELECT if_index, if_in_octets, if_out_octets, UNIX_TIMESTAMP(last_poll_time) as old_time FROM device_snmp_interfaces WHERE device_id = ?");
+        $stmtOld->execute([$devId]);
+        $oldRows = [];
+        while ($r = $stmtOld->fetch(PDO::FETCH_ASSOC)) {
+            $oldRows[(int)$r['if_index']] = $r;
+        }
+
+        $upsertStmt = $pdo->prepare("INSERT INTO device_snmp_interfaces 
+            (device_id, if_index, if_descr, if_alias, if_type, if_speed, if_mac, if_admin_status, if_oper_status, if_in_octets, if_out_octets, if_in_errors, if_out_errors, in_rate_bps, out_rate_bps, last_poll_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                if_descr = VALUES(if_descr),
+                if_alias = VALUES(if_alias),
+                if_type = VALUES(if_type),
+                if_speed = VALUES(if_speed),
+                if_mac = VALUES(if_mac),
+                if_admin_status = VALUES(if_admin_status),
+                if_oper_status = VALUES(if_oper_status),
+                if_in_octets = VALUES(if_in_octets),
+                if_out_octets = VALUES(if_out_octets),
+                if_in_errors = VALUES(if_in_errors),
+                if_out_errors = VALUES(if_out_errors),
+                in_rate_bps = VALUES(in_rate_bps),
+                out_rate_bps = VALUES(out_rate_bps),
+                last_poll_time = VALUES(last_poll_time)");
+
+        $histStmt = $pdo->prepare("INSERT INTO device_snmp_history 
+            (device_id, if_index, in_rate_bps, out_rate_bps, cpu_usage, temperature, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)");
+
+        $savedInterfaces = [];
+
+        foreach ($interfaces as $if) {
+            $idx = (int)$if['if_index'];
+            $inRate = 0;
+            $outRate = 0;
+
+            if (isset($oldRows[$idx])) {
+                $old = $oldRows[$idx];
+                $deltaTime = $nowTs - (int)($old['old_time'] ?? 0);
+                if ($deltaTime > 0 && $deltaTime < 3600) {
+                    $deltaIn = (float)$if['in_octets'] - (float)$old['if_in_octets'];
+                    $deltaOut = (float)$if['out_octets'] - (float)$old['if_out_octets'];
+                    if ($deltaIn >= 0) $inRate = (int)(($deltaIn * 8) / $deltaTime);
+                    if ($deltaOut >= 0) $outRate = (int)(($deltaOut * 8) / $deltaTime);
+                }
+            }
+
+            $upsertStmt->execute([
+                $devId,
+                $idx,
+                $if['if_descr'],
+                $if['if_alias'],
+                $if['if_type'],
+                $if['if_speed'],
+                $if['if_mac'],
+                $if['if_admin_status'],
+                $if['if_oper_status'],
+                $if['in_octets'],
+                $if['out_octets'],
+                $if['in_errors'],
+                $if['out_errors'],
+                $inRate,
+                $outRate,
+                $now
+            ]);
+
+            // Save history snapshot if active or periodic
+            $histStmt->execute([
+                $devId,
+                $idx,
+                $inRate,
+                $outRate,
+                $overview['cpu_percent'],
+                $overview['temperature'],
+                $now
+            ]);
+
+            $if['in_rate_bps'] = $inRate;
+            $if['out_rate_bps'] = $outRate;
+            $if['in_rate_formatted'] = SNMPMonitor::formatBitrate($inRate);
+            $if['out_rate_formatted'] = SNMPMonitor::formatBitrate($outRate);
+            $savedInterfaces[] = $if;
+        }
+
+        // Update device system info
+        $updDev = $pdo->prepare("UPDATE devices SET snmp_last_poll = ?, snmp_sys_descr = ?, snmp_sys_uptime = ? WHERE id = ?");
+        $updDev->execute([$now, substr((string)$overview['sys_descr'], 0, 500), (string)$overview['sys_uptime'], $devId]);
+
+        echo json_encode([
+            'success' => true,
+            'system' => $overview,
+            'interfaces' => $savedInterfaces,
+            'last_poll' => $now
+        ]);
+        break;
+
+    case 'get_snmp_interfaces':
+        $devId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+        if ($devId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Device ID required']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT * FROM device_snmp_interfaces WHERE device_id = ? ORDER BY if_index ASC");
+        $stmt->execute([$devId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        require_once __DIR__ . '/../../includes/snmp_monitor.php';
+        foreach ($rows as &$r) {
+            $r['in_rate_formatted'] = SNMPMonitor::formatBitrate((float)$r['in_rate_bps']);
+            $r['out_rate_formatted'] = SNMPMonitor::formatBitrate((float)$r['out_rate_bps']);
+            $speed = (float)$r['if_speed'];
+            $maxRate = max((float)$r['in_rate_bps'], (float)$r['out_rate_bps']);
+            $r['utilization_percent'] = ($speed > 0) ? round(($maxRate / $speed) * 100, 1) : 0;
+        }
+
+        echo json_encode(['success' => true, 'interfaces' => $rows]);
+        break;
+
+    case 'get_snmp_history':
+        $devId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+        $ifIndex = isset($_GET['if_index']) ? (int)$_GET['if_index'] : 0;
+        $limit = isset($_GET['limit']) ? min(300, max(10, (int)$_GET['limit'])) : 60;
+
+        if ($devId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Device ID required']);
+            exit;
+        }
+
+        if ($ifIndex > 0) {
+            $stmt = $pdo->prepare("SELECT * FROM device_snmp_history WHERE device_id = ? AND if_index = ? ORDER BY created_at DESC LIMIT ?");
+            $stmt->bindValue(1, $devId, PDO::PARAM_INT);
+            $stmt->bindValue(2, $ifIndex, PDO::PARAM_INT);
+            $stmt->bindValue(3, $limit, PDO::PARAM_INT);
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM device_snmp_history WHERE device_id = ? ORDER BY created_at DESC LIMIT ?");
+            $stmt->bindValue(1, $devId, PDO::PARAM_INT);
+            $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        $history = array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC));
+
+        echo json_encode(['success' => true, 'history' => $history]);
+        break;
 }
+
