@@ -127,6 +127,38 @@ try {
         exit;
     }
 
+    if ($action === 'get_public_status_page') {
+        $settings = $pdo->query("SELECT * FROM status_page_settings LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        if (!$settings || empty($settings['is_public_enabled'])) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Status page is not publicly accessible.']);
+            exit;
+        }
+
+        $components = $pdo->query("SELECT c.*, d.name AS linked_device_name, d.status AS linked_device_status 
+            FROM status_page_components c
+            LEFT JOIN devices d ON c.device_id = d.id
+            ORDER BY c.group_name ASC, c.display_order ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+        $incidents = $pdo->query("SELECT * FROM status_page_incidents WHERE status != 'resolved' OR created_at >= NOW() - INTERVAL 7 DAY ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($incidents as &$inc) {
+            $stmtUp = $pdo->prepare("SELECT * FROM status_page_incident_updates WHERE incident_id = ? ORDER BY created_at DESC");
+            $stmtUp->execute([$inc['id']]);
+            $inc['updates'] = $stmtUp->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $maintenances = $pdo->query("SELECT * FROM maintenance_windows WHERE end_time >= NOW() ORDER BY start_time ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'settings' => $settings,
+            'components' => $components,
+            'incidents' => $incidents,
+            'maintenance_windows' => $maintenances
+        ]);
+        exit;
+    }
+
     // --- Authenticated Actions (AUTH REQUIRED) ---
     // Support Bearer Token & X-Agent-Token Authentication for REST API & Telemetry Agents
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
@@ -242,7 +274,11 @@ try {
         // IPAM Actions
         'get_ipam_subnets', 'create_ipam_subnet', 'delete_ipam_subnet', 'get_ipam_subnet_ips', 'assign_ipam_ip', 'scan_ipam_subnet',
         // Rack Elevation Actions
-        'get_rack_cabinets', 'create_rack_cabinet', 'delete_rack_cabinet', 'get_rack_devices', 'mount_rack_device', 'unmount_rack_device'
+        'get_rack_cabinets', 'create_rack_cabinet', 'delete_rack_cabinet', 'get_rack_devices', 'mount_rack_device', 'unmount_rack_device',
+        // Status Page & Incident Actions
+        'get_status_page_admin', 'save_status_page_settings', 'save_status_component', 'delete_status_component', 'create_status_incident', 'update_status_incident', 'resolve_status_incident',
+        // Maintenance Windows Actions
+        'get_maintenance_windows', 'create_maintenance_window', 'delete_maintenance_window', 'check_device_maintenance_status'
     ];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];

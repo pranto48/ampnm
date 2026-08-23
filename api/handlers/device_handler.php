@@ -2188,6 +2188,180 @@ switch ($action) {
         $pdo->prepare("DELETE FROM rack_devices WHERE id = ?")->execute([$id]);
         echo json_encode(['success' => true, 'message' => 'Device unmounted from rack.']);
         break;
+
+    // --- Status Page & Incident Management Handlers ---
+    case 'get_status_page_admin':
+        $settings = $pdo->query("SELECT * FROM status_page_settings LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        $components = $pdo->query("SELECT c.*, d.name AS device_name, d.ip AS device_ip 
+            FROM status_page_components c 
+            LEFT JOIN devices d ON c.device_id = d.id 
+            ORDER BY c.group_name ASC, c.display_order ASC")->fetchAll(PDO::FETCH_ASSOC);
+        $incidents = $pdo->query("SELECT * FROM status_page_incidents ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($incidents as &$inc) {
+            $stmtUp = $pdo->prepare("SELECT * FROM status_page_incident_updates WHERE incident_id = ? ORDER BY created_at DESC");
+            $stmtUp->execute([$inc['id']]);
+            $inc['updates'] = $stmtUp->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'settings' => $settings,
+            'components' => $components,
+            'incidents' => $incidents
+        ]);
+        break;
+
+    case 'save_status_page_settings':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $title = trim($input['title'] ?? $_POST['title'] ?? 'AMPNM System Status');
+        $company = trim($input['company_name'] ?? $_POST['company_name'] ?? 'AMPNM Network');
+        $logo = trim($input['logo_url'] ?? $_POST['logo_url'] ?? '');
+        $msg = trim($input['header_message'] ?? $_POST['header_message'] ?? '');
+        $isPublic = !empty($input['is_public_enabled']) || !empty($_POST['is_public_enabled']) ? 1 : 0;
+
+        $chk = $pdo->query("SELECT id FROM status_page_settings LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        if ($chk) {
+            $stmt = $pdo->prepare("UPDATE status_page_settings SET title = ?, company_name = ?, logo_url = ?, header_message = ?, is_public_enabled = ? WHERE id = ?");
+            $stmt->execute([$title, $company, $logo, $msg, $isPublic, $chk['id']]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO status_page_settings (id, title, company_name, logo_url, header_message, is_public_enabled) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([generateUuid(), $title, $company, $logo, $msg, $isPublic]);
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Status page settings saved successfully!']);
+        break;
+
+    case 'save_status_component':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $name = trim($input['name'] ?? $_POST['name'] ?? '');
+        $group = trim($input['group_name'] ?? $_POST['group_name'] ?? 'Core Services');
+        $devId = $input['device_id'] ?? $_POST['device_id'] ?? null;
+        $status = $input['status'] ?? $_POST['status'] ?? 'operational';
+        $order = (int)($input['display_order'] ?? $_POST['display_order'] ?? 0);
+
+        if (empty($name)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Component Name required']);
+            exit;
+        }
+
+        if (!empty($id)) {
+            $stmt = $pdo->prepare("UPDATE status_page_components SET name = ?, group_name = ?, device_id = ?, status = ?, display_order = ? WHERE id = ?");
+            $stmt->execute([$name, $group, $devId ?: null, $status, $order, $id]);
+        } else {
+            $id = generateUuid();
+            $stmt = $pdo->prepare("INSERT INTO status_page_components (id, name, group_name, device_id, status, display_order) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$id, $name, $group, $devId ?: null, $status, $order]);
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Component saved!', 'id' => $id]);
+        break;
+
+    case 'delete_status_component':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $pdo->prepare("DELETE FROM status_page_components WHERE id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Component deleted']);
+        break;
+
+    case 'create_status_incident':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $title = trim($input['title'] ?? $_POST['title'] ?? '');
+        $status = $input['status'] ?? $_POST['status'] ?? 'investigating';
+        $impact = $input['impact'] ?? $_POST['impact'] ?? 'minor';
+        $initialMessage = trim($input['message'] ?? $_POST['message'] ?? 'We are currently investigating the issue.');
+
+        if (empty($title)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Incident Title required']);
+            exit;
+        }
+
+        $incId = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO status_page_incidents (id, title, status, impact) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$incId, $title, $status, $impact]);
+
+        // Insert initial timeline update
+        $stmtUp = $pdo->prepare("INSERT INTO status_page_incident_updates (id, incident_id, status_state, message) VALUES (?, ?, ?, ?)");
+        $stmtUp->execute([generateUuid(), $incId, $status, $initialMessage]);
+
+        echo json_encode(['success' => true, 'message' => 'Incident published!', 'id' => $incId]);
+        break;
+
+    case 'update_status_incident':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $incId = $input['incident_id'] ?? $_POST['incident_id'] ?? '';
+        $status = $input['status'] ?? $_POST['status'] ?? 'investigating';
+        $message = trim($input['message'] ?? $_POST['message'] ?? '');
+
+        if (empty($incId) || empty($message)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Incident ID and update message required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("UPDATE status_page_incidents SET status = ?, resolved_at = IF(? = 'resolved', NOW(), resolved_at) WHERE id = ?");
+        $stmt->execute([$status, $status, $incId]);
+
+        $stmtUp = $pdo->prepare("INSERT INTO status_page_incident_updates (id, incident_id, status_state, message) VALUES (?, ?, ?, ?)");
+        $stmtUp->execute([generateUuid(), $incId, $status, $message]);
+
+        echo json_encode(['success' => true, 'message' => 'Incident update posted!']);
+        break;
+
+    // --- Planned Maintenance Windows Handlers ---
+    case 'get_maintenance_windows':
+        $windows = $pdo->query("SELECT m.*, d.name AS target_device_name, d.ip AS target_device_ip 
+            FROM maintenance_windows m 
+            LEFT JOIN devices d ON m.target_type = 'device' AND m.target_id = d.id 
+            ORDER BY m.start_time DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'windows' => $windows]);
+        break;
+
+    case 'create_maintenance_window':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $title = trim($input['title'] ?? $_POST['title'] ?? '');
+        $targetType = $input['target_type'] ?? $_POST['target_type'] ?? 'device';
+        $targetId = $input['target_id'] ?? $_POST['target_id'] ?? null;
+        $startTime = $input['start_time'] ?? $_POST['start_time'] ?? '';
+        $endTime = $input['end_time'] ?? $_POST['end_time'] ?? '';
+        $suppressAlerts = !empty($input['suppress_alerts']) || !empty($_POST['suppress_alerts']) ? 1 : 0;
+        $notes = trim($input['notes'] ?? $_POST['notes'] ?? '');
+
+        if (empty($title) || empty($startTime) || empty($endTime)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Title, Start Time, and End Time are required']);
+            exit;
+        }
+
+        $id = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO maintenance_windows (id, title, target_type, target_id, start_time, end_time, suppress_alerts, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $title, $targetType, $targetId ?: null, $startTime, $endTime, $suppressAlerts, $notes]);
+
+        echo json_encode(['success' => true, 'message' => 'Maintenance window scheduled!', 'id' => $id]);
+        break;
+
+    case 'delete_maintenance_window':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $pdo->prepare("DELETE FROM maintenance_windows WHERE id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Maintenance window deleted']);
+        break;
+
+    case 'check_device_maintenance_status':
+        $devId = $input['device_id'] ?? $_GET['device_id'] ?? '';
+        $stmt = $pdo->prepare("SELECT * FROM maintenance_windows WHERE (target_type = 'all' OR (target_type = 'device' AND target_id = ?)) AND NOW() BETWEEN start_time AND end_time LIMIT 1");
+        $stmt->execute([$devId]);
+        $activeWindow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'is_in_maintenance' => $activeWindow ? true : false,
+            'active_window' => $activeWindow
+        ]);
+        break;
 }
 
 

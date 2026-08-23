@@ -1556,6 +1556,90 @@ try {
         message("Default 42U Server Rack cabinet and units seeded.");
     }
 
+    // 32. Status Page Settings Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `status_page_settings` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `title` VARCHAR(150) NOT NULL DEFAULT 'System Status & Incident Board',
+        `company_name` VARCHAR(100) NOT NULL DEFAULT 'AMPNM Enterprise Network',
+        `logo_url` VARCHAR(255) NULL,
+        `header_message` TEXT NULL,
+        `is_public_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'status_page_settings' created or already exists.");
+
+    // 33. Status Page Components Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `status_page_components` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(100) NOT NULL,
+        `group_name` VARCHAR(100) NOT NULL DEFAULT 'Core Infrastructure',
+        `device_id` VARCHAR(36) NULL,
+        `status` ENUM('operational', 'degraded', 'outage', 'maintenance') NOT NULL DEFAULT 'operational',
+        `display_order` INT NOT NULL DEFAULT 0,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_group (`group_name`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'status_page_components' created or already exists.");
+
+    // 34. Status Page Incidents Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `status_page_incidents` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `title` VARCHAR(200) NOT NULL,
+        `status` ENUM('investigating', 'identified', 'monitoring', 'resolved') NOT NULL DEFAULT 'investigating',
+        `impact` ENUM('none', 'minor', 'major', 'critical') NOT NULL DEFAULT 'minor',
+        `postmortem` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `resolved_at` TIMESTAMP NULL,
+        INDEX idx_status (`status`),
+        INDEX idx_created (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'status_page_incidents' created or already exists.");
+
+    // 35. Status Page Incident Updates Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `status_page_incident_updates` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `incident_id` VARCHAR(36) NOT NULL,
+        `status_state` ENUM('investigating', 'identified', 'monitoring', 'resolved') NOT NULL DEFAULT 'investigating',
+        `message` TEXT NOT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_incident (`incident_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'status_page_incident_updates' created or already exists.");
+
+    // 36. Maintenance Windows & Silence Periods Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `maintenance_windows` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `title` VARCHAR(150) NOT NULL,
+        `target_type` ENUM('device', 'map', 'all') NOT NULL DEFAULT 'device',
+        `target_id` VARCHAR(36) NULL,
+        `start_time` DATETIME NOT NULL,
+        `end_time` DATETIME NOT NULL,
+        `suppress_alerts` TINYINT(1) NOT NULL DEFAULT 1,
+        `notes` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_target (`target_type`, `target_id`),
+        INDEX idx_time (`start_time`, `end_time`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'maintenance_windows' created or already exists.");
+
+    // Seed default status page settings & components if empty
+    $chkStatSetting = $pdo->query("SELECT COUNT(*) FROM status_page_settings")->fetchColumn();
+    if ($chkStatSetting == 0) {
+        $spId = generateUuid();
+        $pdo->exec("INSERT INTO status_page_settings (id, title, company_name, header_message, is_public_enabled) VALUES 
+            ('$spId', 'AMPNM Live Infrastructure Status', 'AMPNM Global Network', 'All core systems and communication backbones are actively monitored 24/7.', 1);");
+        
+        // Seed default components
+        $c1 = generateUuid();
+        $c2 = generateUuid();
+        $c3 = generateUuid();
+        $pdo->exec("INSERT INTO status_page_components (id, name, group_name, status, display_order) VALUES
+            ('$c1', 'Core BGP Gateway & Border Routers', 'Network Infrastructure', 'operational', 1),
+            ('$c2', 'Data Center Core Distribution Switches', 'Network Infrastructure', 'operational', 2),
+            ('$c3', 'Cloud API & Management Services', 'Core Services', 'operational', 3);");
+        message("Default Status Page settings and service components seeded.");
+    }
+
 
 
     echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";
