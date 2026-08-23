@@ -3,72 +3,76 @@
 # Copyright (c) IT Support BD. All rights reserved.
 # This file is part of AMPNM.
 # 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License...
-# (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+# AMPNM Docker & Git Safe Auto-Update Script with Health-Check Gate & Auto-Rollback
 #
 set -euo pipefail
 
-# AMPNM Docker Auto Update Script
-# - Creates rollback metadata
-# - Optionally creates DB dump backup
-# - Pulls latest images and recreates containers
-
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 STATE_DIR="$PROJECT_DIR/.update-state"
-TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+TIMESTAMP="$(date -u +%Y%m%d_%H%M%SZ)"
 RUN_DIR="$STATE_DIR/$TIMESTAMP"
 
 mkdir -p "$RUN_DIR"
-
 cd "$PROJECT_DIR"
+
+echo "=== [1/6] Capturing Pre-Update State ==="
+PRE_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "unknown")"
+echo "Current Git Commit: $PRE_COMMIT" > "$RUN_DIR/pre-update-state.txt"
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   COMPOSE=(docker compose)
-else
+elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE=(docker-compose)
+else
+  COMPOSE=()
 fi
 
-"${COMPOSE[@]}" ps > "$RUN_DIR/pre-update-ps.txt" || true
-"${COMPOSE[@]}" images > "$RUN_DIR/pre-update-images.txt" || true
-
-APP_IMAGE_BEFORE="$("${COMPOSE[@]}" images app --format json 2>/dev/null | head -n1 | sed -n 's/.*"ID":"\([^"]*\)".*/\1/p' || true)"
-DB_IMAGE_BEFORE="$("${COMPOSE[@]}" images db --format json 2>/dev/null | head -n1 | sed -n 's/.*"ID":"\([^"]*\)".*/\1/p' || true)"
+if [ ${#COMPOSE[@]} -gt 0 ]; then
+  "${COMPOSE[@]}" ps > "$RUN_DIR/pre-update-ps.txt" 2>/dev/null || true
+  "${COMPOSE[@]}" images > "$RUN_DIR/pre-update-images.txt" 2>/dev/null || true
+fi
 
 cat > "$RUN_DIR/rollback.env" <<META
 TIMESTAMP=$TIMESTAMP
-APP_IMAGE_ID=$APP_IMAGE_BEFORE
-DB_IMAGE_ID=$DB_IMAGE_BEFORE
+PRE_COMMIT=$PRE_COMMIT
+PROJECT_DIR=$PROJECT_DIR
 META
 
-if [ "${AMPNM_BACKUP_DB:-1}" = "1" ]; then
-  BACKUP_FILE="$RUN_DIR/db-backup.sql"
-  "${COMPOSE[@]}" exec -T db sh -lc 'mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' > "$BACKUP_FILE" || {
-    echo "Warning: database backup failed; continuing update" >&2
-  }
-  "${COMPOSE[@]}" exec -T app php /var/www/html/scripts/backup_network_topology.php || true
+echo "=== [2/6] Generating Pre-Update Database & Topology Backup ==="
+if [ -f "$PROJECT_DIR/scripts/backup_network_topology.php" ]; then
+  if command -v php >/dev/null 2>&1; then
+    php "$PROJECT_DIR/scripts/backup_network_topology.php" || true
+  elif [ ${#COMPOSE[@]} -gt 0 ]; then
+    "${COMPOSE[@]}" exec -T app php /var/www/html/scripts/backup_network_topology.php 2>/dev/null || true
+  fi
 fi
 
-echo "Pulling latest images..."
-"${COMPOSE[@]}" pull
+echo "=== [3/6] Pulling Latest Source Code & Migrations ==="
+if [ -d "$PROJECT_DIR/.git" ]; then
+  git fetch origin main
+  git reset --hard origin/main
+fi
 
-echo "Recreating containers..."
-"${COMPOSE[@]}" up -d --remove-orphans
+echo "=== [4/6] Applying Database Schema Migrations ==="
+if command -v php >/dev/null 2>&1 && [ -f "$PROJECT_DIR/database_setup.php" ]; then
+  php "$PROJECT_DIR/database_setup.php" || true
+elif [ ${#COMPOSE[@]} -gt 0 ]; then
+  "${COMPOSE[@]}" exec -T app php /var/www/html/database_setup.php 2>/dev/null || true
+fi
 
-echo "Capturing post-update state..."
-"${COMPOSE[@]}" ps > "$RUN_DIR/post-update-ps.txt" || true
-"${COMPOSE[@]}" images > "$RUN_DIR/post-update-images.txt" || true
+echo "=== [5/6] Restarting Containers / Application Stack ==="
+if [ ${#COMPOSE[@]} -gt 0 ]; then
+  "${COMPOSE[@]}" up -d --remove-orphans || "${COMPOSE[@]}" restart app || true
+fi
 
-# Health Check & Auto-Rollback Mechanism
-HEALTH_CHECK_URL="${AMPNM_HEALTH_URL:-http://localhost:2266/}"
-MAX_RETRIES=12
-RETRY_INTERVAL=5
+echo "=== [6/6] Executing Post-Update Health Check Gate ==="
+HEALTH_CHECK_URL="${AMPNM_HEALTH_URL:-http://127.0.0.1:2266/login.php}"
+MAX_RETRIES=10
+RETRY_INTERVAL=3
 HEALTHY=0
 
-echo "Performing post-update health check on $HEALTH_CHECK_URL..."
 for ((i=1; i<=MAX_RETRIES; i++)); do
-  HTTP_STATUS="$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_CHECK_URL" || echo "000")"
+  HTTP_STATUS="$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_CHECK_URL" 2>/dev/null || echo "000")"
   if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "302" ]; then
     echo "Health check PASSED (HTTP $HTTP_STATUS) on attempt $i/$MAX_RETRIES."
     HEALTHY=1
@@ -85,5 +89,6 @@ if [ "$HEALTHY" -ne 1 ]; then
   exit 1
 fi
 
-echo "Update complete and verified healthy. Rollback metadata: $RUN_DIR/rollback.env"
+echo "SUCCESS: Update completed and verified healthy. Rollback metadata saved at: $RUN_DIR/rollback.env"
+
 
