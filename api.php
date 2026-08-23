@@ -238,7 +238,11 @@ try {
         // Escalation & Webhook Actions
         'get_escalation_settings', 'save_escalation_settings', 'test_webhook_endpoint',
         // Config Backup Vault Actions
-        'backup_device_config', 'get_device_config_history', 'get_device_config_content', 'compare_device_configs'
+        'backup_device_config', 'get_device_config_history', 'get_device_config_content', 'compare_device_configs',
+        // IPAM Actions
+        'get_ipam_subnets', 'create_ipam_subnet', 'delete_ipam_subnet', 'get_ipam_subnet_ips', 'assign_ipam_ip', 'scan_ipam_subnet',
+        // Rack Elevation Actions
+        'get_rack_cabinets', 'create_rack_cabinet', 'delete_rack_cabinet', 'get_rack_devices', 'mount_rack_device', 'unmount_rack_device'
     ];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];

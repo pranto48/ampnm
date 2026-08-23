@@ -1469,6 +1469,93 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'device_config_backups' created or already exists.");
 
+    // 28. IPAM Subnets Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `ipam_subnets` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(100) NOT NULL,
+        `cidr` VARCHAR(45) NOT NULL,
+        `gateway_ip` VARCHAR(45) NULL,
+        `vlan_id` INT NULL,
+        `description` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_cidr (`cidr`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'ipam_subnets' created or already exists.");
+
+    // 29. IPAM IP Addresses Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `ipam_ip_addresses` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `subnet_id` VARCHAR(36) NOT NULL,
+        `ip_address` VARCHAR(45) NOT NULL,
+        `status` ENUM('free', 'allocated', 'reserved', 'gateway', 'dhcp') NOT NULL DEFAULT 'free',
+        `hostname` VARCHAR(100) NULL,
+        `mac_address` VARCHAR(50) NULL,
+        `device_id` VARCHAR(36) NULL,
+        `notes` TEXT NULL,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_subnet_ip (`subnet_id`, `ip_address`),
+        INDEX idx_ip (`ip_address`),
+        INDEX idx_status (`status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'ipam_ip_addresses' created or already exists.");
+
+    // 30. Server Rack Cabinets Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `rack_cabinets` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(100) NOT NULL,
+        `location` VARCHAR(100) NULL,
+        `room` VARCHAR(100) NULL,
+        `total_units` INT NOT NULL DEFAULT 42,
+        `power_budget_watts` INT NOT NULL DEFAULT 5000,
+        `notes` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'rack_cabinets' created or already exists.");
+
+    // 31. Server Rack Mounted Devices Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `rack_devices` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `rack_id` VARCHAR(36) NOT NULL,
+        `device_id` VARCHAR(36) NULL,
+        `start_unit` INT NOT NULL,
+        `unit_height` INT NOT NULL DEFAULT 1,
+        `label` VARCHAR(100) NOT NULL,
+        `category` ENUM('server', 'switch', 'router', 'patch_panel', 'ups', 'pdu', 'storage', 'other') NOT NULL DEFAULT 'server',
+        `power_watts` INT NOT NULL DEFAULT 150,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_rack (`rack_id`),
+        INDEX idx_slot (`rack_id`, `start_unit`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'rack_devices' created or already exists.");
+
+    // Seed default Rack and Subnet if empty
+    $chkSubnet = $pdo->query("SELECT COUNT(*) FROM ipam_subnets")->fetchColumn();
+    if ($chkSubnet == 0) {
+        $subId = generateUuid();
+        $pdo->exec("INSERT INTO ipam_subnets (id, name, cidr, gateway_ip, vlan_id, description) VALUES 
+            ('$subId', 'Management LAN', '192.168.9.0/24', '192.168.9.1', 10, 'Core Network Management Subnet');");
+        message("Default IPAM subnet seeded.");
+    }
+
+    $chkRack = $pdo->query("SELECT COUNT(*) FROM rack_cabinets")->fetchColumn();
+    if ($chkRack == 0) {
+        $rackId = generateUuid();
+        $pdo->exec("INSERT INTO rack_cabinets (id, name, location, room, total_units, power_budget_watts, notes) VALUES 
+            ('$rackId', 'Rack-01 (Core DC)', 'Main Data Center', 'Server Room A', 42, 6000, 'Primary 42U Core Cabinet');");
+        
+        // Seed default mounted devices in Rack-01
+        $rDev1 = generateUuid();
+        $rDev2 = generateUuid();
+        $rDev3 = generateUuid();
+        $pdo->exec("INSERT INTO rack_devices (id, rack_id, start_unit, unit_height, label, category, power_watts) VALUES
+            ('$rDev1', '$rackId', 42, 1, 'Core Distribution Patch Panel', 'patch_panel', 0),
+            ('$rDev2', '$rackId', 40, 2, 'Cisco Catalyst 3850 Switch', 'switch', 250),
+            ('$rDev3', '$rackId', 1, 4, 'APC Smart-UPS RT 5000VA', 'ups', 350);");
+        message("Default 42U Server Rack cabinet and units seeded.");
+    }
+
 
 
     echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";

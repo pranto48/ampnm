@@ -1948,6 +1948,246 @@ switch ($action) {
         $res = AMPNM_ConfigBackupEngine::compareConfigs($b1, $b2);
         echo json_encode($res);
         break;
+
+    // --- IPAM (IP Address Management) Handlers ---
+    case 'get_ipam_subnets':
+        $subnets = $pdo->query("SELECT s.*, 
+            COUNT(i.id) AS total_ips_tracked,
+            SUM(CASE WHEN i.status IN ('allocated', 'gateway', 'dhcp', 'reserved') THEN 1 ELSE 0 END) AS used_ips
+            FROM ipam_subnets s
+            LEFT JOIN ipam_ip_addresses i ON s.id = i.subnet_id
+            GROUP BY s.id
+            ORDER BY s.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'subnets' => $subnets]);
+        break;
+
+    case 'create_ipam_subnet':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $name = trim($input['name'] ?? $_POST['name'] ?? '');
+        $cidr = trim($input['cidr'] ?? $_POST['cidr'] ?? '');
+        $gateway = trim($input['gateway_ip'] ?? $_POST['gateway_ip'] ?? '');
+        $vlan = (int)($input['vlan_id'] ?? $_POST['vlan_id'] ?? 0);
+        $desc = trim($input['description'] ?? $_POST['description'] ?? '');
+
+        if (empty($name) || empty($cidr)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Subnet Name and CIDR are required']);
+            exit;
+        }
+
+        $id = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO ipam_subnets (id, name, cidr, gateway_ip, vlan_id, description) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $name, $cidr, $gateway ?: null, $vlan ?: null, $desc]);
+
+        // Auto-seed gateway if provided
+        if (!empty($gateway)) {
+            $stmtGw = $pdo->prepare("INSERT INTO ipam_ip_addresses (id, subnet_id, ip_address, status, hostname, notes) VALUES (?, ?, ?, 'gateway', 'Default Gateway', 'Subnet Gateway IP') ON DUPLICATE KEY UPDATE status = 'gateway'");
+            $stmtGw->execute([generateUuid(), $id, $gateway]);
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Subnet created successfully!', 'id' => $id]);
+        break;
+
+    case 'delete_ipam_subnet':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $pdo->prepare("DELETE FROM ipam_ip_addresses WHERE subnet_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM ipam_subnets WHERE id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Subnet deleted']);
+        break;
+
+    case 'get_ipam_subnet_ips':
+        $subnetId = $input['subnet_id'] ?? $_GET['subnet_id'] ?? '';
+        if (empty($subnetId)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Subnet ID required']);
+            exit;
+        }
+
+        $stmtSub = $pdo->prepare("SELECT * FROM ipam_subnets WHERE id = ?");
+        $stmtSub->execute([$subnetId]);
+        $subnet = $stmtSub->fetch(PDO::FETCH_ASSOC);
+
+        if (!$subnet) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Subnet not found']);
+            exit;
+        }
+
+        $stmtIps = $pdo->prepare("SELECT i.*, d.name AS linked_device_name, d.status AS linked_device_status 
+            FROM ipam_ip_addresses i 
+            LEFT JOIN devices d ON i.device_id = d.id 
+            WHERE i.subnet_id = ? 
+            ORDER BY INET_ATON(i.ip_address) ASC");
+        $stmtIps->execute([$subnetId]);
+        $ips = $stmtIps->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'subnet' => $subnet, 'ips' => $ips]);
+        break;
+
+    case 'assign_ipam_ip':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $subnetId = $input['subnet_id'] ?? $_POST['subnet_id'] ?? '';
+        $ip = trim($input['ip_address'] ?? $_POST['ip_address'] ?? '');
+        $status = $input['status'] ?? $_POST['status'] ?? 'allocated';
+        $hostname = trim($input['hostname'] ?? $_POST['hostname'] ?? '');
+        $mac = trim($input['mac_address'] ?? $_POST['mac_address'] ?? '');
+        $deviceId = $input['device_id'] ?? $_POST['device_id'] ?? null;
+        $notes = trim($input['notes'] ?? $_POST['notes'] ?? '');
+
+        if (empty($subnetId) || empty($ip)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Subnet ID and IP address required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO ipam_ip_addresses (id, subnet_id, ip_address, status, hostname, mac_address, device_id, notes) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) 
+            ON DUPLICATE KEY UPDATE status = VALUES(status), hostname = VALUES(hostname), mac_address = VALUES(mac_address), device_id = VALUES(device_id), notes = VALUES(notes)");
+        
+        $stmt->execute([generateUuid(), $subnetId, $ip, $status, $hostname, $mac, $deviceId ?: null, $notes]);
+        echo json_encode(['success' => true, 'message' => "IP {$ip} updated successfully!"]);
+        break;
+
+    case 'scan_ipam_subnet':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        require_once __DIR__ . '/../../includes/advanced_scanner.php';
+        $subnetId = $input['subnet_id'] ?? $_POST['subnet_id'] ?? '';
+        $stmtSub = $pdo->prepare("SELECT * FROM ipam_subnets WHERE id = ?");
+        $stmtSub->execute([$subnetId]);
+        $subnet = $stmtSub->fetch(PDO::FETCH_ASSOC);
+
+        if (!$subnet) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Subnet not found']);
+            exit;
+        }
+
+        $scanResult = AMPNM_AdvancedScanner::scanSubnet($subnet['cidr']);
+        $stmtUpsert = $pdo->prepare("INSERT INTO ipam_ip_addresses (id, subnet_id, ip_address, status, hostname, mac_address, notes) 
+            VALUES (?, ?, ?, 'allocated', ?, ?, ?) 
+            ON DUPLICATE KEY UPDATE status = IF(status = 'gateway', 'gateway', 'allocated'), hostname = IF(VALUES(hostname) != '', VALUES(hostname), hostname), mac_address = IF(VALUES(mac_address) != '', VALUES(mac_address), mac_address)");
+
+        $syncedCount = 0;
+        foreach ($scanResult['live_hosts'] as $host) {
+            $notes = "Auto-discovered via IPAM sweep ({$host['type']})";
+            $stmtUpsert->execute([
+                generateUuid(),
+                $subnetId,
+                $host['ip'],
+                $host['hostname'] ?? '',
+                $host['mac'] ?? '',
+                $notes
+            ]);
+            $syncedCount++;
+        }
+
+        echo json_encode(['success' => true, 'message' => "Scan complete. Discovered and mapped {$syncedCount} active IP(s).", 'live_hosts' => $scanResult['live_hosts']]);
+        break;
+
+    // --- Data Center 42U Rack Elevation Handlers ---
+    case 'get_rack_cabinets':
+        $cabinets = $pdo->query("SELECT c.*, 
+            COUNT(r.id) AS mounted_device_count,
+            COALESCE(SUM(r.unit_height), 0) AS used_units,
+            COALESCE(SUM(r.power_watts), 0) AS total_power_draw
+            FROM rack_cabinets c
+            LEFT JOIN rack_devices r ON c.id = r.rack_id
+            GROUP BY c.id
+            ORDER BY c.name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'cabinets' => $cabinets]);
+        break;
+
+    case 'create_rack_cabinet':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $name = trim($input['name'] ?? $_POST['name'] ?? '');
+        $location = trim($input['location'] ?? $_POST['location'] ?? 'Main DC');
+        $room = trim($input['room'] ?? $_POST['room'] ?? 'Server Room');
+        $units = (int)($input['total_units'] ?? $_POST['total_units'] ?? 42);
+        $power = (int)($input['power_budget_watts'] ?? $_POST['power_budget_watts'] ?? 5000);
+        $notes = trim($input['notes'] ?? $_POST['notes'] ?? '');
+
+        if (empty($name)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Cabinet Name is required']);
+            exit;
+        }
+
+        $id = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO rack_cabinets (id, name, location, room, total_units, power_budget_watts, notes) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $name, $location, $room, $units, $power, $notes]);
+
+        echo json_encode(['success' => true, 'message' => 'Rack Cabinet created!', 'id' => $id]);
+        break;
+
+    case 'delete_rack_cabinet':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $pdo->prepare("DELETE FROM rack_devices WHERE rack_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM rack_cabinets WHERE id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Rack Cabinet deleted']);
+        break;
+
+    case 'get_rack_devices':
+        $rackId = $input['rack_id'] ?? $_GET['rack_id'] ?? '';
+        if (empty($rackId)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Rack ID required']);
+            exit;
+        }
+
+        $stmtCabinet = $pdo->prepare("SELECT * FROM rack_cabinets WHERE id = ?");
+        $stmtCabinet->execute([$rackId]);
+        $cabinet = $stmtCabinet->fetch(PDO::FETCH_ASSOC);
+
+        if (!$cabinet) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Rack cabinet not found']);
+            exit;
+        }
+
+        $stmtDevices = $pdo->prepare("SELECT r.*, d.name AS device_name, d.ip AS device_ip, d.status AS device_status, d.type AS device_model 
+            FROM rack_devices r
+            LEFT JOIN devices d ON r.device_id = d.id
+            WHERE r.rack_id = ?
+            ORDER BY r.start_unit DESC");
+        $stmtDevices->execute([$rackId]);
+        $mounted = $stmtDevices->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['success' => true, 'cabinet' => $cabinet, 'mounted_devices' => $mounted]);
+        break;
+
+    case 'mount_rack_device':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $rackId = $input['rack_id'] ?? $_POST['rack_id'] ?? '';
+        $slot = (int)($input['start_unit'] ?? $_POST['start_unit'] ?? 1);
+        $height = (int)($input['unit_height'] ?? $_POST['unit_height'] ?? 1);
+        $label = trim($input['label'] ?? $_POST['label'] ?? 'Server Unit');
+        $cat = $input['category'] ?? $_POST['category'] ?? 'server';
+        $power = (int)($input['power_watts'] ?? $_POST['power_watts'] ?? 150);
+        $deviceId = $input['device_id'] ?? $_POST['device_id'] ?? null;
+
+        if (empty($rackId) || empty($label)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Rack ID and Label required']);
+            exit;
+        }
+
+        $id = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO rack_devices (id, rack_id, device_id, start_unit, unit_height, label, category, power_watts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $rackId, $deviceId ?: null, $slot, $height, $label, $cat, $power]);
+
+        echo json_encode(['success' => true, 'message' => "Mounted {$label} at U{$slot}!", 'id' => $id]);
+        break;
+
+    case 'unmount_rack_device':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $pdo->prepare("DELETE FROM rack_devices WHERE id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Device unmounted from rack.']);
+        break;
 }
 
 
