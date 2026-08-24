@@ -2574,6 +2574,131 @@ switch ($action) {
             'hops' => $hops
         ]);
         break;
+
+    // --- AIOps: AI Root Cause Analysis (RCA) ---
+    case 'get_rca_analysis':
+        require_once __DIR__ . '/../../includes/ai_rca_engine.php';
+        $analysis = AMPNM_AiRcaEngine::analyzeOutages($pdo);
+        echo json_encode([
+            'success' => true,
+            'analysis' => $analysis
+        ]);
+        break;
+
+    // --- AIOps: Predictive Capacity & Anomaly Forecast ---
+    case 'get_predictive_forecasts':
+        $hosts = $pdo->query("SELECT hm.*, d.name AS linked_device_name, d.status AS linked_device_status 
+            FROM host_metrics hm
+            LEFT JOIN devices d ON hm.ip_address = d.ip OR hm.hostname = d.name
+            ORDER BY hm.disk_usage DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+        $forecasts = [];
+        foreach ($hosts as $h) {
+            $diskPct = (float)($h['disk_usage'] ?? 0);
+            $cpuPct = (float)($h['cpu_usage'] ?? 0);
+            $memPct = (float)($h['memory_usage'] ?? 0);
+            $diskTotalGb = round(((float)($h['disk_total'] ?? 0)) / (1024 * 1024 * 1024), 1);
+            $usedGb = round($diskTotalGb * ($diskPct / 100), 1);
+            $freeGb = max(0, round($diskTotalGb - $usedGb, 1));
+
+            // Estimate daily growth rate (default 0.35 GB / day)
+            $growthRateGbPerDay = max(0.1, round($diskTotalGb * 0.005, 2));
+            $daysUntilFull = $growthRateGbPerDay > 0 ? floor($freeGb / $growthRateGbPerDay) : 999;
+            
+            // Risk level assessment
+            $risk = 'low';
+            if ($diskPct >= 90 || $daysUntilFull <= 7) $risk = 'critical';
+            else if ($diskPct >= 80 || $daysUntilFull <= 30) $risk = 'warning';
+
+            $forecasts[] = [
+                'hostname' => $h['hostname'],
+                'ip_address' => $h['ip_address'],
+                'os' => $h['os'],
+                'current_disk_pct' => $diskPct,
+                'current_cpu_pct' => $cpuPct,
+                'current_mem_pct' => $memPct,
+                'disk_total_gb' => $diskTotalGb,
+                'disk_free_gb' => $freeGb,
+                'est_growth_gb_day' => $growthRateGbPerDay,
+                'days_until_disk_full' => $daysUntilFull,
+                'risk_level' => $risk,
+                'anomaly_detected' => ($cpuPct > 85 || $memPct > 90) ? true : false,
+                'recommendation' => $risk === 'critical' 
+                    ? "Immediate Action: Disk exhaustion predicted in {$daysUntilFull} days. Purge logs or expand volume." 
+                    : ($risk === 'warning' ? "Capacity Warning: Disk utilization exceeds 80%. Review growth trend." : "Normal capacity headroom.")
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'total_analyzed' => count($hosts),
+            'forecasts' => $forecasts
+        ]);
+        break;
+
+    // --- AIOps: Autonomous Auto-Remediation Runbooks ---
+    case 'get_remediation_rules':
+        $rules = $pdo->query("SELECT r.*, d.name AS target_device_name, d.ip AS target_device_ip 
+            FROM auto_remediation_rules r 
+            LEFT JOIN devices d ON r.target_device_id = d.id 
+            ORDER BY r.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+        $logs = $pdo->query("SELECT l.*, r.name AS rule_name, d.name AS device_name 
+            FROM auto_remediation_logs l 
+            LEFT JOIN auto_remediation_rules r ON l.rule_id = r.id 
+            LEFT JOIN devices d ON l.device_id = d.id 
+            ORDER BY l.created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'rules' => $rules,
+            'logs' => $logs
+        ]);
+        break;
+
+    case 'save_remediation_rule':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $name = trim($input['name'] ?? $_POST['name'] ?? '');
+        $cond = $input['trigger_condition'] ?? $_POST['trigger_condition'] ?? 'service_down';
+        $targetDev = $input['target_device_id'] ?? $_POST['target_device_id'] ?? null;
+        $actType = $input['action_type'] ?? $_POST['action_type'] ?? 'agent_service_restart';
+        $payload = trim($input['action_payload'] ?? $_POST['action_payload'] ?? '');
+        $retries = (int)($input['max_retries'] ?? $_POST['max_retries'] ?? 3);
+        $cooldown = (int)($input['cooldown_minutes'] ?? $_POST['cooldown_minutes'] ?? 10);
+        $enabled = !empty($input['is_enabled']) ? 1 : 0;
+
+        if (empty($name) || empty($payload)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Rule Name and Action Payload are required']);
+            exit;
+        }
+
+        if (!empty($id)) {
+            $stmt = $pdo->prepare("UPDATE auto_remediation_rules SET name = ?, trigger_condition = ?, target_device_id = ?, action_type = ?, action_payload = ?, max_retries = ?, cooldown_minutes = ?, is_enabled = ? WHERE id = ?");
+            $stmt->execute([$name, $cond, $targetDev ?: null, $actType, $payload, $retries, $cooldown, $enabled, $id]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO auto_remediation_rules (id, name, trigger_condition, target_device_id, action_type, action_payload, max_retries, cooldown_minutes, is_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([generateUuid(), $name, $cond, $targetDev ?: null, $actType, $payload, $retries, $cooldown, $enabled]);
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Remediation rule saved!']);
+        break;
+
+    case 'delete_remediation_rule':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $pdo->prepare("DELETE FROM auto_remediation_rules WHERE id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Rule deleted']);
+        break;
+
+    case 'trigger_remediation_manual':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        require_once __DIR__ . '/../../includes/auto_remediation_engine.php';
+        $ruleId = $input['rule_id'] ?? $_POST['rule_id'] ?? '';
+        $res = AMPNM_AutoRemediationEngine::executeRule($pdo, $ruleId);
+        echo json_encode($res);
+        break;
 }
 
 

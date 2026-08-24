@@ -297,6 +297,9 @@ usort($menu_tree, function($a, $b) {
                                     <a href="agent_logs.php" class="nav-link nav-sublink"><i class="fas fa-file-lines fa-fw mr-2"></i>Agent Logs</a>
                                     <a href="alert_settings.php" class="nav-link nav-sublink"><i class="fas fa-bell fa-fw mr-2"></i>Alert Settings</a>
                                     <a href="alert_escalation.php" class="nav-link nav-sublink"><i class="fas fa-layer-group fa-fw mr-2 text-cyan-400"></i>Escalation &amp; Webhooks</a>
+                                    <a href="root_cause_analysis.php" class="nav-link nav-sublink"><i class="fas fa-brain fa-fw mr-2 text-pink-400"></i>AIOps Root Cause (RCA)</a>
+                                    <a href="predictive_ai.php" class="nav-link nav-sublink"><i class="fas fa-chart-area fa-fw mr-2 text-cyan-400"></i>Predictive AI Capacity</a>
+                                    <a href="auto_remediation.php" class="nav-link nav-sublink"><i class="fas fa-magic fa-fw mr-2 text-amber-400"></i>Auto-Remediation</a>
                                     <a href="maintenance_windows.php" class="nav-link nav-sublink"><i class="fas fa-tools fa-fw mr-2 text-amber-400"></i>Maintenance Windows</a>
                                     <a href="status_page_settings.php" class="nav-link nav-sublink"><i class="fas fa-bullhorn fa-fw mr-2 text-emerald-400"></i>Status Page &amp; Incidents</a>
                                     <a href="windows_agent.php" class="nav-link nav-sublink"><i class="fas fa-person-chalkboard fa-fw mr-2"></i>Agent Onboarding</a>

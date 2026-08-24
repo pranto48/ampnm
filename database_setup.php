@@ -1673,6 +1673,62 @@ try {
         message("Default SLA profiles seeded.");
     }
 
+    // 39. AI Root Cause Analysis (RCA) Incidents Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `ai_rca_incidents` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `root_device_id` VARCHAR(36) NOT NULL,
+        `map_id` VARCHAR(36) NULL,
+        `impact_count` INT NOT NULL DEFAULT 0,
+        `confidence_percent` DECIMAL(5,2) NOT NULL DEFAULT 95.00,
+        `suppressed_device_ids` TEXT NULL,
+        `status` ENUM('active', 'mitigated', 'resolved') NOT NULL DEFAULT 'active',
+        `summary` TEXT NOT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `resolved_at` TIMESTAMP NULL,
+        INDEX idx_root (`root_device_id`),
+        INDEX idx_status (`status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'ai_rca_incidents' created or already exists.");
+
+    // 40. Autonomous Auto-Remediation Runbook Rules Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `auto_remediation_rules` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(150) NOT NULL,
+        `trigger_condition` ENUM('device_down', 'high_cpu', 'high_disk', 'service_down', 'port_down') NOT NULL DEFAULT 'service_down',
+        `target_device_id` VARCHAR(36) NULL,
+        `action_type` ENUM('agent_command', 'agent_service_restart', 'snmp_port_restart', 'custom_script') NOT NULL DEFAULT 'agent_service_restart',
+        `action_payload` TEXT NOT NULL,
+        `max_retries` INT NOT NULL DEFAULT 3,
+        `cooldown_minutes` INT NOT NULL DEFAULT 10,
+        `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'auto_remediation_rules' created or already exists.");
+
+    // 41. Auto-Remediation Execution Logs Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `auto_remediation_logs` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `rule_id` VARCHAR(36) NOT NULL,
+        `device_id` VARCHAR(36) NULL,
+        `trigger_event` VARCHAR(150) NOT NULL,
+        `action_executed` TEXT NOT NULL,
+        `output` TEXT NULL,
+        `status` ENUM('success', 'failed', 'skipped_cooldown') NOT NULL DEFAULT 'success',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_rule (`rule_id`),
+        INDEX idx_created (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'auto_remediation_logs' created or already exists.");
+
+    // Seed default remediation rule if empty
+    $chkRem = $pdo->query("SELECT COUNT(*) FROM auto_remediation_rules")->fetchColumn();
+    if ($chkRem == 0) {
+        $remId = generateUuid();
+        $pdo->exec("INSERT INTO auto_remediation_rules (id, name, trigger_condition, action_type, action_payload, max_retries, cooldown_minutes, is_enabled) VALUES
+            ('$remId', 'Auto-Restart Spooler / Web Service', 'service_down', 'agent_service_restart', 'Spooler', 3, 10, 1);");
+        message("Default Auto-Remediation self-healing rule seeded.");
+    }
+
 
 
     echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";
