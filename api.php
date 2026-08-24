@@ -284,7 +284,9 @@ try {
         // Topology Path Tracer Actions
         'trace_topology_path',
         // AIOps & Predictive AI Actions
-        'get_rca_analysis', 'get_predictive_forecasts', 'get_remediation_rules', 'save_remediation_rule', 'delete_remediation_rule', 'trigger_remediation_manual', 'get_remediation_logs'
+        'get_rca_analysis', 'get_predictive_forecasts', 'get_remediation_rules', 'save_remediation_rule', 'delete_remediation_rule', 'trigger_remediation_manual', 'get_remediation_logs',
+        // Synthetic Monitoring Actions
+        'get_synthetic_monitors', 'create_synthetic_monitor', 'delete_synthetic_monitor', 'test_synthetic_monitor_live', 'run_all_synthetic_monitors'
     ];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];

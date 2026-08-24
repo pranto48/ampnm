@@ -300,6 +300,7 @@ usort($menu_tree, function($a, $b) {
                                     <a href="root_cause_analysis.php" class="nav-link nav-sublink"><i class="fas fa-brain fa-fw mr-2 text-pink-400"></i>AIOps Root Cause (RCA)</a>
                                     <a href="predictive_ai.php" class="nav-link nav-sublink"><i class="fas fa-chart-area fa-fw mr-2 text-cyan-400"></i>Predictive AI Capacity</a>
                                     <a href="auto_remediation.php" class="nav-link nav-sublink"><i class="fas fa-magic fa-fw mr-2 text-amber-400"></i>Auto-Remediation</a>
+                                    <a href="synthetic_monitors.php" class="nav-link nav-sublink"><i class="fas fa-satellite-dish fa-fw mr-2 text-indigo-400"></i>Synthetic Monitors</a>
                                     <a href="maintenance_windows.php" class="nav-link nav-sublink"><i class="fas fa-tools fa-fw mr-2 text-amber-400"></i>Maintenance Windows</a>
                                     <a href="status_page_settings.php" class="nav-link nav-sublink"><i class="fas fa-bullhorn fa-fw mr-2 text-emerald-400"></i>Status Page &amp; Incidents</a>
                                     <a href="windows_agent.php" class="nav-link nav-sublink"><i class="fas fa-person-chalkboard fa-fw mr-2"></i>Agent Onboarding</a>

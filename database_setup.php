@@ -1729,6 +1729,57 @@ try {
         message("Default Auto-Remediation self-healing rule seeded.");
     }
 
+    // 42. Synthetic End-User Monitors Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `synthetic_monitors` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(150) NOT NULL,
+        `type` ENUM('http_api', 'dns_query', 'tcp_port', 'icmp') NOT NULL DEFAULT 'http_api',
+        `target_url` VARCHAR(255) NOT NULL,
+        `port` INT NULL,
+        `http_method` ENUM('GET', 'POST', 'PUT', 'DELETE', 'HEAD') NOT NULL DEFAULT 'GET',
+        `headers` TEXT NULL,
+        `body_payload` TEXT NULL,
+        `expected_status_code` INT NOT NULL DEFAULT 200,
+        `body_assertion` VARCHAR(255) NULL,
+        `timeout_seconds` INT NOT NULL DEFAULT 10,
+        `check_interval_seconds` INT NOT NULL DEFAULT 60,
+        `status` ENUM('operational', 'degraded', 'failing') NOT NULL DEFAULT 'operational',
+        `last_response_time_ms` DECIMAL(8,2) NULL,
+        `last_checked_at` TIMESTAMP NULL,
+        `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'synthetic_monitors' created or already exists.");
+
+    // 43. Synthetic Monitor Execution Runs & Waterfall Timing Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `synthetic_monitor_runs` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `monitor_id` VARCHAR(36) NOT NULL,
+        `status` ENUM('pass', 'fail') NOT NULL DEFAULT 'pass',
+        `status_code` INT NULL,
+        `dns_time_ms` DECIMAL(8,2) NOT NULL DEFAULT 0,
+        `tcp_time_ms` DECIMAL(8,2) NOT NULL DEFAULT 0,
+        `tls_time_ms` DECIMAL(8,2) NOT NULL DEFAULT 0,
+        `ttfb_time_ms` DECIMAL(8,2) NOT NULL DEFAULT 0,
+        `total_time_ms` DECIMAL(8,2) NOT NULL DEFAULT 0,
+        `error_message` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_mon (`monitor_id`),
+        INDEX idx_time (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'synthetic_monitor_runs' created or already exists.");
+
+    // Seed default synthetic monitors if empty
+    $chkSyn = $pdo->query("SELECT COUNT(*) FROM synthetic_monitors")->fetchColumn();
+    if ($chkSyn == 0) {
+        $syn1 = generateUuid();
+        $syn2 = generateUuid();
+        $pdo->exec("INSERT INTO synthetic_monitors (id, name, type, target_url, port, http_method, expected_status_code, timeout_seconds, check_interval_seconds) VALUES
+            ('$syn1', 'Public Gateway API Healthcheck', 'http_api', 'https://httpbin.org/get', 443, 'GET', 200, 10, 60),
+            ('$syn2', 'Global DNS Resolution (Cloudflare 1.1.1.1)', 'dns_query', 'cloudflare.com', 53, 'GET', 200, 5, 60);");
+        message("Default Synthetic Monitors seeded.");
+    }
+
 
 
     echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";

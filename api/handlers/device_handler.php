@@ -2699,6 +2699,85 @@ switch ($action) {
         $res = AMPNM_AutoRemediationEngine::executeRule($pdo, $ruleId);
         echo json_encode($res);
         break;
+
+    // --- Synthetic End-User Performance Monitoring Handlers ---
+    case 'get_synthetic_monitors':
+        $monitors = $pdo->query("SELECT * FROM synthetic_monitors ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+        $recentRuns = $pdo->query("SELECT r.*, m.name AS monitor_name, m.type AS monitor_type 
+            FROM synthetic_monitor_runs r 
+            LEFT JOIN synthetic_monitors m ON r.monitor_id = m.id 
+            ORDER BY r.created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'monitors' => $monitors,
+            'recent_runs' => $recentRuns
+        ]);
+        break;
+
+    case 'create_synthetic_monitor':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $name = trim($input['name'] ?? $_POST['name'] ?? '');
+        $type = $input['type'] ?? $_POST['type'] ?? 'http_api';
+        $target = trim($input['target_url'] ?? $_POST['target_url'] ?? '');
+        $port = !empty($input['port']) ? (int)$input['port'] : null;
+        $method = strtoupper($input['http_method'] ?? $_POST['http_method'] ?? 'GET');
+        $headers = trim($input['headers'] ?? $_POST['headers'] ?? '');
+        $payload = trim($input['body_payload'] ?? $_POST['body_payload'] ?? '');
+        $expCode = (int)($input['expected_status_code'] ?? $_POST['expected_status_code'] ?? 200);
+        $bodyAssert = trim($input['body_assertion'] ?? $_POST['body_assertion'] ?? '');
+        $timeout = (int)($input['timeout_seconds'] ?? $_POST['timeout_seconds'] ?? 10);
+        $interval = (int)($input['check_interval_seconds'] ?? $_POST['check_interval_seconds'] ?? 60);
+
+        if (empty($name) || empty($target)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Monitor Name and Target URL/Host are required']);
+            exit;
+        }
+
+        if (!empty($id)) {
+            $stmt = $pdo->prepare("UPDATE synthetic_monitors SET name = ?, type = ?, target_url = ?, port = ?, http_method = ?, headers = ?, body_payload = ?, expected_status_code = ?, body_assertion = ?, timeout_seconds = ?, check_interval_seconds = ? WHERE id = ?");
+            $stmt->execute([$name, $type, $target, $port, $method, $headers, $payload, $expCode, $bodyAssert, $timeout, $interval, $id]);
+        } else {
+            $newId = generateUuid();
+            $stmt = $pdo->prepare("INSERT INTO synthetic_monitors (id, name, type, target_url, port, http_method, headers, body_payload, expected_status_code, body_assertion, timeout_seconds, check_interval_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$newId, $name, $type, $target, $port, $method, $headers, $payload, $expCode, $bodyAssert, $timeout, $interval]);
+            $id = $newId;
+        }
+
+        // Run immediate initial test check
+        require_once __DIR__ . '/../../includes/synthetic_checker.php';
+        AMPNM_SyntheticChecker::runMonitor($pdo, $id);
+
+        echo json_encode(['success' => true, 'message' => 'Synthetic monitor saved and initial check completed!']);
+        break;
+
+    case 'delete_synthetic_monitor':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $pdo->prepare("DELETE FROM synthetic_monitors WHERE id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM synthetic_monitor_runs WHERE monitor_id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'message' => 'Monitor deleted']);
+        break;
+
+    case 'test_synthetic_monitor_live':
+        require_once __DIR__ . '/../../includes/synthetic_checker.php';
+        $id = $input['id'] ?? $_GET['id'] ?? '';
+        $res = AMPNM_SyntheticChecker::runMonitor($pdo, $id);
+        echo json_encode($res);
+        break;
+
+    case 'run_all_synthetic_monitors':
+        require_once __DIR__ . '/../../includes/synthetic_checker.php';
+        $mons = $pdo->query("SELECT id FROM synthetic_monitors WHERE is_enabled = 1")->fetchAll(PDO::FETCH_COLUMN);
+        $executed = 0;
+        foreach ($mons as $mId) {
+            AMPNM_SyntheticChecker::runMonitor($pdo, $mId);
+            $executed++;
+        }
+        echo json_encode(['success' => true, 'executed_count' => $executed]);
+        break;
 }
 
 
