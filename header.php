@@ -315,6 +315,7 @@ usort($menu_tree, function($a, $b) {
                                         <a href="devices.php" class="nav-link nav-sublink"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
                                         <a href="history.php" class="nav-link nav-sublink"><i class="fas fa-history fa-fw mr-2"></i>History</a>
                                         <a href="status_logs.php" class="nav-link nav-sublink"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
+                                        <a href="sla_reports.php" class="nav-link nav-sublink"><i class="fas fa-file-contract fa-fw mr-2 text-cyan-400"></i>SLA Reports</a>
                                         <a href="system_backup.php" class="nav-link nav-sublink"><i class="fas fa-database fa-fw mr-2"></i>System Backup</a>
                                         <a href="email_notifications.php" class="nav-link nav-sublink"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
                                         <a href="sms_notifications.php" class="nav-link nav-sublink"><i class="fas fa-sms fa-fw mr-2"></i>SMS Notifications</a>

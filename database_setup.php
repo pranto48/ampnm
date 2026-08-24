@@ -1640,6 +1640,39 @@ try {
         message("Default Status Page settings and service components seeded.");
     }
 
+    // 37. SLA Profiles Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `sla_profiles` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(100) NOT NULL,
+        `target_sla_percent` DECIMAL(5,2) NOT NULL DEFAULT 99.90,
+        `business_hours_only` TINYINT(1) NOT NULL DEFAULT 0,
+        `notes` TEXT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'sla_profiles' created or already exists.");
+
+    // 38. SLA Device Assignments Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `sla_device_assignments` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `profile_id` VARCHAR(36) NOT NULL,
+        `device_id` VARCHAR(36) NOT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_prof_dev (`profile_id`, `device_id`),
+        INDEX idx_dev (`device_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'sla_device_assignments' created or already exists.");
+
+    // Seed default SLA profiles if empty
+    $chkSla = $pdo->query("SELECT COUNT(*) FROM sla_profiles")->fetchColumn();
+    if ($chkSla == 0) {
+        $sla1 = generateUuid();
+        $sla2 = generateUuid();
+        $pdo->exec("INSERT INTO sla_profiles (id, name, target_sla_percent, business_hours_only, notes) VALUES
+            ('$sla1', 'Gold SLA - 99.99% High Availability', 99.99, 0, 'Core backbones, mission critical servers (max 4.3 mins downtime/month)'),
+            ('$sla2', 'Standard SLA - 99.90% Enterprise', 99.90, 0, 'Standard business infrastructure (max 43.8 mins downtime/month)');");
+        message("Default SLA profiles seeded.");
+    }
+
 
 
     echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";

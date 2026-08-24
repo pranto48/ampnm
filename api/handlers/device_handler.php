@@ -2362,6 +2362,218 @@ switch ($action) {
             'active_window' => $activeWindow
         ]);
         break;
+
+    // --- SLA Compliance & Executive Reporting Handlers ---
+    case 'get_sla_report_data':
+        $days = (int)($input['days'] ?? $_GET['days'] ?? 30);
+        if ($days <= 0 || $days > 365) $days = 30;
+
+        $targetSla = (float)($input['target_sla'] ?? $_GET['target_sla'] ?? 99.90);
+        $totalWindowMinutes = $days * 24 * 60;
+
+        // Fetch all monitored devices
+        $devices = $pdo->query("SELECT id, name, ip, type, status, map_id FROM devices ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch status logs / downtime summary in the given window
+        $stmtLogs = $pdo->prepare("SELECT device_id, 
+            COUNT(*) AS outage_count,
+            COALESCE(SUM(duration_seconds), 0) AS total_down_seconds
+            FROM status_logs 
+            WHERE status = 'offline' AND created_at >= NOW() - INTERVAL ? DAY
+            GROUP BY device_id");
+        $stmtLogs->execute([$days]);
+        $downSummary = $stmtLogs->fetchAll(PDO::FETCH_KEY_PAIR | PDO::FETCH_GROUP);
+
+        $report = [];
+        $totalSystemUptimeMinutes = 0;
+        $totalSystemPossibleMinutes = count($devices) * $totalWindowMinutes;
+        $breachCount = 0;
+
+        foreach ($devices as $d) {
+            $devId = $d['id'];
+            
+            // Get outage stats
+            $stmtDevLog = $pdo->prepare("SELECT 
+                COUNT(*) AS outages, 
+                COALESCE(SUM(duration_seconds), 0) AS down_sec 
+                FROM status_logs 
+                WHERE device_id = ? AND status = 'offline' AND created_at >= NOW() - INTERVAL ? DAY");
+            $stmtDevLog->execute([$devId, $days]);
+            $stats = $stmtDevLog->fetch(PDO::FETCH_ASSOC);
+
+            $outages = (int)($stats['outages'] ?? 0);
+            $downMinutes = round(($stats['down_sec'] ?? 0) / 60, 1);
+            $uptimeMinutes = max(0, $totalWindowMinutes - $downMinutes);
+            
+            $slaPercent = $totalWindowMinutes > 0 
+                ? round(($uptimeMinutes / $totalWindowMinutes) * 100, 3) 
+                : 100.0;
+
+            // MTTR (Mean Time to Repair in minutes)
+            $mttr = $outages > 0 ? round($downMinutes / $outages, 1) : 0;
+            // MTBF (Mean Time Between Failures in hours)
+            $mtbf = $outages > 0 ? round(($totalWindowMinutes - $downMinutes) / (60 * $outages), 1) : round($totalWindowMinutes / 60, 1);
+
+            $isCompliant = $slaPercent >= $targetSla;
+            if (!$isCompliant) $breachCount++;
+
+            $totalSystemUptimeMinutes += $uptimeMinutes;
+
+            $report[] = [
+                'device_id' => $devId,
+                'name' => $d['name'],
+                'ip' => $d['ip'],
+                'type' => $d['type'],
+                'status' => $d['status'],
+                'outage_count' => $outages,
+                'downtime_minutes' => $downMinutes,
+                'uptime_minutes' => $uptimeMinutes,
+                'sla_percent' => $slaPercent,
+                'mttr_minutes' => $mttr,
+                'mtbf_hours' => $mtbf,
+                'is_compliant' => $isCompliant
+            ];
+        }
+
+        $overallSla = $totalSystemPossibleMinutes > 0 
+            ? round(($totalSystemUptimeMinutes / $totalSystemPossibleMinutes) * 100, 3) 
+            : 100.0;
+
+        echo json_encode([
+            'success' => true,
+            'window_days' => $days,
+            'target_sla' => $targetSla,
+            'overall_sla_percent' => $overallSla,
+            'total_devices' => count($devices),
+            'breach_count' => $breachCount,
+            'device_reports' => $report
+        ]);
+        break;
+
+    case 'get_sla_profiles':
+        $profiles = $pdo->query("SELECT * FROM sla_profiles ORDER BY target_sla_percent DESC")->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'profiles' => $profiles]);
+        break;
+
+    case 'save_sla_profile':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_POST['id'] ?? '';
+        $name = trim($input['name'] ?? $_POST['name'] ?? 'Custom SLA');
+        $target = (float)($input['target_sla_percent'] ?? $_POST['target_sla_percent'] ?? 99.90);
+        $bizOnly = !empty($input['business_hours_only']) ? 1 : 0;
+        $notes = trim($input['notes'] ?? $_POST['notes'] ?? '');
+
+        if (!empty($id)) {
+            $stmt = $pdo->prepare("UPDATE sla_profiles SET name = ?, target_sla_percent = ?, business_hours_only = ?, notes = ? WHERE id = ?");
+            $stmt->execute([$name, $target, $bizOnly, $notes, $id]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO sla_profiles (id, name, target_sla_percent, business_hours_only, notes) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([generateUuid(), $name, $target, $bizOnly, $notes]);
+        }
+
+        echo json_encode(['success' => true, 'message' => 'SLA Profile saved!']);
+        break;
+
+    // --- Topology Path Tracer Handlers ---
+    case 'trace_topology_path':
+        $mapId = $input['map_id'] ?? $_GET['map_id'] ?? '';
+        $sourceId = $input['source_id'] ?? $_GET['source_id'] ?? '';
+        $targetId = $input['target_id'] ?? $_GET['target_id'] ?? '';
+
+        if (empty($mapId) || empty($sourceId) || empty($targetId)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Map ID, Source ID, and Target ID are required']);
+            exit;
+        }
+
+        // Fetch all edges for the map
+        $stmtEdges = $pdo->prepare("SELECT id, source_id, target_id, connection_type FROM device_edges WHERE map_id = ?");
+        $stmtEdges->execute([$mapId]);
+        $edges = $stmtEdges->fetchAll(PDO::FETCH_ASSOC);
+
+        // Build adjacency graph
+        $adj = [];
+        $edgeMap = [];
+        foreach ($edges as $e) {
+            $u = $e['source_id'];
+            $v = $e['target_id'];
+            if (!isset($adj[$u])) $adj[$u] = [];
+            if (!isset($adj[$v])) $adj[$v] = [];
+            $adj[$u][] = $v;
+            $adj[$v][] = $u;
+            $edgeMap["{$u}_{$v}"] = $e['id'];
+            $edgeMap["{$v}_{$u}"] = $e['id'];
+        }
+
+        // Breadth-First Search (Shortest Path)
+        $queue = [[$sourceId]];
+        $visited = [$sourceId => true];
+        $shortestPath = null;
+
+        while (!empty($queue)) {
+            $path = array_shift($queue);
+            $last = end($path);
+
+            if ($last === $targetId) {
+                $shortestPath = $path;
+                break;
+            }
+
+            foreach ($adj[$last] ?? [] as $neighbor) {
+                if (!isset($visited[$neighbor])) {
+                    $visited[$neighbor] = true;
+                    $newPath = $path;
+                    $newPath[] = $neighbor;
+                    $queue[] = $newPath;
+                }
+            }
+        }
+
+        if (!$shortestPath) {
+            echo json_encode(['success' => false, 'message' => 'No active connection path found between selected devices.']);
+            exit;
+        }
+
+        // Fetch device details and build hop list
+        $pathEdgeIds = [];
+        for ($i = 0; $i < count($shortestPath) - 1; $i++) {
+            $k = "{$shortestPath[$i]}_{$shortestPath[$i+1]}";
+            if (isset($edgeMap[$k])) $pathEdgeIds[] = $edgeMap[$k];
+        }
+
+        $inClause = implode(',', array_fill(0, count($shortestPath), '?'));
+        $stmtDevs = $pdo->prepare("SELECT id, name, ip, status, type, last_avg_time FROM devices WHERE id IN ($inClause)");
+        $stmtDevs->execute($shortestPath);
+        $devsLookup = [];
+        foreach ($stmtDevs->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $devsLookup[$row['id']] = $row;
+        }
+
+        $hops = [];
+        $cumulativeLatency = 0;
+        foreach ($shortestPath as $nodeId) {
+            $node = $devsLookup[$nodeId] ?? ['id' => $nodeId, 'name' => 'Unknown Node', 'ip' => '', 'status' => 'unknown'];
+            $lat = (float)($node['last_avg_time'] ?? 1.5);
+            $cumulativeLatency += $lat;
+            $hops[] = [
+                'id' => $nodeId,
+                'name' => $node['name'] ?? 'Node',
+                'ip' => $node['ip'] ?? '',
+                'status' => $node['status'] ?? 'unknown',
+                'type' => $node['type'] ?? 'device',
+                'hop_latency_ms' => $lat
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'path_node_ids' => $shortestPath,
+            'path_edge_ids' => $pathEdgeIds,
+            'hop_count' => count($shortestPath) - 1,
+            'cumulative_latency_ms' => round($cumulativeLatency, 2),
+            'hops' => $hops
+        ]);
+        break;
 }
 
 

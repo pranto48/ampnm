@@ -1414,3 +1414,139 @@ MapApp.network.timeline = {
         }
     }
 };
+
+// --- Topology Path Tracer Engine ---
+window.TopologyPathTracer = {
+    activePathEdges: [],
+
+    init: function() {
+        const btn = document.getElementById('pathTracerBtn');
+        const execBtn = document.getElementById('btnExecutePathTrace');
+
+        if (btn) {
+            btn.addEventListener('click', () => this.openModal());
+        }
+        if (execBtn) {
+            execBtn.addEventListener('click', () => this.executeTrace());
+        }
+    },
+
+    openModal: function() {
+        const modal = document.getElementById('pathTracerModal');
+        const srcSelect = document.getElementById('traceSourceSelect');
+        const tgtSelect = document.getElementById('traceTargetSelect');
+        const resultsBox = document.getElementById('traceResultsBox');
+
+        if (!modal || !srcSelect || !tgtSelect) return;
+
+        resultsBox.classList.add('hidden');
+
+        // Populate selects with all active nodes on the map
+        const allNodes = nodes ? nodes.get({ filter: item => item.isDevice !== false }) : [];
+        if (allNodes.length === 0) {
+            alert('No device nodes present on the current map.');
+            return;
+        }
+
+        const options = allNodes.map(n => `<option value="${n.id}">${n.label || n.name || 'Device'} (${n.ip || 'No IP'})</option>`).join('');
+        srcSelect.innerHTML = options;
+        tgtSelect.innerHTML = options;
+
+        if (allNodes.length > 1) {
+            tgtSelect.selectedIndex = 1;
+        }
+
+        modal.classList.remove('hidden');
+    },
+
+    executeTrace: async function() {
+        const srcId = document.getElementById('traceSourceSelect').value;
+        const tgtId = document.getElementById('traceTargetSelect').value;
+        const mapId = currentMapId;
+
+        if (!srcId || !tgtId || srcId === tgtId) {
+            alert('Please select two distinct source and destination nodes.');
+            return;
+        }
+
+        const btn = document.getElementById('btnExecutePathTrace');
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Tracing Route...`;
+
+        try {
+            const resp = await fetch(`api.php?action=trace_topology_path&map_id=${encodeURIComponent(mapId)}&source_id=${encodeURIComponent(srcId)}&target_id=${encodeURIComponent(tgtId)}`);
+            const data = await resp.json();
+
+            if (!data.success) {
+                alert(data.message || 'No routing path found between the selected nodes.');
+                return;
+            }
+
+            this.renderTraceResults(data);
+            this.highlightPathOnMap(data.path_node_ids, data.path_edge_ids);
+        } catch (e) {
+            alert('Path tracing failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-play"></i> Trace Path &amp; Animate`;
+        }
+    },
+
+    renderTraceResults: function(data) {
+        const box = document.getElementById('traceResultsBox');
+        const hopCountEl = document.getElementById('traceHopCount');
+        const latencyEl = document.getElementById('traceLatency');
+        const listEl = document.getElementById('traceHopsList');
+
+        hopCountEl.textContent = `${data.hop_count} Hop(s)`;
+        latencyEl.textContent = `~${data.cumulative_latency_ms} ms Cumulative`;
+
+        listEl.innerHTML = data.hops.map((h, idx) => `
+            <div class="p-2.5 bg-slate-950/70 border border-slate-800 rounded-lg flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-[10px]">#${idx + 1}</span>
+                    <div>
+                        <div class="font-bold text-white">${h.name}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">${h.ip || 'N/A'} • ${h.type}</div>
+                    </div>
+                </div>
+                <span class="font-mono text-emerald-400 text-xs">${h.hop_latency_ms}ms</span>
+            </div>
+        `).join('');
+
+        box.classList.remove('hidden');
+    },
+
+    highlightPathOnMap: function(nodeIds, edgeIds) {
+        if (!network || !edges) return;
+
+        // Focus and select path nodes
+        network.selectNodes(nodeIds, true);
+        network.fit({
+            nodes: nodeIds,
+            animation: { duration: 1000, easingFunction: 'easeInOutQuad' }
+        });
+
+        // Pulse path edges
+        edgeIds.forEach(eId => {
+            const edge = edges.get(eId);
+            if (edge) {
+                edges.update({
+                    id: eId,
+                    color: { color: '#10b981', highlight: '#34d399', hover: '#34d399' },
+                    width: 5
+                });
+            }
+        });
+    }
+};
+
+window.closePathTracerModal = function() {
+    const modal = document.getElementById('pathTracerModal');
+    if (modal) modal.classList.add('hidden');
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.TopologyPathTracer.init();
+});
+

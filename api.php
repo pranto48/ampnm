@@ -278,7 +278,11 @@ try {
         // Status Page & Incident Actions
         'get_status_page_admin', 'save_status_page_settings', 'save_status_component', 'delete_status_component', 'create_status_incident', 'update_status_incident', 'resolve_status_incident',
         // Maintenance Windows Actions
-        'get_maintenance_windows', 'create_maintenance_window', 'delete_maintenance_window', 'check_device_maintenance_status'
+        'get_maintenance_windows', 'create_maintenance_window', 'delete_maintenance_window', 'check_device_maintenance_status',
+        // SLA & Reporting Actions
+        'get_sla_report_data', 'get_sla_profiles', 'save_sla_profile', 'delete_sla_profile',
+        // Topology Path Tracer Actions
+        'trace_topology_path'
     ];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];

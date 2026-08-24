@@ -117,6 +117,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <button id="addTextBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Text Label" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-font"></i></button>
                             <button id="addMapTitleBtn" class="px-3 py-2 bg-slate-700 text-cyan-400 rounded-lg hover:bg-slate-600 border border-cyan-500/30 flex items-center gap-1.5 font-medium text-xs" title="Add Map Title Banner to Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-heading"></i> Map Title</button>
                             <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
+                            <button id="pathTracerBtn" class="px-3 py-2 bg-slate-700 text-emerald-400 rounded-lg hover:bg-slate-600 border border-emerald-500/30 flex items-center gap-1.5 font-medium text-xs" title="Trace Live Routing Path Between Devices"><i class="fas fa-route"></i> Path Tracer</button>
                             <button id="connectionSettingsBtn" class="px-3 py-2 bg-slate-700 text-cyan-400 rounded-lg hover:bg-slate-600 border border-cyan-500/30 flex items-center gap-1.5" title="Connection Glow & Flow Settings"><i class="fas fa-bolt"></i><span class="hidden md:inline text-xs font-semibold">Glow Settings</span></button>
                             <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
@@ -1274,6 +1275,50 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             Close Rack View
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Topology Path Tracer -->
+    <div id="pathTracerModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-6 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-route text-emerald-400"></i> Topology Path Tracer
+                </h3>
+                <button type="button" onclick="closePathTracerModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Source Node (Origin)</label>
+                        <select id="traceSourceSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"></select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Target Node (Destination)</label>
+                        <select id="traceTargetSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"></select>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closePathTracerModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg">Cancel</button>
+                    <button type="button" id="btnExecutePathTrace" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg shadow-lg shadow-emerald-600/30 flex items-center gap-2">
+                        <i class="fas fa-play"></i> Trace Path &amp; Animate
+                    </button>
+                </div>
+
+                <!-- Trace Results Breakdown Container -->
+                <div id="traceResultsBox" class="hidden mt-4 pt-4 border-t border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300 font-bold text-sm flex items-center gap-1.5"><i class="fas fa-network-wired text-cyan-400"></i> Active Hop Route</span>
+                        <div class="flex items-center gap-3 font-mono text-[11px]">
+                            <span class="text-slate-400" id="traceHopCount">0 Hops</span>
+                            <span class="text-emerald-400 font-bold" id="traceLatency">0 ms Total</span>
+                        </div>
+                    </div>
+                    <div id="traceHopsList" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
                 </div>
             </div>
         </div>
