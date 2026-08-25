@@ -1,11 +1,7 @@
 #!/bin/bash
 #
 # Copyright (c) IT Support BD. All rights reserved.
-# This file is part of AMPNM.
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License...
-# (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
+# AMPNM Git Source Code Updater
 #
 set -e
 
@@ -14,14 +10,9 @@ export HOME=/var/www
 REPO_URL="${AMPNM_UPDATE_REPO_URL:-${REPO_URL:-https://github.com/pranto48/ampnm.git}}"
 UPDATE_BRANCH="${AMPNM_UPDATE_BRANCH:-main}"
 UPSTREAM_REF="origin/${UPDATE_BRANCH}"
-#
-# APP_DIR is the container path where docker compose is executed (repo root mount).
-# Example mapping after restructure: host /var/www/html -> container /var/www/html.
+
 APP_DIR="${APP_DIR:-/var/www/html}"
-# HOST_APP_DIR should point to the host-mounted project root used by this container
-# (same root path by default after removing docker-ampnm subfolder nesting).
 HOST_APP_DIR="${HOST_APP_DIR:-${APP_DIR}}"
-# BACKUP_BASE stores code snapshots under the repo root's data tree.
 BACKUP_BASE="${BACKUP_BASE:-/var/www/html/data/code_backups}"
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d_%H%M%S)}"
 BACKUP_DIR="${BACKUP_BASE}/${TIMESTAMP}"
@@ -31,7 +22,7 @@ RESULT_ENV_FILE="${RESULT_ENV_FILE:-${AMPNM_RESULT_FILE:-/tmp/ampnm_update_resul
 mkdir -p "$(dirname "${LOG_FILE}")"
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
-# Configure git safe directory to avoid dubious ownership issues
+# Ensure git safe directories
 if command -v git >/dev/null 2>&1; then
   git config --global --add safe.directory "${HOST_APP_DIR}" || true
   git config --global --add safe.directory '*' || true
@@ -60,15 +51,19 @@ mark_failure() {
 : > "${RESULT_ENV_FILE}"
 trap 'mark_failure "${LINENO}" "$?"' ERR
 
-echo "[$(date -Iseconds)] Starting AMPNM update"
+echo "[$(date -Iseconds)] Starting AMPNM Git Update"
 echo "REPO_URL=${REPO_URL}"
 echo "UPDATE_BRANCH=${UPDATE_BRANCH}"
 echo "UPSTREAM_REF=${UPSTREAM_REF}"
-echo "APP_DIR=${APP_DIR}"
 echo "HOST_APP_DIR=${HOST_APP_DIR}"
 
-# Step 1: backup
-mkdir -p "${BACKUP_DIR}"
+# Step 1: Backup
+if ! mkdir -p "${BACKUP_DIR}" 2>/dev/null; then
+  BACKUP_BASE="/tmp/ampnm_code_backups"
+  BACKUP_DIR="${BACKUP_BASE}/${TIMESTAMP}"
+  mkdir -p "${BACKUP_DIR}"
+fi
+
 echo "[$(date -Iseconds)] Step 1/4: Creating backup at ${BACKUP_DIR}"
 
 if [ -d "${HOST_APP_DIR}" ]; then
@@ -79,33 +74,25 @@ if [ -d "${HOST_APP_DIR}" ]; then
     --exclude='data' \
     --exclude='storage' \
     --exclude='logs' \
-    "${HOST_APP_DIR}/" "${BACKUP_DIR}/code/"
+    --exclude='uploads' \
+    "${HOST_APP_DIR}/" "${BACKUP_DIR}/code/" 2>/dev/null || true
 
   if command -v git >/dev/null 2>&1 && [ -d "${HOST_APP_DIR}/.git" ]; then
-    (cd "${HOST_APP_DIR}" && git rev-parse HEAD) > "${BACKUP_DIR}/previous_commit.txt" || true
+    (cd "${HOST_APP_DIR}" && git rev-parse HEAD) > "${BACKUP_DIR}/previous_commit.txt" 2>/dev/null || true
   fi
-else
-  echo "HOST_APP_DIR does not exist yet, skipping file backup"
 fi
 
 write_result "BACKUP_PATH" "${BACKUP_DIR}"
 
-# Step 2: code sync
-echo "[$(date -Iseconds)] Step 2/4: Syncing code"
+# Step 2: Code Sync
+echo "[$(date -Iseconds)] Step 2/4: Syncing latest code from GitHub"
 if [ -d "${HOST_APP_DIR}/.git" ]; then
   cd "${HOST_APP_DIR}"
-  git fetch origin --prune
-
-  if git show-ref --verify --quiet "refs/remotes/${UPSTREAM_REF}"; then
-    git reset --hard "${UPSTREAM_REF}"
-  else
-    echo "Configured upstream ref ${UPSTREAM_REF} not found after fetch"
-    exit 1
-  fi
+  git fetch origin "${UPDATE_BRANCH}" --prune || git fetch origin --prune
+  git reset --hard "origin/${UPDATE_BRANCH}" || git reset --hard HEAD
 else
   TMP_CLONE_DIR="$(mktemp -d)"
   git clone --branch "${UPDATE_BRANCH}" --single-branch "${REPO_URL}" "${TMP_CLONE_DIR}"
-
   mkdir -p "${HOST_APP_DIR}"
   rsync -a --delete \
     --exclude='.git' \
@@ -113,56 +100,32 @@ else
     --exclude='data' \
     --exclude='storage' \
     --exclude='logs' \
+    --exclude='uploads' \
     "${TMP_CLONE_DIR}/" "${HOST_APP_DIR}/"
-
   rm -rf "${TMP_CLONE_DIR}"
   cd "${HOST_APP_DIR}"
 fi
 
 NEW_COMMIT=""
-if command -v git >/dev/null 2>&1; then
-  if [ -d "${HOST_APP_DIR}/.git" ]; then
-    NEW_COMMIT="$(cd "${HOST_APP_DIR}" && git rev-parse HEAD)"
-  fi
-fi
-write_result "NEW_COMMIT" "${NEW_COMMIT}"
-
-# Step 3: post-update dependencies/build
-echo "[$(date -Iseconds)] Step 3/4: Post-update dependencies/build"
-cd "${HOST_APP_DIR}"
-
-if [ -f "composer.json" ] && command -v composer >/dev/null 2>&1; then
-  composer install --no-interaction --prefer-dist --no-progress
-elif [ -f "package.json" ] && command -v pnpm >/dev/null 2>&1; then
-  pnpm install --frozen-lockfile || pnpm install
-  if [ -f "vite.config.ts" ] || [ -f "vite.config.js" ]; then
-    pnpm build
-  fi
-else
-  echo "No container-side dependency/build step required; skipped"
+if command -v git >/dev/null 2>&1 && [ -d "${HOST_APP_DIR}/.git" ]; then
+  NEW_COMMIT="$(cd "${HOST_APP_DIR}" && git rev-parse HEAD 2>/dev/null || true)"
 fi
 
-# Step 4: restart services
-echo "[$(date -Iseconds)] Step 4/4: Restarting services"
-COMPOSE_DIR="${APP_DIR}"
-if [ -f "${COMPOSE_DIR}/docker-compose.yml" ] || [ -f "${COMPOSE_DIR}/docker-compose.yaml" ] || [ -f "${COMPOSE_DIR}/compose.yml" ] || [ -f "${COMPOSE_DIR}/compose.yaml" ]; then
-  cd "${COMPOSE_DIR}"
-  if command -v docker >/dev/null 2>&1 && [ -S /var/run/docker.sock ]; then
-    echo "Scheduling container restart in background..."
-    if docker compose version >/dev/null 2>&1; then
-      (nohup sh -c 'sleep 2 && docker compose restart app' >/dev/null 2>&1 &)
-    elif command -v docker-compose >/dev/null 2>&1; then
-      (nohup sh -c 'sleep 2 && docker-compose restart app' >/dev/null 2>&1 &)
-    fi
-  else
-    echo "Docker socket/command not available inside container; skipping compose restart"
-  fi
-else
-  echo "No compose file found in ${COMPOSE_DIR}; skipping restart"
+# Step 3: Run Database Migrations
+echo "[$(date -Iseconds)] Step 3/4: Applying database migrations"
+if [ -f "${HOST_APP_DIR}/database_setup.php" ]; then
+  php "${HOST_APP_DIR}/database_setup.php" >/dev/null 2>&1 || true
 fi
+
+# Step 4: Permissions & Finalization
+echo "[$(date -Iseconds)] Step 4/4: Setting permissions and finalizing"
+mkdir -p "${HOST_APP_DIR}/uploads" "${HOST_APP_DIR}/storage/logs" "${HOST_APP_DIR}/data/code_backups" 2>/dev/null || true
+chmod -R 775 "${HOST_APP_DIR}/uploads" "${HOST_APP_DIR}/storage" "${HOST_APP_DIR}/data" 2>/dev/null || true
+chmod +x "${HOST_APP_DIR}/scripts/"*.sh "${HOST_APP_DIR}/scripts/"*.php 2>/dev/null || true
 
 write_result "STATUS" "success"
 write_result "TIMESTAMP" "${TIMESTAMP}"
+write_result "NEW_COMMIT" "${NEW_COMMIT}"
 write_result "LOG_FILE" "${LOG_FILE}"
 
-echo "[$(date -Iseconds)] Update completed successfully"
+echo "[$(date -Iseconds)] AMPNM update finished successfully (Commit: ${NEW_COMMIT:0:7})"

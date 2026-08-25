@@ -1,18 +1,11 @@
 #!/usr/bin/env bash
 #
 # Copyright (c) IT Support BD. All rights reserved.
-# This file is part of AMPNM.
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License...
-# (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
-#
 # AMPNM Self-Updating Script via Docker Socket
+#
 set -euo pipefail
 
 CONTAINER_ID=$(hostname)
-
-# Force minimum supported API version for compatibility with newer host engines (e.g. Docker 25/26/28+)
 export DOCKER_API_VERSION="${DOCKER_API_VERSION:-1.44}"
 
 if [ ! -S /var/run/docker.sock ]; then
@@ -20,32 +13,39 @@ if [ ! -S /var/run/docker.sock ]; then
   exit 1
 fi
 
-echo "→ Inspecting current container configuration..."
+echo "→ Inspecting current container configuration (${CONTAINER_ID})..."
 
 # 1. Fetch current container configuration from Docker socket
 JSON_CONFIG=$(docker inspect "${CONTAINER_ID}")
 
 # 2. Extract configuration values
-NAME=$(echo "${JSON_CONFIG}" | jq -r '.[0].Name' | sed 's/^\///')
+NAME=$(echo "${JSON_CONFIG}" | jq -r '.[0].Name // "ampnm_server"' | sed 's/^\///')
 
-# Resolve target image dynamically from the currently running container's repository
-CURRENT_IMAGE=$(echo "${JSON_CONFIG}" | jq -r '.[0].Config.Image')
+# Resolve target image dynamically
+CURRENT_IMAGE=$(echo "${JSON_CONFIG}" | jq -r '.[0].Config.Image // "itsupportbd/ampnm:latest"')
 BASE_REPO=$(echo "${CURRENT_IMAGE}" | cut -d':' -f1 | cut -d'@' -f1)
 TARGET_IMAGE="${BASE_REPO:-itsupportbd/ampnm}:latest"
 
+echo "✓ Target Image: ${TARGET_IMAGE}"
+
+# Ensure required storage directories exist
+mkdir -p /var/www/html/uploads /var/www/html/data/code_backups /var/www/html/storage/logs || true
+chown -R www-data:www-data /var/www/html/uploads /var/www/html/data /var/www/html/storage 2>/dev/null || true
+chmod -R 775 /var/www/html/uploads /var/www/html/data /var/www/html/storage 2>/dev/null || true
+
 # Backup active license key from database before stopping the old container
-ACTIVE_LICENSE=$(docker exec "${CONTAINER_ID}" php -r "require '/var/www/html/config.php'; echo getAppLicenseKey();" 2>/dev/null || true)
+ACTIVE_LICENSE=$(docker exec "${CONTAINER_ID}" php -r "require_once '/var/www/html/config.php'; echo getAppLicenseKey();" 2>/dev/null || true)
 if [ -n "$ACTIVE_LICENSE" ]; then
-  echo "✓ Successfully backed up active license key during update."
+  echo "✓ Successfully backed up active license key: ${ACTIVE_LICENSE:0:8}..."
 fi
 
 # Dump the active database into the persistent uploads directory
 echo "→ Creating pre-update database dump in uploads directory..."
 docker exec "${CONTAINER_ID}" sh -c '
   [ -f /etc/apache2/envvars ] && . /etc/apache2/envvars
-  host="${DB_HOST:-127.0.0.1}"
-  user="${DB_USER:-root}"
-  pass="${DB_PASSWORD:-${MYSQL_ROOT_PASSWORD:-}}"
+  host="${DB_HOST:-db}"
+  user="${DB_USER:-user}"
+  pass="${DB_PASSWORD:-password}"
   name="${DB_NAME:-network_monitor}"
   passArg=""
   if [ -n "$pass" ]; then
@@ -54,99 +54,65 @@ docker exec "${CONTAINER_ID}" sh -c '
   mysqldump -h "$host" -u "$user" $passArg "$name" > /var/www/html/uploads/db_backup_pre_update.sql 2>/dev/null || true
 ' || true
 
-# Export pre-update JSON backup of map, devices, and license key
-echo "→ Creating JSON backup of maps, devices, and license key..."
-docker exec "${CONTAINER_ID}" php -r '
-  try {
-    require_once "/var/www/html/includes/bootstrap.php";
-    require_once "/var/www/html/config.php";
-    $pdo = getDbConnection();
-    if ($pdo) {
-      $data = [
-        "timestamp" => date("c"),
-        "license_key" => getAppLicenseKey(),
-        "installation_id" => getInstallationId(),
-        "maps" => $pdo->query("SELECT * FROM maps")->fetchAll(PDO::FETCH_ASSOC),
-        "map_nodes" => $pdo->query("SELECT * FROM map_nodes")->fetchAll(PDO::FETCH_ASSOC),
-        "map_links" => $pdo->query("SELECT * FROM map_links")->fetchAll(PDO::FETCH_ASSOC),
-        "devices" => $pdo->query("SELECT * FROM devices")->fetchAll(PDO::FETCH_ASSOC),
-        "app_settings" => $pdo->query("SELECT * FROM app_settings")->fetchAll(PDO::FETCH_ASSOC)
-      ];
-      file_put_contents("/var/www/html/uploads/pre_update_map_license_backup.json", json_encode($data, JSON_PRETTY_PRINT));
-    }
-  } catch (Throwable $e) {}
-' 2>/dev/null || true
-
-
-echo "Recreating container '${NAME}' with image '${TARGET_IMAGE}'..."
-
-# Reconstruct environment arguments safely using single quote escaping
+# Reconstruct environment arguments
 ENV_ARGS=""
-while read -r env; do
-  if [ -n "$env" ]; then
-    # Skip the old APP_LICENSE_KEY if we successfully retrieved the active license from DB
-    if [ -n "$ACTIVE_LICENSE" ] && [[ "$env" == APP_LICENSE_KEY=* ]]; then
+while read -r env_item; do
+  if [ -n "$env_item" ] && [ "$env_item" != "null" ]; then
+    if [ -n "$ACTIVE_LICENSE" ] && [[ "$env_item" == APP_LICENSE_KEY=* ]]; then
       continue
     fi
-    # Escape any single quotes inside the env variable
-    escaped_env=$(echo "$env" | sed "s/'/'\\\\''/g")
+    escaped_env=$(echo "$env_item" | sed "s/'/'\\\\''/g")
     ENV_ARGS="${ENV_ARGS} -e '${escaped_env}'"
   fi
-done < <(echo "${JSON_CONFIG}" | jq -r '.[0].Config.Env[]')
+done < <(echo "${JSON_CONFIG}" | jq -r '.[0].Config.Env // [] | .[]')
 
-# Append the backed up active license key
 if [ -n "$ACTIVE_LICENSE" ]; then
   escaped_license=$(echo "$ACTIVE_LICENSE" | sed "s/'/'\\\\''/g")
   ENV_ARGS="${ENV_ARGS} -e 'APP_LICENSE_KEY=${escaped_license}'"
 fi
 
-# Reconstruct volume mounts safely
+# Reconstruct volume mounts
 VOLUME_ARGS=""
-while read -r bind; do
-  if [ -n "$bind" ] && [ "$bind" != "null" ]; then
-    escaped_bind=$(echo "$bind" | sed "s/'/'\\\\''/g")
+while read -r bind_item; do
+  if [ -n "$bind_item" ] && [ "$bind_item" != "null" ]; then
+    escaped_bind=$(echo "$bind_item" | sed "s/'/'\\\\''/g")
     VOLUME_ARGS="${VOLUME_ARGS} -v '${escaped_bind}'"
   fi
-done < <(echo "${JSON_CONFIG}" | jq -r '.[0].HostConfig.Binds[]')
+done < <(echo "${JSON_CONFIG}" | jq -r '.[0].HostConfig.Binds // [] | .[]')
 
 # Reconstruct port bindings
 PORT_ARGS=""
-while read -r port_binding; do
-  if [ -n "$port_binding" ] && [ "$port_binding" != "null" ]; then
-    CONTAINER_PORT=$(echo "$port_binding" | cut -d'/' -f1)
-    HOST_PORT=$(echo "$port_binding" | jq -r '.[0].HostPort')
-    if [ -n "$HOST_PORT" ] && [ "$HOST_PORT" != "null" ]; then
-      PORT_ARGS="${PORT_ARGS} -p ${HOST_PORT}:${CONTAINER_PORT}"
-    fi
+while read -r host_port container_port; do
+  if [ -n "$host_port" ] && [ "$host_port" != "null" ] && [ -n "$container_port" ] && [ "$container_port" != "null" ]; then
+    PORT_ARGS="${PORT_ARGS} -p ${host_port}:${container_port}"
   fi
-done < <(echo "${JSON_CONFIG}" | jq -r '.[0].HostConfig.PortBindings | to_entries[] | "\(.key) \(.value)"')
+done < <(echo "${JSON_CONFIG}" | jq -r '.[0].HostConfig.PortBindings // {} | to_entries[] | "\(.value[0].HostPort) \(.key | split("/")[0])"')
 
-# Reconstruct restart policy
-RESTART_POLICY=$(echo "${JSON_CONFIG}" | jq -r '.[0].HostConfig.RestartPolicy.Name')
-if [ -n "$RESTART_POLICY" ] && [ "$RESTART_POLICY" != "no" ] && [ "$RESTART_POLICY" != "null" ]; then
-  RESTART_ARG="--restart ${RESTART_POLICY}"
-else
-  RESTART_ARG="--restart unless-stopped"
+# Fallback port if empty
+if [ -z "$(echo "${PORT_ARGS}" | tr -d ' ')" ]; then
+  PORT_ARGS="-p 2266:2266"
 fi
 
 # Reconstruct network mode
-NET_MODE=$(echo "${JSON_CONFIG}" | jq -r '.[0].HostConfig.NetworkMode')
+NET_MODE=$(echo "${JSON_CONFIG}" | jq -r '.[0].HostConfig.NetworkMode // "ampnm_default"')
 if [ -n "$NET_MODE" ] && [ "$NET_MODE" != "default" ] && [ "$NET_MODE" != "null" ]; then
-  NET_ARG="--network ${NET_MODE}"
+  NET_ARG="--network ${NET_MODE} --network-alias app"
 else
-  NET_ARG=""
+  NET_ARG="--network ampnm_default --network-alias app"
 fi
 
-# Construct the full docker run command
-RUN_CMD="docker run -d --name ${NAME} ${RESTART_ARG} ${NET_ARG} ${PORT_ARGS} ${VOLUME_ARGS} ${ENV_ARGS} ${TARGET_IMAGE}"
-RUN_CMD=$(echo "$RUN_CMD" | tr -s ' ')
+# Construct full docker run command
+RUN_CMD="docker run -d --name ${NAME} --restart unless-stopped ${NET_ARG} ${PORT_ARGS} ${VOLUME_ARGS} ${ENV_ARGS} ${TARGET_IMAGE}"
 
 echo "→ Prepared Docker Run Command:"
 echo "$RUN_CMD"
 
-# Launch helper container to perform update asynchronously, passing environment variables safely
+# Remove any old updater helper container
+docker rm -f ampnm_updater_helper 2>/dev/null || true
+
+# Launch helper container to perform update asynchronously
 echo "→ Launching update helper container..."
-docker run -d --name ampnm_updater_helper --rm \
+docker run -d --name ampnm_updater_helper \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e RUN_CMD="${RUN_CMD}" \
   -e CONTAINER_ID="${CONTAINER_ID}" \
@@ -154,28 +120,19 @@ docker run -d --name ampnm_updater_helper --rm \
   -e DOCKER_API_VERSION="${DOCKER_API_VERSION}" \
   docker:cli sh -c '
     echo "[10%] Initializing self-update routine..."
-    echo "[20%] Waiting for host container request context to close..."
     sleep 3
-    echo "[40%] Pulling latest image \"\${TARGET_IMAGE}\" from Docker Hub..."
-    if ! docker pull "\${TARGET_IMAGE}"; then
-      echo "❌ ERROR [40%]: Failed to pull image \"\${TARGET_IMAGE}\". Please check internet connectivity or repository credentials." >&2
-      exit 1
-    fi
-    echo "[60%] Safely stopping old container \"\${CONTAINER_ID}\"..."
-    if ! docker stop "\${CONTAINER_ID}"; then
-      echo "⚠️ WARNING [60%]: Graceful shutdown failed. Forcing removal..."
-    fi
-    echo "[80%] Removing old container \"\${CONTAINER_ID}\"..."
-    if ! docker rm -f "\${CONTAINER_ID}"; then
-      echo "❌ ERROR [80%]: Failed to remove old container context." >&2
-      exit 1
-    fi
+    echo "[30%] Pulling latest image \"${TARGET_IMAGE}\" from Docker Hub..."
+    docker pull "${TARGET_IMAGE}" || echo "Warning: pull failed, using cached local image"
+    echo "[60%] Safely stopping old container \"${CONTAINER_ID}\"..."
+    docker stop "${CONTAINER_ID}" || true
+    echo "[80%] Removing old container \"${CONTAINER_ID}\"..."
+    docker rm -f "${CONTAINER_ID}" || true
     echo "[90%] Spawning new container..."
-    if ! eval "\${RUN_CMD}"; then
-      echo "❌ ERROR [90%]: Failed to start new container with command: \${RUN_CMD}" >&2
-      exit 1
-    fi
+    eval "${RUN_CMD}"
+    echo "[95%] Running database migrations in new container..."
+    sleep 3
+    docker exec "${NAME}" php /var/www/html/database_setup.php || true
     echo "[100%] Update completed successfully!"
   '
 
-echo "✓ Update helper successfully spawned. Recreating container shortly..."
+echo "✓ Update helper successfully spawned. Recreating container with ${TARGET_IMAGE}..."

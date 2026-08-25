@@ -59,15 +59,11 @@ git config --system --add safe.directory '*' || true
 chown www-data:www-data /var/www || true
 chown www-data:www-data /var/www/html || true
 
-# Only apply recursive permissions to directories that require write access
-if [ -d /var/www/html/uploads ]; then
-    chown -R www-data:www-data /var/www/html/uploads || true
-    chmod -R 775 /var/www/html/uploads || true
-fi
-if [ -d /var/www/html/storage ]; then
-    chown -R www-data:www-data /var/www/html/storage || true
-    chmod -R 775 /var/www/html/storage || true
-fi
+# Ensure directories requiring write access exist and have correct permissions
+mkdir -p /var/www/html/uploads /var/www/html/data /var/www/html/data/code_backups /var/www/html/storage /var/www/html/storage/logs || true
+chown -R www-data:www-data /var/www/html/uploads /var/www/html/data /var/www/html/storage || true
+chmod -R 775 /var/www/html/uploads /var/www/html/data /var/www/html/storage || true
+chmod +x /var/www/html/scripts/*.sh /var/www/html/scripts/*.php 2>/dev/null || true
 
 # Make license files read-only for www-data if they exist
 [ -f /var/www/html/license_guard.php ] && chmod 444 /var/www/html/license_guard.php || true

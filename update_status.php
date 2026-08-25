@@ -123,22 +123,26 @@ function getDockerHubUpdateStatus(): array {
         $httpCodeAll = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
-        $latestTag = 'v1.16';
+        $latestTag = 'v1.22';
         if ($httpCodeAll === 200 && $responseAll) {
             $dataAll = json_decode($responseAll, true);
             if (!empty($dataAll['results'])) {
                 foreach ($dataAll['results'] as $t) {
                     $name = $t['name'] ?? '';
-                    if (preg_match('/^v[0-9]+\.[0-9]+$/', $name)) {
-                        if (version_compare(substr($name, 1), substr($latestTag, 1), '>')) {
-                            $latestTag = $name;
+                    if (preg_match('/^v[0-9]+\.[0-9]+$/i', $name)) {
+                        if (version_compare(ltrim(strtolower($name), 'v'), ltrim(strtolower($latestTag), 'v'), '>')) {
+                            $latestTag = strtolower($name);
                         }
                     }
                 }
             }
         }
-        $currentTag = 'v1.16'; 
-        $updateAvailable = ($latestTag !== $currentTag);
+        $currentTag = 'v1.22';
+        $tagOutput = trim(shell_exec('git describe --tags --abbrev=0 2>/dev/null') ?? '');
+        if (!empty($tagOutput)) {
+            $currentTag = strtolower($tagOutput);
+        }
+        $updateAvailable = (version_compare(ltrim(strtolower($latestTag), 'v'), ltrim(strtolower($currentTag), 'v'), '>'));
         $remoteDigest = $latestTag;
         $localDigest = $currentTag;
     }
