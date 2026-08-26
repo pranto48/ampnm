@@ -173,7 +173,10 @@ $lockHandle = null;
 
 function acquireOpsLock(string $lockPath)
 {
-    $handle = fopen($lockPath, 'c');
+    if (file_exists($lockPath) && (time() - filemtime($lockPath)) > 300) {
+        @unlink($lockPath);
+    }
+    $handle = @fopen($lockPath, 'c');
     if ($handle === false) {
         return false;
     }

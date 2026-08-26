@@ -116,6 +116,7 @@ docker run -d --name ampnm_updater_helper \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e RUN_CMD="${RUN_CMD}" \
   -e CONTAINER_ID="${CONTAINER_ID}" \
+  -e NAME="${NAME}" \
   -e TARGET_IMAGE="${TARGET_IMAGE}" \
   -e DOCKER_API_VERSION="${DOCKER_API_VERSION}" \
   docker:cli sh -c '
@@ -130,7 +131,7 @@ docker run -d --name ampnm_updater_helper \
     echo "[90%] Spawning new container..."
     eval "${RUN_CMD}"
     echo "[95%] Running database migrations in new container..."
-    sleep 3
+    sleep 4
     docker exec "${NAME}" php /var/www/html/database_setup.php || true
     echo "[100%] Update completed successfully!"
   '
