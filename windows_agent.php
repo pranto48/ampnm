@@ -135,6 +135,27 @@ $linuxServiceDownload = $serverUrl . '/download-agent.php?file=ampnm-agent.servi
                 </div>
             </div>
 
+            <!-- Administrator & Antivirus Permission Whitelist Guide -->
+            <div class="bg-slate-900/60 border border-cyan-500/30 rounded-xl p-5 mb-4">
+                <div class="flex items-start gap-3">
+                    <div class="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20 text-lg shrink-0">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                            Run as Administrator &amp; Antivirus Whitelisting
+                        </h4>
+                        <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                            The agent installer automatically requests <strong>UAC Administrator Elevation</strong> and registers <strong>Windows Defender exclusions</strong> for <code>%ProgramData%\AMPNM-Agent</code>.
+                        </p>
+                        <div class="mt-3 p-3 bg-slate-950/80 rounded-lg border border-slate-800 text-2xs font-mono text-emerald-400 space-y-1">
+                            <div><span class="text-slate-500"># 1-Click Auto-Elevate &amp; Install from Elevated PowerShell:</span></div>
+                            <div class="text-cyan-300">Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-slate-900/40 border border-slate-700 rounded-lg p-4">
                 <p class="text-white font-medium text-sm mb-2"><i class="fas fa-check-double text-green-400 mr-2"></i>Windows Verification</p>
                 <pre id="windows-verify-command" class="text-xs text-green-400 whitespace-pre-wrap">Get-Service -Name AMPNM-Agent

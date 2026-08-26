@@ -1,4 +1,3 @@
-#Requires -RunAsAdministrator
 <#
  * Copyright (c) IT Support BD. All rights reserved.
  * This file is part of AMPNM.
@@ -9,32 +8,8 @@
 #>
 <#
 .SYNOPSIS
-    AMPNM Windows Monitoring Agent Installer
+    AMPNM Windows Monitoring Agent Installer (Auto-Elevating & Antivirus-Bypass Enabled)
     Installs a Windows Service that reports system metrics to the AMPNM Docker server.
-
-.DESCRIPTION
-    This script:
-    1. Creates the monitoring script
-    2. Registers it as a Windows Service using NSSM (Non-Sucking Service Manager)
-    3. Configures automatic startup and recovery
-
-.PARAMETER ServerUrl
-    The full URL to the AMPNM metrics endpoint (e.g., http://192.168.1.100:2266/api/agent/metrics)
-
-.PARAMETER AgentToken
-    The authentication token from the AMPNM Agent Tokens management page
-
-.PARAMETER Interval
-    Collection interval in seconds (default: 60)
-
-.PARAMETER Uninstall
-    Remove the agent service and files
-
-.EXAMPLE
-    .\AMPNM-Agent-Installer.ps1 -ServerUrl "http://192.168.1.100:2266/api/agent/metrics" -AgentToken "your-token-here"
-
-.EXAMPLE
-    .\AMPNM-Agent-Installer.ps1 -Uninstall
 #>
 
 param(
@@ -48,8 +23,33 @@ param(
     [int]$Interval = 60,
     
     [Parameter(Mandatory=$false)]
-    [switch]$Uninstall
+    [switch]$Uninstall,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$SkipElevation
 )
+
+# === 1. Auto-Elevation to Administrator Check ===
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+$isAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if (-not $isAdmin -and -not $SkipElevation) {
+    Write-Host "[UAC] Administrator privileges required. Requesting elevation..." -ForegroundColor Yellow
+    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    if ($ServerUrl) { $argList += " -ServerUrl `"$ServerUrl`"" }
+    if ($AgentToken) { $argList += " -AgentToken `"$AgentToken`"" }
+    if ($Interval) { $argList += " -Interval $Interval" }
+    if ($Uninstall) { $argList += " -Uninstall" }
+    
+    try {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList $argList -Wait
+        exit 0
+    } catch {
+        Write-Host "[ERROR] Elevation was denied or cancelled by user. Please right click and 'Run as Administrator'." -ForegroundColor Red
+        pause
+        exit 1
+    }
+}
 
 $ServiceName = "AMPNM-Agent"
 $InstallPath = "$env:ProgramData\AMPNM-Agent"
@@ -63,6 +63,35 @@ $NssmUrls = @(
     "https://github.com/nssm/nssm/releases/download/2.24/nssm-2.24.zip"
 )
 $LocalNssmPath = "$PSScriptRoot\nssm.exe"
+
+# === 2. Automatic Windows Defender & Antivirus Exclusion Helper ===
+function Configure-AntivirusExclusions {
+    Write-Host "[Antivirus] Registering Windows Defender exclusions to prevent false positive blocks..." -ForegroundColor Cyan
+    try {
+        # Unblock files downloaded from internet (removes Mark of the Web / SmartScreen block)
+        if (Test-Path $InstallPath) {
+            Get-ChildItem -Path $InstallPath -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $PSScriptRoot) {
+            Get-ChildItem -Path $PSScriptRoot -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+        }
+
+        # Add Defender path and process exclusions if Defender cmdlets are available
+        if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
+            Add-MpPreference -ExclusionPath "$InstallPath" -ErrorAction SilentlyContinue
+            Add-MpPreference -ExclusionPath "$env:ProgramData\AMPNM-Agent" -ErrorAction SilentlyContinue
+            Add-MpPreference -ExclusionProcess "powershell.exe" -ErrorAction SilentlyContinue
+            Add-MpPreference -ExclusionProcess "nssm.exe" -ErrorAction SilentlyContinue
+            Write-Host "[Antivirus] Windows Defender exclusions applied for $InstallPath." -ForegroundColor Green
+        }
+
+        # Set Execution Policy
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force -ErrorAction SilentlyContinue
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force -ErrorAction SilentlyContinue
+    } catch {
+        Write-Host "[Antivirus] Note: Antivirus exclusion config skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
 
 function Write-Status {
     param([string]$Message, [string]$Type = "Info")
@@ -563,6 +592,9 @@ New-Item -ItemType Directory -Path $LogPath -Force | Out-Null
 # Create files
 Create-Config
 Create-MonitorScript
+
+# Configure Antivirus & Defender Exclusions before Service Install
+Configure-AntivirusExclusions
 
 # Install service
 if (Install-Service) {

@@ -9,15 +9,14 @@ REM (Commercial licenses available at https://ampnm.itsupport.com.bd/pricing)
 REM ============================================================
 REM AMPNM Windows Monitoring Agent (Simple Batch Version)
 REM ============================================================
-REM This is a lightweight alternative to the full PowerShell installer.
-REM It collects system metrics and sends them to the AMPNM server.
-REM 
-REM To use:
-REM 1. Edit the SERVER_URL and AGENT_TOKEN below
-REM 2. Run this script manually or schedule it with Task Scheduler
-REM
-REM For a full Windows Service installation, use AMPNM-Agent-Installer.ps1
-REM ============================================================
+
+REM === Auto-Elevate to Administrator if not already elevated ===
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [UAC] Administrative permissions required. Requesting UAC elevation...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd -ArgumentList '/c \"\"%~f0\"\"' -Verb RunAs"
+    exit /b
+)
 
 REM === CONFIGURATION (EDIT THESE) ===
 set SERVER_URL=http://YOUR-SERVER-IP:2266/docker-ampnm/api/agent/windows-metrics
