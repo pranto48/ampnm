@@ -245,7 +245,10 @@ MapApp.network = {
                 ? MapApp.utils.getCurrentTooltipDisplaySettings()
                 : { connection_enable_animation: true, connection_glow_mode: 'neon-laser', connection_glow_radius: 14, connection_run_style: 'auto', connection_animation_speed: 100, connection_enable_bandwidth_glow: true };
 
-            const isAnimEnabled = displaySettings.connection_enable_animation !== false && displaySettings.connection_enable_animation !== 'false';
+            const isAnimEnabled = displaySettings.connection_enable_animation !== false && 
+                                  displaySettings.connection_enable_animation !== 'false' && 
+                                  displaySettings.connection_enable_animation !== 0 && 
+                                  displaySettings.connection_enable_animation !== '0';
             const glowMode = displaySettings.connection_glow_mode || 'neon-laser';
             const baseGlowRadius = parseInt(displaySettings.connection_glow_radius, 10) || 14;
             const runStyle = displaySettings.connection_run_style || 'auto';
@@ -253,10 +256,10 @@ MapApp.network = {
             globalSpeedMultiplier = animSpeed;
 
             // Sync globalProgress with MapApp.state.edgeAnimProgress on every frame
-            if (MapApp.state && MapApp.state.edgeAnimProgress !== undefined) {
+            if (MapApp.state && typeof MapApp.state.edgeAnimProgress === 'number') {
                 globalProgress = MapApp.state.edgeAnimProgress;
             } else if (isAnimEnabled) {
-                globalProgress = (globalProgress + 0.003 * globalSpeedMultiplier) % 1.0;
+                globalProgress = (globalProgress + 0.005 * globalSpeedMultiplier) % 1.0;
             }
 
             ctx.save();
@@ -295,45 +298,47 @@ MapApp.network = {
                 if (bodyEdge?.options?.hidden === true || bodyEdge?.hidden === true || rawEdge?.hidden === true) continue;
                 if (bodyEdge?.from?.options?.hidden === true || bodyEdge?.to?.options?.hidden === true) continue;
 
-                const fromId = String(rawEdge?.from || bodyEdge?.from?.id || bodyEdge?.from || '');
-                const toId = String(rawEdge?.to || bodyEdge?.to?.id || bodyEdge?.to || '');
-                if (!fromId || !toId) continue;
+                const fromId = rawEdge?.from ?? bodyEdge?.from?.id ?? bodyEdge?.from;
+                const toId = rawEdge?.to ?? bodyEdge?.to?.id ?? bodyEdge?.to;
+                if (fromId === undefined || toId === undefined || fromId === null || toId === null || fromId === '' || toId === '') continue;
 
                 // Robust coordinate extraction
-                let fx = bodyEdge?.from?.x;
-                let fy = bodyEdge?.from?.y;
-                let tx = bodyEdge?.to?.x;
-                let ty = bodyEdge?.to?.y;
+                let fx = (typeof bodyEdge?.from === 'object' && typeof bodyEdge?.from?.x === 'number') ? bodyEdge.from.x : undefined;
+                let fy = (typeof bodyEdge?.from === 'object' && typeof bodyEdge?.from?.y === 'number') ? bodyEdge.from.y : undefined;
+                let tx = (typeof bodyEdge?.to === 'object' && typeof bodyEdge?.to?.x === 'number') ? bodyEdge.to.x : undefined;
+                let ty = (typeof bodyEdge?.to === 'object' && typeof bodyEdge?.to?.y === 'number') ? bodyEdge.to.y : undefined;
 
                 if (typeof fx !== 'number' || typeof fy !== 'number') {
-                    const pos = MapApp.state.network.getPositions([fromId])[fromId];
-                    if (pos) { fx = pos.x; fy = pos.y; }
+                    const pos = MapApp.state.network.getPositions([fromId, Number(fromId), String(fromId)]) || {};
+                    const p = pos[fromId] || pos[Number(fromId)] || pos[String(fromId)];
+                    if (p && typeof p.x === 'number' && typeof p.y === 'number') { fx = p.x; fy = p.y; }
                 }
                 if (typeof tx !== 'number' || typeof ty !== 'number') {
-                    const pos = MapApp.state.network.getPositions([toId])[toId];
-                    if (pos) { tx = pos.x; ty = pos.y; }
+                    const pos = MapApp.state.network.getPositions([toId, Number(toId), String(toId)]) || {};
+                    const p = pos[toId] || pos[Number(toId)] || pos[String(toId)];
+                    if (p && typeof p.x === 'number' && typeof p.y === 'number') { tx = p.x; ty = p.y; }
                 }
                 if (typeof fx !== 'number' || typeof fy !== 'number') {
-                    const rawNode = MapApp.state.nodes ? MapApp.state.nodes.get(fromId) : null;
-                    if (rawNode && typeof rawNode.x === 'number') { fx = rawNode.x; fy = rawNode.y; }
+                    const rawNode = MapApp.state.nodes ? (MapApp.state.nodes.get(fromId) || MapApp.state.nodes.get(Number(fromId)) || MapApp.state.nodes.get(String(fromId))) : null;
+                    if (rawNode && typeof rawNode.x === 'number' && typeof rawNode.y === 'number') { fx = rawNode.x; fy = rawNode.y; }
                 }
                 if (typeof tx !== 'number' || typeof ty !== 'number') {
-                    const rawNode = MapApp.state.nodes ? MapApp.state.nodes.get(toId) : null;
-                    if (rawNode && typeof rawNode.x === 'number') { tx = rawNode.x; ty = rawNode.y; }
+                    const rawNode = MapApp.state.nodes ? (MapApp.state.nodes.get(toId) || MapApp.state.nodes.get(Number(toId)) || MapApp.state.nodes.get(String(toId))) : null;
+                    if (rawNode && typeof rawNode.x === 'number' && typeof rawNode.y === 'number') { tx = rawNode.x; ty = rawNode.y; }
                 }
 
                 if (typeof fx !== 'number' || typeof fy !== 'number' || typeof tx !== 'number' || typeof ty !== 'number') {
                     continue;
                 }
 
-                const sourceStatus = deviceStatuses[fromId] || 'online';
-                const targetStatus = deviceStatuses[toId] || 'online';
+                const sourceStatus = deviceStatuses[String(fromId)] || 'online';
+                const targetStatus = deviceStatuses[String(toId)] || 'online';
                 const isOffline = (sourceStatus === 'offline' || targetStatus === 'offline');
 
                 // Check if animation is disabled for this specific edge
                 const isEdgeAnimated = rawEdge && rawEdge.custom_animated !== undefined 
                     ? (rawEdge.custom_animated == 1 || rawEdge.custom_animated === true || rawEdge.custom_animated === '1') 
-                    : true;
+                    : (rawEdge?.animated !== undefined ? (rawEdge.animated == 1 || rawEdge.animated === true || rawEdge.animated === '1') : true);
 
                 // Edge Color resolution
                 let edgeColor = (typeof bodyEdge?.options?.color === 'string' ? bodyEdge.options.color : bodyEdge?.options?.color?.color) || rawEdge?.custom_color || rawEdge?.color || '#00F2FE';

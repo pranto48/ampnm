@@ -417,8 +417,8 @@ MapApp.ui = {
 
     startCanvasAnimationLoop: () => {
         let lastFrameTime = 0;
-        const targetFPS = 25;
-        const fpsInterval = 1000 / targetFPS; // ~40ms per frame
+        const targetFPS = 30; // 30 FPS for crisp, smooth packet animation
+        const fpsInterval = 1000 / targetFPS;
 
         const loop = (timestamp) => {
             if (document.hidden) {
@@ -436,26 +436,22 @@ MapApp.ui = {
             if (elapsed >= fpsInterval) {
                 lastFrameTime = timestamp - (elapsed % fpsInterval);
 
-                const displaySettings = MapApp.utils.getCurrentTooltipDisplaySettings();
+                const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function')
+                    ? MapApp.utils.getCurrentTooltipDisplaySettings()
+                    : { connection_enable_animation: true, connection_animation_speed: 100 };
+                
                 const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) ?? 100));
                 
                 const timelineSlider = document.getElementById('timelineSlider');
                 const isLive = timelineSlider ? parseInt(timelineSlider.value, 10) === 24 : true;
                 
                 const speedMultiplier = (speedPercent / 100) * (isLive ? 1 : 0);
+                const effSpeed = speedMultiplier > 0 ? speedMultiplier : (isLive ? 1.0 : 0);
 
-                // Check if any nodes use animated SVG icons
-                const hasAnimatedNodes = MapApp.state.nodes ? MapApp.state.nodes.get().some(n =>
-                    n.originalImage && typeof n.originalImage === 'string' && n.originalImage.includes('animated-')
-                ) : false;
+                MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.005 * effSpeed) % 1.0;
 
-                const edgeCount = MapApp.state.edges ? (typeof MapApp.state.edges.get === 'function' ? MapApp.state.edges.get().length : (MapApp.state.edges.length || 0)) : 0;
-                const hasBodyEdges = MapApp.state.network?.body?.edges ? Object.keys(MapApp.state.network.body.edges).length > 0 : false;
-                const effSpeed = speedMultiplier > 0 ? speedMultiplier : 1.0;
-                MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.003 * effSpeed) % 1.0;
-
-                // Redraw canvas if edges or active animated elements exist
-                if (edgeCount > 0 || hasBodyEdges || hasAnimatedNodes) {
+                // Redraw canvas if network exists
+                if (MapApp.state.network) {
                     MapApp.state.network.redraw();
                 }
             }
