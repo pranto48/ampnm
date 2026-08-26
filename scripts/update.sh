@@ -120,7 +120,7 @@ fi
 # Step 4: Permissions & Finalization
 echo "[$(date -Iseconds)] Step 4/4: Setting permissions and finalizing"
 mkdir -p "${HOST_APP_DIR}/uploads" "${HOST_APP_DIR}/storage/logs" "${HOST_APP_DIR}/data/code_backups" 2>/dev/null || true
-chmod -R 775 "${HOST_APP_DIR}/uploads" "${HOST_APP_DIR}/storage" "${HOST_APP_DIR}/data" 2>/dev/null || true
+chmod -R 777 "${HOST_APP_DIR}/uploads" "${HOST_APP_DIR}/storage" "${HOST_APP_DIR}/data" 2>/dev/null || true
 chmod +x "${HOST_APP_DIR}/scripts/"*.sh "${HOST_APP_DIR}/scripts/"*.php 2>/dev/null || true
 
 write_result "STATUS" "success"

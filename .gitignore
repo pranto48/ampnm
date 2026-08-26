@@ -35,3 +35,10 @@ apps/windows-agent/src-tauri/target/
 # Compressed archives
 ampnm.tar.gz
 ampnm.zip
+
+# Runtime App Storage & Backups
+storage/*.json
+storage/logs/*
+data/
+uploads/
+*.lock
