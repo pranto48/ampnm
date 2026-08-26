@@ -1932,6 +1932,37 @@ try {
         INDEX idx_agent (`agent_device_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'agent_device_drives' created or already exists.");
+
+    // 52. Agent Installed Software Inventory Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `agent_software_inventory` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `agent_device_id` BIGINT UNSIGNED NOT NULL,
+        `app_name` VARCHAR(255) NOT NULL,
+        `version` VARCHAR(100) NULL,
+        `publisher` VARCHAR(255) NULL,
+        `install_date` VARCHAR(50) NULL,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_agent_app (`agent_device_id`, `app_name`),
+        INDEX idx_agent (`agent_device_id`),
+        INDEX idx_app (`app_name`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'agent_software_inventory' created or already exists.");
+
+    // 53. Agent Security & Defender Health Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `agent_security_health` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `agent_device_id` BIGINT UNSIGNED NOT NULL,
+        `antivirus_name` VARCHAR(150) NOT NULL DEFAULT 'Windows Defender',
+        `antivirus_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `realtime_protection_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `definitions_updated_at` VARCHAR(100) NULL,
+        `engine_version` VARCHAR(100) NULL,
+        `firewall_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `last_checked_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_agent_sec (`agent_device_id`),
+        INDEX idx_agent (`agent_device_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'agent_security_health' created or already exists.");
     echo "<p style='color: #94a3b8;'><span class='loader'></span>Redirecting to the application in 3 seconds...</p>";
     echo '<meta http-equiv="refresh" content="3;url=index.php">';
 

@@ -280,23 +280,46 @@ function Get-SystemMetrics {
     } catch { }
     
     try {
-        # GPU (NVIDIA-SMI query fallback to performance counters)
-        $gpuPercent = $null
-        if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
-            $gpuRaw = nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>$null
-            $parsedVal = 0.0
-            if ($gpuRaw -and [double]::TryParse($gpuRaw.Trim(), [ref]$parsedVal)) {
-                $gpuPercent = $parsedVal
+        # Windows Defender & Security Health
+        $secStatus = @{
+            antivirus_name = 'Windows Defender'
+            antivirus_enabled = 1
+            realtime_protection_enabled = 1
+            firewall_enabled = 1
+        }
+        if (Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue) {
+            $mp = Get-MpComputerStatus -ErrorAction SilentlyContinue
+            if ($mp) {
+                $secStatus.antivirus_enabled = [int]($mp.AntivirusEnabled -eq $true)
+                $secStatus.realtime_protection_enabled = [int]($mp.RealTimeProtectionEnabled -eq $true)
+                $secStatus.definitions_updated_at = [string]($mp.AntivirusSignatureLastUpdated)
+                $secStatus.engine_version = [string]($mp.AMEngineVersion)
             }
         }
-        if ($gpuPercent -eq $null) {
-            $gpuCounters = Get-Counter -Counter '\GPU Engine(*engtype_3D)\Utilization Percentage' -ErrorAction SilentlyContinue
-            if ($gpuCounters.CounterSamples) {
-                $gpuAvg = ($gpuCounters.CounterSamples | Measure-Object CookedValue -Average).Average
-                $gpuPercent = [math]::Round($gpuAvg, 2)
+        $metrics.security_health = $secStatus
+    } catch { }
+
+    try {
+        # Software Inventory Sample (Registry Uninstall keys)
+        $apps = @()
+        $regPaths = @(
+            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+            "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+        )
+        foreach ($p in $regPaths) {
+            $found = Get-ItemProperty $p -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName -notmatch '^KB[0-9]+' }
+            foreach ($a in $found) {
+                if ($apps.Count -lt 50) {
+                    $apps += @{
+                        app_name = $a.DisplayName
+                        version = [string]$a.DisplayVersion
+                        publisher = [string]$a.Publisher
+                        install_date = [string]$a.InstallDate
+                    }
+                }
             }
         }
-        $metrics.gpu_percent = $gpuPercent
+        $metrics.software_inventory = $apps
     } catch { }
     
     return $metrics

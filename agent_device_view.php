@@ -3,7 +3,7 @@
  * Copyright (c) IT Support BD. All rights reserved.
  * This file is part of AMPNM.
  * 
- * Windows Agent Client Device Live Inspection & Remote Management
+ * Windows Agent Client Device Live Inspection, Diagnostics & Remote Management
  */
 require_once 'includes/auth_check.php';
 require_once 'header.php';
@@ -41,15 +41,20 @@ $stmt = $pdo->prepare("SELECT * FROM agent_device_services WHERE agent_device_id
 $stmt->execute([$device_id]);
 $services = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+// Software Inventory
+$stmt = $pdo->prepare("SELECT * FROM agent_software_inventory WHERE agent_device_id = ? ORDER BY app_name ASC");
+$stmt->execute([$device_id]);
+$software = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+// Security Health
+$stmt = $pdo->prepare("SELECT * FROM agent_security_health WHERE agent_device_id = ? LIMIT 1");
+$stmt->execute([$device_id]);
+$secHealth = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
 // Recent events
 $stmt = $pdo->prepare("SELECT * FROM agent_events WHERE agent_device_id = ? ORDER BY created_at DESC LIMIT 15");
 $stmt->execute([$device_id]);
 $events = $stmt->fetchAll();
-
-// Recent Remote Commands
-$stmt = $pdo->prepare("SELECT * FROM agent_command_queue WHERE agent_device_id = ? ORDER BY created_at DESC LIMIT 10");
-$stmt->execute([$device_id]);
-$recentCommands = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 // 24h chart data (1 point per 15-min bucket)
 $stmt = $pdo->prepare("
@@ -91,22 +96,55 @@ $disk = round($hb['disk_usage_percent']   ?? 0, 1);
 
 <div class="container mx-auto px-4 py-6 max-w-7xl">
     <!-- Back + Header -->
-    <div class="flex items-center gap-3 mb-6">
-        <a href="agent_devices.php" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors border border-slate-700">
-            <i class="fas fa-arrow-left"></i>
-        </a>
-        <div>
-            <h1 class="text-2xl font-bold text-white flex items-center gap-2">
-                <i class="fas fa-desktop text-cyan-400"></i>
-                <?= htmlspecialchars($d['agent_name'] ?: $d['hostname']) ?>
-            </h1>
-            <p class="text-slate-400 text-sm">
-                <?= htmlspecialchars($d['hostname']) ?> &bull; <?= htmlspecialchars($d['os_name']) ?> <?= htmlspecialchars($d['os_version']) ?>
-            </p>
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-3">
+            <a href="agent_devices.php" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors border border-slate-700">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-desktop text-cyan-400"></i>
+                    <?= htmlspecialchars($d['agent_name'] ?: $d['hostname']) ?>
+                </h1>
+                <p class="text-slate-400 text-sm">
+                    <?= htmlspecialchars($d['hostname']) ?> &bull; <?= htmlspecialchars($d['os_name']) ?> <?= htmlspecialchars($d['os_version']) ?> (<?= htmlspecialchars($d['architecture']) ?>)
+                </p>
+            </div>
         </div>
-        <span class="ml-auto px-3 py-1.5 rounded-full text-xs font-bold border <?= $sc ?> uppercase tracking-wider">
-            <?= ucfirst($status) ?>
-        </span>
+        <div class="flex items-center gap-3">
+            <span class="px-3 py-1.5 rounded-full text-xs font-bold border <?= $sc ?> uppercase tracking-wider">
+                <i class="fas fa-circle text-2xs mr-1 animate-pulse"></i> <?= ucfirst($status) ?>
+            </span>
+        </div>
+    </div>
+
+    <!-- Quick Action Toolbar Suite -->
+    <div class="bg-slate-850 border border-slate-800 rounded-xl p-4 mb-6 shadow-xl flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5 mr-2">
+                <i class="fas fa-bolt text-amber-400"></i> Quick Actions:
+            </span>
+            <button onclick="runQuickAction('temp_cleanup')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition flex items-center gap-1.5" title="Purge Temporary Files and Empty Recycle Bin">
+                <i class="fas fa-trash-alt text-amber-400"></i> Clean Temp
+            </button>
+            <button onclick="runQuickAction('flush_dns')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition flex items-center gap-1.5" title="Flush DNS Cache & Renew DHCP Lease">
+                <i class="fas fa-network-wired text-cyan-400"></i> Flush DNS
+            </button>
+            <button onclick="runQuickAction('update_defender')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition flex items-center gap-1.5" title="Update Defender Definitions and trigger Quick Scan">
+                <i class="fas fa-shield-virus text-emerald-400"></i> Defender Update
+            </button>
+            <button onclick="runQuickAction('check_updates')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition flex items-center gap-1.5" title="View Recent Windows Update Hotfixes">
+                <i class="fas fa-cloud-download-alt text-indigo-400"></i> Hotfix History
+            </button>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="runQuickAction('lock_pc')" class="px-3 py-1.5 bg-slate-800 hover:bg-amber-900/40 text-amber-300 text-xs rounded-lg border border-amber-800/40 transition flex items-center gap-1.5">
+                <i class="fas fa-lock"></i> Lock PC
+            </button>
+            <button onclick="runQuickAction('reboot_pc')" class="px-3 py-1.5 bg-slate-800 hover:bg-red-900/40 text-red-300 text-xs rounded-lg border border-red-800/40 transition flex items-center gap-1.5">
+                <i class="fas fa-power-off"></i> Reboot PC
+            </button>
+        </div>
     </div>
 
     <!-- Info Cards Row -->
@@ -119,7 +157,7 @@ $disk = round($hb['disk_usage_percent']   ?? 0, 1);
         <div class="bg-slate-850 border border-slate-800 rounded-xl p-4 text-center">
             <i class="fas fa-memory text-xl <?= $mem >= 90 ? 'text-red-400' : ($mem >= 70 ? 'text-amber-400' : 'text-purple-400') ?> mb-2 block"></i>
             <p class="text-2xl font-bold text-white"><?= $mem ?>%</p>
-            <p class="text-slate-400 text-xs mt-0.5">RAM Usage (<?= $hb ? round(($hb['memory_used_mb'] ?? 0)/1024, 1) . ' / ' . round(($hb['memory_total_mb'] ?? 1)/1024, 1) . ' GB' : '' ?>)</p>
+            <p class="text-slate-400 text-xs mt-0.5">RAM (<?= $hb ? round(($hb['memory_used_mb'] ?? 0)/1024, 1) . ' / ' . round(($hb['memory_total_mb'] ?? 1)/1024, 1) . ' GB' : '' ?>)</p>
         </div>
         <div class="bg-slate-850 border border-slate-800 rounded-xl p-4 text-center">
             <i class="fas fa-hdd text-xl <?= $disk >= 90 ? 'text-red-400' : ($disk >= 70 ? 'text-amber-400' : 'text-emerald-400') ?> mb-2 block"></i>
@@ -133,9 +171,44 @@ $disk = round($hb['disk_usage_percent']   ?? 0, 1);
         </div>
     </div>
 
+    <!-- Security & Defender Status Row -->
+    <?php if ($secHealth): ?>
+    <div class="bg-slate-850 border border-slate-800 rounded-xl p-5 mb-6 shadow-xl">
+        <h3 class="text-white font-semibold mb-3 flex items-center gap-2 text-sm border-b border-slate-800 pb-2">
+            <i class="fas fa-shield-alt text-emerald-400"></i> Windows Defender & Security Posture
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block mb-1">Antivirus Protection</span>
+                <span class="font-bold <?= $secHealth['antivirus_enabled'] ? 'text-emerald-400' : 'text-red-400' ?>">
+                    <i class="fas <?= $secHealth['antivirus_enabled'] ? 'fa-check-circle' : 'fa-times-circle' ?>"></i> <?= htmlspecialchars($secHealth['antivirus_name']) ?>
+                </span>
+            </div>
+            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block mb-1">Real-Time Protection</span>
+                <span class="font-bold <?= $secHealth['realtime_protection_enabled'] ? 'text-emerald-400' : 'text-amber-400' ?>">
+                    <i class="fas <?= $secHealth['realtime_protection_enabled'] ? 'fa-shield-check' : 'fa-exclamation-triangle' ?>"></i> <?= $secHealth['realtime_protection_enabled'] ? 'Enabled' : 'Disabled' ?>
+                </span>
+            </div>
+            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block mb-1">Definitions Updated</span>
+                <span class="font-bold text-slate-200 truncate block" title="<?= htmlspecialchars($secHealth['definitions_updated_at'] ?? 'Unknown') ?>">
+                    <?= htmlspecialchars($secHealth['definitions_updated_at'] ?? 'Up to date') ?>
+                </span>
+            </div>
+            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block mb-1">Engine Version</span>
+                <span class="font-bold text-slate-300 font-mono">
+                    <?= htmlspecialchars($secHealth['engine_version'] ?: 'Standard') ?>
+                </span>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Multi-Drive Storage Section if available -->
     <?php if (!empty($drives)): ?>
-    <div class="bg-slate-850 border border-slate-800 rounded-xl p-5 mb-6">
+    <div class="bg-slate-850 border border-slate-800 rounded-xl p-5 mb-6 shadow-xl">
         <h3 class="text-white font-semibold mb-4 flex items-center gap-2 border-b border-slate-800 pb-3 text-sm">
             <i class="fas fa-hard-drive text-emerald-400"></i> Mounted Disks & Storage Volumes
         </h3>
@@ -193,16 +266,22 @@ $disk = round($hb['disk_usage_percent']   ?? 0, 1);
         </div>
     </div>
 
-    <!-- Windows Services Manager Tab -->
-    <?php if (!empty($services)): ?>
+    <!-- Tabbed Section for Services and Installed Software -->
     <div class="bg-slate-850 border border-slate-800 rounded-xl p-5 mb-6 shadow-xl">
         <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-            <h3 class="text-white font-semibold flex items-center gap-2 text-sm">
-                <i class="fas fa-cogs text-purple-400"></i> Windows Services Manager (<?= count($services) ?> Services)
-            </h3>
-            <input type="text" id="serviceSearch" onkeyup="filterServices()" placeholder="Search service name..." class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 outline-none">
+            <div class="flex gap-4">
+                <button onclick="switchTab('services')" id="tabBtn-services" class="text-sm font-bold pb-2 border-b-2 border-cyan-400 text-white transition flex items-center gap-2">
+                    <i class="fas fa-cogs text-purple-400"></i> Windows Services (<?= count($services) ?>)
+                </button>
+                <button onclick="switchTab('software')" id="tabBtn-software" class="text-sm font-bold pb-2 border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-2">
+                    <i class="fas fa-cube text-emerald-400"></i> Installed Software (<?= count($software) ?>)
+                </button>
+            </div>
+            <input type="text" id="tableFilterInput" onkeyup="filterActiveTabTable()" placeholder="Search..." class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 outline-none">
         </div>
-        <div class="overflow-x-auto max-h-64 overflow-y-auto">
+
+        <!-- Services View -->
+        <div id="tabContent-services" class="overflow-x-auto max-h-64 overflow-y-auto">
             <table class="w-full text-left text-xs text-slate-300" id="servicesTable">
                 <thead class="bg-slate-900/80 text-slate-400 uppercase tracking-wider sticky top-0">
                     <tr>
@@ -214,7 +293,9 @@ $disk = round($hb['disk_usage_percent']   ?? 0, 1);
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                    <?php foreach ($services as $srv): 
+                    <?php if (empty($services)): ?>
+                        <tr><td colspan="5" class="py-4 text-center text-slate-500">No services telemetry received yet.</td></tr>
+                    <?php else: foreach ($services as $srv): 
                         $isRunning = strtolower($srv['status']) === 'running';
                     ?>
                     <tr class="hover:bg-slate-800/40 transition">
@@ -232,83 +313,37 @@ $disk = round($hb['disk_usage_percent']   ?? 0, 1);
                             </button>
                         </td>
                     </tr>
-                    <?php endforeach; ?>
+                    <?php endforeach; endif; ?>
                 </tbody>
             </table>
         </div>
-    </div>
-    <?php endif; ?>
 
-    <!-- Device Details Panel -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="bg-slate-850 border border-slate-800 rounded-xl p-5">
-            <h3 class="text-white font-semibold mb-4 flex items-center gap-2 border-b border-slate-800 pb-2 text-sm">
-                <i class="fas fa-info-circle text-cyan-400"></i> System Specs & Architecture
-            </h3>
-            <dl class="space-y-2 text-sm">
-                <?php
-                $info = [
-                    'Agent UUID' => $d['agent_uuid'],
-                    'OS' => $d['os_name'] . ' ' . $d['os_version'],
-                    'Architecture' => $d['architecture'],
-                    'CPU Model' => $d['cpu_model'] ?? '—',
-                    'CPU Cores' => $d['cpu_cores'] ?? '—',
-                    'Total RAM' => $d['total_memory_mb'] ? number_format($d['total_memory_mb']) . ' MB' : '—',
-                    'Total Disk' => $d['total_disk_gb'] ? $d['total_disk_gb'] . ' GB' : '—',
-                    'Agent Version' => $d['app_version'] ?? '—',
-                ];
-                foreach ($info as $k => $v): ?>
-                    <div class="flex justify-between gap-2 text-xs">
-                        <dt class="text-slate-500 flex-shrink-0"><?= htmlspecialchars($k) ?></dt>
-                        <dd class="text-slate-200 text-right truncate" title="<?= htmlspecialchars((string)$v) ?>"><?= htmlspecialchars((string)$v) ?></dd>
-                    </div>
-                <?php endforeach; ?>
-            </dl>
-        </div>
-        <div class="bg-slate-850 border border-slate-800 rounded-xl p-5">
-            <h3 class="text-white font-semibold mb-4 flex items-center gap-2 border-b border-slate-800 pb-2 text-sm">
-                <i class="fas fa-network-wired text-green-400"></i> Network & Identity
-            </h3>
-            <dl class="space-y-2 text-sm">
-                <?php
-                $net = [
-                    'Hostname' => $d['hostname'],
-                    'Local IP' => $d['local_ip'] ?? '—',
-                    'Public IP' => $d['public_ip'] ?? '—',
-                    'MAC Address' => $d['mac_address'] ?? '—',
-                    'Domain' => $d['domain'] ?? '—',
-                    'Active User' => $hb['active_user'] ?? '—',
-                    'Processes' => $hb['process_count'] ?? '—',
-                    'Services' => $hb['service_count'] ?? '—',
-                ];
-                foreach ($net as $k => $v): ?>
-                    <div class="flex justify-between gap-2 text-xs">
-                        <dt class="text-slate-500 flex-shrink-0"><?= htmlspecialchars($k) ?></dt>
-                        <dd class="text-slate-200 text-right truncate"><?= htmlspecialchars((string)$v) ?></dd>
-                    </div>
-                <?php endforeach; ?>
-            </dl>
-        </div>
-        <div class="bg-slate-850 border border-slate-800 rounded-xl p-5">
-            <h3 class="text-white font-semibold mb-4 flex items-center gap-2 border-b border-slate-800 pb-2 text-sm">
-                <i class="fas fa-calendar-check text-purple-400"></i> Heartbeat & Server Status
-            </h3>
-            <dl class="space-y-2 text-sm">
-                <?php
-                $times = [
-                    'Registered' => $d['registered_at'] ? date('M d, Y H:i', strtotime($d['registered_at'])) : '—',
-                    'Last Heartbeat' => $d['last_seen_at'] ? date('M d, Y H:i:s', strtotime($d['last_seen_at'])) : 'Never',
-                    'HB Interval' => ($d['heartbeat_interval_seconds'] ?? 5) . 's',
-                    'Battery' => ($hb && $hb['battery_percent'] !== null) ? $hb['battery_percent'] . '% (' . ($hb['battery_status'] ?? 'unknown') . ')' : '—',
-                    'Server' => $d['server_address'] ? parse_url($d['server_address'], PHP_URL_HOST) ?? $d['server_address'] : '—',
-                ];
-                foreach ($times as $k => $v): ?>
-                    <div class="flex justify-between gap-2 text-xs">
-                        <dt class="text-slate-500 flex-shrink-0"><?= htmlspecialchars($k) ?></dt>
-                        <dd class="text-slate-200 text-right truncate"><?= htmlspecialchars((string)$v) ?></dd>
-                    </div>
-                <?php endforeach; ?>
-            </dl>
+        <!-- Software Inventory View -->
+        <div id="tabContent-software" class="hidden overflow-x-auto max-h-64 overflow-y-auto">
+            <table class="w-full text-left text-xs text-slate-300" id="softwareTable">
+                <thead class="bg-slate-900/80 text-slate-400 uppercase tracking-wider sticky top-0">
+                    <tr>
+                        <th class="py-2 px-3">Application Name</th>
+                        <th class="py-2 px-3">Version</th>
+                        <th class="py-2 px-3">Publisher</th>
+                        <th class="py-2 px-3">Install Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    <?php if (empty($software)): ?>
+                        <tr><td colspan="4" class="py-4 text-center text-slate-500">No installed software detected yet.</td></tr>
+                    <?php else: foreach ($software as $app): ?>
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-2 px-3 font-semibold text-white flex items-center gap-1.5">
+                            <i class="fas fa-cube text-slate-500 text-2xs"></i> <?= htmlspecialchars($app['app_name']) ?>
+                        </td>
+                        <td class="py-2 px-3 font-mono text-cyan-300"><?= htmlspecialchars($app['version'] ?: '—') ?></td>
+                        <td class="py-2 px-3 text-slate-400"><?= htmlspecialchars($app['publisher'] ?: '—') ?></td>
+                        <td class="py-2 px-3 text-slate-500"><?= htmlspecialchars($app['install_date'] ?: '—') ?></td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -409,7 +444,70 @@ makeChart('chart-disk', chartDisk, '#34d399', 'rgba(52,211,153,0.08)', 'Disk %')
     });
 })();
 
-// Remote Console Methods
+// Tab Switcher
+let activeTab = 'services';
+function switchTab(tab) {
+    activeTab = tab;
+    ['services', 'software'].forEach(t => {
+        const btn = document.getElementById(`tabBtn-${t}`);
+        const content = document.getElementById(`tabContent-${t}`);
+        if (t === tab) {
+            btn.className = 'text-sm font-bold pb-2 border-b-2 border-cyan-400 text-white transition flex items-center gap-2';
+            content.classList.remove('hidden');
+        } else {
+            btn.className = 'text-sm font-bold pb-2 border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-2';
+            content.classList.add('hidden');
+        }
+    });
+}
+
+function filterActiveTabTable() {
+    const q = document.getElementById('tableFilterInput').value.toLowerCase();
+    const tableId = activeTab === 'services' ? 'servicesTable' : 'softwareTable';
+    const rows = document.querySelectorAll(`#${tableId} tbody tr`);
+    rows.forEach(r => {
+        const txt = r.textContent.toLowerCase();
+        r.style.display = txt.includes(q) ? '' : 'none';
+    });
+}
+
+// Quick Actions Runner
+function runQuickAction(actionType) {
+    const actionMap = {
+        'temp_cleanup': {
+            desc: 'Purge Windows Temp Files and Empty Recycle Bin',
+            cmd: 'Clear-RecycleBin -Force -ErrorAction SilentlyContinue; Remove-Item -Path "$env:TEMP\\*" -Recurse -Force -ErrorAction SilentlyContinue; "Temp files purged successfully."'
+        },
+        'flush_dns': {
+            desc: 'Flush DNS Resolver Cache & Renew DHCP Lease',
+            cmd: 'ipconfig /flushdns; ipconfig /renew; "DNS Cache Flushed & IP Lease Renewed."'
+        },
+        'update_defender': {
+            desc: 'Update Defender Signatures & Trigger Quick Scan',
+            cmd: 'Update-MpSignature; Start-MpScan -ScanType QuickScan; "Defender definition update and quick scan triggered."'
+        },
+        'check_updates': {
+            desc: 'Fetch Recent Windows Update Hotfixes',
+            cmd: 'Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 8 HotFixID, Description, InstalledOn | Format-Table -AutoSize'
+        },
+        'lock_pc': {
+            desc: 'Lock Remote Workstation Session',
+            cmd: 'rundll32.exe user32.dll,LockWorkStation; "Workstation session locked."'
+        },
+        'reboot_pc': {
+            desc: 'Force Reboot Client PC',
+            cmd: 'Restart-Computer -Force; "Reboot signal sent."'
+        }
+    };
+
+    const target = actionMap[actionType];
+    if (!target) return;
+    if (actionType === 'reboot_pc' && !confirm('Are you sure you want to reboot this computer immediately?')) return;
+
+    setConsoleCommand(target.cmd);
+    dispatchRemoteCommand();
+}
+
 function setConsoleCommand(cmd) {
     document.getElementById('cmdInput').value = cmd;
 }
@@ -469,15 +567,6 @@ function pollCommandOutput(commandId, attempts = 0) {
     }, 1500);
 }
 
-function filterServices() {
-    const q = document.getElementById('serviceSearch').value.toLowerCase();
-    const rows = document.querySelectorAll('#servicesTable tbody tr');
-    rows.forEach(r => {
-        const txt = r.textContent.toLowerCase();
-        r.style.display = txt.includes(q) ? '' : 'none';
-    });
-}
-
 async function restartServiceAction(serviceName) {
     if (!confirm(`Are you sure you want to restart service '${serviceName}'?`)) return;
     try {
@@ -488,9 +577,8 @@ async function restartServiceAction(serviceName) {
         });
         const json = await res.json();
         if (json.success) {
-            alert(json.message);
             if (json.command_id) {
-                document.getElementById('cmdInput').value = `Restart-Service ${serviceName}`;
+                document.getElementById('cmdInput').value = `Restart-Service -Name '${serviceName}' -Force`;
                 dispatchRemoteCommand();
             }
         }

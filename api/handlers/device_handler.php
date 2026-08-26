@@ -2955,6 +2955,22 @@ switch ($action) {
         $drives = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         echo json_encode(['success' => true, 'drives' => $drives]);
         break;
+
+    case 'get_agent_software':
+        $agentId = (int)($input['agent_device_id'] ?? $_GET['agent_device_id'] ?? 0);
+        $stmt = $pdo->prepare("SELECT * FROM agent_software_inventory WHERE agent_device_id = ? ORDER BY app_name ASC");
+        $stmt->execute([$agentId]);
+        $apps = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        echo json_encode(['success' => true, 'software' => $apps]);
+        break;
+
+    case 'get_agent_security_health':
+        $agentId = (int)($input['agent_device_id'] ?? $_GET['agent_device_id'] ?? 0);
+        $stmt = $pdo->prepare("SELECT * FROM agent_security_health WHERE agent_device_id = ? LIMIT 1");
+        $stmt->execute([$agentId]);
+        $sec = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        echo json_encode(['success' => true, 'security' => $sec]);
+        break;
 }
 
 

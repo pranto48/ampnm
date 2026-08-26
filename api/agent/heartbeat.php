@@ -247,7 +247,58 @@ try {
         }
     }
 
-    // 8. Ingest Client Events if provided
+    // 8. Ingest Client Software Inventory if provided
+    if (isset($payload['software_inventory']) && is_array($payload['software_inventory'])) {
+        $insApp = $pdo->prepare("INSERT INTO agent_software_inventory 
+            (id, agent_device_id, app_name, version, publisher, install_date, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE 
+                version = VALUES(version),
+                publisher = VALUES(publisher),
+                install_date = VALUES(install_date),
+                updated_at = NOW()");
+        foreach ($payload['software_inventory'] as $app) {
+            $appName = trim($app['name'] ?? $app['app_name'] ?? '');
+            if (!empty($appName)) {
+                $insApp->execute([
+                    generateUuid(),
+                    $agent_id,
+                    $appName,
+                    $app['version'] ?? null,
+                    $app['publisher'] ?? null,
+                    $app['install_date'] ?? null
+                ]);
+            }
+        }
+    }
+
+    // 9. Ingest Client Security & Defender Health if provided
+    if (isset($payload['security_health']) && is_array($payload['security_health'])) {
+        $sec = $payload['security_health'];
+        $insSec = $pdo->prepare("INSERT INTO agent_security_health 
+            (id, agent_device_id, antivirus_name, antivirus_enabled, realtime_protection_enabled, definitions_updated_at, engine_version, firewall_enabled, last_checked_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE 
+                antivirus_name = VALUES(antivirus_name),
+                antivirus_enabled = VALUES(antivirus_enabled),
+                realtime_protection_enabled = VALUES(realtime_protection_enabled),
+                definitions_updated_at = VALUES(definitions_updated_at),
+                engine_version = VALUES(engine_version),
+                firewall_enabled = VALUES(firewall_enabled),
+                last_checked_at = NOW()");
+        $insSec->execute([
+            generateUuid(),
+            $agent_id,
+            $sec['antivirus_name'] ?? 'Windows Defender',
+            isset($sec['antivirus_enabled']) ? (int)$sec['antivirus_enabled'] : 1,
+            isset($sec['realtime_protection_enabled']) ? (int)$sec['realtime_protection_enabled'] : 1,
+            $sec['definitions_updated_at'] ?? null,
+            $sec['engine_version'] ?? null,
+            isset($sec['firewall_enabled']) ? (int)$sec['firewall_enabled'] : 1
+        ]);
+    }
+
+    // 10. Ingest Client Events if provided
     if (isset($payload['events']) && is_array($payload['events'])) {
         $stmt_event = $pdo->prepare("INSERT INTO agent_events (agent_device_id, event_type, severity, message, metadata_json) VALUES (?, ?, ?, ?, ?)");
         foreach ($payload['events'] as $evt) {
