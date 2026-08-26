@@ -2778,6 +2778,106 @@ switch ($action) {
         }
         echo json_encode(['success' => true, 'executed_count' => $executed]);
         break;
+
+    // --- Configuration Compliance & Golden Standard Handlers ---
+    case 'run_compliance_audit':
+        require_once __DIR__ . '/../../includes/compliance_engine.php';
+        $compEngine = new ComplianceEngine($pdo);
+        $devices = $pdo->query("SELECT id FROM devices")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $results = [];
+        foreach ($devices as $devId) {
+            $results[] = $compEngine->auditDevice($devId);
+        }
+        echo json_encode(['success' => true, 'audited_count' => count($results), 'results' => $results]);
+        break;
+
+    case 'get_compliance_overview':
+        require_once __DIR__ . '/../../includes/compliance_engine.php';
+        $compEngine = new ComplianceEngine($pdo);
+        echo json_encode(['success' => true, 'overview' => $compEngine->getGlobalComplianceOverview()]);
+        break;
+
+    case 'get_compliance_rules':
+        require_once __DIR__ . '/../../includes/compliance_engine.php';
+        $compEngine = new ComplianceEngine($pdo);
+        echo json_encode(['success' => true, 'rules' => $compEngine->getRules($_GET['vendor'] ?? null)]);
+        break;
+
+    // --- VoIP & IP SLA Quality Probe Handlers ---
+    case 'run_voip_probe':
+        require_once __DIR__ . '/../../includes/voip_probe_engine.php';
+        $voipEngine = new VoipProbeEngine($pdo);
+        $probeId = $input['probe_id'] ?? $_GET['probe_id'] ?? '';
+        echo json_encode($voipEngine->runProbe($probeId));
+        break;
+
+    case 'run_all_voip_probes':
+        require_once __DIR__ . '/../../includes/voip_probe_engine.php';
+        $voipEngine = new VoipProbeEngine($pdo);
+        $probes = $pdo->query("SELECT id FROM voip_sla_probes WHERE is_enabled = 1")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $probed = 0;
+        foreach ($probes as $pId) {
+            $voipEngine->runProbe($pId);
+            $probed++;
+        }
+        echo json_encode(['success' => true, 'probed_count' => $probed]);
+        break;
+
+    case 'get_voip_probe_history':
+        require_once __DIR__ . '/../../includes/voip_probe_engine.php';
+        $voipEngine = new VoipProbeEngine($pdo);
+        $probeId = $input['probe_id'] ?? $_GET['probe_id'] ?? '';
+        echo json_encode(['success' => true, 'history' => $voipEngine->getProbeHistory($probeId, 25)]);
+        break;
+
+    case 'create_voip_probe':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $name = trim($input['name'] ?? '');
+        $host = trim($input['target_host'] ?? '');
+        $codec = trim($input['codec_simulated'] ?? 'G.711_uLaw');
+        $minMos = (float)($input['min_mos_threshold'] ?? 3.8);
+
+        if (empty($name) || empty($host)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Name and Target Host are required']);
+            exit;
+        }
+
+        $probeId = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO voip_sla_probes (id, name, target_host, codec_simulated, min_mos_threshold) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$probeId, $name, $host, $codec, $minMos]);
+
+        require_once __DIR__ . '/../../includes/voip_probe_engine.php';
+        $voipEngine = new VoipProbeEngine($pdo);
+        $voipEngine->runProbe($probeId);
+
+        echo json_encode(['success' => true, 'probe_id' => $probeId]);
+        break;
+
+    case 'delete_voip_probe':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $probeId = $input['probe_id'] ?? $_GET['probe_id'] ?? '';
+        $pdo->prepare("DELETE FROM voip_sla_probes WHERE id = ?")->execute([$probeId]);
+        $pdo->prepare("DELETE FROM voip_sla_metrics WHERE probe_id = ?")->execute([$probeId]);
+        echo json_encode(['success' => true]);
+        break;
+
+    // --- Planned Maintenance Window Handlers ---
+    case 'create_maintenance_window':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        require_once __DIR__ . '/../../includes/maintenance_engine.php';
+        $maintEngine = new MaintenanceEngine($pdo);
+        $id = $maintEngine->scheduleWindow($input);
+        echo json_encode(['success' => true, 'id' => $id]);
+        break;
+
+    case 'delete_maintenance_window':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $id = $input['id'] ?? $_GET['id'] ?? '';
+        $pdo->prepare("DELETE FROM maintenance_windows WHERE id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM maintenance_device_assignments WHERE maintenance_id = ?")->execute([$id]);
+        echo json_encode(['success' => true]);
+        break;
 }
 
 

@@ -281,6 +281,7 @@ usort($menu_tree, function($a, $b) {
                                     <a href="device_config_backups.php" class="nav-link nav-sublink"><i class="fas fa-file-code fa-fw mr-2 text-indigo-400"></i>Config Vault</a>
                                     <a href="floor_plan.php" class="nav-link nav-sublink"><i class="fas fa-building fa-fw mr-2"></i>Floor Plan</a>
                                     <a href="network_graphs.php" class="nav-link nav-sublink"><i class="fas fa-chart-line fa-fw mr-2"></i>Network Graphs</a>
+                                    <a href="compliance_audit.php" class="nav-link nav-sublink"><i class="fas fa-shield-check fa-fw mr-2 text-emerald-400"></i>Config Compliance</a>
                                 </div>
                             </div>
                             <div class="nav-group">
@@ -290,6 +291,7 @@ usort($menu_tree, function($a, $b) {
                                 </button>
                                 <div class="nav-group-items">
                                     <a href="host_metrics.php" class="nav-link nav-sublink"><i class="fas fa-microchip fa-fw mr-2"></i>Host Metrics</a>
+                                    <a href="voip_qos_monitor.php" class="nav-link nav-sublink"><i class="fas fa-headset fa-fw mr-2 text-indigo-400"></i>VoIP &amp; IP SLA (MOS)</a>
                                     <a href="ssl_monitors.php" class="nav-link nav-sublink"><i class="fas fa-lock fa-fw mr-2 text-cyan-400"></i>SSL Expiry Tracker</a>
                                     <a href="agent_devices.php" class="nav-link nav-sublink"><i class="fas fa-desktop fa-fw mr-2"></i>Windows Agents</a>
                                     <a href="agent_enrollment.php" class="nav-link nav-sublink"><i class="fas fa-key fa-fw mr-2"></i>Agent Enrollment</a>

@@ -1782,7 +1782,109 @@ try {
 
 
 
-    echo "<h2 style='color: #06b6d4; margin-top: 14px;'>Database setup completed successfully!</h2>";
+    // 44. Configuration Compliance & Golden Standard Rules Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `config_compliance_rules` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(150) NOT NULL,
+        `vendor` ENUM('cisco', 'mikrotik', 'juniper', 'linux', 'generic') NOT NULL DEFAULT 'generic',
+        `severity` ENUM('critical', 'high', 'medium', 'low') NOT NULL DEFAULT 'high',
+        `rule_type` ENUM('must_contain', 'must_not_contain', 'regex_match') NOT NULL DEFAULT 'must_contain',
+        `pattern_expression` TEXT NOT NULL,
+        `remediation_command` TEXT NULL,
+        `description` TEXT NULL,
+        `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'config_compliance_rules' created or already exists.");
+
+    // 45. Device Configuration Compliance Audit Results Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `config_compliance_results` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `device_id` VARCHAR(36) NOT NULL,
+        `compliance_score` DECIMAL(5,2) NOT NULL DEFAULT 100.00,
+        `total_rules` INT NOT NULL DEFAULT 0,
+        `passed_rules` INT NOT NULL DEFAULT 0,
+        `failed_rules` INT NOT NULL DEFAULT 0,
+        `violations_json` LONGTEXT NULL,
+        `remediation_diff` LONGTEXT NULL,
+        `audited_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_dev (`device_id`),
+        INDEX idx_score (`compliance_score`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'config_compliance_results' created or already exists.");
+
+    // Seed default CIS / Golden compliance rules if empty
+    $chkComp = $pdo->query("SELECT COUNT(*) FROM config_compliance_rules")->fetchColumn();
+    if ($chkComp == 0) {
+        $r1 = generateUuid();
+        $r2 = generateUuid();
+        $r3 = generateUuid();
+        $r4 = generateUuid();
+        $pdo->exec("INSERT INTO config_compliance_rules (id, name, vendor, severity, rule_type, pattern_expression, remediation_command, description) VALUES
+            ('$r1', 'Enforce Cisco Password Encryption', 'cisco', 'high', 'must_contain', 'service password-encryption', 'service password-encryption', 'Ensures cleartext passwords are obfuscated in running config.'),
+            ('$r2', 'Disable Insecure SNMP Community Public', 'generic', 'critical', 'must_not_contain', 'community public', 'no snmp-server community public', 'Default public SNMP community poses major security risk.'),
+            ('$r3', 'Enforce SSH Version 2 Only', 'cisco', 'high', 'must_contain', 'ip ssh version 2', 'ip ssh version 2', 'Prohibits vulnerable SSHv1 protocol.'),
+            ('$r4', 'Configure Network Time Protocol (NTP) Sync', 'generic', 'medium', 'regex_match', '(ntp server|system ntp|server [0-9]+\\.[0-9]+)', 'ntp server 0.pool.ntp.org', 'Synchronized system clock is mandatory for security logging.');");
+        message("Default Golden Config & CIS Security Compliance rules seeded.");
+    }
+
+    // 46. VoIP & IP SLA Quality Probes Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `voip_sla_probes` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(150) NOT NULL,
+        `target_host` VARCHAR(255) NOT NULL,
+        `probe_type` ENUM('icmp_jitter', 'udp_jitter', 'sip_voice') NOT NULL DEFAULT 'icmp_jitter',
+        `target_port` INT NULL DEFAULT 5060,
+        `codec_simulated` ENUM('G.711_uLaw', 'G.729', 'Opus_HD') NOT NULL DEFAULT 'G.711_uLaw',
+        `min_mos_threshold` DECIMAL(3,2) NOT NULL DEFAULT 3.80,
+        `max_jitter_ms` DECIMAL(5,2) NOT NULL DEFAULT 30.00,
+        `max_rtt_ms` DECIMAL(6,2) NOT NULL DEFAULT 150.00,
+        `check_interval_seconds` INT NOT NULL DEFAULT 60,
+        `status` ENUM('excellent', 'good', 'fair', 'poor', 'failing') NOT NULL DEFAULT 'excellent',
+        `last_mos_score` DECIMAL(3,2) NULL,
+        `last_jitter_ms` DECIMAL(5,2) NULL,
+        `last_checked_at` TIMESTAMP NULL,
+        `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'voip_sla_probes' created or already exists.");
+
+    // 47. VoIP & IP SLA Quality Metrics History Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `voip_sla_metrics` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `probe_id` VARCHAR(36) NOT NULL,
+        `rtt_ms` DECIMAL(6,2) NOT NULL DEFAULT 0,
+        `jitter_ms` DECIMAL(5,2) NOT NULL DEFAULT 0,
+        `packet_loss_percent` DECIMAL(5,2) NOT NULL DEFAULT 0,
+        `mos_score` DECIMAL(3,2) NOT NULL DEFAULT 4.40,
+        `call_quality_rating` VARCHAR(30) NOT NULL DEFAULT 'Excellent',
+        `recorded_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_probe (`probe_id`),
+        INDEX idx_rec (`recorded_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'voip_sla_metrics' created or already exists.");
+
+    // Seed default VoIP SLA probe if empty
+    $chkVoip = $pdo->query("SELECT COUNT(*) FROM voip_sla_probes")->fetchColumn();
+    if ($chkVoip == 0) {
+        $vp1 = generateUuid();
+        $vp2 = generateUuid();
+        $pdo->exec("INSERT INTO voip_sla_probes (id, name, target_host, probe_type, codec_simulated, min_mos_threshold, max_jitter_ms) VALUES
+            ('$vp1', 'HQ Core Gateway Voice Trunk', '8.8.8.8', 'icmp_jitter', 'G.711_uLaw', 4.00, 20.00),
+            ('$vp2', 'Branch Office Cloud PBX SIP Probe', '1.1.1.1', 'icmp_jitter', 'G.729', 3.80, 30.00);");
+        message("Default VoIP SLA Jitter Probes seeded.");
+    }
+
+    // 48. Maintenance Device Assignments Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `maintenance_device_assignments` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `maintenance_id` VARCHAR(36) NOT NULL,
+        `device_id` VARCHAR(36) NOT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_maint_dev (`maintenance_id`, `device_id`),
+        INDEX idx_dev (`device_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'maintenance_device_assignments' created or already exists.");
     echo "<p style='color: #94a3b8;'><span class='loader'></span>Redirecting to the application in 3 seconds...</p>";
     echo '<meta http-equiv="refresh" content="3;url=index.php">';
 

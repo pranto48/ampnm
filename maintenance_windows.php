@@ -1,307 +1,297 @@
 <?php
-/*
+/**
+ * AMPNM Planned Maintenance Windows & Silence Periods Manager
  * Copyright (c) IT Support BD. All rights reserved.
- * AMPNM Planned Maintenance Windows & Alert Silence Engine
  */
-require_once 'includes/bootstrap.php';
-require_once 'includes/auth_check.php';
-require_once 'includes/db.php';
 
-if (($_SESSION['user_role'] ?? 'viewer') !== 'admin') {
-    header('Location: index.php');
-    exit;
-}
+require_once 'includes/auth_check.php';
+require_once 'includes/maintenance_engine.php';
+include 'header.php';
 
 $pdo = getDbConnection();
-$devices = $pdo->query("SELECT id, name, ip FROM devices ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
-
-require_once 'header.php';
+$engine = new MaintenanceEngine($pdo);
+$allWindows = $engine->getAllWindows();
+$activeWindows = $engine->getActiveWindows();
+$devices = $pdo->query("SELECT id, name, ip_address FROM devices ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+$maps = $pdo->query("SELECT id, name FROM maps ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
 ?>
 
-<div class="container mx-auto px-4 py-6 max-w-7xl">
+<div class="container-fluid px-4 py-4 max-w-7xl mx-auto">
+    <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
             <h1 class="text-2xl font-bold text-white flex items-center gap-3">
-                <i class="fas fa-tools text-cyan-400"></i> Planned Maintenance &amp; Alert Silence Engine
+                <i class="fas fa-calendar-alt text-amber-400"></i>
+                <span>Planned Maintenance Windows & Alert Silence</span>
             </h1>
-            <p class="text-slate-400 text-sm mt-1">Schedule planned maintenance windows to automatically silence down-alerts and mark devices with maintenance badges.</p>
+            <p class="text-slate-400 text-sm mt-1">
+                Schedule blackout periods, suppress false alert storms during upgrades, and isolate planned downtime from SLA calculations.
+            </p>
         </div>
-        <div class="flex items-center gap-3">
-            <button type="button" onclick="openNewWindowModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-semibold shadow-lg shadow-cyan-600/30 transition-all flex items-center gap-2">
-                <i class="fas fa-calendar-plus"></i> Schedule Window
+        <div>
+            <button onclick="openScheduleModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-semibold shadow-lg shadow-amber-900/30 transition flex items-center gap-2">
+                <i class="fas fa-plus"></i> Schedule Maintenance
             </button>
         </div>
     </div>
 
-    <!-- Summary Stats Bar -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex items-center gap-4 shadow-md">
-            <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-xl">
-                <i class="fas fa-calendar-alt"></i>
-            </div>
+    <!-- Active Maintenance Alert Banner if any -->
+    <?php if (!empty($activeWindows)): ?>
+    <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
+        <div class="flex items-center gap-3">
+            <span class="flex h-3 w-3 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+            </span>
             <div>
-                <span class="text-xs text-slate-400 uppercase font-semibold tracking-wider">Total Scheduled</span>
-                <h3 class="text-xl font-bold text-white" id="stat-total-windows">0</h3>
-            </div>
-        </div>
-        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex items-center gap-4 shadow-md">
-            <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl">
-                <i class="fas fa-bell-slash"></i>
-            </div>
-            <div>
-                <span class="text-xs text-slate-400 uppercase font-semibold tracking-wider">Active Now (Silenced)</span>
-                <h3 class="text-xl font-bold text-white" id="stat-active-windows">0</h3>
-            </div>
-        </div>
-        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex items-center gap-4 shadow-md">
-            <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div>
-                <span class="text-xs text-slate-400 uppercase font-semibold tracking-wider">Upcoming Windows</span>
-                <h3 class="text-xl font-bold text-white" id="stat-upcoming-windows">0</h3>
+                <h4 class="font-bold text-amber-300 text-sm">Active Maintenance In Progress</h4>
+                <p class="text-xs text-amber-200/80 mt-0.5">
+                    <?= count($activeWindows) ?> window(s) are currently active. Alert notifications are suppressed for targeted systems.
+                </p>
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
-    <!-- Maintenance Windows Table -->
-    <div class="bg-slate-800/80 backdrop-blur rounded-xl border border-slate-700/80 overflow-hidden shadow-xl">
-        <div class="px-6 py-4 border-b border-slate-700/60 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-white flex items-center gap-2">
-                <i class="fas fa-list-alt text-cyan-400"></i> Scheduled Maintenance Schedules
-            </h2>
-            <span class="text-xs text-slate-400" id="table-count-label">Loading schedules...</span>
+    <!-- Maintenance Windows List -->
+    <div class="bg-slate-850 border border-slate-800 rounded-xl overflow-hidden shadow-xl mb-8">
+        <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+            <h3 class="font-semibold text-white flex items-center gap-2">
+                <i class="fas fa-clock text-cyan-400"></i> Scheduled & Historical Maintenance
+            </h3>
+            <span class="text-xs text-slate-400"><?= count($allWindows) ?> Total Schedules</span>
         </div>
-
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-300">
-                <thead class="bg-slate-900/60 text-xs text-slate-400 uppercase border-b border-slate-700/60 font-semibold font-mono">
+                <thead class="bg-slate-900/60 text-slate-400 uppercase text-xs tracking-wider">
                     <tr>
-                        <th class="px-6 py-3.5">Window Title</th>
-                        <th class="px-6 py-3.5">Target Scope</th>
-                        <th class="px-6 py-3.5">Start Time</th>
-                        <th class="px-6 py-3.5">End Time</th>
-                        <th class="px-6 py-3.5">Status</th>
-                        <th class="px-6 py-3.5">Alerts</th>
-                        <th class="px-6 py-3.5 text-right">Actions</th>
+                        <th class="py-3 px-4">Title / Scope</th>
+                        <th class="py-3 px-4">Target Type</th>
+                        <th class="py-3 px-4">Start Time</th>
+                        <th class="py-3 px-4">End Time</th>
+                        <th class="py-3 px-4">Status</th>
+                        <th class="py-3 px-4">Alert Suppression</th>
+                        <th class="py-3 px-4 text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="windows-table-body" class="divide-y divide-slate-700/40">
-                    <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-slate-500">
-                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading maintenance windows...
-                        </td>
-                    </tr>
+                <tbody class="divide-y divide-slate-800">
+                    <?php if (empty($allWindows)): ?>
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-slate-500">
+                                <i class="fas fa-calendar-check text-4xl mb-2 block"></i>
+                                No planned maintenance windows found. Click "Schedule Maintenance" to add one.
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <?php 
+                        $nowTs = time();
+                        foreach ($allWindows as $w): 
+                            $startTs = strtotime($w['start_time']);
+                            $endTs = strtotime($w['end_time']);
+                            $isActive = ($nowTs >= $startTs && $nowTs <= $endTs);
+                            $isUpcoming = ($nowTs < $startTs);
+                            $isExpired = ($nowTs > $endTs);
+                        ?>
+                        <tr class="hover:bg-slate-800/40 transition">
+                            <td class="py-3.5 px-4 font-semibold text-white">
+                                <?= htmlspecialchars($w['title']) ?>
+                                <?php if (!empty($w['notes'])): ?>
+                                    <span class="block text-xs font-normal text-slate-400 truncate max-w-xs"><?= htmlspecialchars($w['notes']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="py-3.5 px-4 text-xs font-mono capitalize">
+                                <span class="px-2 py-0.5 rounded bg-slate-900 text-cyan-300 border border-slate-700">
+                                    <?= htmlspecialchars($w['target_type']) ?>
+                                </span>
+                            </td>
+                            <td class="py-3.5 px-4 text-xs text-slate-300">
+                                <?= date('Y-m-d H:i', $startTs) ?>
+                            </td>
+                            <td class="py-3.5 px-4 text-xs text-slate-300">
+                                <?= date('Y-m-d H:i', $endTs) ?>
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <?php if ($isActive): ?>
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                                        In Progress
+                                    </span>
+                                <?php elseif ($isUpcoming): ?>
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                                        Upcoming
+                                    </span>
+                                <?php else: ?>
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400">
+                                        Completed
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="py-3.5 px-4 text-xs">
+                                <?php if ($w['suppress_alerts']): ?>
+                                    <span class="text-emerald-400 flex items-center gap-1"><i class="fas fa-bell-slash"></i> Suppressed</span>
+                                <?php else: ?>
+                                    <span class="text-slate-500 flex items-center gap-1"><i class="fas fa-bell"></i> Alerts Active</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="py-3.5 px-4 text-right">
+                                <button onclick="deleteMaintenanceWindow('<?= $w['id'] ?>')" class="text-red-400 hover:text-red-300 text-xs transition">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
-<!-- Modal: Schedule New Window -->
-<div id="new-window-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-        <div class="flex items-center justify-between mb-4 border-b border-slate-700 pb-3">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-                <i class="fas fa-calendar-plus text-cyan-400"></i> Schedule Maintenance Window
+<!-- Modal: Schedule Maintenance Window -->
+<div id="scheduleModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl p-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fas fa-calendar-plus text-amber-400"></i> Schedule Maintenance Window
             </h3>
-            <button type="button" onclick="closeNewWindowModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
         </div>
-
-        <form id="new-window-form" onsubmit="submitNewWindow(event)" class="space-y-3.5 text-xs">
+        <form onsubmit="saveMaintenanceWindow(event)" class="space-y-4">
             <div>
-                <label class="block text-slate-300 font-medium mb-1">Window Title / Description</label>
-                <input type="text" id="win-title" required placeholder="e.g. Core Switch Firmware Upgrade & Power Check" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none">
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Title / Maintenance Purpose</label>
+                <input type="text" id="maintTitle" required placeholder="e.g. Core Switch Firmware Upgrade" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Target Scope</label>
+                <select id="maintTargetType" onchange="toggleScopeInputs()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none">
+                    <option value="all">Entire Infrastructure (Global)</option>
+                    <option value="device">Specific Network Device</option>
+                    <option value="map">Specific Topology Map</option>
+                </select>
+            </div>
+
+            <div id="scopeDeviceWrapper" class="hidden">
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Select Device</label>
+                <select id="maintDeviceId" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none">
+                    <?php foreach ($devices as $d): ?>
+                        <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['name']) ?> (<?= htmlspecialchars($d['ip_address']) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div id="scopeMapWrapper" class="hidden">
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Select Topology Map</label>
+                <select id="maintMapId" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none">
+                    <?php foreach ($maps as $m): ?>
+                        <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-slate-300 font-medium mb-1">Target Scope</label>
-                    <select id="win-target-type" onchange="toggleTargetDeviceSelect()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none">
-                        <option value="device">Single Specific Device</option>
-                        <option value="all">All Network Infrastructure (Global)</option>
-                    </select>
-                </div>
-                <div id="target-device-group">
-                    <label class="block text-slate-300 font-medium mb-1">Select Target Device</label>
-                    <select id="win-target-id" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none">
-                        <?php foreach ($devices as $d): ?>
-                            <option value="<?= htmlspecialchars($d['id']) ?>"><?= htmlspecialchars($d['name']) ?> (<?= htmlspecialchars($d['ip'] ?? '') ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-slate-300 font-medium mb-1">Start Date &amp; Time</label>
-                    <input type="datetime-local" id="win-start" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none">
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Start Date & Time</label>
+                    <input type="datetime-local" id="maintStartTime" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none">
                 </div>
                 <div>
-                    <label class="block text-slate-300 font-medium mb-1">End Date &amp; Time</label>
-                    <input type="datetime-local" id="win-end" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none">
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">End Date & Time</label>
+                    <input type="datetime-local" id="maintEndTime" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none">
                 </div>
             </div>
 
             <div>
-                <label class="block text-slate-300 font-medium mb-1">Maintenance Notes / Work Order</label>
-                <textarea id="win-notes" rows="2" placeholder="Planned datacenter electrical maintenance and switch OS reload..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"></textarea>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Notes / Scope Details</label>
+                <textarea id="maintNotes" rows="2" placeholder="Engineers involved, rollback plans, ticket #..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"></textarea>
             </div>
 
-            <div class="pt-2">
-                <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
-                    <input type="checkbox" id="win-suppress" checked class="rounded border-slate-600 bg-slate-800 text-cyan-500">
-                    <span>Suppress Alerts (Do NOT dispatch Telegram, SMS, WhatsApp, Webhooks during window)</span>
-                </label>
+            <div class="flex items-center gap-2 pt-2">
+                <input type="checkbox" id="maintSuppressAlerts" checked class="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-800">
+                <label for="maintSuppressAlerts" class="text-xs text-slate-300">Suppress Telegram / SMS / Email alerts during maintenance</label>
             </div>
 
-            <div class="pt-3 flex justify-end gap-2 border-t border-slate-700">
-                <button type="button" onclick="closeNewWindowModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg shadow-lg shadow-cyan-600/30 transition-colors">Schedule Window</button>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="closeScheduleModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-semibold">Schedule Window</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-let windowsList = [];
-
-async function loadMaintenanceWindows() {
-    try {
-        const resp = await fetch('api.php?action=get_maintenance_windows');
-        const data = await resp.json();
-        windowsList = data.windows || [];
-
-        const now = new Date();
-        let activeCount = 0;
-        let upcomingCount = 0;
-
-        windowsList.forEach(w => {
-            const start = new Date(w.start_time);
-            const end = new Date(w.end_time);
-            if (now >= start && now <= end) activeCount++;
-            else if (now < start) upcomingCount++;
-        });
-
-        document.getElementById('stat-total-windows').textContent = windowsList.length;
-        document.getElementById('stat-active-windows').textContent = activeCount;
-        document.getElementById('stat-upcoming-windows').textContent = upcomingCount;
-        document.getElementById('table-count-label').textContent = `${windowsList.length} schedule(s) found`;
-
-        renderWindowsTable(windowsList);
-    } catch (e) {
-        console.error('Error loading maintenance windows', e);
-    }
+function toggleScopeInputs() {
+    const val = document.getElementById('maintTargetType').value;
+    document.getElementById('scopeDeviceWrapper').classList.toggle('hidden', val !== 'device');
+    document.getElementById('scopeMapWrapper').classList.toggle('hidden', val !== 'map');
 }
 
-function renderWindowsTable(windows) {
-    const tbody = document.getElementById('windows-table-body');
-    if (windows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-slate-500">No maintenance windows scheduled. Click "+ Schedule Window" to create one.</td></tr>`;
-        return;
-    }
-
+function openScheduleModal() {
     const now = new Date();
-    tbody.innerHTML = windows.map(w => {
-        const start = new Date(w.start_time);
-        const end = new Date(w.end_time);
-        let statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-700 text-slate-400">Expired</span>';
+    const startStr = now.toISOString().slice(0, 16);
+    const end = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours default
+    const endStr = end.toISOString().slice(0, 16);
 
-        if (now >= start && now <= end) {
-            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse"><i class="fas fa-tools mr-1"></i>Active Now</span>';
-        } else if (now < start) {
-            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">Upcoming</span>';
-        }
+    document.getElementById('maintStartTime').value = startStr;
+    document.getElementById('maintEndTime').value = endStr;
 
-        const targetScope = w.target_type === 'all' 
-            ? '<span class="font-bold text-white"><i class="fas fa-globe text-cyan-400 mr-1"></i>All Global Devices</span>'
-            : `<div class="font-bold text-white">${w.target_device_name || 'Device'}</div><div class="text-[11px] text-slate-400 font-mono">${w.target_device_ip || ''}</div>`;
-
-        const alertBadge = w.suppress_alerts == 1
-            ? '<span class="text-amber-400 text-xs flex items-center gap-1 font-mono"><i class="fas fa-bell-slash"></i> Silenced</span>'
-            : '<span class="text-slate-500 text-xs font-mono">Active</span>';
-
-        return `
-            <tr class="hover:bg-slate-700/30 transition-colors">
-                <td class="px-6 py-4">
-                    <div class="font-bold text-white text-sm">${w.title}</div>
-                    ${w.notes ? `<div class="text-xs text-slate-400 mt-0.5">${w.notes}</div>` : ''}
-                </td>
-                <td class="px-6 py-4">${targetScope}</td>
-                <td class="px-6 py-4 font-mono text-xs text-slate-300">${w.start_time}</td>
-                <td class="px-6 py-4 font-mono text-xs text-slate-300">${w.end_time}</td>
-                <td class="px-6 py-4">${statusBadge}</td>
-                <td class="px-6 py-4">${alertBadge}</td>
-                <td class="px-6 py-4 text-right">
-                    <button type="button" onclick="deleteWindow('${w.id}')" class="p-1.5 text-slate-400 hover:text-red-400 transition-colors" title="Delete Schedule">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
+    const m = document.getElementById('scheduleModal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
 }
 
-function openNewWindowModal() {
-    // Set default start time to now + 5 mins, end time to now + 2 hours
-    const now = new Date();
-    const start = new Date(now.getTime() + 5 * 60000);
-    const end = new Date(now.getTime() + 120 * 60000);
-
-    document.getElementById('win-start').value = start.toISOString().slice(0, 16);
-    document.getElementById('win-end').value = end.toISOString().slice(0, 16);
-    document.getElementById('new-window-modal').classList.remove('hidden');
+function closeScheduleModal() {
+    const m = document.getElementById('scheduleModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
 }
 
-function closeNewWindowModal() {
-    document.getElementById('new-window-modal').classList.add('hidden');
-}
-
-function toggleTargetDeviceSelect() {
-    const isAll = document.getElementById('win-target-type').value === 'all';
-    document.getElementById('target-device-group').style.display = isAll ? 'none' : 'block';
-}
-
-async function submitNewWindow(e) {
+async function saveMaintenanceWindow(e) {
     e.preventDefault();
-    const title = document.getElementById('win-title').value;
-    const target_type = document.getElementById('win-target-type').value;
-    const target_id = target_type === 'device' ? document.getElementById('win-target-id').value : null;
-    const start_time = document.getElementById('win-start').value;
-    const end_time = document.getElementById('win-end').value;
-    const suppress_alerts = document.getElementById('win-suppress').checked ? 1 : 0;
-    const notes = document.getElementById('win-notes').value;
+    const type = document.getElementById('maintTargetType').value;
+    let targetId = null;
+    if (type === 'device') targetId = document.getElementById('maintDeviceId').value;
+    if (type === 'map') targetId = document.getElementById('maintMapId').value;
+
+    const payload = {
+        title: document.getElementById('maintTitle').value,
+        target_type: type,
+        target_id: targetId,
+        start_time: document.getElementById('maintStartTime').value.replace('T', ' ') + ':00',
+        end_time: document.getElementById('maintEndTime').value.replace('T', ' ') + ':00',
+        suppress_alerts: document.getElementById('maintSuppressAlerts').checked ? 1 : 0,
+        notes: document.getElementById('maintNotes').value
+    };
 
     try {
-        const resp = await fetch('api.php?action=create_maintenance_window', {
+        const res = await fetch('api.php?action=create_maintenance_window', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, target_type, target_id, start_time, end_time, suppress_alerts, notes })
+            body: JSON.stringify(payload)
         });
-        const res = await resp.json();
-        alert(res.message || 'Scheduled!');
-        closeNewWindowModal();
-        loadMaintenanceWindows();
-    } catch (err) {
-        alert('Error scheduling maintenance window: ' + err.message);
+        const json = await res.json();
+        if (json.success) {
+            location.reload();
+        } else {
+            alert('Failed: ' + (json.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Network error');
     }
 }
 
-async function deleteWindow(id) {
-    if (!confirm('Cancel and delete this maintenance window?')) return;
+async function deleteMaintenanceWindow(id) {
+    if (!confirm('Are you sure you want to delete this maintenance schedule?')) return;
     try {
-        await fetch('api.php?action=delete_maintenance_window', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        loadMaintenanceWindows();
-    } catch (err) {
-        alert('Error deleting: ' + err.message);
+        const res = await fetch(`api.php?action=delete_maintenance_window&id=${id}`, { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+            location.reload();
+        } else {
+            alert('Delete failed');
+        }
+    } catch (e) {
+        alert('Network error');
     }
 }
-
-document.addEventListener('DOMContentLoaded', loadMaintenanceWindows);
 </script>
 
 <?php include 'footer.php'; ?>
