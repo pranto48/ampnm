@@ -2878,6 +2878,83 @@ switch ($action) {
         $pdo->prepare("DELETE FROM maintenance_device_assignments WHERE maintenance_id = ?")->execute([$id]);
         echo json_encode(['success' => true]);
         break;
+
+    // --- Windows Agent Live Command & Remote Services Handlers ---
+    case 'dispatch_agent_command':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $agentId = (int)($input['agent_device_id'] ?? $_POST['agent_device_id'] ?? 0);
+        $cmdType = $input['command_type'] ?? $_POST['command_type'] ?? 'powershell';
+        $cmdText = trim($input['command_text'] ?? $_POST['command_text'] ?? '');
+        $dispatchedBy = $_SESSION['user_name'] ?? $_SESSION['username'] ?? 'admin';
+
+        if ($agentId <= 0 || empty($cmdText)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Agent Device ID and Command Text are required']);
+            exit;
+        }
+
+        $cmdId = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO agent_command_queue 
+            (id, agent_device_id, command_type, command_text, status, dispatched_by, created_at)
+            VALUES (?, ?, ?, ?, 'pending', ?, NOW())");
+        $stmt->execute([$cmdId, $agentId, $cmdType, $cmdText, $dispatchedBy]);
+
+        echo json_encode(['success' => true, 'command_id' => $cmdId, 'status' => 'pending']);
+        break;
+
+    case 'get_agent_command_status':
+        $cmdId = $input['command_id'] ?? $_GET['command_id'] ?? '';
+        if (empty($cmdId)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Command ID required']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT * FROM agent_command_queue WHERE id = ? LIMIT 1");
+        $stmt->execute([$cmdId]);
+        $cmd = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$cmd) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Command not found']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'command' => $cmd]);
+        break;
+
+    case 'get_agent_services':
+        $agentId = (int)($input['agent_device_id'] ?? $_GET['agent_device_id'] ?? 0);
+        $stmt = $pdo->prepare("SELECT * FROM agent_device_services WHERE agent_device_id = ? ORDER BY status ASC, service_name ASC");
+        $stmt->execute([$agentId]);
+        $services = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        echo json_encode(['success' => true, 'services' => $services]);
+        break;
+
+    case 'restart_agent_service':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Admin required']); exit; }
+        $agentId = (int)($input['agent_device_id'] ?? $_POST['agent_device_id'] ?? 0);
+        $serviceName = trim($input['service_name'] ?? $_POST['service_name'] ?? '');
+        if ($agentId <= 0 || empty($serviceName)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Agent ID and Service Name required']);
+            exit;
+        }
+
+        $cmdText = "Restart-Service -Name '{$serviceName}' -Force -PassThru | Select-Object Name, Status";
+        $cmdId = generateUuid();
+        $stmt = $pdo->prepare("INSERT INTO agent_command_queue 
+            (id, agent_device_id, command_type, command_text, status, dispatched_by, created_at)
+            VALUES (?, ?, 'service_control', ?, 'pending', ?, NOW())");
+        $stmt->execute([$cmdId, $agentId, $cmdText, $_SESSION['username'] ?? 'admin']);
+
+        echo json_encode(['success' => true, 'command_id' => $cmdId, 'message' => "Service restart queued for '{$serviceName}'"]);
+        break;
+
+    case 'get_agent_drives':
+        $agentId = (int)($input['agent_device_id'] ?? $_GET['agent_device_id'] ?? 0);
+        $stmt = $pdo->prepare("SELECT * FROM agent_device_drives WHERE agent_device_id = ? ORDER BY drive_letter ASC");
+        $stmt->execute([$agentId]);
+        $drives = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        echo json_encode(['success' => true, 'drives' => $drives]);
+        break;
 }
 
 

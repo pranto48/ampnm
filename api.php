@@ -290,7 +290,9 @@ try {
         // Compliance & Golden Config Actions
         'run_compliance_audit', 'get_compliance_overview', 'get_compliance_rules',
         // VoIP & IP SLA Actions
-        'run_voip_probe', 'run_all_voip_probes', 'get_voip_probe_history', 'create_voip_probe', 'delete_voip_probe'
+        'run_voip_probe', 'run_all_voip_probes', 'get_voip_probe_history', 'create_voip_probe', 'delete_voip_probe',
+        // Windows Agent Remote Management Actions
+        'dispatch_agent_command', 'get_agent_command_status', 'get_agent_services', 'restart_agent_service', 'get_agent_drives'
     ];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];

@@ -190,7 +190,64 @@ try {
         $memory_total_mb, $disk_total_gb, $agent_id
     ]);
     
-    // 6. Ingest Client Events if provided
+    // 6. Ingest Client Drives if provided
+    if (isset($payload['drives']) && is_array($payload['drives'])) {
+        $insDrv = $pdo->prepare("INSERT INTO agent_device_drives 
+            (id, agent_device_id, drive_letter, volume_name, file_system, total_gb, free_gb, used_percent, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE 
+                volume_name = VALUES(volume_name),
+                file_system = VALUES(file_system),
+                total_gb = VALUES(total_gb),
+                free_gb = VALUES(free_gb),
+                used_percent = VALUES(used_percent),
+                updated_at = NOW()");
+        foreach ($payload['drives'] as $drv) {
+            $letter = trim($drv['drive_letter'] ?? $drv['name'] ?? '');
+            if (!empty($letter)) {
+                $totalGb = (float)($drv['total_gb'] ?? 0);
+                $freeGb = (float)($drv['free_gb'] ?? 0);
+                $usedPct = $totalGb > 0 ? round((($totalGb - $freeGb) / $totalGb) * 100, 2) : 0;
+                $insDrv->execute([
+                    generateUuid(),
+                    $agent_id,
+                    $letter,
+                    $drv['volume_name'] ?? 'Local Disk',
+                    $drv['file_system'] ?? 'NTFS',
+                    $totalGb,
+                    $freeGb,
+                    $usedPct
+                ]);
+            }
+        }
+    }
+
+    // 7. Ingest Client Services if provided
+    if (isset($payload['services']) && is_array($payload['services'])) {
+        $insSrv = $pdo->prepare("INSERT INTO agent_device_services 
+            (id, agent_device_id, service_name, display_name, status, start_type, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE 
+                display_name = VALUES(display_name),
+                status = VALUES(status),
+                start_type = VALUES(start_type),
+                updated_at = NOW()");
+        foreach ($payload['services'] as $srv) {
+            $sName = trim($srv['service_name'] ?? $srv['name'] ?? '');
+            if (!empty($sName)) {
+                $insSrv->execute([
+                    generateUuid(),
+                    $agent_id,
+                    $sName,
+                    $srv['display_name'] ?? $sName,
+                    $srv['status'] ?? 'Running',
+                    $srv['start_type'] ?? 'Automatic'
+                ]);
+            }
+        }
+    }
+
+    // 8. Ingest Client Events if provided
     if (isset($payload['events']) && is_array($payload['events'])) {
         $stmt_event = $pdo->prepare("INSERT INTO agent_events (agent_device_id, event_type, severity, message, metadata_json) VALUES (?, ?, ?, ?, ?)");
         foreach ($payload['events'] as $evt) {
@@ -211,13 +268,29 @@ try {
         $stmt_warn->execute([$agent_id, "Threshold warning: " . implode(', ', $warnings)]);
     }
     
+    // 9. Fetch Pending Commands to execute on this agent
+    $pendingCommands = [];
+    $cmdStmt = $pdo->prepare("SELECT id, command_type, command_text FROM agent_command_queue 
+        WHERE agent_device_id = ? AND status = 'pending' 
+        ORDER BY created_at ASC LIMIT 5");
+    $cmdStmt->execute([$agent_id]);
+    $pendingCommands = $cmdStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    if (!empty($pendingCommands)) {
+        $updCmd = $pdo->prepare("UPDATE agent_command_queue SET status = 'running' WHERE id = ?");
+        foreach ($pendingCommands as $c) {
+            $updCmd->execute([$c['id']]);
+        }
+    }
+
     // Get server configuration for response
     $heartbeat_interval = (int)(getAppSetting('agent_heartbeat_interval_seconds') ?? 5);
     if ($heartbeat_interval < 1) $heartbeat_interval = 5;
     
     echo json_encode([
         'success' => true,
-        'heartbeat_interval_seconds' => $heartbeat_interval
+        'heartbeat_interval_seconds' => $heartbeat_interval,
+        'pending_commands' => $pendingCommands
     ]);
     
 } catch (Exception $e) {

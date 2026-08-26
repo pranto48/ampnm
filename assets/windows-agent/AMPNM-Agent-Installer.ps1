@@ -213,20 +213,58 @@ function Get-SystemMetrics {
     } catch { }
     
     try {
-        # Disk (aggregated local fixed drives)
+        # Multi-Drive Disk Collection
         $disks = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3"
+        $driveList = @()
         $totalSize = 0
         $freeSpace = 0
         foreach ($d in $disks) {
             if ($d.Size -gt 0) {
                 $totalSize += $d.Size
                 $freeSpace += $d.FreeSpace
+                $driveList += @{
+                    drive_letter = $d.DeviceID
+                    volume_name = $d.VolumeName
+                    file_system = $d.FileSystem
+                    total_gb = [math]::Round($d.Size / 1GB, 2)
+                    free_gb = [math]::Round($d.FreeSpace / 1GB, 2)
+                }
             }
         }
+        $metrics.drives = $driveList
         if ($totalSize -gt 0) {
             $metrics.disk_total_gb = [math]::Round($totalSize / 1GB, 2)
             $metrics.disk_free_gb = [math]::Round($freeSpace / 1GB, 2)
         }
+    } catch { }
+
+    try {
+        # Top 8 Processes by CPU
+        $procList = @()
+        $procs = Get-Process | Sort-Object CPU -Descending | Select-Object -First 8
+        foreach ($p in $procs) {
+            $procList += @{
+                name = $p.ProcessName
+                pid = $p.Id
+                cpu_percent = [math]::Round(($p.CPU ?? 0), 1)
+                memory_mb = [math]::Round(($p.WorkingSet64 / 1MB), 1)
+            }
+        }
+        $metrics.processes = $procList
+    } catch { }
+
+    try {
+        # Running Services Sample
+        $svcList = @()
+        $svcs = Get-Service | Where-Object { $_.Status -eq 'Running' } | Select-Object -First 20
+        foreach ($s in $svcs) {
+            $svcList += @{
+                service_name = $s.Name
+                display_name = $s.DisplayName
+                status = [string]$s.Status
+            }
+        }
+        $metrics.services = $svcList
     } catch { }
     
     try {
@@ -273,7 +311,7 @@ function Send-Metrics {
             'X-Agent-Token' = $AgentToken
         }
         
-        $body = $Metrics | ConvertTo-Json -Compress
+        $body = $Metrics | ConvertTo-Json -Depth 5 -Compress
         
         $response = Invoke-RestMethod -Uri $ServerUrl -Method Post -Headers $headers -Body $body -TimeoutSec 30
         
@@ -288,6 +326,38 @@ function Send-Metrics {
                     $script:CurrentInterval = $suggested
                 }
             }
+            
+            # Execute Remote Pending Commands if received from Server
+            if ($response.pending_commands -and $response.pending_commands.Count -gt 0) {
+                foreach ($cmd in $response.pending_commands) {
+                    Write-Log "Executing remote command ID: $($cmd.id) Type: $($cmd.command_type)"
+                    $cmdOutput = ""
+                    $exitCode = 0
+                    try {
+                        $cmdOutput = (Invoke-Expression -Command $cmd.command_text 2>&1 | Out-String).Trim()
+                        $exitCode = 0
+                    } catch {
+                        $cmdOutput = $_.Exception.Message
+                        $exitCode = 1
+                    }
+
+                    # Report Result Back to Server
+                    try {
+                        $resultUrl = $ServerUrl.Replace('/heartbeat.php', '/command_result.php').Replace('/metrics', '/command_result.php')
+                        if (-not $resultUrl.EndsWith('.php')) { $resultUrl = "$ServerUrl/api/agent/command_result.php" }
+                        $resBody = @{
+                            command_id = $cmd.id
+                            exit_code = $exitCode
+                            output = $cmdOutput
+                        } | ConvertTo-Json -Compress
+                        Invoke-RestMethod -Uri $resultUrl -Method Post -Headers $headers -Body $resBody -TimeoutSec 15 | Out-Null
+                        Write-Log "Reported command result for $($cmd.id) successfully"
+                    } catch {
+                        Write-Log "Error posting command result: $_"
+                    }
+                }
+            }
+
             Write-Log "Metrics sent successfully. Device: $deviceMatched. Next sync: $script:CurrentInterval sec"
         } else {
             Write-Log "Server returned: $($response | ConvertTo-Json -Compress)"

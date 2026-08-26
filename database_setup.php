@@ -1885,6 +1885,53 @@ try {
         INDEX idx_dev (`device_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'maintenance_device_assignments' created or already exists.");
+
+    // 49. Agent Remote Command Queue Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `agent_command_queue` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `agent_device_id` BIGINT UNSIGNED NOT NULL,
+        `command_type` ENUM('powershell', 'cmd', 'service_control', 'process_kill') NOT NULL DEFAULT 'powershell',
+        `command_text` TEXT NOT NULL,
+        `status` ENUM('pending', 'running', 'completed', 'failed', 'cancelled') NOT NULL DEFAULT 'pending',
+        `output` LONGTEXT NULL,
+        `exit_code` INT NULL,
+        `dispatched_by` VARCHAR(100) NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `executed_at` TIMESTAMP NULL,
+        INDEX idx_agent_status (`agent_device_id`, `status`),
+        INDEX idx_created (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'agent_command_queue' created or already exists.");
+
+    // 50. Agent Windows Services Cache Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `agent_device_services` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `agent_device_id` BIGINT UNSIGNED NOT NULL,
+        `service_name` VARCHAR(150) NOT NULL,
+        `display_name` VARCHAR(255) NULL,
+        `status` VARCHAR(50) NOT NULL DEFAULT 'Running',
+        `start_type` VARCHAR(50) NULL DEFAULT 'Automatic',
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_agent_srv (`agent_device_id`, `service_name`),
+        INDEX idx_agent (`agent_device_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'agent_device_services' created or already exists.");
+
+    // 51. Agent Multi-Drive Disk Storage Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `agent_device_drives` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `agent_device_id` BIGINT UNSIGNED NOT NULL,
+        `drive_letter` VARCHAR(10) NOT NULL,
+        `volume_name` VARCHAR(100) NULL,
+        `file_system` VARCHAR(30) NULL DEFAULT 'NTFS',
+        `total_gb` DECIMAL(10,2) NOT NULL DEFAULT 0,
+        `free_gb` DECIMAL(10,2) NOT NULL DEFAULT 0,
+        `used_percent` DECIMAL(5,2) NOT NULL DEFAULT 0,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_agent_drv (`agent_device_id`, `drive_letter`),
+        INDEX idx_agent (`agent_device_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'agent_device_drives' created or already exists.");
     echo "<p style='color: #94a3b8;'><span class='loader'></span>Redirecting to the application in 3 seconds...</p>";
     echo '<meta http-equiv="refresh" content="3;url=index.php">';
 
