@@ -1963,6 +1963,71 @@ try {
         INDEX idx_agent (`agent_device_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'agent_security_health' created or already exists.");
+
+    // 54. Security Audit & Auth Logs Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `security_audit_logs` (
+        `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `ip_address` VARCHAR(64) NOT NULL,
+        `event_type` VARCHAR(64) NOT NULL,
+        `target_type` VARCHAR(64) NULL,
+        `target_identifier` VARCHAR(255) NULL,
+        `details` TEXT NULL,
+        `user_agent` VARCHAR(255) NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ip (`ip_address`),
+        INDEX idx_event (`event_type`),
+        INDEX idx_created (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'security_audit_logs' created or already exists.");
+
+    // 55. Security IP Jail Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `security_ip_jail` (
+        `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `ip_address` VARCHAR(64) NOT NULL UNIQUE,
+        `reason` VARCHAR(255) NOT NULL,
+        `attempt_count` INT UNSIGNED NOT NULL DEFAULT 1,
+        `jail_until` DATETIME NOT NULL,
+        `is_permanent` TINYINT(1) NOT NULL DEFAULT 0,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_jail_until (`jail_until`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'security_ip_jail' created or already exists.");
+
+    // 56. Device Security Vulnerabilities & Port Audit Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `security_vulnerabilities` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `device_id` INT(6) UNSIGNED NOT NULL,
+        `category` ENUM('open_port', 'weak_snmp', 'unencrypted_protocol', 'outdated_os', 'cve_risk') NOT NULL,
+        `severity` ENUM('info', 'low', 'medium', 'high', 'critical') NOT NULL DEFAULT 'medium',
+        `title` VARCHAR(255) NOT NULL,
+        `description` TEXT NULL,
+        `recommendation` TEXT NULL,
+        `detected_port` INT NULL,
+        `status` ENUM('active', 'resolved', 'ignored') NOT NULL DEFAULT 'active',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
+        INDEX idx_dev_status (`device_id`, `status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'security_vulnerabilities' created or already exists.");
+
+    // 57. Encrypted Credential Vault Storage Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `encrypted_vault_keys` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `user_id` INT(6) UNSIGNED NOT NULL,
+        `vault_name` VARCHAR(150) NOT NULL,
+        `credential_type` ENUM('snmp_v3', 'ssh_password', 'agent_token', 'api_secret', 'general') NOT NULL,
+        `encrypted_payload` LONGTEXT NOT NULL,
+        `fingerprint` VARCHAR(64) NOT NULL,
+        `description` VARCHAR(255) NULL,
+        `last_rotated_at` DATETIME NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+        INDEX idx_user (`user_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'encrypted_vault_keys' created or already exists.");
+
     echo "<p style='color: #94a3b8;'><span class='loader'></span>Redirecting to the application in 3 seconds...</p>";
     echo '<meta http-equiv="refresh" content="3;url=index.php">';
 

@@ -330,6 +330,7 @@ usort($menu_tree, function($a, $b) {
                                         <a href="update_status.php" class="nav-link nav-sublink"><i class="fas fa-cloud-download-alt fa-fw mr-2"></i>Update Status</a>
                                         <a href="users.php" class="nav-link nav-sublink"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
                                         <a href="audit_logs.php" class="nav-link nav-sublink"><i class="fas fa-shield-alt fa-fw mr-2"></i>Audit Logs</a>
+                                        <a href="security_audit.php" class="nav-link nav-sublink"><i class="fas fa-shield-halved fa-fw mr-2 text-cyan-400"></i>Security &amp; Vault</a>
                                         <a href="menu_settings.php" class="nav-link nav-sublink"><i class="fas fa-palette fa-fw mr-2"></i>Menu &amp; Themes</a>
                                         <a href="license_management.php" class="nav-link nav-sublink"><i class="fas fa-id-card fa-fw mr-2"></i>License</a>
                                     </div>
