@@ -229,8 +229,8 @@ usort($menu_tree, function($a, $b) {
                         <div class="flex flex-col">
                             <span class="font-extrabold text-white text-base leading-tight tracking-tight flex items-center gap-1.5">
                                 AMPNM
-                                <span class="text-[10px] bg-blue-900/80 text-blue-300 font-bold px-1.5 py-0.5 rounded border border-blue-700/50">
-                                    v1.19
+                                <span class="text-[10px] bg-cyan-900/80 text-cyan-300 font-bold px-1.5 py-0.5 rounded border border-cyan-700/50">
+                                    v1.22
                                 </span>
                             </span>
                             <span class="text-[9px] text-slate-400 font-medium tracking-wide uppercase select-none">
@@ -251,8 +251,8 @@ usort($menu_tree, function($a, $b) {
                             <div class="flex flex-col">
                                 <span class="font-extrabold text-white text-base leading-tight tracking-tight flex items-center gap-1.5">
                                     AMPNM
-                                    <span class="text-[10px] bg-blue-900/80 text-blue-300 font-bold px-1.5 py-0.5 rounded border border-blue-700/50">
-                                        v1.20
+                                    <span class="text-[10px] bg-cyan-900/80 text-cyan-300 font-bold px-1.5 py-0.5 rounded border border-cyan-700/50">
+                                        v1.22
                                     </span>
                                 </span>
                                 <span class="text-[9px] text-slate-400 font-medium tracking-wide uppercase select-none">

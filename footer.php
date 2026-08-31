@@ -15,6 +15,7 @@
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
     <script src="assets/js/shared.js?v=<?= time() ?>"></script>
+    <script src="assets/js/command_palette.js?v=<?= time() ?>"></script>
     <script src="assets/js/dashboard.js?v=<?= time() ?>"></script>
     <script src="assets/js/devices.js?v=<?= time() ?>"></script>
     <script src="assets/js/history.js?v=<?= time() ?>"></script>

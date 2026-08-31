@@ -59,6 +59,46 @@ $dashboardLastCheckedAt = isset($updateState['checked_at']) ? (string) $updateSt
         <div id="dashboard-content">
             <div class="text-center py-16" id="dashboardLoader"><div class="loader mx-auto"></div></div>
             <div id="dashboard-widgets" class="hidden">
+                <!-- User-Friendly Quick Launch Hub -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+                    <a href="map.php" class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 rounded-2xl flex flex-col items-center justify-center text-center gap-2 group transition-all duration-300 shadow-md hover:-translate-y-0.5">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-cyan-500 group-hover:text-slate-900 transition-all duration-300">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                        <span class="text-xs font-semibold text-white group-hover:text-cyan-300">Topology Map</span>
+                    </a>
+                    <a href="network_scanner.php" class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl flex flex-col items-center justify-center text-center gap-2 group transition-all duration-300 shadow-md hover:-translate-y-0.5">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-slate-900 transition-all duration-300">
+                            <i class="fas fa-radar"></i>
+                        </div>
+                        <span class="text-xs font-semibold text-white group-hover:text-emerald-300">Auto Discovery</span>
+                    </a>
+                    <a href="agent_devices.php" class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-blue-500/50 rounded-2xl flex flex-col items-center justify-center text-center gap-2 group transition-all duration-300 shadow-md hover:-translate-y-0.5">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-slate-900 transition-all duration-300">
+                            <i class="fas fa-desktop"></i>
+                        </div>
+                        <span class="text-xs font-semibold text-white group-hover:text-blue-300">Windows Agent</span>
+                    </a>
+                    <a href="security_audit.php" class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-purple-500/50 rounded-2xl flex flex-col items-center justify-center text-center gap-2 group transition-all duration-300 shadow-md hover:-translate-y-0.5">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-slate-900 transition-all duration-300">
+                            <i class="fas fa-shield-halved"></i>
+                        </div>
+                        <span class="text-xs font-semibold text-white group-hover:text-purple-300">Security Vault</span>
+                    </a>
+                    <a href="alert_settings.php" class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 rounded-2xl flex flex-col items-center justify-center text-center gap-2 group transition-all duration-300 shadow-md hover:-translate-y-0.5">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-slate-900 transition-all duration-300">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <span class="text-xs font-semibold text-white group-hover:text-amber-300">Alert Settings</span>
+                    </a>
+                    <button type="button" onclick="AMPNM.CommandPalette.open()" class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 rounded-2xl flex flex-col items-center justify-center text-center gap-2 group transition-all duration-300 shadow-md hover:-translate-y-0.5">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center text-lg group-hover:scale-110 group-hover:bg-cyan-500 group-hover:text-slate-900 transition-all duration-300">
+                            <i class="fas fa-terminal"></i>
+                        </div>
+                        <span class="text-xs font-semibold text-white group-hover:text-cyan-300">Command (Ctrl+K)</span>
+                    </button>
+                </div>
+
                 <!-- Docker Server Metrics Widget -->
                 <div id="widget-server-metrics" class="bg-slate-800/50 border border-slate-700 rounded-xl shadow-lg p-6 mb-8 hover:border-cyan-500/30 transition-all duration-300">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700/60 pb-4 mb-4">
