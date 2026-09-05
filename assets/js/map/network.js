@@ -528,8 +528,8 @@ MapApp.network = {
                             ctx.fillStyle = edgeColor;
                             ctx.shadowColor = edgeColor;
                             ctx.shadowBlur = 12;
-                            ctx.fill();
                         }
+                    }
                 }
 
                 ctx.shadowBlur = 0;
