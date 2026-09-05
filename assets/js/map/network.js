@@ -382,28 +382,54 @@ MapApp.network = {
                 const effectiveStyle = runStyle === 'auto' ? 'data-flow' : runStyle;
 
                 if (effectiveStyle === 'data-flow') {
-                    // Draw flowing quantum cyber packets
-                    for (let i = 0; i < 4; i++) {
-                        const t = (globalProgress + i / 4) % 1.0;
+                    // Draw flowing quantum cyber packets with trailing comet particles (authentic network data-flow)
+                    const packetCount = 3;
+                    for (let i = 0; i < packetCount; i++) {
+                        const t = (globalProgress + i / packetCount) % 1.0;
                         const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
-                        if (pt) {
-                            // Outer Neon Glow
-                            ctx.beginPath();
-                            ctx.arc(pt.x, pt.y, 4.5, 0, 2 * Math.PI);
-                            ctx.fillStyle = edgeColor;
-                            ctx.shadowColor = edgeColor;
-                            ctx.shadowBlur = 14;
-                            ctx.fill();
+                        if (!pt) continue;
 
-                            // Bright Core Center
-                            ctx.beginPath();
-                            ctx.arc(pt.x, pt.y, 2.0, 0, 2 * Math.PI);
-                            ctx.fillStyle = '#FFFFFF';
-                            ctx.shadowColor = '#FFFFFF';
-                            ctx.shadowBlur = 4;
-                            ctx.fill();
+                        // Trailing comet particles that stream behind each packet
+                        const tails = [
+                            { offset: 0.012, radius: 3.2, alpha: 0.65, glow: 8 },
+                            { offset: 0.024, radius: 2.2, alpha: 0.40, glow: 5 },
+                            { offset: 0.038, radius: 1.4, alpha: 0.20, glow: 3 }
+                        ];
+
+                        for (const tail of tails) {
+                            const tailT = (t - tail.offset + 1.0) % 1.0;
+                            const tailPt = getPointAlongEdge(bodyEdge, tailT, fx, fy, tx, ty);
+                            if (tailPt) {
+                                ctx.save();
+                                ctx.globalAlpha = tail.alpha;
+                                ctx.beginPath();
+                                ctx.arc(tailPt.x, tailPt.y, tail.radius, 0, 2 * Math.PI);
+                                ctx.fillStyle = edgeColor;
+                                ctx.shadowColor = edgeColor;
+                                ctx.shadowBlur = tail.glow;
+                                ctx.fill();
+                                ctx.restore();
+                            }
                         }
+
+                        // Main Packet Head: Outer Radiant Neon Halo
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 4.8, 0, 2 * Math.PI);
+                        ctx.fillStyle = edgeColor;
+                        ctx.shadowColor = edgeColor;
+                        ctx.shadowBlur = 15;
+                        ctx.fill();
+
+                        // Main Packet Head: High-intensity Core
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 2.2, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.shadowColor = '#FFFFFF';
+                        ctx.shadowBlur = 6;
+                        ctx.fill();
                     }
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = 'transparent';
                 } else if (effectiveStyle === 'data-stream') {
                     // High-density stream
                     for (let i = 0; i < 10; i++) {
@@ -504,8 +530,10 @@ MapApp.network = {
                             ctx.shadowBlur = 12;
                             ctx.fill();
                         }
-                    }
                 }
+
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
 
                 // 🌟 LAYER 3: LIVE SNMP BANDWIDTH FLOW BADGE ON EDGE
                 const midX = (fx + tx) / 2;

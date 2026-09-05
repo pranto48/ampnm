@@ -135,6 +135,7 @@ function initMap() {
         const connectionRunStyle = document.getElementById('connectionRunStyle');
         const connectionAnimationSpeed = document.getElementById('connectionAnimationSpeed');
         const connectionAnimationSpeedValue = document.getElementById('connectionAnimationSpeedValue');
+        const motionEnableAnimation = document.getElementById('motionEnableAnimation');
         const globalThickness = merged.connection_line_thickness ?? 2;
         const globalThicknessInput = document.getElementById('globalLineThickness');
         const globalThicknessPxInput = document.getElementById('globalLineThicknessPx');
@@ -157,6 +158,15 @@ function initMap() {
         if (globalThicknessInput) globalThicknessInput.value = String(globalThickness);
         if (globalThicknessPxInput) globalThicknessPxInput.value = String(globalThickness);
         if (globalThicknessVal) globalThicknessVal.textContent = `${globalThickness}px`;
+
+        const isAnim = merged.connection_enable_animation !== false && 
+                       merged.connection_enable_animation !== 'false' && 
+                       merged.connection_enable_animation !== 0 && 
+                       merged.connection_enable_animation !== '0';
+        if (motionEnableAnimation) motionEnableAnimation.checked = isAnim;
+        if (MapApp.ui && typeof MapApp.ui.syncConnectionAnimToggleUI === 'function') {
+            MapApp.ui.syncConnectionAnimToggleUI(isAnim);
+        }
     };
 
     const readTooltipDisplayControls = () => {
@@ -173,6 +183,8 @@ function initMap() {
         const connectionRunStyle = document.getElementById('connectionRunStyle')?.value || defaults.connection_run_style;
         const connectionAnimationSpeed = Number(document.getElementById('connectionAnimationSpeed')?.value ?? defaults.connection_animation_speed);
         const globalLineThickness = parseFloat(document.getElementById('globalLineThicknessPx')?.value || document.getElementById('globalLineThickness')?.value || 2);
+        const motionEnableAnimation = document.getElementById('motionEnableAnimation');
+        const connectionEnableAnim = motionEnableAnimation ? motionEnableAnimation.checked : defaults.connection_enable_animation;
 
         return {
             density: density === 'compact' ? 'compact' : 'comfortable',
@@ -184,6 +196,7 @@ function initMap() {
             panel_text_color: panelTextColor,
             panel_muted_color: panelMutedColor,
             panel_accent_color: panelAccentColor,
+            connection_enable_animation: connectionEnableAnim,
             connection_run_style: ['auto', 'solid', 'dashed', 'dotted', 'data-flow', 'data-stream', 'pulse', 'wave', 'morse', 'zipper'].includes(connectionRunStyle) ? connectionRunStyle : defaults.connection_run_style,
             connection_animation_speed: Math.min(200, Math.max(0, connectionAnimationSpeed)),
             connection_line_thickness: Math.min(16, Math.max(1, globalLineThickness))
@@ -1275,6 +1288,26 @@ function initMap() {
             }
         });
     }
+
+    // Connection Data Flow Animation Quick Toggle Button
+    const toggleConnectionAnimBtn = document.getElementById('toggleConnectionAnimBtn');
+    if (toggleConnectionAnimBtn) {
+        toggleConnectionAnimBtn.addEventListener('click', () => {
+            if (MapApp.ui && typeof MapApp.ui.toggleConnectionAnimation === 'function') {
+                MapApp.ui.toggleConnectionAnimation();
+            }
+        });
+    }
+
+    // Map Settings Motion Tab Checkbox
+    const motionEnableAnimationInput = document.getElementById('motionEnableAnimation');
+    if (motionEnableAnimationInput) {
+        motionEnableAnimationInput.addEventListener('change', (e) => {
+            if (MapApp.ui && typeof MapApp.ui.toggleConnectionAnimation === 'function') {
+                MapApp.ui.toggleConnectionAnimation(e.target.checked);
+            }
+        });
+    };
 
     if (closeConnectionSettingsBtn) {
         closeConnectionSettingsBtn.addEventListener('click', () => closeModal('connectionSettingsModal'));

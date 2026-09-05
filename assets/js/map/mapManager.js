@@ -536,6 +536,16 @@ MapApp.mapManager = {
         else MapApp.network.restoreSavedView();
         MapApp.ui.updateStaticEdgeColors();
         MapApp.ui.startCanvasAnimationLoop();
+        if (MapApp.ui && typeof MapApp.ui.syncConnectionAnimToggleUI === 'function') {
+            const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function')
+                ? MapApp.utils.getCurrentTooltipDisplaySettings()
+                : { connection_enable_animation: true };
+            const isAnim = displaySettings.connection_enable_animation !== false &&
+                           displaySettings.connection_enable_animation !== 'false' &&
+                           displaySettings.connection_enable_animation !== 0 &&
+                           displaySettings.connection_enable_animation !== '0';
+            MapApp.ui.syncConnectionAnimToggleUI(isAnim);
+        }
         setTimeout(() => {
             if (MapApp.state.network) {
                 MapApp.state.network.redraw();

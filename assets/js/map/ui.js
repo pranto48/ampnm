@@ -483,14 +483,103 @@ MapApp.ui = {
         MapApp.ui.startCanvasAnimationLoop();
     },
 
+    syncConnectionAnimToggleUI: (isEnabled) => {
+        const btn = document.getElementById('toggleConnectionAnimBtn');
+        const icon = document.getElementById('toggleConnectionAnimIcon');
+        const text = document.getElementById('toggleConnectionAnimText');
+        const motionChk = document.getElementById('motionEnableAnimation');
+        const csChk = document.getElementById('csEnableAnimation');
+
+        if (motionChk && motionChk.checked !== isEnabled) {
+            motionChk.checked = isEnabled;
+        }
+        if (csChk && csChk.checked !== isEnabled) {
+            csChk.checked = isEnabled;
+        }
+
+        if (btn) {
+            if (isEnabled) {
+                btn.className = 'px-3 py-2 bg-cyan-950/70 text-cyan-400 rounded-lg hover:bg-cyan-900/80 border border-cyan-500/60 flex items-center gap-1.5 transition-all shadow-sm shadow-cyan-500/20';
+                btn.title = 'Connection Data Flow Animation is ON (কানেকশন অ্যানিমেশন চালু - বন্ধ করতে ক্লিক করুন)';
+                if (icon) icon.className = 'fas fa-wave-square text-cyan-400 animate-pulse';
+                if (text) text.textContent = 'Flow: ON';
+            } else {
+                btn.className = 'px-3 py-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 hover:text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-all';
+                btn.title = 'Connection Data Flow Animation is OFF (কানেকশন অ্যানিমেশন বন্ধ - চালু করতে ক্লিক করুন)';
+                if (icon) icon.className = 'fas fa-pause text-slate-500';
+                if (text) text.textContent = 'Flow: OFF';
+            }
+        }
+    },
+
+    toggleConnectionAnimation: (forceState) => {
+        const currentMapId = MapApp.state?.currentMapId;
+        const currentSettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function')
+            ? MapApp.utils.getCurrentTooltipDisplaySettings()
+            : { connection_enable_animation: true };
+
+        const currentState = currentSettings.connection_enable_animation !== false &&
+                             currentSettings.connection_enable_animation !== 'false' &&
+                             currentSettings.connection_enable_animation !== 0 &&
+                             currentSettings.connection_enable_animation !== '0';
+
+        const newState = typeof forceState === 'boolean' ? forceState : !currentState;
+
+        // Update in MapApp.state
+        if (currentMapId) {
+            if (!MapApp.state.tooltipDisplaySettingsByMap) {
+                MapApp.state.tooltipDisplaySettingsByMap = {};
+            }
+            MapApp.state.tooltipDisplaySettingsByMap[currentMapId] = {
+                ...currentSettings,
+                connection_enable_animation: newState
+            };
+            try {
+                localStorage.setItem(`mapTooltipDisplay:${currentMapId}`, JSON.stringify(MapApp.state.tooltipDisplaySettingsByMap[currentMapId]));
+            } catch (e) {
+                console.warn('Failed to save to localStorage:', e);
+            }
+        }
+
+        // Also save to global ampnm_tooltip_display_settings
+        try {
+            const globalSettings = JSON.parse(localStorage.getItem('ampnm_tooltip_display_settings') || '{}');
+            globalSettings.connection_enable_animation = newState;
+            localStorage.setItem('ampnm_tooltip_display_settings', JSON.stringify(globalSettings));
+        } catch (e) {}
+
+        // Sync all UI toggle elements
+        MapApp.ui.syncConnectionAnimToggleUI(newState);
+
+        // Notify user
+        if (window.notyf) {
+            if (newState) {
+                window.notyf.success('Connection flow animation enabled (কানেকশন ডাটা ফ্লো চালু)');
+            } else {
+                window.notyf.success('Connection flow animation disabled (কানেকশন ডাটা ফ্লো বন্ধ)');
+            }
+        }
+
+        // Trigger redraw
+        if (MapApp.state.network) {
+            MapApp.state.network.redraw();
+        }
+    },
+
     openConnectionSettingsModal: () => {
         const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function') 
             ? MapApp.utils.getCurrentTooltipDisplaySettings() 
             : {};
         
-        const isAnim = displaySettings.connection_enable_animation !== false && displaySettings.connection_enable_animation !== 'false';
+        const isAnim = displaySettings.connection_enable_animation !== false && 
+                       displaySettings.connection_enable_animation !== 'false' &&
+                       displaySettings.connection_enable_animation !== 0 &&
+                       displaySettings.connection_enable_animation !== '0';
         const animEl = document.getElementById('csEnableAnimation');
         if (animEl) animEl.checked = isAnim;
+
+        const motionAnimEl = document.getElementById('motionEnableAnimation');
+        if (motionAnimEl) motionAnimEl.checked = isAnim;
         
         const glowModeEl = document.getElementById('csGlowMode');
         if (glowModeEl) glowModeEl.value = displaySettings.connection_glow_mode || 'neon-laser';
@@ -558,9 +647,13 @@ MapApp.ui = {
         const thickness = parseInt(document.getElementById('csThickness')?.value, 10) || 2;
         const bandwidthGlow = document.getElementById('csEnableBandwidthGlow') ? document.getElementById('csEnableBandwidthGlow').checked : true;
         
-        const stored = JSON.parse(localStorage.getItem('ampnm_tooltip_display_settings') || '{}');
-        const updated = {
-            ...stored,
+        const currentMapId = MapApp.state?.currentMapId;
+        const currentSettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function')
+            ? MapApp.utils.getCurrentTooltipDisplaySettings()
+            : {};
+
+        const updatedSettings = {
+            ...currentSettings,
             connection_enable_animation: isAnim,
             connection_glow_mode: glowMode,
             connection_glow_radius: glowRadius,
@@ -569,8 +662,23 @@ MapApp.ui = {
             connection_line_thickness: thickness,
             connection_enable_bandwidth_glow: bandwidthGlow
         };
-        
-        localStorage.setItem('ampnm_tooltip_display_settings', JSON.stringify(updated));
+
+        if (currentMapId) {
+            if (!MapApp.state.tooltipDisplaySettingsByMap) {
+                MapApp.state.tooltipDisplaySettingsByMap = {};
+            }
+            MapApp.state.tooltipDisplaySettingsByMap[currentMapId] = updatedSettings;
+            try {
+                localStorage.setItem(`mapTooltipDisplay:${currentMapId}`, JSON.stringify(updatedSettings));
+            } catch (e) {}
+        }
+
+        try {
+            const stored = JSON.parse(localStorage.getItem('ampnm_tooltip_display_settings') || '{}');
+            localStorage.setItem('ampnm_tooltip_display_settings', JSON.stringify({ ...stored, ...updatedSettings }));
+        } catch (e) {}
+
+        MapApp.ui.syncConnectionAnimToggleUI(isAnim);
         closeModal('connectionSettingsModal');
         
         if (window.notyf) window.notyf.success('Connection glow & flow settings saved!');

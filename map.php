@@ -119,6 +119,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
                             <button id="pathTracerBtn" class="px-3 py-2 bg-slate-700 text-emerald-400 rounded-lg hover:bg-slate-600 border border-emerald-500/30 flex items-center gap-1.5 font-medium text-xs" title="Trace Live Routing Path Between Devices"><i class="fas fa-route"></i> Path Tracer</button>
                             <button id="connectionSettingsBtn" class="px-3 py-2 bg-slate-700 text-cyan-400 rounded-lg hover:bg-slate-600 border border-cyan-500/30 flex items-center gap-1.5" title="Connection Glow & Flow Settings"><i class="fas fa-bolt"></i><span class="hidden md:inline text-xs font-semibold">Glow Settings</span></button>
+                            <button id="toggleConnectionAnimBtn" class="px-3 py-2 bg-cyan-950/60 text-cyan-400 rounded-lg hover:bg-cyan-900/60 border border-cyan-500/50 flex items-center gap-1.5 transition-all shadow-sm" title="Toggle Connection Data Flow Animation (কানেকশন অ্যানিমেশন চালু/বন্ধ করুন)"><i id="toggleConnectionAnimIcon" class="fas fa-wave-square"></i><span id="toggleConnectionAnimText" class="hidden md:inline text-xs font-semibold">Flow: ON</span></button>
                             <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
                             <input type="file" id="importFile" class="hidden" accept=".json">
@@ -808,7 +809,21 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                     </div>
                     <div data-map-settings-panel="motion" class="space-y-3 hidden">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-700/80">
+                    <!-- Master Animation Toggle Card -->
+                    <div class="flex items-center justify-between p-3.5 bg-slate-900/80 rounded-xl border border-slate-700 shadow-inner">
+                        <div>
+                            <div class="text-sm font-semibold text-white flex items-center gap-2">
+                                <i class="fas fa-bolt text-cyan-400"></i> Connection Flow Animations (ডাটা ফ্লো অ্যানিমেশন)
+                            </div>
+                            <div class="text-xs text-slate-400 mt-0.5">কানেকশন লাইনে রিয়েল-টাইম ডাটা প্যাকেট ও লেজার ফ্লো অ্যানিমেশন চালু বা বন্ধ রাখুন</div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer ml-3 flex-shrink-0">
+                            <input type="checkbox" id="motionEnableAnimation" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-700/80">
                         <div>
                             <label for="connectionRunStyle" class="block text-xs font-medium text-slate-400 mb-1">Connection Running Style</label>
                             <select id="connectionRunStyle" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500">
