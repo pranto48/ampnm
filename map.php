@@ -1332,6 +1332,9 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 if (panel) panel.classList.remove('hidden');
                 this.classList.remove('bg-slate-700', 'text-slate-200');
                 this.classList.add('bg-cyan-700', 'text-white');
+                if (tab === 'labelstyle' && typeof window.loadGlobalLabelSettings === 'function') {
+                    window.loadGlobalLabelSettings();
+                }
             });
         });
 
@@ -1436,6 +1439,12 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 return res;
             };
         }
+
+        setTimeout(() => {
+            if (typeof window.loadGlobalLabelSettings === 'function') {
+                window.loadGlobalLabelSettings();
+            }
+        }, 300);
     });
 })();
 </script>
