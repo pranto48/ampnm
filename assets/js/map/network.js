@@ -545,6 +545,103 @@ MapApp.network = {
                 }
             }
 
+            // =========================================================================
+            // DEVICE OFFLINE RED ALERT & WARNING YELLOW BLINKING / PULSING SYSTEM
+            // =========================================================================
+            const now = Date.now();
+            const pulseT1 = (now % 1400) / 1400; // 0 to 1 smooth expansion loop
+            const pulseT2 = ((now + 700) % 1400) / 1400; // Phase shifted 50%
+            const flashAlpha = 0.35 + 0.65 * Math.abs(Math.sin((now % 800) / 800 * Math.PI)); // Fast emergency blink
+
+            const allMapNodes = (MapApp.state && MapApp.state.nodes && typeof MapApp.state.nodes.get === 'function')
+                ? MapApp.state.nodes.get()
+                : [];
+
+            for (const node of allMapNodes) {
+                if (!node || !node.id) continue;
+                if (node.deviceData && node.deviceData.type === 'box') continue; // Skip container boxes
+
+                const status = (node.deviceData && node.deviceData.status) ? String(node.deviceData.status).toLowerCase() : 'online';
+                if (status !== 'offline' && status !== 'warning' && status !== 'critical') continue;
+
+                // Obtain coordinate of node
+                let nodePos = MapApp.state.network.getPositions([node.id])?.[node.id];
+                if (!nodePos && typeof node.x === 'number' && typeof node.y === 'number') {
+                    nodePos = { x: node.x, y: node.y };
+                }
+                if (!nodePos || typeof nodePos.x !== 'number' || typeof nodePos.y !== 'number') continue;
+
+                const baseSize = (node.deviceData?.icon_size || node.size || 50);
+                const baseRadius = Math.max(16, baseSize / 2);
+
+                const isOffline = (status === 'offline' || status === 'critical');
+                const alertColor = isOffline ? '#ef4444' : '#f59e0b';
+                const rgb = isOffline ? '239, 68, 68' : '245, 158, 11';
+
+                ctx.save();
+
+                // 1. Radar Expanding Shockwave 1
+                ctx.beginPath();
+                ctx.arc(nodePos.x, nodePos.y, baseRadius + pulseT1 * 34, 0, 2 * Math.PI);
+                ctx.strokeStyle = `rgba(${rgb}, ${(1 - pulseT1) * 0.95})`;
+                ctx.lineWidth = Math.max(1, 2.5 * (1 - pulseT1 * 0.5));
+                ctx.shadowColor = alertColor;
+                ctx.shadowBlur = 14 * (1 - pulseT1);
+                ctx.stroke();
+
+                // 2. Radar Expanding Shockwave 2 (Phase Shifted)
+                ctx.beginPath();
+                ctx.arc(nodePos.x, nodePos.y, baseRadius + pulseT2 * 34, 0, 2 * Math.PI);
+                ctx.strokeStyle = `rgba(${rgb}, ${(1 - pulseT2) * 0.75})`;
+                ctx.lineWidth = Math.max(1, 2 * (1 - pulseT2 * 0.5));
+                ctx.stroke();
+
+                // 3. Radial Pulsing Core Halo (Glow directly behind/around the icon)
+                const grad = ctx.createRadialGradient(nodePos.x, nodePos.y, baseRadius * 0.4, nodePos.x, nodePos.y, baseRadius + 14);
+                grad.addColorStop(0, `rgba(${rgb}, ${0.5 * flashAlpha})`);
+                grad.addColorStop(0.7, `rgba(${rgb}, ${0.25 * flashAlpha})`);
+                grad.addColorStop(1, `rgba(${rgb}, 0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(nodePos.x, nodePos.y, baseRadius + 14, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // 4. Solid High-Visibility Blinking Perimeter Ring
+                ctx.beginPath();
+                ctx.arc(nodePos.x, nodePos.y, baseRadius + 4, 0, 2 * Math.PI);
+                ctx.strokeStyle = `rgba(${rgb}, ${flashAlpha})`;
+                ctx.lineWidth = 2.5;
+                ctx.shadowColor = alertColor;
+                ctx.shadowBlur = 16 * flashAlpha;
+                ctx.stroke();
+
+                // 5. Emergency Warning Beacon Badge (Top-Right of device icon)
+                const badgeX = nodePos.x + baseRadius * 0.72;
+                const badgeY = nodePos.y - baseRadius * 0.72;
+                const badgeRadius = 9;
+
+                ctx.beginPath();
+                ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = isOffline ? `rgba(220, 38, 38, ${Math.max(0.7, flashAlpha)})` : `rgba(217, 119, 6, ${Math.max(0.7, flashAlpha)})`;
+                ctx.shadowColor = alertColor;
+                ctx.shadowBlur = 12 * flashAlpha;
+                ctx.fill();
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Exclamation / Warning Icon inside badge
+                ctx.fillStyle = isOffline ? '#ffffff' : '#000000';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 0;
+                ctx.fillText(isOffline ? '!' : '▲', badgeX, badgeY + (isOffline ? 0 : -0.5));
+
+                ctx.restore();
+            }
+
             ctx.restore();
         });
 
