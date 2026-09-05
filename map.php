@@ -844,8 +844,10 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                     <!-- Global Label Style Panel -->
                     <div data-map-settings-panel="labelstyle" class="space-y-4 hidden">
-                        <h3 class="text-lg font-semibold text-white pt-1">Global Label Style</h3>
-                        <p class="text-xs text-slate-500">Set default label color, size, and text style for <em>all</em> devices on this map. Individual device settings override these globals.</p>
+                        <div class="border-b border-slate-700/80 pb-2">
+                            <h3 class="text-lg font-semibold text-white pt-1">Device Label Style & Position</h3>
+                            <p class="text-xs text-slate-400">Set default label color, size, text style, and position / gap distance for <em>all</em> devices on this map.</p>
+                        </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label for="globalLabelColor" class="block text-xs font-medium text-slate-400 mb-1">Default Label Color</label>
@@ -855,10 +857,61 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                                 </div>
                             </div>
                             <div>
-                                <label for="globalLabelSize" class="block text-xs font-medium text-slate-400 mb-1">Default Label Size <span id="globalLabelSizeVal" class="text-cyan-400">14px</span></label>
+                                <label for="globalLabelSize" class="block text-xs font-medium text-slate-400 mb-1">Default Label Size <span id="globalLabelSizeVal" class="text-cyan-400 font-semibold">14px</span></label>
                                 <input id="globalLabelSize" type="range" min="8" max="32" step="1" value="14" class="w-full accent-cyan-500">
                             </div>
                         </div>
+
+                        <!-- Device Label Position & Gap (Near / Gap System) -->
+                        <div class="bg-slate-900/80 border border-cyan-900/50 rounded-xl p-3.5 space-y-3 shadow-inner">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                                    <i class="fas fa-arrows-alt-v text-cyan-400"></i>
+                                    Device Label Position & Gap (আইকন থেকে লেবেলের দূরত্ব / পজিশন)
+                                </label>
+                                <span id="globalLabelVAdjustVal" class="text-xs px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700/60 font-mono font-bold">0px (Standard)</span>
+                            </div>
+                            
+                            <!-- Quick Preset Buttons -->
+                            <div class="flex flex-wrap gap-1.5 text-xs">
+                                <button type="button" class="label-pos-preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/70 transition-all flex items-center gap-1" data-vadjust="-75">
+                                    <i class="fas fa-arrow-up text-amber-400"></i> Top (উপরে -75px)
+                                </button>
+                                <button type="button" class="label-pos-preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/70 transition-all flex items-center gap-1" data-vadjust="-15">
+                                    <i class="fas fa-compress-alt text-emerald-400"></i> Near / Tight (কাছে -15px)
+                                </button>
+                                <button type="button" class="label-pos-preset-btn px-2.5 py-1 rounded-md bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 border border-cyan-600/80 transition-all flex items-center gap-1 font-semibold" data-vadjust="0">
+                                    <i class="fas fa-circle-dot text-cyan-400"></i> Standard (স্বাভাবিক 0px)
+                                </button>
+                                <button type="button" class="label-pos-preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/70 transition-all flex items-center gap-1" data-vadjust="12">
+                                    <i class="fas fa-expand-alt text-blue-400"></i> Medium Gap (+12px)
+                                </button>
+                                <button type="button" class="label-pos-preset-btn px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/70 transition-all flex items-center gap-1" data-vadjust="25">
+                                    <i class="fas fa-arrows-alt-v text-indigo-400"></i> Wide Gap (+25px)
+                                </button>
+                            </div>
+
+                            <!-- Slider and manual input -->
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1">
+                                    <input id="globalLabelVAdjust" type="range" min="-80" max="60" step="1" value="0" class="w-full accent-cyan-500 cursor-pointer">
+                                    <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
+                                        <span>-80px (Top)</span>
+                                        <span>-15px (Near)</span>
+                                        <span>0px (Standard)</span>
+                                        <span>+25px (Gap)</span>
+                                        <span>+60px (Far)</span>
+                                    </div>
+                                </div>
+                                <div class="w-20">
+                                    <div class="relative">
+                                        <input id="globalLabelVAdjustPx" type="number" min="-80" max="60" value="0" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white font-mono text-center focus:ring-1 focus:ring-cyan-500">
+                                        <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">px</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label class="text-xs font-medium text-slate-400 block mb-2">Text Style</label>
@@ -874,9 +927,20 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                                 </div>
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="text-xs font-medium text-slate-400 block mb-2">Preview</label>
-                                <div class="bg-slate-900 border border-slate-700 rounded-lg p-4 flex items-center justify-center" style="min-height:56px;">
-                                    <span id="globalLabelPreview" class="text-sm transition-all" style="color:#ffffff;">Device Name Label</span>
+                                <label class="text-xs font-medium text-slate-400 block mb-2">Interactive Live Simulation</label>
+                                <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center relative overflow-hidden" style="min-height:140px;">
+                                    <div class="absolute top-2 left-3 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Node & Label Spacing</div>
+                                    <div id="previewMockNode" class="flex flex-col items-center justify-center relative my-auto">
+                                        <!-- Device Icon -->
+                                        <div id="previewDeviceIcon" class="w-12 h-12 rounded-xl bg-slate-800 border-2 border-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 z-10 transition-all duration-150">
+                                            <i class="fas fa-network-wired text-emerald-400 text-xl"></i>
+                                        </div>
+                                        <!-- Label with dynamic vertical offset -->
+                                        <div id="previewLabelContainer" class="transition-all duration-150 text-center z-20" style="margin-top: 6px;">
+                                            <span id="globalLabelPreview" class="text-sm transition-all inline-block select-none" style="color:#ffffff;">Core-Router-01</span>
+                                            <div id="previewLivePingSub" class="text-[10px] text-emerald-400 font-mono opacity-85">0.8ms | TTL:64</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -884,7 +948,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <button type="button" id="applyGlobalLabelStyleBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-semibold">
                                 <i class="fas fa-magic mr-2"></i>Apply to All Devices on Map
                             </button>
-                            <p class="text-xs text-slate-500 mt-1">This will refresh all nodes on the current map with the chosen label style.</p>
+                            <p class="text-xs text-slate-500 mt-1">This will refresh all nodes on the current map with the chosen label style and gap distance.</p>
                         </div>
                     </div>
                 </div>
@@ -1005,39 +1069,77 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
 <script>
 (function() {
     function updateGlobalLabelPreview() {
-        const colorPicker = document.getElementById('globalLabelColor');
-        const colorHex    = document.getElementById('globalLabelColorHex');
-        const preview     = document.getElementById('globalLabelPreview');
-        const sizeSlider  = document.getElementById('globalLabelSize');
-        const sizeVal     = document.getElementById('globalLabelSizeVal');
-        const boldCheck   = document.getElementById('globalLabelBold');
-        const italicCheck = document.getElementById('globalLabelItalic');
+        const colorPicker  = document.getElementById('globalLabelColor');
+        const colorHex     = document.getElementById('globalLabelColorHex');
+        const preview      = document.getElementById('globalLabelPreview');
+        const sizeSlider   = document.getElementById('globalLabelSize');
+        const sizeVal      = document.getElementById('globalLabelSizeVal');
+        const boldCheck    = document.getElementById('globalLabelBold');
+        const italicCheck  = document.getElementById('globalLabelItalic');
+        const vadjustSlider= document.getElementById('globalLabelVAdjust');
+        const vadjustPx    = document.getElementById('globalLabelVAdjustPx');
+        const vadjustVal   = document.getElementById('globalLabelVAdjustVal');
+        const previewLabelCont = document.getElementById('previewLabelContainer');
+        const previewMockNode  = document.getElementById('previewMockNode');
+
         if (!preview) return;
         const color  = colorHex ? colorHex.value : '#ffffff';
         const size   = sizeSlider ? sizeSlider.value : 14;
         const bold   = boldCheck && boldCheck.checked ? 'bold' : 'normal';
         const italic = italicCheck && italicCheck.checked ? 'italic' : 'normal';
+        const vadjust = vadjustSlider ? parseInt(vadjustSlider.value, 10) || 0 : 0;
+
         if (sizeVal) sizeVal.textContent = size + 'px';
         preview.style.color = color;
         preview.style.fontSize = size + 'px';
         preview.style.fontWeight = bold;
         preview.style.fontStyle = italic;
+
+        if (vadjustVal) {
+            let labelDesc = 'Standard';
+            if (vadjust <= -45) labelDesc = 'Top / Above';
+            else if (vadjust <= -5) labelDesc = 'Near / Tight';
+            else if (vadjust <= 5) labelDesc = 'Standard';
+            else if (vadjust <= 20) labelDesc = 'Medium Gap';
+            else labelDesc = 'Wide Gap';
+            vadjustVal.textContent = `${vadjust > 0 ? '+' : ''}${vadjust}px (${labelDesc})`;
+        }
+
+        if (vadjustPx && parseInt(vadjustPx.value) !== vadjust) {
+            vadjustPx.value = vadjust;
+        }
+
+        // Live preview node and label movement
+        if (previewLabelCont && previewMockNode) {
+            if (vadjust <= -45) {
+                previewMockNode.style.flexDirection = 'column-reverse';
+                previewLabelCont.style.marginBottom = Math.max(2, Math.min(28, Math.abs(vadjust) - 45)) + 'px';
+                previewLabelCont.style.marginTop = '0px';
+            } else {
+                previewMockNode.style.flexDirection = 'column';
+                previewLabelCont.style.marginBottom = '0px';
+                const visualMargin = Math.max(0, Math.round(6 + vadjust * 0.5));
+                previewLabelCont.style.marginTop = visualMargin + 'px';
+            }
+        }
     }
 
     // Persist to localStorage whenever settings are changed in the panel
     function saveGlobalLabelSettings() {
         const mapId = MapApp.state?.currentMapId;
         if (!mapId) return;
-        const colorHex    = document.getElementById('globalLabelColorHex');
-        const sizeSlider  = document.getElementById('globalLabelSize');
-        const boldCheck   = document.getElementById('globalLabelBold');
-        const italicCheck = document.getElementById('globalLabelItalic');
+        const colorHex     = document.getElementById('globalLabelColorHex');
+        const sizeSlider   = document.getElementById('globalLabelSize');
+        const boldCheck    = document.getElementById('globalLabelBold');
+        const italicCheck  = document.getElementById('globalLabelItalic');
+        const vadjustSlider= document.getElementById('globalLabelVAdjust');
 
         const settings = {
             color: colorHex ? colorHex.value : '#ffffff',
             size: sizeSlider ? parseInt(sizeSlider.value) : 14,
             bold: boldCheck && boldCheck.checked ? 1 : 0,
-            italic: italicCheck && italicCheck.checked ? 1 : 0
+            italic: italicCheck && italicCheck.checked ? 1 : 0,
+            vadjust: vadjustSlider ? parseInt(vadjustSlider.value, 10) || 0 : 0
         };
         localStorage.setItem(`mapLabelSettings:${mapId}`, JSON.stringify(settings));
     }
@@ -1050,17 +1152,23 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             const raw = localStorage.getItem(`mapLabelSettings:${mapId}`);
             if (raw) {
                 const settings = JSON.parse(raw);
-                const colorPicker = document.getElementById('globalLabelColor');
-                const colorHex    = document.getElementById('globalLabelColorHex');
-                const sizeSlider  = document.getElementById('globalLabelSize');
-                const boldCheck   = document.getElementById('globalLabelBold');
-                const italicCheck = document.getElementById('globalLabelItalic');
+                const colorPicker  = document.getElementById('globalLabelColor');
+                const colorHex     = document.getElementById('globalLabelColorHex');
+                const sizeSlider   = document.getElementById('globalLabelSize');
+                const boldCheck    = document.getElementById('globalLabelBold');
+                const italicCheck  = document.getElementById('globalLabelItalic');
+                const vadjustSlider= document.getElementById('globalLabelVAdjust');
+                const vadjustPx    = document.getElementById('globalLabelVAdjustPx');
                 
                 if (colorPicker && settings.color) colorPicker.value = settings.color;
                 if (colorHex && settings.color) colorHex.value = settings.color;
                 if (sizeSlider && settings.size) sizeSlider.value = settings.size;
                 if (boldCheck) boldCheck.checked = settings.bold == 1;
                 if (italicCheck) italicCheck.checked = settings.italic == 1;
+                if (settings.vadjust !== undefined) {
+                    if (vadjustSlider) vadjustSlider.value = settings.vadjust;
+                    if (vadjustPx) vadjustPx.value = settings.vadjust;
+                }
                 
                 updateGlobalLabelPreview();
             }
@@ -1070,12 +1178,14 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
     };
 
     document.addEventListener('DOMContentLoaded', function() {
-        const colorPicker = document.getElementById('globalLabelColor');
-        const colorHex    = document.getElementById('globalLabelColorHex');
-        const sizeSlider  = document.getElementById('globalLabelSize');
-        const boldCheck   = document.getElementById('globalLabelBold');
-        const italicCheck = document.getElementById('globalLabelItalic');
-        const applyBtn    = document.getElementById('applyGlobalLabelStyleBtn');
+        const colorPicker  = document.getElementById('globalLabelColor');
+        const colorHex     = document.getElementById('globalLabelColorHex');
+        const sizeSlider   = document.getElementById('globalLabelSize');
+        const boldCheck    = document.getElementById('globalLabelBold');
+        const italicCheck  = document.getElementById('globalLabelItalic');
+        const vadjustSlider= document.getElementById('globalLabelVAdjust');
+        const vadjustPx    = document.getElementById('globalLabelVAdjustPx');
+        const applyBtn     = document.getElementById('applyGlobalLabelStyleBtn');
 
         if (colorPicker) {
             colorPicker.addEventListener('input', function() {
@@ -1111,6 +1221,40 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 saveGlobalLabelSettings();
             });
         }
+        if (vadjustSlider) {
+            vadjustSlider.addEventListener('input', function() {
+                if (vadjustPx) vadjustPx.value = this.value;
+                updateGlobalLabelPreview();
+                saveGlobalLabelSettings();
+            });
+        }
+        if (vadjustPx) {
+            vadjustPx.addEventListener('input', function() {
+                const val = parseInt(this.value, 10);
+                if (!isNaN(val)) {
+                    if (vadjustSlider) vadjustSlider.value = val;
+                    updateGlobalLabelPreview();
+                    saveGlobalLabelSettings();
+                }
+            });
+        }
+
+        // Preset buttons click handler
+        document.querySelectorAll('.label-pos-preset-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetVAdjust = parseInt(this.dataset.vadjust, 10) || 0;
+                if (vadjustSlider) vadjustSlider.value = targetVAdjust;
+                if (vadjustPx) vadjustPx.value = targetVAdjust;
+                document.querySelectorAll('.label-pos-preset-btn').forEach(b => {
+                    b.classList.remove('bg-cyan-900/60', 'text-cyan-200', 'border-cyan-600/80', 'font-semibold');
+                    b.classList.add('bg-slate-800', 'text-slate-200', 'border-slate-600/70');
+                });
+                this.classList.remove('bg-slate-800', 'text-slate-200', 'border-slate-600/70');
+                this.classList.add('bg-cyan-900/60', 'text-cyan-200', 'border-cyan-600/80', 'font-semibold');
+                updateGlobalLabelPreview();
+                saveGlobalLabelSettings();
+            });
+        });
 
         // Tab switching handler (includes labelstyle tab)
         document.querySelectorAll('.map-settings-tab-btn').forEach(btn => {
@@ -1139,6 +1283,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 const size       = sizeSlider ? parseInt(sizeSlider.value) : 14;
                 const bold       = boldCheck && boldCheck.checked ? 1 : 0;
                 const italic     = italicCheck && italicCheck.checked ? 1 : 0;
+                const vadjust    = vadjustSlider ? (parseInt(vadjustSlider.value, 10) || 0) : 0;
                 const face       = (bold && italic) ? 'bold italic Arial' : bold ? 'bold Arial' : italic ? 'italic Arial' : 'Arial';
 
                 const allNodes = MapApp.state.nodes.get();
@@ -1161,23 +1306,25 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         await MapApp.api.post('update_device', {
                             id: n.id,
                             updates: {
-                                name_text_color:  color,
-                                name_text_size:   size,
-                                name_text_bold:   bold,
-                                name_text_italic: italic,
+                                name_text_color:   color,
+                                name_text_size:    size,
+                                name_text_bold:    bold,
+                                name_text_italic:  italic,
+                                name_text_vadjust: vadjust
                             }
                         });
                         // Update node's deviceData in memory
                         const updatedDeviceData = {
                             ...n.deviceData,
-                            name_text_color:  color,
-                            name_text_size:   size,
-                            name_text_bold:   bold,
-                            name_text_italic: italic,
+                            name_text_color:   color,
+                            name_text_size:    size,
+                            name_text_bold:    bold,
+                            name_text_italic:  italic,
+                            name_text_vadjust: vadjust
                         };
                         MapApp.state.nodes.update({
                             id:   n.id,
-                            font: { color, size, face, multi: true },
+                            font: { color, size, face, multi: true, vadjust: vadjust },
                             deviceData: updatedDeviceData
                         });
                         savedCount++;
@@ -1193,13 +1340,18 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 applyBtn.innerHTML = '<i class="fas fa-magic mr-2"></i>Apply to All Devices on Map';
 
                 if (failCount === 0) {
-                    if (window.notyf) notyf.success('Label style saved for all ' + savedCount + ' devices!');
+                    if (window.notyf) notyf.success('Label style & gap distance saved for all ' + savedCount + ' devices!');
                 } else {
                     if (window.notyf) notyf.error('Saved ' + savedCount + ' devices, ' + failCount + ' failed.');
                 }
 
                 // Also persist label settings to localStorage as the map defaults
                 saveGlobalLabelSettings();
+
+                // Redraw canvas network
+                if (MapApp.state?.network) {
+                    MapApp.state.network.redraw();
+                }
             });
         }
 

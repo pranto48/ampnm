@@ -1044,7 +1044,8 @@ MapApp.network = {
                                         title: MapApp.utils.buildNodeTitle(updated),
                                         font: {
                                             color: updated.name_text_color || 'white', size: parseInt(updated.name_text_size, 10) || 14, multi: true,
-                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial'
+                                            face: (updated.name_text_bold == 1 && updated.name_text_italic == 1) ? 'bold italic Arial' : updated.name_text_bold == 1 ? 'bold Arial' : updated.name_text_italic == 1 ? 'italic Arial' : 'Arial',
+                                            vadjust: (updated.name_text_vadjust !== null && updated.name_text_vadjust !== undefined) ? parseInt(updated.name_text_vadjust, 10) : 0
                                         },
                                         deviceData: updated
                                     };

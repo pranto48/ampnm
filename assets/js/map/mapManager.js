@@ -399,6 +399,7 @@ MapApp.mapManager = {
             let labelSize = parseInt(d.name_text_size);
             let labelBold = d.name_text_bold == 1;
             let labelItalic = d.name_text_italic == 1;
+            let labelVAdjust = (d.name_text_vadjust !== null && d.name_text_vadjust !== undefined && d.name_text_vadjust !== '') ? parseInt(d.name_text_vadjust) : null;
 
             const mapSettingsRaw = localStorage.getItem(`mapLabelSettings:${mapId}`);
             if (mapSettingsRaw) {
@@ -412,16 +413,22 @@ MapApp.mapManager = {
                     }
                     if (!labelBold) labelBold = mapSettings.bold == 1;
                     if (!labelItalic) labelItalic = mapSettings.italic == 1;
+                    if (labelVAdjust === null || isNaN(labelVAdjust) || labelVAdjust === 0) {
+                        if (mapSettings.vadjust !== undefined && !isNaN(parseInt(mapSettings.vadjust))) {
+                            labelVAdjust = parseInt(mapSettings.vadjust);
+                        }
+                    }
                 } catch(e) {}
             }
             if (!labelColor) labelColor = '#ffffff';
             if (isNaN(labelSize)) labelSize = 14;
+            if (labelVAdjust === null || isNaN(labelVAdjust)) labelVAdjust = 0;
 
             const labelFace = labelBold && labelItalic ? 'bold italic Arial' : labelBold ? 'bold Arial' : labelItalic ? 'italic Arial' : 'Arial';
             const baseNode = {
                 id: d.id, label: label, title: MapApp.utils.buildNodeTitle(d),
                 x: overridePos?.x ?? d.x, y: overridePos?.y ?? d.y,
-                font: { color: labelColor, size: labelSize, multi: true, face: labelFace },
+                font: { color: labelColor, size: labelSize, multi: true, face: labelFace, vadjust: labelVAdjust },
                 deviceData: d
             };
 
@@ -557,13 +564,14 @@ MapApp.mapManager = {
             const cpLabelBold = createdDevice.name_text_bold == 1;
             const cpLabelItalic = createdDevice.name_text_italic == 1;
             const cpLabelFace = cpLabelBold && cpLabelItalic ? 'bold italic Arial' : cpLabelBold ? 'bold Arial' : cpLabelItalic ? 'italic Arial' : 'Arial';
+            const cpLabelVAdjust = (createdDevice.name_text_vadjust !== null && createdDevice.name_text_vadjust !== undefined) ? parseInt(createdDevice.name_text_vadjust) : 0;
             const baseNode = {
                 id: createdDevice.id,
                 label: createdDevice.name,
                 title: MapApp.utils.buildNodeTitle(createdDevice),
                 x: createdDevice.x,
                 y: createdDevice.y,
-                font: { color: cpLabelColor, size: parseInt(createdDevice.name_text_size) || 14, multi: true, face: cpLabelFace },
+                font: { color: cpLabelColor, size: parseInt(createdDevice.name_text_size) || 14, multi: true, face: cpLabelFace, vadjust: cpLabelVAdjust },
                 deviceData: createdDevice
             };
 

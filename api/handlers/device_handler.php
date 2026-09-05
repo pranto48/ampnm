@@ -997,7 +997,7 @@ switch ($action) {
                 exit;
             }
 
-            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config', 'snmp_enabled', 'snmp_version', 'snmp_community', 'snmp_port', 'snmp_v3_user', 'snmp_v3_auth_proto', 'snmp_v3_auth_pass', 'snmp_v3_priv_proto', 'snmp_v3_priv_pass', 'snmp_v3_sec_level'];
+            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'name_text_vadjust', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl', 'port_config', 'snmp_enabled', 'snmp_version', 'snmp_community', 'snmp_port', 'snmp_v3_user', 'snmp_v3_auth_proto', 'snmp_v3_auth_pass', 'snmp_v3_priv_proto', 'snmp_v3_priv_pass', 'snmp_v3_sec_level'];
             if (!$hasSubchoice) {
                 $allowed_fields = array_values(array_diff($allowed_fields, ['subchoice']));
             }

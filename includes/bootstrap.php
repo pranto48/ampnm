@@ -76,7 +76,7 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
             }
         }
 
-        // Auto-migrate devices for label styles
+        // Auto-migrate devices for label styles and position gap
         try {
             $pdo->query("SELECT `name_text_color` FROM `devices` LIMIT 1");
         } catch (PDOException $e) {
@@ -85,6 +85,13 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
                     ADD COLUMN `name_text_color` VARCHAR(20) DEFAULT '#ffffff',
                     ADD COLUMN `name_text_bold` TINYINT(1) DEFAULT 0,
                     ADD COLUMN `name_text_italic` TINYINT(1) DEFAULT 0");
+            } catch (Exception $e2) {}
+        }
+        try {
+            $pdo->query("SELECT `name_text_vadjust` FROM `devices` LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $pdo->exec("ALTER TABLE `devices` ADD COLUMN `name_text_vadjust` INT DEFAULT 0 COMMENT 'Label vertical offset in pixels'");
             } catch (Exception $e2) {}
         }
 

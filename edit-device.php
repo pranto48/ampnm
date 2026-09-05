@@ -91,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name_text_color = trim($_POST['name_text_color'] ?? '#ffffff');
     $name_text_bold = isset($_POST['name_text_bold']) ? 1 : 0;
     $name_text_italic = isset($_POST['name_text_italic']) ? 1 : 0;
+    $name_text_vadjust = isset($_POST['name_text_vadjust']) ? (int)$_POST['name_text_vadjust'] : 0;
     $icon_url = trim($_POST['icon_url'] ?? '');
     $warning_latency_threshold = $_POST['warning_latency_threshold'] ?? null;
     $warning_packetloss_threshold = $_POST['warning_packetloss_threshold'] ?? null;
@@ -158,6 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
                 $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
                 $hasSnmp = dbColumnExists($pdo, 'devices', 'snmp_enabled');
+                $hasVAdjust = dbColumnExists($pdo, 'devices', 'name_text_vadjust');
                 $schemaWarning = '';
 
             if ($hasSubchoice) {
@@ -175,6 +177,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
                     $show_live_ping
                 ];
+                if ($hasVAdjust) {
+                    $fields .= ", name_text_vadjust = ?";
+                    $values[] = $name_text_vadjust;
+                }
                 if ($hasPortConfig) {
                     $fields .= ", port_config = ?";
                     $values[] = empty($port_config) ? null : $port_config;
@@ -415,7 +421,7 @@ $form_data = $device ?? [];
                 </div>
 
                 <!-- Device Label Style -->
-                <fieldset class="border border-cyan-800/50 rounded-lg p-4 bg-slate-900/30">
+                <fieldset class="border border-cyan-800/50 rounded-lg p-4 bg-slate-900/30 space-y-4">
                     <legend class="text-sm font-semibold text-cyan-400 px-2"><i class="fas fa-font mr-1"></i> Device Label Style</legend>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
@@ -439,12 +445,62 @@ $form_data = $device ?? [];
                             </div>
                         </div>
                         <div>
-                            <label class="text-xs font-medium text-slate-400 block mb-2">Live Preview</label>
-                            <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 flex items-center justify-center" style="min-height:60px;">
-                                <span id="label_preview" class="text-sm transition-all" style="color:<?= htmlspecialchars($form_data['name_text_color'] ?? '#ffffff') ?>;font-weight:<?= ($form_data['name_text_bold'] ?? 0) ? 'bold' : 'normal' ?>;font-style:<?= ($form_data['name_text_italic'] ?? 0) ? 'italic' : 'normal' ?>"><?= htmlspecialchars($form_data['name'] ?? 'Device Name') ?></span>
+                            <label class="text-xs font-medium text-slate-400 block mb-2">Live Node Preview</label>
+                            <div class="bg-slate-950/80 border border-slate-700 rounded-lg p-3 flex flex-col items-center justify-center relative overflow-hidden" style="min-height:90px;">
+                                <div id="editPreviewMockNode" class="flex flex-col items-center justify-center transition-all duration-150 relative">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 border border-cyan-500/60 flex items-center justify-center text-cyan-400 text-sm">
+                                        <i class="fas fa-server"></i>
+                                    </div>
+                                    <div id="editPreviewLabelCont" class="transition-all duration-150 text-center" style="margin-top: 4px;">
+                                        <span id="label_preview" class="text-xs transition-all inline-block select-none" style="color:<?= htmlspecialchars($form_data['name_text_color'] ?? '#ffffff') ?>;font-weight:<?= ($form_data['name_text_bold'] ?? 0) ? 'bold' : 'normal' ?>;font-style:<?= ($form_data['name_text_italic'] ?? 0) ? 'italic' : 'normal' ?>"><?= htmlspecialchars($form_data['name'] ?? 'Device Name') ?></span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Label Position & Gap Controls -->
+                    <div class="bg-slate-950/60 border border-slate-700/70 rounded-lg p-3 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+                                <i class="fas fa-arrows-alt-v text-cyan-400"></i>
+                                Label Position & Gap (আইকন থেকে লেবেলের দূরত্ব)
+                            </label>
+                            <span id="name_text_vadjust_val" class="text-xs px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700/60 font-mono font-bold"><?= (int)($form_data['name_text_vadjust'] ?? 0) ?>px</span>
+                        </div>
+
+                        <!-- Quick Presets -->
+                        <div class="flex flex-wrap gap-1.5 text-xs">
+                            <button type="button" class="dev-label-preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 transition-all" data-vadjust="-75">
+                                <i class="fas fa-arrow-up text-amber-400 text-[10px]"></i> Top (-75px)
+                            </button>
+                            <button type="button" class="dev-label-preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 transition-all" data-vadjust="-15">
+                                <i class="fas fa-compress-alt text-emerald-400 text-[10px]"></i> Near (-15px)
+                            </button>
+                            <button type="button" class="dev-label-preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 transition-all" data-vadjust="0">
+                                <i class="fas fa-circle-dot text-cyan-400 text-[10px]"></i> Standard (0px)
+                            </button>
+                            <button type="button" class="dev-label-preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 transition-all" data-vadjust="12">
+                                <i class="fas fa-expand-alt text-blue-400 text-[10px]"></i> Gap (+12px)
+                            </button>
+                            <button type="button" class="dev-label-preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 transition-all" data-vadjust="25">
+                                <i class="fas fa-arrows-alt-v text-indigo-400 text-[10px]"></i> Wide (+25px)
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1">
+                                <input type="range" id="name_text_vadjust" name="name_text_vadjust" min="-80" max="60" step="1" value="<?= (int)($form_data['name_text_vadjust'] ?? 0) ?>" class="w-full accent-cyan-500 cursor-pointer">
+                            </div>
+                            <div class="w-20">
+                                <div class="relative">
+                                    <input type="number" id="name_text_vadjust_px" min="-80" max="60" value="<?= (int)($form_data['name_text_vadjust'] ?? 0) ?>" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white font-mono text-center focus:ring-1 focus:ring-cyan-500">
+                                    <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
                 <!-- SNMP Deep Monitoring & Port Telemetry Card -->
                 <fieldset class="border border-cyan-500/40 bg-slate-900/40 rounded-xl p-5 shadow-lg">
                     <legend class="text-sm font-bold text-cyan-400 px-2.5 flex items-center gap-2">
@@ -777,6 +833,47 @@ $form_data = $device ?? [];
     if (boldCheck) boldCheck.addEventListener('change', updatePreview);
     if (italicCheck) italicCheck.addEventListener('change', updatePreview);
     if (nameInput) nameInput.addEventListener('input', updatePreview);
+
+    // Label Position & Gap Sync
+    const vadjustSlider = document.getElementById('name_text_vadjust');
+    const vadjustPx     = document.getElementById('name_text_vadjust_px');
+    const vadjustVal    = document.getElementById('name_text_vadjust_val');
+    const editPreviewCont = document.getElementById('editPreviewLabelCont');
+    const presetBtns    = document.querySelectorAll('.dev-label-preset-btn');
+
+    function syncVAdjust(val) {
+        const num = parseInt(val, 10) || 0;
+        if (vadjustSlider) vadjustSlider.value = num;
+        if (vadjustPx) vadjustPx.value = num;
+        if (vadjustVal) vadjustVal.textContent = (num > 0 ? '+' : '') + num + 'px';
+        if (editPreviewCont) {
+            if (num < -40) {
+                editPreviewCont.style.marginTop = '-52px';
+            } else {
+                const margin = Math.round(4 + (num * 0.45));
+                editPreviewCont.style.marginTop = margin + 'px';
+            }
+        }
+    }
+
+    if (vadjustSlider) {
+        vadjustSlider.addEventListener('input', function() {
+            syncVAdjust(this.value);
+        });
+    }
+    if (vadjustPx) {
+        vadjustPx.addEventListener('input', function() {
+            syncVAdjust(this.value);
+        });
+    }
+    presetBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const v = this.getAttribute('data-vadjust');
+            syncVAdjust(v);
+        });
+    });
+
+    if (vadjustSlider) syncVAdjust(vadjustSlider.value);
 
     // SNMP Live Controls & Diagnostics
     const snmpEnabled = document.getElementById('snmp_enabled');
