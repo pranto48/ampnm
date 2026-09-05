@@ -217,7 +217,11 @@ MapApp.network = {
             for (const edgeId in bodyEdges) {
                 const bEdge = bodyEdges[edgeId];
                 if (bEdge) {
-                    edgesToRender.push({ id: edgeId, bodyEdge: bEdge, rawEdge: (MapApp.state.edges && typeof MapApp.state.edges.get === 'function') ? MapApp.state.edges.get(edgeId) : null });
+                    let raw = null;
+                    if (MapApp.state.edges && typeof MapApp.state.edges.get === 'function') {
+                        raw = MapApp.state.edges.get(edgeId) || MapApp.state.edges.get(Number(edgeId)) || MapApp.state.edges.get(String(edgeId));
+                    }
+                    edgesToRender.push({ id: edgeId, bodyEdge: bEdge, rawEdge: raw });
                     processedEdgeIds.add(String(edgeId));
                 }
             }
@@ -253,13 +257,14 @@ MapApp.network = {
             const baseGlowRadius = parseInt(displaySettings.connection_glow_radius, 10) || 14;
             const runStyle = displaySettings.connection_run_style || 'auto';
             const animSpeed = displaySettings.connection_animation_speed !== undefined ? (displaySettings.connection_animation_speed / 100) : 1.0;
-            globalSpeedMultiplier = animSpeed;
+            globalSpeedMultiplier = animSpeed > 0 ? animSpeed : 1.0;
 
             // Sync globalProgress with MapApp.state.edgeAnimProgress on every frame
-            if (MapApp.state && typeof MapApp.state.edgeAnimProgress === 'number') {
+            if (MapApp.state && typeof MapApp.state.edgeAnimProgress === 'number' && !isNaN(MapApp.state.edgeAnimProgress)) {
                 globalProgress = MapApp.state.edgeAnimProgress;
             } else if (isAnimEnabled) {
-                globalProgress = (globalProgress + 0.005 * globalSpeedMultiplier) % 1.0;
+                globalProgress = ((globalProgress || 0) + 0.005 * (globalSpeedMultiplier || 1.0)) % 1.0;
+                if (MapApp.state) MapApp.state.edgeAnimProgress = globalProgress;
             }
 
             ctx.save();

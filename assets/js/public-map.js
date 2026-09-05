@@ -444,7 +444,7 @@ function renderMap({ map, devices, edges }) {
 
         // Throttled master animation loop (~25 FPS) with tab visibility pause
         (function startAnimationLoop() {
-            let lastFrameTime = 0;
+            let lastFrameTime = performance.now();
             let animRafId = null;
             const targetFPS = 25;
             const fpsInterval = 1000 / targetFPS;
@@ -459,7 +459,11 @@ function renderMap({ map, devices, edges }) {
                     return;
                 }
 
-                const elapsed = timestamp - (lastFrameTime || timestamp);
+                if (!lastFrameTime) {
+                    lastFrameTime = timestamp;
+                }
+
+                const elapsed = timestamp - lastFrameTime;
                 if (elapsed >= fpsInterval) {
                     lastFrameTime = timestamp - (elapsed % fpsInterval);
 

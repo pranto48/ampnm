@@ -416,7 +416,7 @@ MapApp.ui = {
     },
 
     startCanvasAnimationLoop: () => {
-        let lastFrameTime = 0;
+        let lastFrameTime = performance.now();
         const targetFPS = 30; // 30 FPS for crisp, smooth packet animation
         const fpsInterval = 1000 / targetFPS;
 
@@ -432,7 +432,11 @@ MapApp.ui = {
                 return;
             }
 
-            const elapsed = timestamp - (lastFrameTime || timestamp);
+            if (!lastFrameTime) {
+                lastFrameTime = timestamp;
+            }
+
+            const elapsed = timestamp - lastFrameTime;
             if (elapsed >= fpsInterval) {
                 lastFrameTime = timestamp - (elapsed % fpsInterval);
 
@@ -440,6 +444,11 @@ MapApp.ui = {
                     ? MapApp.utils.getCurrentTooltipDisplaySettings()
                     : { connection_enable_animation: true, connection_animation_speed: 100 };
                 
+                const isAnim = displaySettings.connection_enable_animation !== false && 
+                               displaySettings.connection_enable_animation !== 'false' && 
+                               displaySettings.connection_enable_animation !== 0 && 
+                               displaySettings.connection_enable_animation !== '0';
+
                 const speedPercent = Math.min(200, Math.max(0, Number(displaySettings.connection_animation_speed) ?? 100));
                 
                 const timelineSlider = document.getElementById('timelineSlider');
@@ -448,7 +457,9 @@ MapApp.ui = {
                 const speedMultiplier = (speedPercent / 100) * (isLive ? 1 : 0);
                 const effSpeed = speedMultiplier > 0 ? speedMultiplier : (isLive ? 1.0 : 0);
 
-                MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.005 * effSpeed) % 1.0;
+                if (isAnim) {
+                    MapApp.state.edgeAnimProgress = ((MapApp.state.edgeAnimProgress || 0) + 0.005 * effSpeed) % 1.0;
+                }
 
                 // Redraw canvas if network exists
                 if (MapApp.state.network) {
