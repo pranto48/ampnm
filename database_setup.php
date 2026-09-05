@@ -2028,6 +2028,52 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'encrypted_vault_keys' created or already exists.");
 
+    // 58. Multi-Tenant Organizations Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `organizations` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `name` VARCHAR(150) NOT NULL,
+        `slug` VARCHAR(100) NOT NULL UNIQUE,
+        `tier` ENUM('free', 'pro', 'enterprise') NOT NULL DEFAULT 'free',
+        `max_devices` INT UNSIGNED NOT NULL DEFAULT 50,
+        `max_pollers` INT UNSIGNED NOT NULL DEFAULT 2,
+        `status` ENUM('active', 'suspended', 'trial') NOT NULL DEFAULT 'active',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_status (`status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'organizations' created or already exists.");
+
+    // 59. Organization Membership & RBAC Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `organization_members` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `org_id` VARCHAR(36) NOT NULL,
+        `user_id` INT(6) UNSIGNED NOT NULL,
+        `role` ENUM('owner', 'admin', 'engineer', 'viewer') NOT NULL DEFAULT 'viewer',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_org_user (`org_id`, `user_id`),
+        FOREIGN KEY (`org_id`) REFERENCES `organizations`(`id`) ON DELETE CASCADE,
+        FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+        INDEX idx_user_role (`user_id`, `role`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'organization_members' created or already exists.");
+
+    // 60. Hybrid Cloud Edge Pollers Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `edge_pollers` (
+        `id` VARCHAR(36) PRIMARY KEY,
+        `org_id` VARCHAR(36) NOT NULL,
+        `name` VARCHAR(150) NOT NULL,
+        `auth_token` VARCHAR(255) NOT NULL UNIQUE,
+        `status` ENUM('online', 'offline', 'degraded') NOT NULL DEFAULT 'offline',
+        `ip_address` VARCHAR(64) NULL,
+        `version` VARCHAR(32) NOT NULL DEFAULT 'v1.0.0',
+        `last_heartbeat_at` DATETIME NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (`org_id`) REFERENCES `organizations`(`id`) ON DELETE CASCADE,
+        INDEX idx_org_status (`org_id`, `status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    message("Table 'edge_pollers' created or already exists.");
+
     echo "<p style='color: #94a3b8;'><span class='loader'></span>Redirecting to the application in 3 seconds...</p>";
     echo '<meta http-equiv="refresh" content="3;url=index.php">';
 
