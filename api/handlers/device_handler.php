@@ -942,23 +942,37 @@ switch ($action) {
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Device ID and updates are required']); exit; }
 
-            // Check duplicates if name or ip is updated
+            // Fetch current device to compare unchanged name and ip
+            $stmtCurrent = $pdo->prepare("SELECT name, ip, type FROM devices WHERE id = ?");
+            $stmtCurrent->execute([$id]);
+            $currentDev = $stmtCurrent->fetch(PDO::FETCH_ASSOC);
+
+            // Check duplicates if name is updated and actually changed
             if (array_key_exists('name', $updates)) {
-                $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND id != ? AND user_id IN ($groupIdsStr)");
-                $stmtDupName->execute([$updates['name'], $id]);
-                if ((int)$stmtDupName->fetchColumn() > 0) {
-                    http_response_code(400);
-                    echo json_encode(['error' => 'A device with this name already exists in your group.']);
-                    exit;
+                $newName = trim((string)$updates['name']);
+                $origName = trim((string)($currentDev['name'] ?? ''));
+                $devType = $updates['type'] ?? ($currentDev['type'] ?? '');
+                if ($devType !== 'text' && $devType !== 'box' && strcasecmp($newName, $origName) !== 0) {
+                    $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND id != ? AND user_id IN ($groupIdsStr)");
+                    $stmtDupName->execute([$newName, $id]);
+                    if ((int)$stmtDupName->fetchColumn() > 0) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'A device with this name already exists in your group.']);
+                        exit;
+                    }
                 }
             }
             if (array_key_exists('ip', $updates) && !empty($updates['ip'])) {
-                $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND id != ? AND user_id IN ($groupIdsStr)");
-                $stmtDupIp->execute([$updates['ip'], $id]);
-                if ((int)$stmtDupIp->fetchColumn() > 0) {
-                    http_response_code(400);
-                    echo json_encode(['error' => 'A device with this IP address already exists in your group.']);
-                    exit;
+                $newIp = trim((string)$updates['ip']);
+                $origIp = trim((string)($currentDev['ip'] ?? ''));
+                if (strcasecmp($newIp, $origIp) !== 0) {
+                    $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND id != ? AND user_id IN ($groupIdsStr)");
+                    $stmtDupIp->execute([$newIp, $id]);
+                    if ((int)$stmtDupIp->fetchColumn() > 0) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'A device with this IP address already exists in your group.']);
+                        exit;
+                    }
                 }
             }
 

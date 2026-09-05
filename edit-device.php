@@ -12,8 +12,8 @@ include 'header.php';
 
 $pdo = getDbConnection();
 $current_user_id = $_SESSION['user_id'];
+$device_id = isset($_GET['id']) ? (int)$_GET['id'] : (isset($_POST['id']) ? (int)$_POST['id'] : 0);
 $message = '';
-$device_id = $_GET['id'] ?? null;
 
 function dbColumnExists(PDO $pdo, string $table, string $column): bool {
     try {
@@ -122,16 +122,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $current_group_user_ids = $stmtGroup->fetchAll(PDO::FETCH_COLUMN) ?: [$current_user_id];
             $groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
 
-            // Check duplicate name (excluding current device)
-            $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND id != ? AND user_id IN ($groupIdsStr)");
-            $stmtDupName->execute([$name, $device_id]);
-            $nameExists = (int)$stmtDupName->fetchColumn() > 0;
+            // Check duplicate name only if name was actually changed
+            $nameExists = false;
+            $originalName = trim($device['name'] ?? '');
+            if ($type !== 'text' && $type !== 'box' && strcasecmp($name, $originalName) !== 0) {
+                if ($user_role === 'admin') {
+                    $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND id != ?");
+                    $stmtDupName->execute([$name, $device_id]);
+                } else {
+                    $stmtDupName = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE LOWER(name) = LOWER(?) AND id != ? AND user_id IN ($groupIdsStr)");
+                    $stmtDupName->execute([$name, $device_id]);
+                }
+                $nameExists = (int)$stmtDupName->fetchColumn() > 0;
+            }
 
-            // Check duplicate IP (excluding current device)
+            // Check duplicate IP only if IP was actually changed and not empty
             $ipExists = false;
-            if (!empty($ip)) {
-                $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND id != ? AND user_id IN ($groupIdsStr)");
-                $stmtDupIp->execute([$ip, $device_id]);
+            $originalIp = trim($device['ip'] ?? '');
+            if (!empty($ip) && strcasecmp($ip, $originalIp) !== 0) {
+                if ($user_role === 'admin') {
+                    $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND id != ?");
+                    $stmtDupIp->execute([$ip, $device_id]);
+                } else {
+                    $stmtDupIp = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE ip = ? AND id != ? AND user_id IN ($groupIdsStr)");
+                    $stmtDupIp->execute([$ip, $device_id]);
+                }
                 $ipExists = (int)$stmtDupIp->fetchColumn() > 0;
             }
 
@@ -265,7 +280,8 @@ $form_data = $device ?? [];
         <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6 max-w-4xl mx-auto">
             <?= $message ?>
             <?php if ($device): ?>
-            <form method="POST" class="space-y-4">
+            <form method="POST" action="edit-device.php?id=<?= (int)$device_id ?><?= isset($_GET['return']) ? '&return=' . urlencode($_GET['return']) : '' ?>" class="space-y-4">
+                <input type="hidden" name="id" value="<?= (int)$device_id ?>">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="name" class="block text-sm font-medium text-slate-400 mb-1">Device Name</label>
