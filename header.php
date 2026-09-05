@@ -282,6 +282,8 @@ usort($menu_tree, function($a, $b) {
                                     <a href="device_config_backups.php" class="nav-link nav-sublink"><i class="fas fa-file-code fa-fw mr-2 text-indigo-400"></i>Config Vault</a>
                                     <a href="floor_plan.php" class="nav-link nav-sublink"><i class="fas fa-building fa-fw mr-2"></i>Floor Plan</a>
                                     <a href="network_graphs.php" class="nav-link nav-sublink"><i class="fas fa-chart-line fa-fw mr-2"></i>Network Graphs</a>
+                                    <a href="web_terminal.php" class="nav-link nav-sublink"><i class="fas fa-terminal fa-fw mr-2 text-amber-400"></i>Web Terminal (SSH)</a>
+                                    <a href="edge_poller_manager.php" class="nav-link nav-sublink"><i class="fas fa-tower-broadcast fa-fw mr-2 text-indigo-400"></i>Edge Pollers</a>
                                     <a href="compliance_audit.php" class="nav-link nav-sublink"><i class="fas fa-shield-check fa-fw mr-2 text-emerald-400"></i>Config Compliance</a>
                                 </div>
                             </div>
