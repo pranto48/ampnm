@@ -1051,6 +1051,77 @@ switch ($action) {
         }
         break;
 
+    case 'bulk_update_label_style':
+        if ($user_role !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can update device label styles.']);
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $is_global = !empty($input['is_global']);
+            $map_id = isset($input['map_id']) && $input['map_id'] !== '' ? (int)$input['map_id'] : null;
+            $vadjust = isset($input['vadjust']) ? (int)$input['vadjust'] : 0;
+            $color = !empty($input['color']) ? trim((string)$input['color']) : '#ffffff';
+            $size = isset($input['size']) ? (int)$input['size'] : 14;
+            $bold = !empty($input['bold']) ? 1 : 0;
+            $italic = !empty($input['italic']) ? 1 : 0;
+
+            if ($is_global || $map_id === null) {
+                $stmt = $pdo->prepare("
+                    UPDATE devices 
+                    SET name_text_vadjust = ?, 
+                        name_text_color = ?, 
+                        name_text_size = ?, 
+                        name_text_bold = ?, 
+                        name_text_italic = ?, 
+                        updated_at = CURRENT_TIMESTAMP 
+                    WHERE user_id IN ($groupIdsStr)
+                ");
+                $stmt->execute([$vadjust, $color, $size, $bold, $italic]);
+                $count = $stmt->rowCount();
+                echo json_encode([
+                    'success' => true,
+                    'scope' => 'global',
+                    'updated_count' => $count,
+                    'settings' => [
+                        'vadjust' => $vadjust,
+                        'color' => $color,
+                        'size' => $size,
+                        'bold' => $bold,
+                        'italic' => $italic
+                    ]
+                ]);
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE devices 
+                    SET name_text_vadjust = ?, 
+                        name_text_color = ?, 
+                        name_text_size = ?, 
+                        name_text_bold = ?, 
+                        name_text_italic = ?, 
+                        updated_at = CURRENT_TIMESTAMP 
+                    WHERE map_id = ? AND user_id IN ($groupIdsStr)
+                ");
+                $stmt->execute([$vadjust, $color, $size, $bold, $italic, $map_id]);
+                $count = $stmt->rowCount();
+                echo json_encode([
+                    'success' => true,
+                    'scope' => 'map',
+                    'map_id' => $map_id,
+                    'updated_count' => $count,
+                    'settings' => [
+                        'vadjust' => $vadjust,
+                        'color' => $color,
+                        'size' => $size,
+                        'bold' => $bold,
+                        'italic' => $italic
+                    ]
+                ]);
+            }
+            exit;
+        }
+        break;
+
     case 'update_device_status_by_ip': // NEW ACTION
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ip_address = $input['ip_address'] ?? null;

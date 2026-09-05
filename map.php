@@ -727,7 +727,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-cyan-700 text-white" data-map-settings-tab="device">Mouse Over Device Information</button>
                         <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="connection">Mouse Over Connection Information</button>
                         <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="motion">Connection Running Options</button>
-                        <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="labelstyle"><i class="fas fa-font mr-1"></i>Label Style</button>
+                        <button type="button" class="map-settings-tab-btn px-3 py-1.5 text-xs rounded-lg bg-slate-700 text-slate-200" data-map-settings-tab="labelstyle"><i class="fas fa-font mr-1"></i>Label Style & Gap</button>
                     </div>
                     <div data-map-settings-panel="device" class="space-y-3">
                     <h3 class="text-lg font-semibold text-white">Mouse Over Device Information</h3>
@@ -842,12 +842,34 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         </div>
                     </div>
                     </div>
-                    <!-- Global Label Style Panel -->
+                    <!-- Global Label Style & Position Panel -->
                     <div data-map-settings-panel="labelstyle" class="space-y-4 hidden">
-                        <div class="border-b border-slate-700/80 pb-2">
-                            <h3 class="text-lg font-semibold text-white pt-1">Device Label Style & Position</h3>
-                            <p class="text-xs text-slate-400">Set default label color, size, text style, and position / gap distance for <em>all</em> devices on this map.</p>
+                        <div class="border-b border-slate-700/80 pb-2 flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-white pt-1 flex items-center gap-2">
+                                    <i class="fas fa-arrows-alt-v text-cyan-400"></i> Global Device Label Position & Gap Style
+                                </h3>
+                                <p class="text-xs text-slate-400">ডিভাইস আইকন থেকে লেবেলের দূরত্ব (Near / Gap), পজিশন ও টেক্সট স্টাইল বর্তমান ম্যাপ বা সমগ্র নেটওয়ার্কের সকল ডিভাইসের জন্য গ্লোবালি কনফিগার করুন।</p>
+                            </div>
                         </div>
+
+                        <!-- Global Network Default Toggle Card -->
+                        <div class="p-3 bg-gradient-to-r from-cyan-950/70 via-slate-900 to-slate-900 border border-cyan-800/50 rounded-xl flex items-center justify-between shadow-md">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-cyan-900/60 border border-cyan-600/60 flex items-center justify-center text-cyan-300">
+                                    <i class="fas fa-globe text-sm"></i>
+                                </div>
+                                <div>
+                                    <span class="text-xs font-bold text-white block">Global System Default (সকল ম্যাপের গ্লোবাল ডিফল্ট)</span>
+                                    <span class="text-[11px] text-slate-400 block">অন্যান্য সব ম্যাপ এবং ভবিষ্যতে নতুন তৈরি করা ডিভাইসে এই লেবেল পজিশন ও গ্যাপ ডিফল্ট হিসেবে প্রযোজ্য হবে।</span>
+                                </div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer ml-3 flex-shrink-0">
+                                <input type="checkbox" id="globalLabelSaveAsSystemDefault" class="sr-only peer" checked>
+                                <div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                            </label>
+                        </div>
+
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label for="globalLabelColor" class="block text-xs font-medium text-slate-400 mb-1">Default Label Color</label>
@@ -944,11 +966,22 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                                 </div>
                             </div>
                         </div>
-                        <div class="pt-2 border-t border-slate-700">
-                            <button type="button" id="applyGlobalLabelStyleBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-semibold">
-                                <i class="fas fa-magic mr-2"></i>Apply to All Devices on Map
-                            </button>
-                            <p class="text-xs text-slate-500 mt-1">This will refresh all nodes on the current map with the chosen label style and gap distance.</p>
+
+                        <!-- Apply Actions: Current Map vs Global System-Wide -->
+                        <div class="pt-3 border-t border-slate-700 space-y-2">
+                            <div class="flex flex-col sm:flex-row gap-2.5">
+                                <button type="button" id="applyMapLabelStyleBtn" class="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow">
+                                    <i class="fas fa-map text-cyan-400"></i> Apply to Current Map
+                                </button>
+                                <button type="button" id="applyGlobalAllDevicesBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-600/30 transition">
+                                    <i class="fas fa-globe"></i> Apply Globally (All Devices & Maps)
+                                </button>
+                                <button type="button" id="applyGlobalLabelStyleBtn" class="hidden"></button>
+                            </div>
+                            <p class="text-[11px] text-slate-500 leading-relaxed">
+                                <strong class="text-slate-300">Apply to Current Map:</strong> শুধু বর্তমান ম্যাপের ডিভাইসগুলোতে নির্বাচিত দূরত্ব ও স্টাইল সেট করবে।<br>
+                                <strong class="text-cyan-400">Apply Globally:</strong> ডাটাবেজের সকল ম্যাপ ও নেটওয়ার্ক ডিভাইসে এক ক্লিকে গ্লোবাল দূরত্ব ও স্টাইল প্রয়োগ করবে এবং ডিফল্ট সেটিং হিসেবে স্থায়ী করবে।
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -1124,15 +1157,14 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         }
     }
 
-    // Persist to localStorage whenever settings are changed in the panel
+    // Persist to localStorage (both current map and global network settings)
     function saveGlobalLabelSettings() {
-        const mapId = MapApp.state?.currentMapId;
-        if (!mapId) return;
         const colorHex     = document.getElementById('globalLabelColorHex');
         const sizeSlider   = document.getElementById('globalLabelSize');
         const boldCheck    = document.getElementById('globalLabelBold');
         const italicCheck  = document.getElementById('globalLabelItalic');
         const vadjustSlider= document.getElementById('globalLabelVAdjust');
+        const isGlobalDefault = document.getElementById('globalLabelSaveAsSystemDefault')?.checked !== false;
 
         const settings = {
             color: colorHex ? colorHex.value : '#ffffff',
@@ -1141,17 +1173,37 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             italic: italicCheck && italicCheck.checked ? 1 : 0,
             vadjust: vadjustSlider ? parseInt(vadjustSlider.value, 10) || 0 : 0
         };
-        localStorage.setItem(`mapLabelSettings:${mapId}`, JSON.stringify(settings));
+
+        const mapId = MapApp.state?.currentMapId;
+        if (mapId) {
+            localStorage.setItem(`mapLabelSettings:${mapId}`, JSON.stringify(settings));
+        }
+        if (isGlobalDefault) {
+            localStorage.setItem('globalDeviceLabelSettings', JSON.stringify(settings));
+        }
     }
 
     window.loadGlobalLabelSettings = function() {
         const mapId = MapApp.state?.currentMapId;
-        if (!mapId) return;
-        
         try {
-            const raw = localStorage.getItem(`mapLabelSettings:${mapId}`);
-            if (raw) {
-                const settings = JSON.parse(raw);
+            const mapRaw = mapId ? localStorage.getItem(`mapLabelSettings:${mapId}`) : null;
+            const globalRaw = localStorage.getItem('globalDeviceLabelSettings');
+            let settings = null;
+            if (mapRaw) {
+                try { settings = JSON.parse(mapRaw); } catch(e) {}
+            }
+            if (!settings && globalRaw) {
+                try { settings = JSON.parse(globalRaw); } catch(e) {}
+            } else if (settings && globalRaw) {
+                try {
+                    const g = JSON.parse(globalRaw);
+                    if ((settings.vadjust === undefined || settings.vadjust === null) && g.vadjust !== undefined) {
+                        settings.vadjust = g.vadjust;
+                    }
+                } catch(e) {}
+            }
+
+            if (settings) {
                 const colorPicker  = document.getElementById('globalLabelColor');
                 const colorHex     = document.getElementById('globalLabelColorHex');
                 const sizeSlider   = document.getElementById('globalLabelSize');
@@ -1172,6 +1224,10 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                 
                 updateGlobalLabelPreview();
             }
+            const globalToggle = document.getElementById('globalLabelSaveAsSystemDefault');
+            if (globalToggle) {
+                globalToggle.checked = true;
+            }
         } catch(e) {
             console.error('Failed to load global label settings', e);
         }
@@ -1185,7 +1241,14 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
         const italicCheck  = document.getElementById('globalLabelItalic');
         const vadjustSlider= document.getElementById('globalLabelVAdjust');
         const vadjustPx    = document.getElementById('globalLabelVAdjustPx');
-        const applyBtn     = document.getElementById('applyGlobalLabelStyleBtn');
+        const applyMapBtn  = document.getElementById('applyMapLabelStyleBtn');
+        const applyGlobalBtn = document.getElementById('applyGlobalAllDevicesBtn');
+        const applyLegacyBtn = document.getElementById('applyGlobalLabelStyleBtn');
+        const globalToggle = document.getElementById('globalLabelSaveAsSystemDefault');
+
+        if (globalToggle) {
+            globalToggle.addEventListener('change', saveGlobalLabelSettings);
+        }
 
         if (colorPicker) {
             colorPicker.addEventListener('input', function() {
@@ -1272,87 +1335,96 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
             });
         });
 
-        // Apply global label style to all map nodes AND save to database
-        if (applyBtn) {
-            applyBtn.addEventListener('click', async function() {
-                if (!window.MapApp || !MapApp.state || !MapApp.state.nodes) {
-                    if (window.notyf) notyf.error('Map is not loaded yet.');
-                    return;
-                }
-                const color      = colorHex ? colorHex.value : '#ffffff';
-                const size       = sizeSlider ? parseInt(sizeSlider.value) : 14;
-                const bold       = boldCheck && boldCheck.checked ? 1 : 0;
-                const italic     = italicCheck && italicCheck.checked ? 1 : 0;
-                const vadjust    = vadjustSlider ? (parseInt(vadjustSlider.value, 10) || 0) : 0;
-                const face       = (bold && italic) ? 'bold italic Arial' : bold ? 'bold Arial' : italic ? 'italic Arial' : 'Arial';
+        // Unified apply function supporting both current map and global system-wide update
+        async function executeApplyLabelStyle(isGlobal) {
+            if (!window.MapApp || !MapApp.state || !MapApp.state.nodes) {
+                if (window.notyf) notyf.error('Map is not loaded yet.');
+                return;
+            }
+            const color      = colorHex ? colorHex.value : '#ffffff';
+            const size       = sizeSlider ? parseInt(sizeSlider.value) : 14;
+            const bold       = boldCheck && boldCheck.checked ? 1 : 0;
+            const italic     = italicCheck && italicCheck.checked ? 1 : 0;
+            const vadjust    = vadjustSlider ? (parseInt(vadjustSlider.value, 10) || 0) : 0;
+            const face       = (bold && italic) ? 'bold italic Arial' : bold ? 'bold Arial' : italic ? 'italic Arial' : 'Arial';
 
-                const allNodes = MapApp.state.nodes.get();
-                const realDevices = allNodes.filter(n => n.deviceData && n.deviceData.type !== 'box');
+            const activeBtn = isGlobal ? applyGlobalBtn : applyMapBtn;
+            const originalHtml = activeBtn ? activeBtn.innerHTML : '';
+            if (activeBtn) {
+                activeBtn.disabled = true;
+                activeBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Applying...';
+            }
 
-                if (realDevices.length === 0) {
-                    if (window.notyf) notyf.error('No devices on this map.');
-                    return;
-                }
-
-                applyBtn.disabled = true;
-                applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
-
-                let savedCount = 0;
-                let failCount  = 0;
-
-                // Save each device via API and update canvas
-                const promises = realDevices.map(async (n) => {
-                    try {
-                        await MapApp.api.post('update_device', {
-                            id: n.id,
-                            updates: {
-                                name_text_color:   color,
-                                name_text_size:    size,
-                                name_text_bold:    bold,
-                                name_text_italic:  italic,
-                                name_text_vadjust: vadjust
-                            }
-                        });
-                        // Update node's deviceData in memory
-                        const updatedDeviceData = {
-                            ...n.deviceData,
-                            name_text_color:   color,
-                            name_text_size:    size,
-                            name_text_bold:    bold,
-                            name_text_italic:  italic,
-                            name_text_vadjust: vadjust
-                        };
-                        MapApp.state.nodes.update({
-                            id:   n.id,
-                            font: { color, size, face, multi: true, vadjust: vadjust },
-                            deviceData: updatedDeviceData
-                        });
-                        savedCount++;
-                    } catch(e) {
-                        console.warn('Failed to save label style for device', n.id, e);
-                        failCount++;
-                    }
+            try {
+                // Call atomic bulk_update_label_style backend API
+                const res = await MapApp.api.post('bulk_update_label_style', {
+                    map_id: isGlobal ? null : (MapApp.state?.currentMapId || null),
+                    is_global: isGlobal,
+                    vadjust: vadjust,
+                    color: color,
+                    size: size,
+                    bold: bold,
+                    italic: italic
                 });
 
-                await Promise.all(promises);
+                // Update active canvas nodes in memory
+                const allNodes = MapApp.state.nodes.get();
+                const realDevices = allNodes.filter(n => n.deviceData && n.deviceData.type !== 'box');
+                realDevices.forEach(n => {
+                    const updatedDeviceData = {
+                        ...n.deviceData,
+                        name_text_color:   color,
+                        name_text_size:    size,
+                        name_text_bold:    bold,
+                        name_text_italic:  italic,
+                        name_text_vadjust: vadjust
+                    };
+                    MapApp.state.nodes.update({
+                        id:   n.id,
+                        font: { color, size, face, multi: true, vadjust: vadjust },
+                        deviceData: updatedDeviceData
+                    });
+                });
 
-                applyBtn.disabled = false;
-                applyBtn.innerHTML = '<i class="fas fa-magic mr-2"></i>Apply to All Devices on Map';
-
-                if (failCount === 0) {
-                    if (window.notyf) notyf.success('Label style & gap distance saved for all ' + savedCount + ' devices!');
-                } else {
-                    if (window.notyf) notyf.error('Saved ' + savedCount + ' devices, ' + failCount + ' failed.');
-                }
-
-                // Also persist label settings to localStorage as the map defaults
-                saveGlobalLabelSettings();
-
-                // Redraw canvas network
+                // Redraw network canvas
                 if (MapApp.state?.network) {
                     MapApp.state.network.redraw();
                 }
-            });
+
+                // Persist settings
+                saveGlobalLabelSettings();
+                if (isGlobal) {
+                    const settings = { color, size, bold, italic, vadjust };
+                    localStorage.setItem('globalDeviceLabelSettings', JSON.stringify(settings));
+                }
+
+                const count = res?.updated_count ?? realDevices.length;
+                if (window.notyf) {
+                    if (isGlobal) {
+                        notyf.success(`Global Label Position & Gap saved for ALL ${count} devices across all maps!`);
+                    } else {
+                        notyf.success(`Label Position & Gap saved for all ${count} devices on this map!`);
+                    }
+                }
+            } catch(e) {
+                console.error('Failed to apply label style', e);
+                if (window.notyf) notyf.error('Failed to save label style: ' + (e.message || 'Server error'));
+            } finally {
+                if (activeBtn) {
+                    activeBtn.disabled = false;
+                    activeBtn.innerHTML = originalHtml;
+                }
+            }
+        }
+
+        if (applyMapBtn) {
+            applyMapBtn.addEventListener('click', () => executeApplyLabelStyle(false));
+        }
+        if (applyGlobalBtn) {
+            applyGlobalBtn.addEventListener('click', () => executeApplyLabelStyle(true));
+        }
+        if (applyLegacyBtn) {
+            applyLegacyBtn.addEventListener('click', () => executeApplyLabelStyle(false));
         }
 
         // Hook into MapApp.mapManager.switchMap to load global label styles when map changes

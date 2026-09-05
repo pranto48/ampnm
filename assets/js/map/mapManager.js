@@ -401,24 +401,38 @@ MapApp.mapManager = {
             let labelItalic = d.name_text_italic == 1;
             let labelVAdjust = (d.name_text_vadjust !== null && d.name_text_vadjust !== undefined && d.name_text_vadjust !== '') ? parseInt(d.name_text_vadjust) : null;
 
+            // Fallback: Check map-specific settings, then fall back to system-wide globalDeviceLabelSettings
+            let effSettings = null;
             const mapSettingsRaw = localStorage.getItem(`mapLabelSettings:${mapId}`);
+            const globalSettingsRaw = localStorage.getItem('globalDeviceLabelSettings');
             if (mapSettingsRaw) {
+                try { effSettings = JSON.parse(mapSettingsRaw); } catch(e) {}
+            }
+            if (!effSettings && globalSettingsRaw) {
+                try { effSettings = JSON.parse(globalSettingsRaw); } catch(e) {}
+            } else if (effSettings && globalSettingsRaw) {
                 try {
-                    const mapSettings = JSON.parse(mapSettingsRaw);
-                    if (!labelColor || labelColor === '#ffffff') {
-                        labelColor = mapSettings.color || '#ffffff';
-                    }
-                    if (isNaN(labelSize) || labelSize === 14) {
-                        labelSize = parseInt(mapSettings.size) || 14;
-                    }
-                    if (!labelBold) labelBold = mapSettings.bold == 1;
-                    if (!labelItalic) labelItalic = mapSettings.italic == 1;
-                    if (labelVAdjust === null || isNaN(labelVAdjust) || labelVAdjust === 0) {
-                        if (mapSettings.vadjust !== undefined && !isNaN(parseInt(mapSettings.vadjust))) {
-                            labelVAdjust = parseInt(mapSettings.vadjust);
-                        }
+                    const g = JSON.parse(globalSettingsRaw);
+                    if ((effSettings.vadjust === undefined || effSettings.vadjust === null) && g.vadjust !== undefined) {
+                        effSettings.vadjust = g.vadjust;
                     }
                 } catch(e) {}
+            }
+
+            if (effSettings) {
+                if (!labelColor || labelColor === '#ffffff') {
+                    labelColor = effSettings.color || '#ffffff';
+                }
+                if (isNaN(labelSize) || labelSize === 14) {
+                    labelSize = parseInt(effSettings.size) || 14;
+                }
+                if (!labelBold) labelBold = effSettings.bold == 1;
+                if (!labelItalic) labelItalic = effSettings.italic == 1;
+                if (labelVAdjust === null || isNaN(labelVAdjust) || labelVAdjust === 0) {
+                    if (effSettings.vadjust !== undefined && !isNaN(parseInt(effSettings.vadjust))) {
+                        labelVAdjust = parseInt(effSettings.vadjust);
+                    }
+                }
             }
             if (!labelColor) labelColor = '#ffffff';
             if (isNaN(labelSize)) labelSize = 14;
@@ -564,7 +578,13 @@ MapApp.mapManager = {
             const cpLabelBold = createdDevice.name_text_bold == 1;
             const cpLabelItalic = createdDevice.name_text_italic == 1;
             const cpLabelFace = cpLabelBold && cpLabelItalic ? 'bold italic Arial' : cpLabelBold ? 'bold Arial' : cpLabelItalic ? 'italic Arial' : 'Arial';
-            const cpLabelVAdjust = (createdDevice.name_text_vadjust !== null && createdDevice.name_text_vadjust !== undefined) ? parseInt(createdDevice.name_text_vadjust) : 0;
+            let cpLabelVAdjust = (createdDevice.name_text_vadjust !== null && createdDevice.name_text_vadjust !== undefined) ? parseInt(createdDevice.name_text_vadjust) : 0;
+            if (cpLabelVAdjust === 0) {
+                try {
+                    const g = JSON.parse(localStorage.getItem('globalDeviceLabelSettings') || '{}');
+                    if (g.vadjust !== undefined) cpLabelVAdjust = parseInt(g.vadjust, 10) || 0;
+                } catch(e) {}
+            }
             const baseNode = {
                 id: createdDevice.id,
                 label: createdDevice.name,
