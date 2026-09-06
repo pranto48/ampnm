@@ -26,15 +26,108 @@ function stopEdgeAnimation() {
 }
 
 MapApp.network = {
+    isRestoringView: false,
+    _saveViewTimeout: null,
     getUserStorageId: () => (window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest'),
     getViewStorageKey: () => `ampnm_map_view:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
+    getFixedZoomStorageKey: () => `ampnm_map_zoom_fixed:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
     getNodePosStorageKey: () => `ampnm_map_node_positions:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
 
-    saveCurrentView: () => {
+    isZoomFixed: () => {
+        if (!MapApp.state?.currentMapId) return false;
+        try {
+            const raw = localStorage.getItem(MapApp.network.getFixedZoomStorageKey());
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            return !!(parsed && parsed.fixed);
+        } catch (e) {
+            return false;
+        }
+    },
+
+    getFixedZoomData: () => {
+        if (!MapApp.state?.currentMapId) return null;
+        try {
+            const raw = localStorage.getItem(MapApp.network.getFixedZoomStorageKey());
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return (parsed && parsed.fixed && typeof parsed.scale === 'number' && parsed.position) ? parsed : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    updateFixZoomUI: (forcedFixed) => {
+        const btn = document.getElementById('fixZoomBtn');
+        if (!btn) return;
+        const icon = document.getElementById('fixZoomIcon') || btn.querySelector('i');
+        const text = document.getElementById('fixZoomText');
+        const isFixed = typeof forcedFixed === 'boolean' ? forcedFixed : MapApp.network.isZoomFixed();
+
+        if (isFixed) {
+            btn.classList.remove('bg-slate-700', 'text-slate-300', 'hover:bg-slate-600', 'border-slate-600/50');
+            btn.classList.add('bg-cyan-600', 'text-white', 'hover:bg-cyan-500', 'border-cyan-400', 'shadow-md');
+            if (icon) {
+                icon.className = 'fas fa-thumbtack text-white';
+            }
+            if (text) text.textContent = 'Zoom Fixed';
+            btn.title = 'Zoom is Fixed for this Map (click to unlock/unpin)';
+        } else {
+            btn.classList.remove('bg-cyan-600', 'text-white', 'hover:bg-cyan-500', 'border-cyan-400', 'shadow-md');
+            btn.classList.add('bg-slate-700', 'text-slate-300', 'hover:bg-slate-600', 'border-slate-600/50');
+            if (icon) {
+                icon.className = 'fas fa-thumbtack text-slate-300';
+            }
+            if (text) text.textContent = 'Fix Zoom';
+            btn.title = 'Fix / Lock Current Zoom Level (জুম লেভেল ফিক্স করুন)';
+        }
+    },
+
+    toggleFixZoom: () => {
         if (!MapApp.state.network || !MapApp.state.currentMapId) return;
-        const scale = MapApp.state.network.getScale();
-        const position = MapApp.state.network.getViewPosition();
-        localStorage.setItem(MapApp.network.getViewStorageKey(), JSON.stringify({ scale, position }));
+        const fixedKey = MapApp.network.getFixedZoomStorageKey();
+        const currentlyFixed = MapApp.network.isZoomFixed();
+
+        if (currentlyFixed) {
+            localStorage.removeItem(fixedKey);
+            MapApp.network.updateFixZoomUI(false);
+            if (window.notyf) {
+                window.notyf.info('Zoom unpinned. Map zoom will now track your latest view.');
+            }
+        } else {
+            const scale = MapApp.state.network.getScale();
+            const position = MapApp.state.network.getViewPosition();
+            const payload = { fixed: true, scale, position, timestamp: Date.now() };
+            localStorage.setItem(fixedKey, JSON.stringify(payload));
+            localStorage.setItem(MapApp.network.getViewStorageKey(), JSON.stringify({ scale, position }));
+            MapApp.network.updateFixZoomUI(true);
+            if (window.notyf) {
+                window.notyf.success('Current zoom level fixed for this map!');
+            }
+        }
+    },
+
+    saveCurrentView: () => {
+        if (MapApp.network.isRestoringView) return;
+        if (!MapApp.state.network || !MapApp.state.currentMapId) return;
+
+        // If zoom is fixed by user, do not overwrite the fixed zoom
+        if (MapApp.network.isZoomFixed()) return;
+
+        clearTimeout(MapApp.network._saveViewTimeout);
+        MapApp.network._saveViewTimeout = setTimeout(() => {
+            if (MapApp.network.isRestoringView || !MapApp.state.network || !MapApp.state.currentMapId) return;
+            if (MapApp.network.isZoomFixed()) return;
+            try {
+                const scale = MapApp.state.network.getScale();
+                const position = MapApp.state.network.getViewPosition();
+                if (typeof scale === 'number' && !isNaN(scale) && position && !isNaN(position.x) && !isNaN(position.y)) {
+                    localStorage.setItem(MapApp.network.getViewStorageKey(), JSON.stringify({ scale, position }));
+                }
+            } catch (error) {
+                // Ignore storage error
+            }
+        }, 150);
     },
 
     saveNodePositionForUser: (nodeId, position) => {
@@ -51,18 +144,42 @@ MapApp.network = {
 
     restoreSavedView: () => {
         if (!MapApp.state.network || !MapApp.state.currentMapId) return;
+
+        MapApp.network.updateFixZoomUI();
+
+        let saved = null;
+        const fixedData = MapApp.network.getFixedZoomData();
+        if (fixedData && fixedData.scale && fixedData.position) {
+            saved = fixedData;
+        } else {
+            try {
+                const raw = localStorage.getItem(MapApp.network.getViewStorageKey());
+                if (raw) saved = JSON.parse(raw);
+                if (!saved?.position || !saved?.scale) {
+                    const fallbackRaw = localStorage.getItem(`ampnm_map_view:${MapApp.state.currentMapId}`) ||
+                                        localStorage.getItem(`ampnm_map_view:guest:${MapApp.state.currentMapId}`);
+                    if (fallbackRaw) saved = JSON.parse(fallbackRaw);
+                }
+            } catch (error) {
+                saved = null;
+            }
+        }
+
+        if (!saved?.position || typeof saved?.scale !== 'number') return;
+
+        MapApp.network.isRestoringView = true;
         try {
-            const raw = localStorage.getItem(MapApp.network.getViewStorageKey());
-            if (!raw) return;
-            const saved = JSON.parse(raw);
-            if (!saved?.position || !saved?.scale) return;
             MapApp.state.network.moveTo({
                 position: saved.position,
                 scale: saved.scale,
                 animation: false
             });
         } catch (error) {
-            // Ignore malformed preference data
+            // Ignore moveTo errors
+        } finally {
+            setTimeout(() => {
+                MapApp.network.isRestoringView = false;
+            }, 300);
         }
     },
 
@@ -133,6 +250,13 @@ MapApp.network = {
         };
         MapApp.state.network = new vis.Network(container, data, options);
         MapApp.network.restoreSavedView();
+
+        // Restore view after initial layout and stabilization
+        MapApp.state.network.once("afterDrawing", () => {
+            MapApp.network.restoreSavedView();
+        });
+        setTimeout(() => MapApp.network.restoreSavedView(), 150);
+        setTimeout(() => MapApp.network.restoreSavedView(), 350);
 
         // Auto-start unified animation loop when network is initialized
         if (MapApp.ui && typeof MapApp.ui.startCanvasAnimationLoop === 'function') {
@@ -698,7 +822,6 @@ MapApp.network = {
         });
 
         MapApp.state.network.on("dragging", (params) => {
-            MapApp.network.saveCurrentView();
             if (!boxResizeState || !params.nodes || !params.nodes.includes(boxResizeState.id)) return;
             const node = MapApp.state.nodes.get(boxResizeState.id);
             if (!node?.deviceData) return;

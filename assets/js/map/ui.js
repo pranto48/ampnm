@@ -43,6 +43,8 @@ MapApp.ui = {
             refreshStatusBtn: document.getElementById('refreshStatusBtn'),
             liveRefreshToggle: document.getElementById('liveRefreshToggle'),
             addEdgeBtn: document.getElementById('addEdgeBtn'),
+            fixZoomBtn: document.getElementById('fixZoomBtn'),
+            resetZoomBtn: document.getElementById('resetZoomBtn'),
             fullscreenBtn: document.getElementById('fullscreenBtn'),
             exportBtn: document.getElementById('exportBtn'),
             importBtn: document.getElementById('importBtn'),

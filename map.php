@@ -124,6 +124,8 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                             <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
                             <input type="file" id="importFile" class="hidden" accept=".json">
                             <button id="mapSettingsBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Map Settings" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-cog"></i></button>
+                            <button id="fixZoomBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 border border-slate-600/50 flex items-center gap-1.5 transition-all shadow-sm" title="Fix / Lock Current Zoom Level (ব্যবহারকারীর জন্য বর্তমান জুম লেভেল ফিক্স করুন)"><i id="fixZoomIcon" class="fas fa-thumbtack text-slate-300"></i><span id="fixZoomText" class="hidden md:inline text-xs font-semibold">Fix Zoom</span></button>
+                            <button id="resetZoomBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 border border-slate-600/50 flex items-center gap-1.5 transition-all shadow-sm" title="Fit to Screen (পর্দায় ফিট করুন)"><i class="fas fa-compress-arrows-alt text-slate-300"></i><span class="hidden md:inline text-xs font-semibold">Fit</span></button>
                             <button id="fullscreenBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Toggle Fullscreen"><i class="fas fa-expand"></i></button>
                         </div>
                     </div>

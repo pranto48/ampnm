@@ -646,6 +646,34 @@ function initMap() {
         });
     }
 
+    if (els.fixZoomBtn) {
+        els.fixZoomBtn.addEventListener('click', () => {
+            if (MapApp.network && typeof MapApp.network.toggleFixZoom === 'function') {
+                MapApp.network.toggleFixZoom();
+            }
+        });
+    }
+
+    if (els.resetZoomBtn) {
+        els.resetZoomBtn.addEventListener('click', () => {
+            if (!MapApp.state.network) return;
+            if (MapApp.network && typeof MapApp.network.isZoomFixed === 'function' && MapApp.network.isZoomFixed()) {
+                MapApp.network.toggleFixZoom();
+            }
+            MapApp.state.network.fit({
+                animation: { duration: 400, easingFunction: 'easeInOutQuad' }
+            });
+            setTimeout(() => {
+                if (MapApp.network && typeof MapApp.network.saveCurrentView === 'function') {
+                    MapApp.network.saveCurrentView();
+                }
+            }, 450);
+            if (window.notyf) {
+                window.notyf.info('Map view reset to fit screen.');
+            }
+        });
+    }
+
     // Only admin can create/rename/delete maps
     if (window.userRole === 'admin') {
         if (els.newMapBtn) els.newMapBtn.addEventListener('click', mapManager.createMap);

@@ -261,6 +261,7 @@ try {
         'get_devices', 'create_device', 'update_device', 'delete_device', 'bulk_delete_devices',
         'copy_device', 'get_device_details', 'check_device', 'check_all_devices_globally',
         'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip',
+        'bulk_update_label_style',
         // SNMP Actions
         'test_snmp', 'poll_snmp', 'get_snmp_interfaces', 'get_snmp_history',
         // Agent Remote Command Actions
