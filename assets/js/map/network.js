@@ -418,6 +418,16 @@ MapApp.network = {
                         imgEl.style.width = size + 'px';
                         imgEl.style.height = size + 'px';
                         imgEl.style.display = 'block';
+
+                        const devStatus = (node.deviceData && node.deviceData.status) ? String(node.deviceData.status).toLowerCase() : 'online';
+                        const isDevDisrupted = (devStatus === 'offline' || devStatus === 'critical');
+                        if (isDevDisrupted) {
+                            imgEl.style.filter = devStatus === 'offline' 
+                                ? 'grayscale(100%) opacity(0.4) drop-shadow(0 0 6px rgba(239,68,68,0.7))' 
+                                : 'sepia(80%) saturate(200%) hue-rotate(330deg) opacity(0.6) drop-shadow(0 0 6px rgba(245,158,11,0.7))';
+                        } else {
+                            imgEl.style.filter = 'none';
+                        }
                     } else {
                         imgEl.style.display = 'none';
                     }
@@ -466,7 +476,9 @@ MapApp.network = {
             if (MapApp.state.nodes && typeof MapApp.state.nodes.forEach === 'function') {
                 MapApp.state.nodes.forEach(node => {
                     if (node && node.id) {
-                        deviceStatuses[String(node.id)] = node.deviceData ? node.deviceData.status : 'online';
+                        deviceStatuses[String(node.id)] = (node.deviceData && node.deviceData.status) 
+                            ? String(node.deviceData.status).toLowerCase() 
+                            : 'online';
                     }
                 });
             }
@@ -563,9 +575,11 @@ MapApp.network = {
                     continue;
                 }
 
-                const sourceStatus = deviceStatuses[String(fromId)] || 'online';
-                const targetStatus = deviceStatuses[String(toId)] || 'online';
+                const sourceStatus = (deviceStatuses[String(fromId)] || 'online').toLowerCase();
+                const targetStatus = (deviceStatuses[String(toId)] || 'online').toLowerCase();
                 const isOffline = (sourceStatus === 'offline' || targetStatus === 'offline');
+                const isCritical = (sourceStatus === 'critical' || targetStatus === 'critical');
+                const isDisrupted = (isOffline || isCritical);
 
                 // Check if animation is disabled for this specific edge
                 const isEdgeAnimated = rawEdge && rawEdge.custom_animated !== undefined 
@@ -575,7 +589,9 @@ MapApp.network = {
                 // Edge Color resolution
                 let edgeColor = (typeof bodyEdge?.options?.color === 'string' ? bodyEdge.options.color : bodyEdge?.options?.color?.color) || rawEdge?.custom_color || rawEdge?.color || '#00F2FE';
                 if (isOffline) {
-                    edgeColor = '#ef4444'; // Slower / diagnostic red alert pulse on offline links
+                    edgeColor = '#ef4444'; // Red alert pulse on offline links
+                } else if (isCritical) {
+                    edgeColor = '#f59e0b'; // Amber alert pulse on critical links
                 } else if (displaySettings.connection_enable_bandwidth_glow !== false) {
                     const util = rawEdge && rawEdge.utilization_percent !== undefined ? parseFloat(rawEdge.utilization_percent) : 0;
                     if (util >= 80) {
@@ -590,7 +606,11 @@ MapApp.network = {
                 // 🌟 LAYER 1: NEON LASER LINE GLOW OVERLAY
                 if (glowMode !== 'off') {
                     let glowBlur = baseGlowRadius;
-                    if (glowMode === 'cyber-pulse') {
+                    if (isOffline) {
+                        glowBlur = baseGlowRadius * (0.8 + 0.4 * Math.sin(Date.now() / 150));
+                    } else if (isCritical) {
+                        glowBlur = baseGlowRadius * (0.7 + 0.3 * Math.sin(Date.now() / 300));
+                    } else if (glowMode === 'cyber-pulse') {
                         glowBlur = baseGlowRadius * (0.6 + 0.4 * Math.sin(globalProgress * Math.PI * 2));
                     } else if (glowMode === 'high-bloom') {
                         glowBlur = baseGlowRadius * 1.5;
@@ -608,16 +628,58 @@ MapApp.network = {
                     ctx.stroke();
                 }
 
-                // 🌟 LAYER 2: ANIMATED CYBER PACKETS / PULSES
+                // 🌟 LAYER 2: ANIMATED CYBER PACKETS / PULSES (OR HUNG / STOPPED STATE)
                 if (!isAnimEnabled || !isEdgeAnimated) continue;
 
-                const effectiveStyle = runStyle === 'auto' ? 'data-flow' : runStyle;
+                if (isDisrupted) {
+                    // Packet flow is HUNG or STOPPED because a connected device is Offline or Critical
+                    if (isCritical && !isOffline) {
+                        // CRITICAL: Flow is HUNG (packets suspended in place with amber alert jitter)
+                        const shiver = Math.sin(Date.now() / 90) * 0.005;
+                        const hungSpots = [0.25, 0.5, 0.75];
+                        for (let i = 0; i < hungSpots.length; i++) {
+                            const t = Math.max(0.05, Math.min(0.95, hungSpots[i] + shiver));
+                            const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
+                            if (!pt) continue;
 
-                if (effectiveStyle === 'data-flow') {
-                    // Draw flowing quantum cyber packets with trailing comet particles (authentic network data-flow)
-                    const packetCount = 3;
-                    for (let i = 0; i < packetCount; i++) {
-                        const t = (globalProgress + i / packetCount) % 1.0;
+                            ctx.beginPath();
+                            ctx.arc(pt.x, pt.y, 4.5, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#f59e0b';
+                            ctx.shadowColor = '#f59e0b';
+                            ctx.shadowBlur = 12;
+                            ctx.fill();
+
+                            ctx.beginPath();
+                            ctx.arc(pt.x, pt.y, 2.0, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fill();
+                        }
+                    } else if (isOffline) {
+                        // OFFLINE: Flow is STOPPED (faint stationary markers, no forward flow)
+                        const stoppedSpots = [0.35, 0.65];
+                        for (let i = 0; i < stoppedSpots.length; i++) {
+                            const pt = getPointAlongEdge(bodyEdge, stoppedSpots[i], fx, fy, tx, ty);
+                            if (!pt) continue;
+
+                            ctx.beginPath();
+                            ctx.arc(pt.x, pt.y, 3.5, 0, 2 * Math.PI);
+                            ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
+                            ctx.shadowColor = '#ef4444';
+                            ctx.shadowBlur = 8;
+                            ctx.fill();
+                        }
+                    }
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = 'transparent';
+                } else {
+                    // OKAY / ONLINE: Normal fluid animation flow running smoothly!
+                    const effectiveStyle = runStyle === 'auto' ? 'data-flow' : runStyle;
+
+                    if (effectiveStyle === 'data-flow') {
+                        // Draw flowing quantum cyber packets with trailing comet particles (authentic network data-flow)
+                        const packetCount = 3;
+                        for (let i = 0; i < packetCount; i++) {
+                            const t = (globalProgress + i / packetCount) % 1.0;
                         const pt = getPointAlongEdge(bodyEdge, t, fx, fy, tx, ty);
                         if (!pt) continue;
 
@@ -763,45 +825,114 @@ MapApp.network = {
                         }
                     }
                 }
+                }
 
                 ctx.shadowBlur = 0;
                 ctx.shadowColor = 'transparent';
 
-                // 🌟 LAYER 3: LIVE SNMP BANDWIDTH FLOW BADGE ON EDGE
+                // 🌟 LAYER 3: STOP / HUNG ANIMATION ICON BADGE OR LIVE SNMP BANDWIDTH FLOW BADGE
                 const midX = (fx + tx) / 2;
                 const midY = (fy + ty) / 2;
-                const bwSpeed = rawEdge?.bandwidth_speed_mbps || rawEdge?.bandwidth_speed;
-                const speedText = bwSpeed ? (parseFloat(bwSpeed) >= 1000 ? (parseFloat(bwSpeed)/1000).toFixed(1) + ' Gbps' : parseFloat(bwSpeed).toFixed(1) + ' Mbps') : null;
 
-                if (speedText) {
+                if (isDisrupted) {
+                    // RENDER DEDICATED STOP / HUNG ANIMATION ICON ON CONNECTION FLOW
                     ctx.save();
-                    ctx.font = 'bold 9px "Inter", monospace';
-                    const textMetrics = ctx.measureText(speedText);
-                    const badgeW = textMetrics.width + 12;
-                    const badgeH = 16;
+                    const isOff = isOffline;
+                    const badgeColor = isOff ? '#ef4444' : '#f59e0b';
+                    const badgeBg = 'rgba(11, 18, 33, 0.94)';
+                    const pulseGlow = isOff ? (10 + 6 * Math.sin(Date.now() / 180)) : (8 + 4 * Math.sin(Date.now() / 250));
 
-                    // Futuristic pill badge
+                    const badgeText = isOff ? 'STOPPED' : 'FLOW HUNG';
+                    ctx.font = 'bold 9.5px "Inter", monospace';
+                    const textMetrics = ctx.measureText(badgeText);
+                    const badgeW = textMetrics.width + 30;
+                    const badgeH = 20;
+
+                    // Outer Glow & Pill Container
                     ctx.beginPath();
                     if (ctx.roundRect) {
-                        ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 8);
+                        ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 10);
                     } else {
                         ctx.rect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH);
                     }
-                    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-                    ctx.strokeStyle = edgeColor;
-                    ctx.lineWidth = 1;
-                    ctx.shadowColor = edgeColor;
-                    ctx.shadowBlur = 8;
+                    ctx.fillStyle = badgeBg;
+                    ctx.strokeStyle = badgeColor;
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowColor = badgeColor;
+                    ctx.shadowBlur = pulseGlow;
                     ctx.fill();
                     ctx.stroke();
 
-                    // Text
-                    ctx.fillStyle = '#38bdf8';
+                    // Icon Circle on left side of badge
+                    const iconCenterX = midX - badgeW / 2 + 10;
+                    const iconCenterY = midY;
+
+                    if (isOff) {
+                        // Red Stop Symbol (circle with inner stop square)
+                        ctx.fillStyle = '#ef4444';
+                        ctx.beginPath();
+                        ctx.arc(iconCenterX, iconCenterY, 5, 0, 2 * Math.PI);
+                        ctx.fill();
+
+                        // Inner white square
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(iconCenterX - 2, iconCenterY - 2, 4, 4);
+                    } else {
+                        // Amber Pause/Hang Symbol (circle with inner pause bars ❚❚)
+                        ctx.fillStyle = '#f59e0b';
+                        ctx.beginPath();
+                        ctx.arc(iconCenterX, iconCenterY, 5, 0, 2 * Math.PI);
+                        ctx.fill();
+
+                        // Inner pause bars
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(iconCenterX - 2.5, iconCenterY - 2.5, 1.8, 5);
+                        ctx.fillRect(iconCenterX + 0.7, iconCenterY - 2.5, 1.8, 5);
+                    }
+
+                    // Text Label
+                    ctx.fillStyle = isOff ? '#fca5a5' : '#fde68a';
                     ctx.shadowBlur = 0;
-                    ctx.textAlign = 'center';
+                    ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(speedText, midX, midY);
+                    ctx.fillText(badgeText, midX - badgeW / 2 + 19, midY);
+
                     ctx.restore();
+                } else {
+                    // Normal healthy connection: Live SNMP Bandwidth flow badge (if available)
+                    const bwSpeed = rawEdge?.bandwidth_speed_mbps || rawEdge?.bandwidth_speed;
+                    const speedText = bwSpeed ? (parseFloat(bwSpeed) >= 1000 ? (parseFloat(bwSpeed)/1000).toFixed(1) + ' Gbps' : parseFloat(bwSpeed).toFixed(1) + ' Mbps') : null;
+
+                    if (speedText) {
+                        ctx.save();
+                        ctx.font = 'bold 9px "Inter", monospace';
+                        const textMetrics = ctx.measureText(speedText);
+                        const badgeW = textMetrics.width + 12;
+                        const badgeH = 16;
+
+                        // Futuristic pill badge
+                        ctx.beginPath();
+                        if (ctx.roundRect) {
+                            ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 8);
+                        } else {
+                            ctx.rect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH);
+                        }
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                        ctx.strokeStyle = edgeColor;
+                        ctx.lineWidth = 1;
+                        ctx.shadowColor = edgeColor;
+                        ctx.shadowBlur = 8;
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // Text
+                        ctx.fillStyle = '#38bdf8';
+                        ctx.shadowBlur = 0;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(speedText, midX, midY);
+                        ctx.restore();
+                    }
                 }
             }
 

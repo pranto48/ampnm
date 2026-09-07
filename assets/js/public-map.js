@@ -534,6 +534,16 @@ function renderMap({ map, devices, edges }) {
                     imgEl.style.width = size + 'px';
                     imgEl.style.height = size + 'px';
                     imgEl.style.display = 'block';
+
+                    const devStatus = (node.status || node.deviceData?.status || 'online').toLowerCase();
+                    const isDevDisrupted = (devStatus === 'offline' || devStatus === 'critical');
+                    if (isDevDisrupted) {
+                        imgEl.style.filter = devStatus === 'offline' 
+                            ? 'grayscale(100%) opacity(0.4) drop-shadow(0 0 6px rgba(239,68,68,0.7))' 
+                            : 'sepia(80%) saturate(200%) hue-rotate(330deg) opacity(0.6) drop-shadow(0 0 6px rgba(245,158,11,0.7))';
+                    } else {
+                        imgEl.style.filter = 'none';
+                    }
                 } else {
                     imgEl.style.display = 'none';
                 }
@@ -547,12 +557,21 @@ function renderMap({ map, devices, edges }) {
                 }
             });
 
-            // Draw Edge Neon Laser Glow & Flowing Animated Cyber Packets
+            // Draw Edge Neon Laser Glow & Flowing Animated Cyber Packets (With Stop/Hang Logic)
             const ctx = visNetwork.canvas.getContext();
             if (ctx && visEdgesDataset) {
                 ctx.save();
                 const edges = visEdgesDataset.get();
                 const progress = ((Date.now() % 3000) / 3000);
+
+                const nodeStatusMap = {};
+                if (visNodesDataset) {
+                    visNodesDataset.get().forEach(n => {
+                        if (n && n.id) {
+                            nodeStatusMap[String(n.id)] = (n.status || n.deviceData?.status || 'online').toLowerCase();
+                        }
+                    });
+                }
 
                 edges.forEach(edge => {
                     const fromId = String(edge.from);
@@ -567,7 +586,19 @@ function renderMap({ map, devices, edges }) {
                     const fy = fromPos.y;
                     const tx = toPos.x;
                     const ty = toPos.y;
-                    const edgeColor = edge.custom_color || (typeof edge.color === 'string' ? edge.color : edge.color?.color) || '#00F2FE';
+
+                    const sourceStatus = nodeStatusMap[fromId] || 'online';
+                    const targetStatus = nodeStatusMap[toId] || 'online';
+                    const isOffline = (sourceStatus === 'offline' || targetStatus === 'offline');
+                    const isCritical = (sourceStatus === 'critical' || targetStatus === 'critical');
+                    const isDisrupted = (isOffline || isCritical);
+
+                    let edgeColor = edge.custom_color || (typeof edge.color === 'string' ? edge.color : edge.color?.color) || '#00F2FE';
+                    if (isOffline) {
+                        edgeColor = '#ef4444';
+                    } else if (isCritical) {
+                        edgeColor = '#f59e0b';
+                    }
 
                     // Layer 1: Neon Glow
                     ctx.beginPath();
@@ -575,28 +606,131 @@ function renderMap({ map, devices, edges }) {
                     ctx.lineTo(tx, ty);
                     ctx.strokeStyle = edgeColor;
                     ctx.shadowColor = edgeColor;
-                    ctx.shadowBlur = 10;
+                    ctx.shadowBlur = isDisrupted ? (isOffline ? 14 : 10) : 10;
                     ctx.lineWidth = Math.max(1, (edge.width || 2) * 0.8);
                     ctx.stroke();
 
-                    // Layer 2: Moving Cyber Packets
-                    for (let i = 0; i < 4; i++) {
-                        const t = (progress + i / 4) % 1.0;
-                        const px = fx + (tx - fx) * t;
-                        const py = fy + (ty - fy) * t;
+                    // Layer 2: Moving Cyber Packets OR Hung/Stopped State
+                    if (isDisrupted) {
+                        if (isCritical && !isOffline) {
+                            // HUNG: stationary packets with amber alert shimmer
+                            const shiver = Math.sin(Date.now() / 90) * 0.005;
+                            const hungSpots = [0.25, 0.5, 0.75];
+                            for (let i = 0; i < hungSpots.length; i++) {
+                                const t = Math.max(0.05, Math.min(0.95, hungSpots[i] + shiver));
+                                const px = fx + (tx - fx) * t;
+                                const py = fy + (ty - fy) * t;
 
-                        ctx.beginPath();
-                        ctx.arc(px, py, 4, 0, 2 * Math.PI);
-                        ctx.fillStyle = edgeColor;
-                        ctx.shadowColor = edgeColor;
-                        ctx.shadowBlur = 12;
-                        ctx.fill();
+                                ctx.beginPath();
+                                ctx.arc(px, py, 4.5, 0, 2 * Math.PI);
+                                ctx.fillStyle = '#f59e0b';
+                                ctx.shadowColor = '#f59e0b';
+                                ctx.shadowBlur = 12;
+                                ctx.fill();
 
-                        ctx.beginPath();
-                        ctx.arc(px, py, 1.8, 0, 2 * Math.PI);
-                        ctx.fillStyle = '#FFFFFF';
-                        ctx.fill();
+                                ctx.beginPath();
+                                ctx.arc(px, py, 2.0, 0, 2 * Math.PI);
+                                ctx.fillStyle = '#FFFFFF';
+                                ctx.fill();
+                            }
+                        } else if (isOffline) {
+                            // STOPPED: static faint dots, no forward animation
+                            const stoppedSpots = [0.35, 0.65];
+                            for (let i = 0; i < stoppedSpots.length; i++) {
+                                const px = fx + (tx - fx) * stoppedSpots[i];
+                                const py = fy + (ty - fy) * stoppedSpots[i];
+
+                                ctx.beginPath();
+                                ctx.arc(px, py, 3.5, 0, 2 * Math.PI);
+                                ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
+                                ctx.shadowColor = '#ef4444';
+                                ctx.shadowBlur = 8;
+                                ctx.fill();
+                            }
+                        }
+                    } else {
+                        // HEALTHY / OKAY: Running animation flow!
+                        for (let i = 0; i < 4; i++) {
+                            const t = (progress + i / 4) % 1.0;
+                            const px = fx + (tx - fx) * t;
+                            const py = fy + (ty - fy) * t;
+
+                            ctx.beginPath();
+                            ctx.arc(px, py, 4, 0, 2 * Math.PI);
+                            ctx.fillStyle = edgeColor;
+                            ctx.shadowColor = edgeColor;
+                            ctx.shadowBlur = 12;
+                            ctx.fill();
+
+                            ctx.beginPath();
+                            ctx.arc(px, py, 1.8, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fill();
+                        }
                     }
+
+                    // Layer 3: STOP / HUNG Animation Icon Badge on Link
+                    if (isDisrupted) {
+                        const midX = (fx + tx) / 2;
+                        const midY = (fy + ty) / 2;
+                        const isOff = isOffline;
+                        const badgeColor = isOff ? '#ef4444' : '#f59e0b';
+                        const badgeBg = 'rgba(11, 18, 33, 0.94)';
+                        const pulseGlow = isOff ? (10 + 6 * Math.sin(Date.now() / 180)) : (8 + 4 * Math.sin(Date.now() / 250));
+                        const badgeText = isOff ? 'STOPPED' : 'FLOW HUNG';
+
+                        ctx.save();
+                        ctx.font = 'bold 9.5px "Inter", monospace';
+                        const textMetrics = ctx.measureText(badgeText);
+                        const badgeW = textMetrics.width + 30;
+                        const badgeH = 20;
+
+                        ctx.beginPath();
+                        if (ctx.roundRect) {
+                            ctx.roundRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH, 10);
+                        } else {
+                            ctx.rect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH);
+                        }
+                        ctx.fillStyle = badgeBg;
+                        ctx.strokeStyle = badgeColor;
+                        ctx.lineWidth = 1.5;
+                        ctx.shadowColor = badgeColor;
+                        ctx.shadowBlur = pulseGlow;
+                        ctx.fill();
+                        ctx.stroke();
+
+                        const iconCenterX = midX - badgeW / 2 + 10;
+                        const iconCenterY = midY;
+
+                        if (isOff) {
+                            ctx.fillStyle = '#ef4444';
+                            ctx.beginPath();
+                            ctx.arc(iconCenterX, iconCenterY, 5, 0, 2 * Math.PI);
+                            ctx.fill();
+
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(iconCenterX - 2, iconCenterY - 2, 4, 4);
+                        } else {
+                            ctx.fillStyle = '#f59e0b';
+                            ctx.beginPath();
+                            ctx.arc(iconCenterX, iconCenterY, 5, 0, 2 * Math.PI);
+                            ctx.fill();
+
+                            ctx.fillStyle = '#0f172a';
+                            ctx.fillRect(iconCenterX - 2.5, iconCenterY - 2.5, 1.8, 5);
+                            ctx.fillRect(iconCenterX + 0.7, iconCenterY - 2.5, 1.8, 5);
+                        }
+
+                        ctx.fillStyle = isOff ? '#fca5a5' : '#fde68a';
+                        ctx.shadowBlur = 0;
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(badgeText, midX - badgeW / 2 + 19, midY);
+                        ctx.restore();
+                    }
+
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = 'transparent';
                 });
 
                 // =========================================================================
