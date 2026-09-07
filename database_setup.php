@@ -282,6 +282,8 @@ try {
             `y` DECIMAL(10, 4) NULL,
             `map_id` INT(6) UNSIGNED,
             `ping_interval` INT(11) NULL,
+            `critical_offline_seconds` INT(11) NOT NULL DEFAULT 20,
+            `offline_timeout_seconds` INT(11) NOT NULL DEFAULT 30,
             `icon_size` INT(11) DEFAULT 50,
             `name_text_size` INT(11) DEFAULT 14,
             `name_text_color` VARCHAR(20) DEFAULT '#ffffff',
@@ -1231,9 +1233,13 @@ try {
         $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `max_emails_per_hour` INT(6) UNSIGNED DEFAULT 240 AFTER `connection_timeout_seconds`;");
         message("Upgraded 'smtp_settings' table: added 'max_emails_per_hour' column.");
     }
-    if (!columnExists($pdo, $dbname, 'smtp_settings', 'allow_invalid_certs')) {
-        $pdo->exec("ALTER TABLE `smtp_settings` ADD COLUMN `allow_invalid_certs` TINYINT(1) DEFAULT 0 AFTER `max_emails_per_hour`;");
-        message("Upgraded 'smtp_settings' table: added 'allow_invalid_certs' column.");
+    if (!columnExists($pdo, $dbname, 'devices', 'critical_offline_seconds')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `critical_offline_seconds` INT(11) NOT NULL DEFAULT 20 AFTER `ping_interval`;");
+        message("Upgraded 'devices' table: added 'critical_offline_seconds' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'offline_timeout_seconds')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `offline_timeout_seconds` INT(11) NOT NULL DEFAULT 30 AFTER `critical_offline_seconds`;");
+        message("Upgraded 'devices' table: added 'offline_timeout_seconds' column.");
     }
 
     // ==========================================

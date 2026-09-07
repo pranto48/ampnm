@@ -147,6 +147,8 @@ function initDevices() {
                     <div>
                         <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Status Thresholds</h3>
                         <div class="grid grid-cols-1 gap-x-4 gap-y-1 text-sm">
+                            <div class="text-amber-300">Critical Timeout: <span class="text-white font-semibold">${device.critical_offline_seconds || 20}s</span></div>
+                            <div class="text-red-400">Offline Timeout: <span class="text-white font-semibold">${device.offline_timeout_seconds || 30}s</span></div>
                             <div class="text-yellow-400">${renderThreshold('Warning Latency', device.warning_latency_threshold, 'ms')}</div>
                             <div class="text-yellow-400">${renderThreshold('Warning Packet Loss', device.warning_packetloss_threshold, '%')}</div>
                             <div class="text-red-400">${renderThreshold('Critical Latency', device.critical_latency_threshold, 'ms')}</div>

@@ -315,49 +315,56 @@ function sendWhatsappNotification($pdo, $device, $oldStatus, $newStatus, $detail
 
 function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details, &$first_failed_at = null) {
     $packetLoss = isset($parsedResult['packet_loss']) ? (int)$parsedResult['packet_loss'] : 100;
+    $critTimeout = !empty($device['critical_offline_seconds']) ? (int)$device['critical_offline_seconds'] : 20;
+    $offTimeout = !empty($device['offline_timeout_seconds']) ? (int)$device['offline_timeout_seconds'] : 30;
 
     // Failure / 100% loss / unreachable check
     if (!$pingResult['success'] || $packetLoss >= 100) {
         $now = time();
-        if (empty($device['first_failed_at'])) {
+        if (empty($first_failed_at)) {
             $first_failed_at = date('Y-m-d H:i:s');
-            // First failure detected: represents 20s failure duration for 20s interval
-            $failDuration = !empty($device['ping_interval']) ? (int)$device['ping_interval'] : 20;
+            $failDuration = 0;
         } else {
-            $first_failed_at = $device['first_failed_at'];
-            $failDuration = $now - strtotime($device['first_failed_at']);
-            if ($failDuration < 20) {
-                $failDuration = 20;
-            }
+            $failDuration = max(0, $now - strtotime($first_failed_at));
         }
 
-        if ($failDuration < 30) {
-            $status = 'critical';
-            $details = "Critical: 100% packet loss for {$failDuration}s.";
-        } else {
+        if ($failDuration >= $offTimeout) {
             $status = 'offline';
-            $details = "Offline: 100% packet loss for {$failDuration}s.";
+            $details = "Offline: 100% packet loss / unreachable for {$failDuration}s (>= {$offTimeout}s).";
+        } elseif ($failDuration >= $critTimeout) {
+            $status = 'critical';
+            $details = "Critical: 100% packet loss / unreachable for {$failDuration}s (>= {$critTimeout}s).";
+        } else {
+            // Transient loss under critical timeout (< 20s): Do not show Critical!
+            $prevStatus = !empty($device['status']) ? $device['status'] : 'online';
+            $status = ($prevStatus === 'offline' || $prevStatus === 'critical') ? $prevStatus : 'online';
+            $details = "Connection dropped for {$failDuration}s (Critical at {$critTimeout}s, Offline at {$offTimeout}s).";
         }
         return $status;
     }
 
-    // Ping succeeded: reset first_failed_at
+    // Ping succeeded: reset first_failed_at immediately
     $first_failed_at = null;
     $status = 'online';
     $details = "Online with {$parsedResult['avg_time']}ms latency.";
 
-    if ($device['critical_latency_threshold'] && $parsedResult['avg_time'] > $device['critical_latency_threshold']) {
+    $critLatency = !empty($device['critical_latency_threshold']) ? (float)$device['critical_latency_threshold'] : 450;
+    $critLoss = !empty($device['critical_packetloss_threshold']) ? (float)$device['critical_packetloss_threshold'] : 80;
+    $warnLatency = !empty($device['warning_latency_threshold']) ? (float)$device['warning_latency_threshold'] : 200;
+    $warnLoss = !empty($device['warning_packetloss_threshold']) ? (float)$device['warning_packetloss_threshold'] : 25;
+
+    if ($parsedResult['avg_time'] > $critLatency) {
         $status = 'critical';
-        $details = "Critical latency: {$parsedResult['avg_time']}ms (>{$device['critical_latency_threshold']}ms).";
-    } elseif ($device['critical_packetloss_threshold'] && $parsedResult['packet_loss'] > $device['critical_packetloss_threshold']) {
+        $details = "Critical latency: {$parsedResult['avg_time']}ms (>{$critLatency}ms).";
+    } elseif ($parsedResult['packet_loss'] > $critLoss) {
         $status = 'critical';
-        $details = "Critical packet loss: {$parsedResult['packet_loss']}% (>{$device['critical_packetloss_threshold']}%).";
-    } elseif ($device['warning_latency_threshold'] && $parsedResult['avg_time'] > $device['warning_latency_threshold']) {
+        $details = "Critical packet loss: {$parsedResult['packet_loss']}% (>{$critLoss}%).";
+    } elseif ($parsedResult['avg_time'] > $warnLatency) {
         $status = 'warning';
-        $details = "Warning latency: {$parsedResult['avg_time']}ms (>{$device['warning_latency_threshold']}ms).";
-    } elseif ($device['warning_packetloss_threshold'] && $parsedResult['packet_loss'] > $device['warning_packetloss_threshold']) {
+        $details = "Warning latency: {$parsedResult['avg_time']}ms (>{$warnLatency}ms).";
+    } elseif ($parsedResult['packet_loss'] > $warnLoss) {
         $status = 'warning';
-        $details = "Warning packet loss: {$parsedResult['packet_loss']}% (>{$device['warning_packetloss_threshold']}%).";
+        $details = "Warning packet loss: {$parsedResult['packet_loss']}% (>{$warnLoss}%).";
     }
     return $status;
 }
@@ -613,7 +620,7 @@ function evaluateDeviceCheck($pdo, $device, &$details, &$last_avg_time, &$last_t
         $details = 'Port monitoring selected but no port is configured; falling back to ping.';
     }
 
-    $pingResult = executePing($device['ip'], 1);
+    $pingResult = executePing($device['ip'], 2);
     savePingResult($pdo, $device['ip'], $pingResult);
     $parsedResult = parsePingOutput($pingResult['output']);
     $first_failed_at = $device['first_failed_at'] ?? null;
@@ -953,19 +960,47 @@ switch ($action) {
                 }
             }
 
-            $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $pdo->prepare($sql);
+            $hasTimeoutCols = false;
+            try {
+                $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+                if ($dbName) {
+                    $stmtCol = $pdo->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+                    $stmtCol->execute([$dbName, 'devices', 'critical_offline_seconds']);
+                    $hasTimeoutCols = ((int)$stmtCol->fetchColumn()) > 0;
+                }
+            } catch (Throwable $e) {
+                $hasTimeoutCols = false;
+            }
+
             $portConfigValue = isset($input['port_config']) ? (is_string($input['port_config']) ? $input['port_config'] : json_encode($input['port_config'])) : null;
-            $stmt->execute([
-                $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['subchoice'] ?? 0, $input['description'] ?? null, $input['map_id'] ?? null,
-                $input['x'] ?? null, $input['y'] ?? null,
-                $input['ping_interval'] ?? 20, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
-                $input['router_api_username'] ?? null, $input['router_api_password'] ?? null, $input['router_api_port'] ?? null,
-                $input['warning_latency_threshold'] ?? 200, $input['warning_packetloss_threshold'] ?? 25,
-                $input['critical_latency_threshold'] ?? 450, $input['critical_packetloss_threshold'] ?? 80,
-                ($input['show_live_ping'] ?? false) ? 1 : 0,
-                $portConfigValue
-            ]);
+            if ($hasTimeoutCols) {
+                $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, critical_offline_seconds, offline_timeout_seconds, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['subchoice'] ?? 0, $input['description'] ?? null, $input['map_id'] ?? null,
+                    $input['x'] ?? null, $input['y'] ?? null,
+                    $input['ping_interval'] ?? 20, $input['critical_offline_seconds'] ?? 20, $input['offline_timeout_seconds'] ?? 30,
+                    $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
+                    $input['router_api_username'] ?? null, $input['router_api_password'] ?? null, $input['router_api_port'] ?? null,
+                    $input['warning_latency_threshold'] ?? 200, $input['warning_packetloss_threshold'] ?? 25,
+                    $input['critical_latency_threshold'] ?? 450, $input['critical_packetloss_threshold'] ?? 80,
+                    ($input['show_live_ping'] ?? false) ? 1 : 0,
+                    $portConfigValue
+                ]);
+            } else {
+                $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['subchoice'] ?? 0, $input['description'] ?? null, $input['map_id'] ?? null,
+                    $input['x'] ?? null, $input['y'] ?? null,
+                    $input['ping_interval'] ?? 20, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
+                    $input['router_api_username'] ?? null, $input['router_api_password'] ?? null, $input['router_api_port'] ?? null,
+                    $input['warning_latency_threshold'] ?? 200, $input['warning_packetloss_threshold'] ?? 25,
+                    $input['critical_latency_threshold'] ?? 450, $input['critical_packetloss_threshold'] ?? 80,
+                    ($input['show_live_ping'] ?? false) ? 1 : 0,
+                    $portConfigValue
+                ]);
+            }
             $lastId = $pdo->lastInsertId();
             log_audit($pdo, 'create_device', 'device', $lastId, "Created device '{$input['name']}' (type: {$input['type']})");
             $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id IN ($groupIdsStr)");
@@ -1037,7 +1072,7 @@ switch ($action) {
                 exit;
             }
 
-            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'name_text_vadjust', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'first_failed_at', 'last_avg_time', 'last_ttl', 'port_config', 'snmp_enabled', 'snmp_version', 'snmp_community', 'snmp_port', 'snmp_v3_user', 'snmp_v3_auth_proto', 'snmp_v3_auth_pass', 'snmp_v3_priv_proto', 'snmp_v3_priv_pass', 'snmp_v3_sec_level'];
+            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'critical_offline_seconds', 'offline_timeout_seconds', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'name_text_vadjust', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'first_failed_at', 'last_avg_time', 'last_ttl', 'port_config', 'snmp_enabled', 'snmp_version', 'snmp_community', 'snmp_port', 'snmp_v3_user', 'snmp_v3_auth_proto', 'snmp_v3_auth_pass', 'snmp_v3_priv_proto', 'snmp_v3_priv_pass', 'snmp_v3_sec_level'];
             if (!$hasSubchoice) {
                 $allowed_fields = array_values(array_diff($allowed_fields, ['subchoice']));
             }

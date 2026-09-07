@@ -41,6 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description'] ?? '');
     $map_id = $_POST['map_id'] ?? null;
     $ping_interval = !empty($_POST['ping_interval']) ? (int)$_POST['ping_interval'] : 20;
+    $critical_offline_seconds = !empty($_POST['critical_offline_seconds']) ? (int)$_POST['critical_offline_seconds'] : 20;
+    $offline_timeout_seconds = !empty($_POST['offline_timeout_seconds']) ? (int)$_POST['offline_timeout_seconds'] : 30;
     $icon_size = $_POST['icon_size'] ?? 50;
     $name_text_size = $_POST['name_text_size'] ?? 14;
     $icon_url = trim($_POST['icon_url'] ?? '');
@@ -89,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
                 $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
+                $hasTimeoutCols = dbColumnExists($pdo, 'devices', 'critical_offline_seconds');
                 if ($hasSubchoice) {
                     $cols = "user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping";
                     $placeholders = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
@@ -96,14 +99,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $current_user_id, $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
                         $monitor_method, $type, is_numeric($subchoice) ? (int)$subchoice : 0,
                         empty($description) ? null : $description, empty($map_id) ? null : $map_id,
-                        100, 100, empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                        100, 100, empty($ping_interval) ? 20 : $ping_interval, $icon_size, $name_text_size,
                         empty($icon_url) ? null : $icon_url,
-                        empty($warning_latency_threshold) ? null : $warning_latency_threshold,
-                        empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                        empty($critical_latency_threshold) ? null : $critical_latency_threshold,
-                        empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                        empty($warning_latency_threshold) ? 200 : $warning_latency_threshold,
+                        empty($warning_packetloss_threshold) ? 25 : $warning_packetloss_threshold,
+                        empty($critical_latency_threshold) ? 450 : $critical_latency_threshold,
+                        empty($critical_packetloss_threshold) ? 80 : $critical_packetloss_threshold,
                         $show_live_ping
                     ];
+                    if ($hasTimeoutCols) {
+                        $cols .= ", critical_offline_seconds, offline_timeout_seconds";
+                        $placeholders .= ", ?, ?";
+                        $values[] = $critical_offline_seconds;
+                        $values[] = $offline_timeout_seconds;
+                    }
                     if ($hasPortConfig) {
                         $cols .= ", port_config";
                         $placeholders .= ", ?";
@@ -118,12 +127,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute([
                         $current_user_id, $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port,
                         $monitor_method, $type, empty($description) ? null : $description, empty($map_id) ? null : $map_id,
-                        100, 100, empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size,
+                        100, 100, empty($ping_interval) ? 20 : $ping_interval, $icon_size, $name_text_size,
                         empty($icon_url) ? null : $icon_url,
-                        empty($warning_latency_threshold) ? null : $warning_latency_threshold,
-                        empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
-                        empty($critical_latency_threshold) ? null : $critical_latency_threshold,
-                        empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
+                        empty($warning_latency_threshold) ? 200 : $warning_latency_threshold,
+                        empty($warning_packetloss_threshold) ? 25 : $warning_packetloss_threshold,
+                        empty($critical_latency_threshold) ? 450 : $critical_latency_threshold,
+                        empty($critical_packetloss_threshold) ? 80 : $critical_packetloss_threshold,
                         $show_live_ping
                     ]);
                 }
@@ -260,10 +269,6 @@ include 'header.php';
                     </div>
                 </div>
 
-                <div>
-                    <label for="ping_interval" class="block text-sm font-medium text-slate-400 mb-1">Ping Interval (seconds)</label>
-                    <input type="number" id="ping_interval" name="ping_interval" placeholder="e.g., 20" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" value="<?= htmlspecialchars($_POST['ping_interval'] ?? '20') ?>">
-                </div>
 
                 <fieldset class="border border-slate-600 rounded-lg p-4">
                     <legend class="text-sm font-medium text-slate-400 px-2">Custom Icon (Optional)</legend>
@@ -286,24 +291,74 @@ include 'header.php';
                     </div>
                 </div>
 
-                <fieldset class="border border-slate-600 rounded-lg p-4">
-                    <legend class="text-sm font-medium text-slate-400 px-2">Status Thresholds (Optional)</legend>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="warning_latency_threshold" class="block text-xs text-slate-400 mb-1">Warn Latency (ms)</label>
-                            <input type="number" id="warning_latency_threshold" name="warning_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm" value="<?= htmlspecialchars($_POST['warning_latency_threshold'] ?? '200') ?>">
+                <!-- Status Thresholds & Ping Availability -->
+                <fieldset class="border border-cyan-800/60 rounded-xl p-5 bg-slate-900/40 space-y-4 shadow-lg">
+                    <legend class="text-sm font-bold text-cyan-400 px-2.5 flex items-center gap-2">
+                        <i class="fas fa-heartbeat text-cyan-400"></i>
+                        Ping Interval, Critical (20s) & Offline (30s) System
+                    </legend>
+                    
+                    <!-- Availability & Timeout System (20s Critical & 30s Offline) -->
+                    <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">
+                                <i class="fas fa-stopwatch mr-1"></i> Availability & Timeout Timers (সময়সীমা নিয়ন্ত্রণ)
+                            </span>
+                            <span class="text-[11px] text-slate-400">Destination unreachable / Packet loss delay</span>
                         </div>
-                        <div>
-                            <label for="warning_packetloss_threshold" class="block text-xs text-slate-400 mb-1">Warn Packet Loss (%)</label>
-                            <input type="number" id="warning_packetloss_threshold" name="warning_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm" value="<?= htmlspecialchars($_POST['warning_packetloss_threshold'] ?? '25') ?>">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label for="ping_interval" class="block text-xs font-semibold text-slate-300 mb-1">
+                                    <i class="fas fa-wave-square text-cyan-400 mr-1"></i>Ping Interval (seconds)
+                                </label>
+                                <input type="number" id="ping_interval" name="ping_interval" min="1" placeholder="20" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-cyan-500" value="<?= htmlspecialchars($_POST['ping_interval'] ?? '20') ?>">
+                                <p class="text-[11px] text-slate-400 mt-1">কত সেকেন্ড পর পর পিং চেক হবে (Standard: 20s)।</p>
+                            </div>
+                            <div>
+                                <label for="critical_offline_seconds" class="block text-xs font-semibold text-amber-300 mb-1">
+                                    <i class="fas fa-exclamation-triangle text-amber-400 mr-1"></i>Critical Timeout (seconds)
+                                </label>
+                                <input type="number" id="critical_offline_seconds" name="critical_offline_seconds" min="1" placeholder="20" class="w-full bg-slate-900 border border-amber-600/50 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-amber-500 font-semibold" value="<?= htmlspecialchars($_POST['critical_offline_seconds'] ?? '20') ?>">
+                                <p class="text-[11px] text-amber-300/80 mt-1">যদি ২০ সেকেন্ড অবিচ্ছিন্নভাবে Unreachable বা ড্রপ থাকে তবে Critical দেখাবে।</p>
+                            </div>
+                            <div>
+                                <label for="offline_timeout_seconds" class="block text-xs font-semibold text-red-400 mb-1">
+                                    <i class="fas fa-times-circle text-red-500 mr-1"></i>Offline Timeout (seconds)
+                                </label>
+                                <input type="number" id="offline_timeout_seconds" name="offline_timeout_seconds" min="1" placeholder="30" class="w-full bg-slate-900 border border-red-600/50 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-red-500 font-semibold" value="<?= htmlspecialchars($_POST['offline_timeout_seconds'] ?? '30') ?>">
+                                <p class="text-[11px] text-red-300/80 mt-1">যদি ৩০ সেকেন্ড Unreachable বা Timeout থাকে তবে Offline এবং নোটিফিকেশন পাঠাবে।</p>
+                            </div>
                         </div>
-                        <div>
-                            <label for="critical_latency_threshold" class="block text-xs text-slate-400 mb-1">Critical Latency (ms)</label>
-                            <input type="number" id="critical_latency_threshold" name="critical_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm" value="<?= htmlspecialchars($_POST['critical_latency_threshold'] ?? '450') ?>">
+                    </div>
+
+                    <!-- Latency & Packet Loss Performance Thresholds -->
+                    <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
+                        <div class="border-b border-slate-800 pb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                <i class="fas fa-chart-bar mr-1"></i> Latency & Packet Loss Thresholds (পারফরম্যান্স থ্রেশহোল্ড)
+                            </span>
                         </div>
-                        <div>
-                            <label for="critical_packetloss_threshold" class="block text-xs text-slate-400 mb-1">Critical Packet Loss (%)</label>
-                            <input type="number" id="critical_packetloss_threshold" name="critical_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm" value="<?= htmlspecialchars($_POST['critical_packetloss_threshold'] ?? '80') ?>">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <label for="warning_latency_threshold" class="block text-xs font-semibold text-yellow-400 mb-1">Warn Latency (ms)</label>
+                                <input type="number" id="warning_latency_threshold" name="warning_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['warning_latency_threshold'] ?? '200') ?>">
+                                <p class="text-[10px] text-slate-400 mt-0.5">Default: 200 ms</p>
+                            </div>
+                            <div>
+                                <label for="warning_packetloss_threshold" class="block text-xs font-semibold text-yellow-400 mb-1">Warn Packet Loss (%)</label>
+                                <input type="number" id="warning_packetloss_threshold" name="warning_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['warning_packetloss_threshold'] ?? '25') ?>">
+                                <p class="text-[10px] text-slate-400 mt-0.5">Default: 25%</p>
+                            </div>
+                            <div>
+                                <label for="critical_latency_threshold" class="block text-xs font-semibold text-red-400 mb-1">Critical Latency (ms)</label>
+                                <input type="number" id="critical_latency_threshold" name="critical_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['critical_latency_threshold'] ?? '450') ?>">
+                                <p class="text-[10px] text-slate-400 mt-0.5">Default: 450 ms</p>
+                            </div>
+                            <div>
+                                <label for="critical_packetloss_threshold" class="block text-xs font-semibold text-red-400 mb-1">Critical Packet Loss (%)</label>
+                                <input type="number" id="critical_packetloss_threshold" name="critical_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['critical_packetloss_threshold'] ?? '80') ?>">
+                                <p class="text-[10px] text-slate-400 mt-0.5">Default: 80%</p>
+                            </div>
                         </div>
                     </div>
                 </fieldset>
