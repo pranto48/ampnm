@@ -1069,7 +1069,7 @@ switch ($action) {
                     $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['subchoice'] ?? 0, $input['description'] ?? null, $input['map_id'] ?? null,
                     $input['x'] ?? null, $input['y'] ?? null,
                     $input['ping_interval'] ?? 20, $input['critical_offline_seconds'] ?? 20, $input['offline_timeout_seconds'] ?? 30,
-                    $input['monitoring_mode'] ?? 'time_threshold', $input['critical_packet_count'] ?? 20, $input['offline_packet_count'] ?? 30,
+                    $input['monitoring_mode'] ?? 'packet_count', $input['critical_packet_count'] ?? 20, $input['offline_packet_count'] ?? 30,
                     $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
                     $input['router_api_username'] ?? null, $input['router_api_password'] ?? null, $input['router_api_port'] ?? null,
                     $input['warning_latency_threshold'] ?? 200, $input['warning_packetloss_threshold'] ?? 25,

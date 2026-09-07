@@ -317,7 +317,7 @@ include 'header.php';
                         <p class="text-[11px] text-slate-400">ডিভাইসটি কোন পদ্ধতিতে পর্যবেক্ষণ করবেন তা নির্ধারণ করুন (শুধুমাত্র একটি অপশন কার্যকর থাকবে):</p>
                         
                         <?php 
-                            $current_mode = $_POST['monitoring_mode'] ?? 'time_threshold'; 
+                            $current_mode = $_POST['monitoring_mode'] ?? 'packet_count'; 
                         ?>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                             <!-- Option 1: Time & Performance Threshold Mode -->

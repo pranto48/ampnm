@@ -284,7 +284,7 @@ try {
             `ping_interval` INT(11) NULL,
             `critical_offline_seconds` INT(11) NOT NULL DEFAULT 20,
             `offline_timeout_seconds` INT(11) NOT NULL DEFAULT 30,
-            `monitoring_mode` VARCHAR(30) NOT NULL DEFAULT 'time_threshold',
+            `monitoring_mode` VARCHAR(30) NOT NULL DEFAULT 'packet_count',
             `critical_packet_count` INT(11) NOT NULL DEFAULT 20,
             `offline_packet_count` INT(11) NOT NULL DEFAULT 30,
             `consecutive_drops` INT(11) NOT NULL DEFAULT 0,
