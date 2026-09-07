@@ -313,8 +313,61 @@ function sendWhatsappNotification($pdo, $device, $oldStatus, $newStatus, $detail
 }
 
 
-function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details, &$first_failed_at = null) {
+function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details, &$first_failed_at = null, &$consecutive_drops = null) {
     $packetLoss = isset($parsedResult['packet_loss']) ? (int)$parsedResult['packet_loss'] : 100;
+    $monitoringMode = $device['monitoring_mode'] ?? 'time_threshold';
+    if ($consecutive_drops === null) {
+        $consecutive_drops = (int)($device['consecutive_drops'] ?? 0);
+    }
+
+    // -------------------------------------------------------------
+    // OPTION 2: Packet Count Drop Mode (প্যাকেট সংখ্যা ভিত্তিক ড্রপ মোড)
+    // -------------------------------------------------------------
+    if ($monitoringMode === 'packet_count') {
+        $critPackets = !empty($device['critical_packet_count']) ? (int)$device['critical_packet_count'] : 20;
+        $offPackets = !empty($device['offline_packet_count']) ? (int)$device['offline_packet_count'] : 30;
+        $isPingSuccess = !empty($pingResult['success']) && ($packetLoss < 100);
+
+        if ($isPingSuccess) {
+            // Normal / Online state (0% loss, all packets received)
+            $consecutive_drops = 0;
+            $first_failed_at = null;
+            $status = 'online';
+            $details = "Online (0% packet loss - Sent = {$critPackets}, Received = {$critPackets}, Lost = 0).";
+            // Performance thresholds (latency & packet loss) are completely bypassed / disabled in this mode!
+            return $status;
+        }
+
+        // Ping failed / unreachable / 100% loss
+        $now = time();
+        if (empty($first_failed_at)) {
+            $first_failed_at = date('Y-m-d H:i:s');
+            $failDuration = 0;
+        } else {
+            $failDuration = max(0, $now - strtotime($first_failed_at));
+        }
+
+        // Increment drops: either by failure tick or duration in seconds
+        $consecutive_drops = max($consecutive_drops + 1, $failDuration);
+
+        if ($consecutive_drops >= $offPackets) {
+            $status = 'offline';
+            $details = "Offline: {$consecutive_drops} consecutive packets lost (>= {$offPackets} packets threshold).";
+        } elseif ($consecutive_drops >= $critPackets) {
+            $status = 'critical';
+            $details = "Critical: {$consecutive_drops} consecutive packets lost (>= {$critPackets} packets threshold).";
+        } else {
+            // Under critical threshold: do not mark critical yet
+            $prevStatus = !empty($device['status']) ? $device['status'] : 'online';
+            $status = ($prevStatus === 'offline' || $prevStatus === 'critical') ? $prevStatus : 'online';
+            $details = "{$consecutive_drops} packet(s) lost (Critical threshold: {$critPackets} packets).";
+        }
+        return $status;
+    }
+
+    // -------------------------------------------------------------
+    // OPTION 1: Time & Performance Threshold Mode (সময় ও পারফরম্যান্স থ্রেশহোল্ড মোড)
+    // -------------------------------------------------------------
     $critTimeout = !empty($device['critical_offline_seconds']) ? (int)$device['critical_offline_seconds'] : 20;
     $offTimeout = !empty($device['offline_timeout_seconds']) ? (int)$device['offline_timeout_seconds'] : 30;
 
@@ -327,6 +380,7 @@ function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details,
         } else {
             $failDuration = max(0, $now - strtotime($first_failed_at));
         }
+        $consecutive_drops = max($consecutive_drops + 1, $failDuration);
 
         if ($failDuration >= $offTimeout) {
             $status = 'offline';
@@ -343,8 +397,9 @@ function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details,
         return $status;
     }
 
-    // Ping succeeded: reset first_failed_at immediately
+    // Ping succeeded: reset first_failed_at and consecutive_drops immediately
     $first_failed_at = null;
+    $consecutive_drops = 0;
     $status = 'online';
     $details = "Online with {$parsedResult['avg_time']}ms latency.";
 
@@ -507,13 +562,15 @@ function checkDevicesInParallel(PDO $pdo, array $devices, string $userRole, int 
             ];
 
             $first_failed_at = $device['first_failed_at'] ?? null;
+            $consecutive_drops = (int)($device['consecutive_drops'] ?? 0);
             $details = '';
-            $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details, $first_failed_at);
+            $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details, $first_failed_at, $consecutive_drops);
 
             $results[$device['id']] = [
                 'status' => $status,
                 'last_seen' => $status !== 'offline' ? date('Y-m-d H:i:s') : $device['last_seen'],
                 'first_failed_at' => $first_failed_at,
+                'consecutive_drops' => $consecutive_drops,
                 'last_avg_time' => $parsedResult['avg_time'] ?? null,
                 'last_ttl' => $parsedResult['ttl'] ?? null,
                 'check_output' => $pingResult['output'],
@@ -537,6 +594,7 @@ function checkDevicesInParallel(PDO $pdo, array $devices, string $userRole, int 
         $last_avg_time = $eval['last_avg_time'];
         $last_ttl = $eval['last_ttl'];
         $first_failed_at = $eval['first_failed_at'] ?? null;
+        $consecutive_drops = $eval['consecutive_drops'] ?? 0;
         $details = $eval['details'];
 
         if ($old_status !== $new_status) {
@@ -549,8 +607,8 @@ function checkDevicesInParallel(PDO $pdo, array $devices, string $userRole, int 
         }
 
         // Update database
-        $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ? WHERE id = ?";
-        $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $device['id']];
+        $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ?, consecutive_drops = ? WHERE id = ?";
+        $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $consecutive_drops, $device['id']];
 
         if ($userRole !== 'viewer') {
             $updateSql .= " AND user_id = ?";
@@ -565,11 +623,14 @@ function checkDevicesInParallel(PDO $pdo, array $devices, string $userRole, int 
             'name' => $device['name'],
             'old_status' => $old_status,
             'status' => $new_status,
+            'monitoring_mode' => $device['monitoring_mode'] ?? 'time_threshold',
+            'critical_packet_count' => $device['critical_packet_count'] ?? 20,
+            'offline_packet_count' => $device['offline_packet_count'] ?? 30,
+            'consecutive_drops' => $consecutive_drops,
             'last_seen' => $last_seen,
             'first_failed_at' => $first_failed_at,
             'last_avg_time' => $last_avg_time,
             'last_ttl' => $last_ttl,
-            'last_ping_output' => $eval['check_output']
         ];
     }
 
@@ -624,13 +685,22 @@ function evaluateDeviceCheck($pdo, $device, &$details, &$last_avg_time, &$last_t
     savePingResult($pdo, $device['ip'], $pingResult);
     $parsedResult = parsePingOutput($pingResult['output']);
     $first_failed_at = $device['first_failed_at'] ?? null;
-    $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details, $first_failed_at);
+    $consecutive_drops = (int)($device['consecutive_drops'] ?? 0);
+    $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details, $first_failed_at, $consecutive_drops);
     $last_avg_time = $parsedResult['avg_time'] ?? null;
     $last_ttl = $parsedResult['ttl'] ?? null;
     $check_output = $pingResult['output'];
     $last_seen = $status !== 'offline' ? date('Y-m-d H:i:s') : $last_seen;
 
-    return ['status' => $status, 'last_seen' => $last_seen, 'first_failed_at' => $first_failed_at];
+    return [
+        'status' => $status,
+        'last_seen' => $last_seen,
+        'first_failed_at' => $first_failed_at,
+        'consecutive_drops' => $consecutive_drops,
+        'monitoring_mode' => $device['monitoring_mode'] ?? 'time_threshold',
+        'critical_packet_count' => $device['critical_packet_count'] ?? 20,
+        'offline_packet_count' => $device['offline_packet_count'] ?? 30
+    ];
 }
 
 switch ($action) {
@@ -769,6 +839,10 @@ switch ($action) {
             $status = 'unknown';
             $last_seen = $device['last_seen'];
             $first_failed_at = $device['first_failed_at'] ?? null;
+            $consecutive_drops = (int)($device['consecutive_drops'] ?? 0);
+            $monitoring_mode = $device['monitoring_mode'] ?? 'time_threshold';
+            $critical_packet_count = (int)($device['critical_packet_count'] ?? 20);
+            $offline_packet_count = (int)($device['offline_packet_count'] ?? 30);
             $last_avg_time = null;
             $last_ttl = null;
             $check_output = 'Device has no IP configured for checking.';
@@ -779,6 +853,10 @@ switch ($action) {
                 $status = $evaluation['status'];
                 $last_seen = $evaluation['last_seen'];
                 $first_failed_at = $evaluation['first_failed_at'] ?? null;
+                $consecutive_drops = $evaluation['consecutive_drops'] ?? 0;
+                $monitoring_mode = $evaluation['monitoring_mode'] ?? $monitoring_mode;
+                $critical_packet_count = $evaluation['critical_packet_count'] ?? $critical_packet_count;
+                $offline_packet_count = $evaluation['offline_packet_count'] ?? $offline_packet_count;
             }
             
             logStatusChange($pdo, $deviceId, $old_status, $status, $details);
@@ -789,8 +867,8 @@ switch ($action) {
             
             // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
             // This allows viewers to update the status of devices on shared maps.
-            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ? WHERE id = ?";
-            $updateParams = [$status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $deviceId];
+            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ?, consecutive_drops = ? WHERE id = ?";
+            $updateParams = [$status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $consecutive_drops, $deviceId];
 
             // Only add user_id filter if the user is NOT a viewer
             if ($user_role !== 'viewer') {
@@ -805,9 +883,14 @@ switch ($action) {
                 'status' => $status,
                 'last_seen' => $last_seen,
                 'first_failed_at' => $first_failed_at,
+                'consecutive_drops' => $consecutive_drops,
+                'monitoring_mode' => $monitoring_mode,
+                'critical_packet_count' => $critical_packet_count,
+                'offline_packet_count' => $offline_packet_count,
                 'last_avg_time' => $last_avg_time,
                 'last_ttl' => $last_ttl,
-                'last_ping_output' => $check_output
+                'last_ping_output' => $check_output,
+                'details' => $details
             ]);
         }
         break;
@@ -961,19 +1044,40 @@ switch ($action) {
             }
 
             $hasTimeoutCols = false;
+            $hasMonitoringCols = false;
             try {
                 $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
                 if ($dbName) {
                     $stmtCol = $pdo->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?');
                     $stmtCol->execute([$dbName, 'devices', 'critical_offline_seconds']);
                     $hasTimeoutCols = ((int)$stmtCol->fetchColumn()) > 0;
+
+                    $stmtCol2 = $pdo->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+                    $stmtCol2->execute([$dbName, 'devices', 'monitoring_mode']);
+                    $hasMonitoringCols = ((int)$stmtCol2->fetchColumn()) > 0;
                 }
             } catch (Throwable $e) {
                 $hasTimeoutCols = false;
+                $hasMonitoringCols = false;
             }
 
             $portConfigValue = isset($input['port_config']) ? (is_string($input['port_config']) ? $input['port_config'] : json_encode($input['port_config'])) : null;
-            if ($hasTimeoutCols) {
+            if ($hasMonitoringCols) {
+                $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, critical_offline_seconds, offline_timeout_seconds, monitoring_mode, critical_packet_count, offline_packet_count, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['subchoice'] ?? 0, $input['description'] ?? null, $input['map_id'] ?? null,
+                    $input['x'] ?? null, $input['y'] ?? null,
+                    $input['ping_interval'] ?? 20, $input['critical_offline_seconds'] ?? 20, $input['offline_timeout_seconds'] ?? 30,
+                    $input['monitoring_mode'] ?? 'time_threshold', $input['critical_packet_count'] ?? 20, $input['offline_packet_count'] ?? 30,
+                    $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
+                    $input['router_api_username'] ?? null, $input['router_api_password'] ?? null, $input['router_api_port'] ?? null,
+                    $input['warning_latency_threshold'] ?? 200, $input['warning_packetloss_threshold'] ?? 25,
+                    $input['critical_latency_threshold'] ?? 450, $input['critical_packetloss_threshold'] ?? 80,
+                    ($input['show_live_ping'] ?? false) ? 1 : 0,
+                    $portConfigValue
+                ]);
+            } elseif ($hasTimeoutCols) {
                 $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, critical_offline_seconds, offline_timeout_seconds, icon_size, name_text_size, name_text_color, name_text_bold, name_text_italic, icon_url, router_api_username, router_api_password, router_api_port, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping, port_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
@@ -1072,7 +1176,7 @@ switch ($action) {
                 exit;
             }
 
-            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'critical_offline_seconds', 'offline_timeout_seconds', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'name_text_vadjust', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'first_failed_at', 'last_avg_time', 'last_ttl', 'port_config', 'snmp_enabled', 'snmp_version', 'snmp_community', 'snmp_port', 'snmp_v3_user', 'snmp_v3_auth_proto', 'snmp_v3_auth_pass', 'snmp_v3_priv_proto', 'snmp_v3_priv_pass', 'snmp_v3_sec_level'];
+            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'subchoice', 'description', 'x', 'y', 'map_id', 'target_map_id', 'is_rack', 'rack_units', 'rack_position', 'ping_interval', 'critical_offline_seconds', 'offline_timeout_seconds', 'monitoring_mode', 'critical_packet_count', 'offline_packet_count', 'consecutive_drops', 'icon_size', 'name_text_size', 'name_text_color', 'name_text_bold', 'name_text_italic', 'name_text_vadjust', 'icon_url', 'router_api_username', 'router_api_password', 'router_api_port', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'first_failed_at', 'last_avg_time', 'last_ttl', 'port_config', 'snmp_enabled', 'snmp_version', 'snmp_community', 'snmp_port', 'snmp_v3_user', 'snmp_v3_auth_proto', 'snmp_v3_auth_pass', 'snmp_v3_priv_proto', 'snmp_v3_priv_pass', 'snmp_v3_sec_level'];
             if (!$hasSubchoice) {
                 $allowed_fields = array_values(array_diff($allowed_fields, ['subchoice']));
             }

@@ -284,6 +284,10 @@ try {
             `ping_interval` INT(11) NULL,
             `critical_offline_seconds` INT(11) NOT NULL DEFAULT 20,
             `offline_timeout_seconds` INT(11) NOT NULL DEFAULT 30,
+            `monitoring_mode` VARCHAR(30) NOT NULL DEFAULT 'time_threshold',
+            `critical_packet_count` INT(11) NOT NULL DEFAULT 20,
+            `offline_packet_count` INT(11) NOT NULL DEFAULT 30,
+            `consecutive_drops` INT(11) NOT NULL DEFAULT 0,
             `icon_size` INT(11) DEFAULT 50,
             `name_text_size` INT(11) DEFAULT 14,
             `name_text_color` VARCHAR(20) DEFAULT '#ffffff',
@@ -1240,6 +1244,22 @@ try {
     if (!columnExists($pdo, $dbname, 'devices', 'offline_timeout_seconds')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `offline_timeout_seconds` INT(11) NOT NULL DEFAULT 30 AFTER `critical_offline_seconds`;");
         message("Upgraded 'devices' table: added 'offline_timeout_seconds' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'monitoring_mode')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `monitoring_mode` VARCHAR(30) NOT NULL DEFAULT 'time_threshold' AFTER `offline_timeout_seconds`;");
+        message("Upgraded 'devices' table: added 'monitoring_mode' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'critical_packet_count')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `critical_packet_count` INT(11) NOT NULL DEFAULT 20 AFTER `monitoring_mode`;");
+        message("Upgraded 'devices' table: added 'critical_packet_count' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'offline_packet_count')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `offline_packet_count` INT(11) NOT NULL DEFAULT 30 AFTER `critical_packet_count`;");
+        message("Upgraded 'devices' table: added 'offline_packet_count' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'consecutive_drops')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `consecutive_drops` INT(11) NOT NULL DEFAULT 0 AFTER `offline_packet_count`;");
+        message("Upgraded 'devices' table: added 'consecutive_drops' column.");
     }
 
     // ==========================================

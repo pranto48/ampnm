@@ -147,12 +147,19 @@ function initDevices() {
                     <div>
                         <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Status Thresholds</h3>
                         <div class="grid grid-cols-1 gap-x-4 gap-y-1 text-sm">
-                            <div class="text-amber-300">Critical Timeout: <span class="text-white font-semibold">${device.critical_offline_seconds || 20}s</span></div>
-                            <div class="text-red-400">Offline Timeout: <span class="text-white font-semibold">${device.offline_timeout_seconds || 30}s</span></div>
-                            <div class="text-yellow-400">${renderThreshold('Warning Latency', device.warning_latency_threshold, 'ms')}</div>
-                            <div class="text-yellow-400">${renderThreshold('Warning Packet Loss', device.warning_packetloss_threshold, '%')}</div>
-                            <div class="text-red-400">${renderThreshold('Critical Latency', device.critical_latency_threshold, 'ms')}</div>
-                            <div class="text-red-400">${renderThreshold('Critical Packet Loss', device.critical_packetloss_threshold, '%')}</div>
+                            <div class="text-cyan-300">Mode: <span class="text-white font-semibold">${device.monitoring_mode === 'packet_count' ? 'Packet Count Drop' : 'Time & Threshold'}</span></div>
+                            ${device.monitoring_mode === 'packet_count' ? `
+                                <div class="text-amber-300">Critical Drops: <span class="text-white font-semibold">${device.critical_packet_count || 20} packets</span></div>
+                                <div class="text-red-400">Offline Drops: <span class="text-white font-semibold">${device.offline_packet_count || 30} packets</span></div>
+                                <div class="text-slate-400 text-xs italic">Latency & Loss thresholds disabled</div>
+                            ` : `
+                                <div class="text-amber-300">Critical Timeout: <span class="text-white font-semibold">${device.critical_offline_seconds || 20}s</span></div>
+                                <div class="text-red-400">Offline Timeout: <span class="text-white font-semibold">${device.offline_timeout_seconds || 30}s</span></div>
+                                <div class="text-yellow-400">${renderThreshold('Warning Latency', device.warning_latency_threshold, 'ms')}</div>
+                                <div class="text-yellow-400">${renderThreshold('Warning Packet Loss', device.warning_packetloss_threshold, '%')}</div>
+                                <div class="text-red-400">${renderThreshold('Critical Latency', device.critical_latency_threshold, 'ms')}</div>
+                                <div class="text-red-400">${renderThreshold('Critical Packet Loss', device.critical_packetloss_threshold, '%')}</div>
+                            `}
                         </div>
                     </div>
                      <div>

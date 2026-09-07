@@ -9,6 +9,33 @@
 window.MapApp = window.MapApp || {};
 
 MapApp.deviceManager = {
+    getStatusNotificationMessage: (deviceData, status) => {
+        const name = deviceData.name || 'Device';
+        const isPacketMode = (deviceData.monitoring_mode === 'packet_count');
+        const critPackets = deviceData.critical_packet_count || 20;
+        const offPackets = deviceData.offline_packet_count || 30;
+
+        if (status === 'critical') {
+            if (isPacketMode) {
+                return `Device '${name}' is Critical (${critPackets} packets lost / 100% loss).`;
+            }
+            return `Device '${name}' is Critical (20s unreachable).`;
+        }
+        if (status === 'offline') {
+            if (isPacketMode) {
+                return `Device '${name}' is now Offline (${offPackets} packets lost / 100% loss).`;
+            }
+            return `Device '${name}' is now Offline (30s+ down).`;
+        }
+        if (status === 'online') {
+            if (isPacketMode) {
+                return `Device '${name}' is back online (Packets: Sent = ${critPackets}, Received = ${critPackets}, Lost = 0).`;
+            }
+            return `Device '${name}' is back online.`;
+        }
+        return `Device '${name}' is ${status}.`;
+    },
+
     pingSingleDevice: async (deviceId) => {
         const node = MapApp.state.nodes.get(deviceId);
         if (!node || node.deviceData.type === 'box') return;
@@ -19,12 +46,12 @@ MapApp.deviceManager = {
         try {
             const result = await MapApp.api.post('check_device', { id: deviceId });
             const rawStatus = result.status;
+            const isPacketMode = (result.monitoring_mode === 'packet_count' || node.deviceData.monitoring_mode === 'packet_count');
 
-            // --- Time-based failure logic: 20s Critical, 30s Offline with notification ---
             let newStatus = rawStatus;
             const isUnreachable = (rawStatus === 'critical' && result.last_ping_output && result.last_ping_output.includes('packet loss')) || rawStatus === 'offline';
 
-            if (isUnreachable) {
+            if (!isPacketMode && isUnreachable) {
                 if (!MapApp.state.deviceFirstFailTime[deviceId]) {
                     // First failure: record 20s elapsed as this is a 20s interval failure
                     MapApp.state.deviceFirstFailTime[deviceId] = Date.now() - 20000;
@@ -47,7 +74,7 @@ MapApp.deviceManager = {
                     newStatus = 'offline';
                 }
             } else {
-                // Success or normal online status
+                // Success, packet mode, or normal online status
                 delete MapApp.state.deviceFirstFailTime[deviceId];
                 if (MapApp.state.offlineTimers && MapApp.state.offlineTimers[deviceId]) {
                     clearTimeout(MapApp.state.offlineTimers[deviceId]);
@@ -55,22 +82,31 @@ MapApp.deviceManager = {
                 }
             }
 
+            const updatedDeviceData = { 
+                ...node.deviceData, 
+                status: newStatus, 
+                monitoring_mode: result.monitoring_mode || node.deviceData.monitoring_mode || 'time_threshold',
+                critical_packet_count: result.critical_packet_count || node.deviceData.critical_packet_count || 20,
+                offline_packet_count: result.offline_packet_count || node.deviceData.offline_packet_count || 30,
+                last_avg_time: result.last_avg_time, 
+                last_ttl: result.last_ttl, 
+                last_ping_output: result.last_ping_output 
+            };
+
             if (newStatus !== oldStatus) {
                 if (newStatus === 'warning') {
                     SoundManager.play('warning');
                 } else if (newStatus === 'critical') {
                     SoundManager.play('critical');
-                    window.notyf.error({ message: `Device '${node.deviceData.name}' is Critical (100% ping loss).`, duration: 5000, dismissible: true });
+                    window.notyf.error({ message: MapApp.deviceManager.getStatusNotificationMessage(updatedDeviceData, newStatus), duration: 5000, dismissible: true });
                 } else if (newStatus === 'offline') {
                     SoundManager.play('offline');
-                    window.notyf.error({ message: `Device '${node.deviceData.name}' is now Offline (30s+ down).`, duration: 5000, dismissible: true });
+                    window.notyf.error({ message: MapApp.deviceManager.getStatusNotificationMessage(updatedDeviceData, newStatus), duration: 5000, dismissible: true });
                 } else if (newStatus === 'online' && (oldStatus === 'offline' || oldStatus === 'critical' || oldStatus === 'warning')) {
                     SoundManager.play('online');
-                    window.notyf.success({ message: `Device '${node.deviceData.name}' is back online.`, duration: 5000 });
+                    window.notyf.success({ message: MapApp.deviceManager.getStatusNotificationMessage(updatedDeviceData, newStatus), duration: 5000 });
                 }
             }
-
-            const updatedDeviceData = { ...node.deviceData, status: newStatus, last_avg_time: result.last_avg_time, last_ttl: result.last_ttl, last_ping_output: result.last_ping_output };
             let label = updatedDeviceData.name;
             if (updatedDeviceData.show_live_ping && updatedDeviceData.status === 'online' && updatedDeviceData.last_avg_time !== null) {
                 label += `\n${updatedDeviceData.last_avg_time}ms | TTL:${updatedDeviceData.last_ttl || 'N/A'}`;
@@ -128,11 +164,12 @@ MapApp.deviceManager = {
                 const oldStatus = device.old_status;
                 const rawStatus = device.status;
 
-                // --- Time-based failure logic for bulk refresh: 20s Critical, 30s Offline with notification ---
+                // --- Mode-based failure logic for bulk refresh ---
                 let effectiveStatus = rawStatus;
+                const isPacketMode = (device.monitoring_mode === 'packet_count' || node.deviceData.monitoring_mode === 'packet_count');
                 const isUnreachable = (rawStatus === 'critical' && device.last_ping_output && device.last_ping_output.includes('packet loss')) || rawStatus === 'offline';
 
-                if (isUnreachable) {
+                if (!isPacketMode && isUnreachable) {
                     if (!MapApp.state.deviceFirstFailTime[device.id]) {
                         MapApp.state.deviceFirstFailTime[device.id] = Date.now() - 20000;
                     }
@@ -158,13 +195,13 @@ MapApp.deviceManager = {
                         SoundManager.play('warning');
                     } else if (effectiveStatus === 'critical') {
                         SoundManager.play('critical');
-                        window.notyf.error({ message: `Device '${device.name}' is Critical (100% ping loss).`, duration: 5000, dismissible: true });
+                        window.notyf.error({ message: MapApp.deviceManager.getStatusNotificationMessage(device, effectiveStatus), duration: 5000, dismissible: true });
                     } else if (effectiveStatus === 'offline') {
                         SoundManager.play('offline');
-                        window.notyf.error({ message: `Device '${device.name}' is now Offline (30s+ down).`, duration: 5000, dismissible: true });
+                        window.notyf.error({ message: MapApp.deviceManager.getStatusNotificationMessage(device, effectiveStatus), duration: 5000, dismissible: true });
                     } else if (effectiveStatus === 'online' && (oldStatus === 'offline' || oldStatus === 'critical' || oldStatus === 'warning')) {
                         SoundManager.play('online');
-                        window.notyf.success({ message: `Device '${device.name}' is back online.`, duration: 5000 });
+                        window.notyf.success({ message: MapApp.deviceManager.getStatusNotificationMessage(device, effectiveStatus), duration: 5000 });
                     } else {
                         window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${effectiveStatus}.`, duration: 5000 });
                     }

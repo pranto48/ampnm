@@ -43,6 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ping_interval = !empty($_POST['ping_interval']) ? (int)$_POST['ping_interval'] : 20;
     $critical_offline_seconds = !empty($_POST['critical_offline_seconds']) ? (int)$_POST['critical_offline_seconds'] : 20;
     $offline_timeout_seconds = !empty($_POST['offline_timeout_seconds']) ? (int)$_POST['offline_timeout_seconds'] : 30;
+    $monitoring_mode = in_array($_POST['monitoring_mode'] ?? '', ['time_threshold', 'packet_count']) ? $_POST['monitoring_mode'] : 'time_threshold';
+    $critical_packet_count = !empty($_POST['critical_packet_count']) ? max(1, (int)$_POST['critical_packet_count']) : 20;
+    $offline_packet_count = !empty($_POST['offline_packet_count']) ? max(1, (int)$_POST['offline_packet_count']) : 30;
     $icon_size = $_POST['icon_size'] ?? 50;
     $name_text_size = $_POST['name_text_size'] ?? 14;
     $icon_url = trim($_POST['icon_url'] ?? '');
@@ -92,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $hasSubchoice = dbColumnExists($pdo, 'devices', 'subchoice');
                 $hasPortConfig = dbColumnExists($pdo, 'devices', 'port_config');
                 $hasTimeoutCols = dbColumnExists($pdo, 'devices', 'critical_offline_seconds');
+                $hasMonitoringMode = dbColumnExists($pdo, 'devices', 'monitoring_mode');
                 if ($hasSubchoice) {
                     $cols = "user_id, name, ip, check_port, monitor_method, type, subchoice, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping";
                     $placeholders = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
@@ -112,6 +116,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $placeholders .= ", ?, ?";
                         $values[] = $critical_offline_seconds;
                         $values[] = $offline_timeout_seconds;
+                    }
+                    if ($hasMonitoringMode) {
+                        $cols .= ", monitoring_mode, critical_packet_count, offline_packet_count";
+                        $placeholders .= ", ?, ?, ?";
+                        $values[] = $monitoring_mode;
+                        $values[] = $critical_packet_count;
+                        $values[] = $offline_packet_count;
                     }
                     if ($hasPortConfig) {
                         $cols .= ", port_config";
@@ -292,14 +303,59 @@ include 'header.php';
                 </div>
 
                 <!-- Status Thresholds & Ping Availability -->
-                <fieldset class="border border-cyan-800/60 rounded-xl p-5 bg-slate-900/40 space-y-4 shadow-lg">
+                <fieldset class="border border-cyan-800/60 rounded-xl p-5 bg-slate-900/40 space-y-5 shadow-lg">
                     <legend class="text-sm font-bold text-cyan-400 px-2.5 flex items-center gap-2">
                         <i class="fas fa-heartbeat text-cyan-400"></i>
-                        Ping Interval, Critical (20s) & Offline (30s) System
+                        Ping Interval, Critical & Offline Monitoring System
                     </legend>
                     
-                    <!-- Availability & Timeout System (20s Critical & 30s Offline) -->
-                    <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
+                    <!-- Monitoring Mode Selection Radio Cards -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-cyan-300">
+                            <i class="fas fa-sliders-h mr-1"></i> মনিটরিং মেথড / মোড নির্বাচন (Select Monitoring Mode)
+                        </label>
+                        <p class="text-[11px] text-slate-400">ডিভাইসটি কোন পদ্ধতিতে পর্যবেক্ষণ করবেন তা নির্ধারণ করুন (শুধুমাত্র একটি অপশন কার্যকর থাকবে):</p>
+                        
+                        <?php 
+                            $current_mode = $_POST['monitoring_mode'] ?? 'time_threshold'; 
+                        ?>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <!-- Option 1: Time & Performance Threshold Mode -->
+                            <label class="relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 <?= $current_mode === 'time_threshold' ? 'border-cyan-500 bg-cyan-950/30 ring-1 ring-cyan-500' : 'border-slate-800 bg-slate-950/60 hover:border-slate-700' ?>" id="card_mode_time_threshold">
+                                <div class="flex items-start gap-3">
+                                    <input type="radio" name="monitoring_mode" value="time_threshold" class="mt-1 h-4 w-4 text-cyan-500 border-slate-600 focus:ring-cyan-500" <?= $current_mode === 'time_threshold' ? 'checked' : '' ?> onchange="toggleMonitoringMode('time_threshold')">
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-white uppercase tracking-wide">১. সময় ও পারফরম্যান্স থ্রেশহোল্ড মোড</span>
+                                            <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-700/50">Time-based</span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-300 mt-1.5 leading-relaxed">
+                                            সময়সীমা (যেমন ২০ সেকেন্ড আনরিচেবল হলে Critical, ৩০ সেকেন্ডে Offline) এবং নির্ধারিত ল্যাটেন্সি (ms) ও প্যাকেট লস (%) সীমা দ্বারা ডিভাইস স্ট্যাটাস পর্যবেক্ষণ করে।
+                                        </p>
+                                    </div>
+                                </div>
+                            </label>
+
+                            <!-- Option 2: Packet Count Drop Mode -->
+                            <label class="relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 <?= $current_mode === 'packet_count' ? 'border-cyan-500 bg-cyan-950/30 ring-1 ring-cyan-500' : 'border-slate-800 bg-slate-950/60 hover:border-slate-700' ?>" id="card_mode_packet_count">
+                                <div class="flex items-start gap-3">
+                                    <input type="radio" name="monitoring_mode" value="packet_count" class="mt-1 h-4 w-4 text-cyan-500 border-slate-600 focus:ring-cyan-500" <?= $current_mode === 'packet_count' ? 'checked' : '' ?> onchange="toggleMonitoringMode('packet_count')">
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-white uppercase tracking-wide">২. প্যাকেট সংখ্যা ভিত্তিক ড্রপ মোড</span>
+                                            <span class="text-[10px] px-2 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/50">Packet Count</span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-300 mt-1.5 leading-relaxed">
+                                            টানা প্যাকেট ড্রপের সংখ্যা গণনা করে (যেমন ২০টি প্যাকেট ড্রপে Critical, ৩০টিতে Offline)। এই মোডে ল্যাটেন্সি ও পারফরম্যান্স থ্রেশহোল্ড সম্পূর্ণ নিষ্ক্রিয় থাকবে।
+                                        </p>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Availability & Timeout System (Time-based settings) -->
+                    <div id="section_time_threshold" class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
                         <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                             <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">
                                 <i class="fas fa-stopwatch mr-1"></i> Availability & Timeout Timers (সময়সীমা নিয়ন্ত্রণ)
@@ -331,32 +387,75 @@ include 'header.php';
                         </div>
                     </div>
 
+                    <!-- Packet Count Drop Configuration (Packet Count settings) -->
+                    <div id="section_packet_count" class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-300">
+                                <i class="fas fa-layer-group mr-1"></i> Packet Count Drop Configuration (প্যাকেট সংখ্যা ড্রপ সেটিংস)
+                            </span>
+                            <span class="text-[11px] text-slate-400">Strict packet drop threshold without latency interference</span>
+                        </div>
+                        
+                        <div class="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-lg text-xs text-emerald-300 flex items-start gap-2.5">
+                            <i class="fas fa-shield-alt text-emerald-400 mt-0.5"></i>
+                            <div>
+                                <strong>স্বাভাবিক অবস্থা নির্দেশিকা:</strong>
+                                <span class="font-mono bg-emerald-900/60 px-1.5 py-0.5 rounded text-emerald-200 ml-1">Packets: Sent = 20, Received = 20, Lost = 0 (0% loss)</span>
+                                <span>হলে ডিভাইস সম্পূর্ণ Online থাকবে (Critical হবে না)। শুধুমাত্র টানা প্যাকেট লস্ট হলে নিচের থ্রেশহোল্ড অনুযায়ী অবস্থা পরিবর্তিত হবে।</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="critical_packet_count" class="block text-xs font-semibold text-amber-300 mb-1">
+                                    <i class="fas fa-exclamation-triangle text-amber-400 mr-1"></i>Critical Packet Count (ড্রপ সংখ্যা)
+                                </label>
+                                <input type="number" id="critical_packet_count" name="critical_packet_count" min="1" placeholder="20" class="w-full bg-slate-900 border border-amber-600/50 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-amber-500 font-semibold" value="<?= htmlspecialchars($_POST['critical_packet_count'] ?? '20') ?>">
+                                <p class="text-[11px] text-amber-300/80 mt-1">টানা ২০টি প্যাকেট ড্রপ (বা ১০০% লস) হলে Critical দেখাবে।</p>
+                            </div>
+                            <div>
+                                <label for="offline_packet_count" class="block text-xs font-semibold text-red-400 mb-1">
+                                    <i class="fas fa-times-circle text-red-500 mr-1"></i>Offline Packet Count (ড্রপ সংখ্যা)
+                                </label>
+                                <input type="number" id="offline_packet_count" name="offline_packet_count" min="1" placeholder="30" class="w-full bg-slate-900 border border-red-600/50 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-red-500 font-semibold" value="<?= htmlspecialchars($_POST['offline_packet_count'] ?? '30') ?>">
+                                <p class="text-[11px] text-red-300/80 mt-1">টানা ৩০টি প্যাকেট ড্রপ (বা ১০০% লস) হলে Offline এবং নোটিফিকেশন পাঠাবে।</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Latency & Packet Loss Performance Thresholds -->
-                    <div class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
-                        <div class="border-b border-slate-800 pb-2">
+                    <div id="performance_thresholds_container" class="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3 transition-all duration-300">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
                             <span class="text-xs font-bold uppercase tracking-wider text-slate-300">
                                 <i class="fas fa-chart-bar mr-1"></i> Latency & Packet Loss Thresholds (পারফরম্যান্স থ্রেশহোল্ড)
                             </span>
+                            <span id="threshold_status_badge" class="text-[10px] px-2 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-700/40">সক্রিয় (Active)</span>
                         </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+                        <div id="threshold_disabled_notice" class="hidden p-3 bg-amber-950/40 border border-amber-800/50 rounded-lg text-xs text-amber-300 flex items-center gap-2">
+                            <i class="fas fa-ban text-amber-400"></i>
+                            <span><strong>বিজ্ঞপ্তি:</strong> 'প্যাকেট সংখ্যা ভিত্তিক ড্রপ মোড' নির্বাচিত থাকায় ল্যাটেন্সি ও প্যাকেট লস পারফরম্যান্স থ্রেশহোল্ড সম্পূর্ণ নিষ্ক্রিয় রয়েছে। শুধুমাত্র প্যাকেট ড্রপ সংখ্যা অনুযায়ী ডিভাইস নিয়ন্ত্রিত হবে।</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="threshold_inputs_grid">
                             <div>
                                 <label for="warning_latency_threshold" class="block text-xs font-semibold text-yellow-400 mb-1">Warn Latency (ms)</label>
-                                <input type="number" id="warning_latency_threshold" name="warning_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['warning_latency_threshold'] ?? '200') ?>">
+                                <input type="number" id="warning_latency_threshold" name="warning_latency_threshold" class="threshold-input w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['warning_latency_threshold'] ?? '200') ?>">
                                 <p class="text-[10px] text-slate-400 mt-0.5">Default: 200 ms</p>
                             </div>
                             <div>
                                 <label for="warning_packetloss_threshold" class="block text-xs font-semibold text-yellow-400 mb-1">Warn Packet Loss (%)</label>
-                                <input type="number" id="warning_packetloss_threshold" name="warning_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['warning_packetloss_threshold'] ?? '25') ?>">
+                                <input type="number" id="warning_packetloss_threshold" name="warning_packetloss_threshold" class="threshold-input w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['warning_packetloss_threshold'] ?? '25') ?>">
                                 <p class="text-[10px] text-slate-400 mt-0.5">Default: 25%</p>
                             </div>
                             <div>
                                 <label for="critical_latency_threshold" class="block text-xs font-semibold text-red-400 mb-1">Critical Latency (ms)</label>
-                                <input type="number" id="critical_latency_threshold" name="critical_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['critical_latency_threshold'] ?? '450') ?>">
+                                <input type="number" id="critical_latency_threshold" name="critical_latency_threshold" class="threshold-input w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['critical_latency_threshold'] ?? '450') ?>">
                                 <p class="text-[10px] text-slate-400 mt-0.5">Default: 450 ms</p>
                             </div>
                             <div>
                                 <label for="critical_packetloss_threshold" class="block text-xs font-semibold text-red-400 mb-1">Critical Packet Loss (%)</label>
-                                <input type="number" id="critical_packetloss_threshold" name="critical_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['critical_packetloss_threshold'] ?? '80') ?>">
+                                <input type="number" id="critical_packetloss_threshold" name="critical_packetloss_threshold" class="threshold-input w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white" value="<?= htmlspecialchars($_POST['critical_packetloss_threshold'] ?? '80') ?>">
                                 <p class="text-[10px] text-slate-400 mt-0.5">Default: 80%</p>
                             </div>
                         </div>
@@ -503,6 +602,44 @@ include 'header.php';
         loadDefaultGroups(typeSelect.value);
     }
 })();
+
+function toggleMonitoringMode(mode) {
+    const cardTime = document.getElementById('card_mode_time_threshold');
+    const cardPacket = document.getElementById('card_mode_packet_count');
+    const sectionTime = document.getElementById('section_time_threshold');
+    const sectionPacket = document.getElementById('section_packet_count');
+    const threshContainer = document.getElementById('performance_thresholds_container');
+    const threshNotice = document.getElementById('threshold_disabled_notice');
+    const threshBadge = document.getElementById('threshold_status_badge');
+    const threshInputs = document.querySelectorAll('.threshold-input');
+
+    if (mode === 'packet_count') {
+        if (cardTime) cardTime.className = 'relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 border-slate-800 bg-slate-950/60 hover:border-slate-700';
+        if (cardPacket) cardPacket.className = 'relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 border-cyan-500 bg-cyan-950/30 ring-1 ring-cyan-500';
+        if (threshContainer) threshContainer.classList.add('opacity-40', 'pointer-events-none', 'grayscale', 'select-none');
+        if (threshNotice) threshNotice.classList.remove('hidden');
+        if (threshBadge) {
+            threshBadge.textContent = 'নিষ্ক্রিয় (Disabled)';
+            threshBadge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+        }
+        threshInputs.forEach(el => el.setAttribute('tabindex', '-1'));
+    } else {
+        if (cardTime) cardTime.className = 'relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 border-cyan-500 bg-cyan-950/30 ring-1 ring-cyan-500';
+        if (cardPacket) cardPacket.className = 'relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 border-slate-800 bg-slate-950/60 hover:border-slate-700';
+        if (threshContainer) threshContainer.classList.remove('opacity-40', 'pointer-events-none', 'grayscale', 'select-none');
+        if (threshNotice) threshNotice.classList.add('hidden');
+        if (threshBadge) {
+            threshBadge.textContent = 'সক্রিয় (Active)';
+            threshBadge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-900/50 text-emerald-300 border border-emerald-700/40';
+        }
+        threshInputs.forEach(el => el.removeAttribute('tabindex'));
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const selectedMode = document.querySelector('input[name="monitoring_mode"]:checked')?.value || 'time_threshold';
+    toggleMonitoringMode(selectedMode);
+});
 </script>
 
 <?php include 'footer.php'; ?>
