@@ -1682,8 +1682,36 @@ function initMap() {
         };
 
         const onPointerUp = (event) => {
-            isDragging = false;
-            element.releasePointerCapture(event.pointerId);
+            if (isDragging) {
+                isDragging = false;
+                element.releasePointerCapture(event.pointerId);
+
+                // Save dragged position for Connection Types
+                if (element.id === 'connection-legend' && MapApp.network && typeof MapApp.network.saveConnectionLegendPos === 'function') {
+                    MapApp.network.saveConnectionLegendPos({
+                        left: element.style.left,
+                        top: element.style.top,
+                        visible: !element.classList.contains('hidden')
+                    });
+
+                    // If zoom is fixed, update the fixed payload with this position
+                    if (typeof MapApp.network.isZoomFixed === 'function' && MapApp.network.isZoomFixed()) {
+                        const fixedKey = MapApp.network.getFixedZoomStorageKey();
+                        try {
+                            const raw = localStorage.getItem(fixedKey);
+                            if (raw) {
+                                const parsed = JSON.parse(raw);
+                                parsed.connectionLegend = {
+                                    left: element.style.left,
+                                    top: element.style.top,
+                                    visible: !element.classList.contains('hidden')
+                                };
+                                localStorage.setItem(fixedKey, JSON.stringify(parsed));
+                            }
+                        } catch (e) {}
+                    }
+                }
+            }
         };
 
         element.addEventListener('pointerdown', onPointerDown);
@@ -1691,15 +1719,31 @@ function initMap() {
         window.addEventListener('pointerup', onPointerUp);
     };
 
+    const fixConnLegendBtn = document.getElementById('fixConnLegendBtn');
+    if (fixConnLegendBtn) {
+        fixConnLegendBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (MapApp.network && typeof MapApp.network.toggleFixZoom === 'function') {
+                MapApp.network.toggleFixZoom();
+            }
+        });
+    }
+
     if (showConnectionLegendBtn && connectionLegend && toggleConnectionLegendBtn) {
         showConnectionLegendBtn.addEventListener('click', () => {
             connectionLegend.classList.remove('hidden');
             showConnectionLegendBtn.classList.add('hidden');
+            if (MapApp.network && typeof MapApp.network.saveConnectionLegendPos === 'function') {
+                MapApp.network.saveConnectionLegendPos({ visible: true });
+            }
         });
 
         toggleConnectionLegendBtn.addEventListener('click', () => {
             connectionLegend.classList.add('hidden');
             showConnectionLegendBtn.classList.remove('hidden');
+            if (MapApp.network && typeof MapApp.network.saveConnectionLegendPos === 'function') {
+                MapApp.network.saveConnectionLegendPos({ visible: false });
+            }
         });
 
         // Show legend by default
@@ -1708,6 +1752,11 @@ function initMap() {
 
         // Allow the legend to be dragged anywhere on the map wrapper
         makeDraggable(connectionLegend, mapWrapper);
+
+        // Restore saved position and fixed status if available
+        if (MapApp.network && typeof MapApp.network.restoreConnectionLegendPos === 'function') {
+            MapApp.network.restoreConnectionLegendPos();
+        }
     }
 
     // Initial Load

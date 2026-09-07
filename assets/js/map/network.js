@@ -33,6 +33,69 @@ MapApp.network = {
     getFixedZoomStorageKey: () => `ampnm_map_zoom_fixed:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
     getNodePosStorageKey: () => `ampnm_map_node_positions:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
 
+    getConnectionLegendStorageKey: () => `ampnm_connection_legend_pos:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
+    getConnectionLegendUserKey: () => `ampnm_connection_legend_pos:${MapApp.network.getUserStorageId()}`,
+
+    saveConnectionLegendPos: (pos) => {
+        const legend = document.getElementById('connection-legend');
+        if (!legend && !pos) return;
+        const left = pos?.left ?? (legend ? legend.style.left : null);
+        const top = pos?.top ?? (legend ? legend.style.top : null);
+        const visible = pos?.visible ?? (legend ? !legend.classList.contains('hidden') : true);
+
+        if (!left && !top && typeof visible !== 'boolean') return;
+
+        const data = { left, top, visible, timestamp: Date.now() };
+        try {
+            if (MapApp.state?.currentMapId) {
+                localStorage.setItem(MapApp.network.getConnectionLegendStorageKey(), JSON.stringify(data));
+            }
+            localStorage.setItem(MapApp.network.getConnectionLegendUserKey(), JSON.stringify(data));
+        } catch (e) {
+            // ignore
+        }
+    },
+
+    restoreConnectionLegendPos: () => {
+        const legend = document.getElementById('connection-legend');
+        const showBtn = document.getElementById('showConnectionLegend');
+        if (!legend) return;
+
+        let pos = null;
+        const fixedData = MapApp.network.getFixedZoomData();
+        if (fixedData && fixedData.connectionLegend) {
+            pos = fixedData.connectionLegend;
+        } else {
+            try {
+                const mapRaw = MapApp.state?.currentMapId ? localStorage.getItem(MapApp.network.getConnectionLegendStorageKey()) : null;
+                const userRaw = localStorage.getItem(MapApp.network.getConnectionLegendUserKey());
+                const raw = mapRaw || userRaw;
+                if (raw) pos = JSON.parse(raw);
+            } catch (e) {
+                pos = null;
+            }
+        }
+
+        if (pos && (pos.left || pos.top)) {
+            legend.style.right = 'auto';
+            legend.style.bottom = 'auto';
+            if (pos.left) legend.style.left = pos.left;
+            if (pos.top) legend.style.top = pos.top;
+        }
+
+        if (pos && typeof pos.visible === 'boolean') {
+            if (pos.visible) {
+                legend.classList.remove('hidden');
+                if (showBtn) showBtn.classList.add('hidden');
+            } else {
+                legend.classList.add('hidden');
+                if (showBtn) showBtn.classList.remove('hidden');
+            }
+        }
+
+        MapApp.network.updateFixZoomUI();
+    },
+
     isZoomFixed: () => {
         if (!MapApp.state?.currentMapId) return false;
         try {
@@ -58,28 +121,46 @@ MapApp.network = {
     },
 
     updateFixZoomUI: (forcedFixed) => {
-        const btn = document.getElementById('fixZoomBtn');
-        if (!btn) return;
-        const icon = document.getElementById('fixZoomIcon') || btn.querySelector('i');
-        const text = document.getElementById('fixZoomText');
         const isFixed = typeof forcedFixed === 'boolean' ? forcedFixed : MapApp.network.isZoomFixed();
 
-        if (isFixed) {
-            btn.classList.remove('bg-slate-700', 'text-slate-300', 'hover:bg-slate-600', 'border-slate-600/50');
-            btn.classList.add('bg-cyan-600', 'text-white', 'hover:bg-cyan-500', 'border-cyan-400', 'shadow-md');
-            if (icon) {
-                icon.className = 'fas fa-thumbtack text-white';
+        // Update toolbar Fix Zoom button
+        const btn = document.getElementById('fixZoomBtn');
+        if (btn) {
+            const icon = document.getElementById('fixZoomIcon') || btn.querySelector('i');
+            const text = document.getElementById('fixZoomText');
+            if (isFixed) {
+                btn.classList.remove('bg-slate-700', 'text-slate-300', 'hover:bg-slate-600', 'border-slate-600/50');
+                btn.classList.add('bg-cyan-600', 'text-white', 'hover:bg-cyan-500', 'border-cyan-400', 'shadow-md');
+                if (icon) icon.className = 'fas fa-thumbtack text-white';
+                if (text) text.textContent = 'Zoom Fixed';
+                btn.title = 'Zoom & Connection Types Position Fixed (click to unlock)';
+            } else {
+                btn.classList.remove('bg-cyan-600', 'text-white', 'hover:bg-cyan-500', 'border-cyan-400', 'shadow-md');
+                btn.classList.add('bg-slate-700', 'text-slate-300', 'hover:bg-slate-600', 'border-slate-600/50');
+                if (icon) icon.className = 'fas fa-thumbtack text-slate-300';
+                if (text) text.textContent = 'Fix Zoom';
+                btn.title = 'Fix / Lock Current Zoom & Connection Types Position';
             }
-            if (text) text.textContent = 'Zoom Fixed';
-            btn.title = 'Zoom is Fixed for this Map (click to unlock/unpin)';
-        } else {
-            btn.classList.remove('bg-cyan-600', 'text-white', 'hover:bg-cyan-500', 'border-cyan-400', 'shadow-md');
-            btn.classList.add('bg-slate-700', 'text-slate-300', 'hover:bg-slate-600', 'border-slate-600/50');
-            if (icon) {
-                icon.className = 'fas fa-thumbtack text-slate-300';
+        }
+
+        // Update Connection Types box pin button
+        const connPinBtn = document.getElementById('fixConnLegendBtn');
+        if (connPinBtn) {
+            const pinIcon = document.getElementById('fixConnLegendIcon');
+            const pinText = document.getElementById('fixConnLegendText');
+            if (isFixed) {
+                connPinBtn.classList.remove('text-slate-400', 'border-transparent');
+                connPinBtn.classList.add('bg-cyan-950/80', 'text-cyan-300', 'border-cyan-500/50', 'shadow-sm');
+                if (pinIcon) pinIcon.className = 'fas fa-thumbtack text-cyan-400';
+                if (pinText) pinText.textContent = 'Fixed';
+                connPinBtn.title = 'Position Fixed with Zoom (Click to unlock)';
+            } else {
+                connPinBtn.classList.remove('bg-cyan-950/80', 'text-cyan-300', 'border-cyan-500/50', 'shadow-sm');
+                connPinBtn.classList.add('text-slate-400', 'border-transparent');
+                if (pinIcon) pinIcon.className = 'fas fa-thumbtack text-slate-400';
+                if (pinText) pinText.textContent = 'Fix Pos';
+                connPinBtn.title = 'Fix Position with Zoom (জুমের সাথে পজিশন ফিক্স করুন)';
             }
-            if (text) text.textContent = 'Fix Zoom';
-            btn.title = 'Fix / Lock Current Zoom Level (জুম লেভেল ফিক্স করুন)';
         }
     },
 
@@ -92,17 +173,38 @@ MapApp.network = {
             localStorage.removeItem(fixedKey);
             MapApp.network.updateFixZoomUI(false);
             if (window.notyf) {
-                window.notyf.info('Zoom unpinned. Map zoom will now track your latest view.');
+                window.notyf.info('Zoom & Connection Types position unpinned.');
             }
         } else {
             const scale = MapApp.state.network.getScale();
             const position = MapApp.state.network.getViewPosition();
-            const payload = { fixed: true, scale, position, timestamp: Date.now() };
+
+            // Capture Connection Types position
+            const legend = document.getElementById('connection-legend');
+            let connPos = null;
+            if (legend) {
+                connPos = {
+                    left: legend.style.left || null,
+                    top: legend.style.top || null,
+                    visible: !legend.classList.contains('hidden')
+                };
+            }
+
+            const payload = { 
+                fixed: true, 
+                scale, 
+                position, 
+                connectionLegend: connPos,
+                timestamp: Date.now() 
+            };
             localStorage.setItem(fixedKey, JSON.stringify(payload));
             localStorage.setItem(MapApp.network.getViewStorageKey(), JSON.stringify({ scale, position }));
+            if (connPos && (connPos.left || connPos.top)) {
+                MapApp.network.saveConnectionLegendPos(connPos);
+            }
             MapApp.network.updateFixZoomUI(true);
             if (window.notyf) {
-                window.notyf.success('Current zoom level fixed for this map!');
+                window.notyf.success('Current zoom & Connection Types position fixed!');
             }
         }
     },
@@ -146,6 +248,7 @@ MapApp.network = {
         if (!MapApp.state.network || !MapApp.state.currentMapId) return;
 
         MapApp.network.updateFixZoomUI();
+        MapApp.network.restoreConnectionLegendPos();
 
         let saved = null;
         const fixedData = MapApp.network.getFixedZoomData();

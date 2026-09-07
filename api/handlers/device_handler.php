@@ -919,10 +919,10 @@ switch ($action) {
             $stmt->execute([
                 $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['subchoice'] ?? 0, $input['description'] ?? null, $input['map_id'] ?? null,
                 $input['x'] ?? null, $input['y'] ?? null,
-                $input['ping_interval'] ?? null, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
+                $input['ping_interval'] ?? 10, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['name_text_color'] ?? '#ffffff', $input['name_text_bold'] ?? 0, $input['name_text_italic'] ?? 0, $input['icon_url'] ?? null,
                 $input['router_api_username'] ?? null, $input['router_api_password'] ?? null, $input['router_api_port'] ?? null,
-                $input['warning_latency_threshold'] ?? null, $input['warning_packetloss_threshold'] ?? null,
-                $input['critical_latency_threshold'] ?? null, $input['critical_packetloss_threshold'] ?? null,
+                $input['warning_latency_threshold'] ?? 400, $input['warning_packetloss_threshold'] ?? 50,
+                $input['critical_latency_threshold'] ?? 500, $input['critical_packetloss_threshold'] ?? 100,
                 ($input['show_live_ping'] ?? false) ? 1 : 0,
                 $portConfigValue
             ]);
