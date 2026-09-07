@@ -1483,7 +1483,7 @@ function initMap() {
                 document.getElementById('mapBgColor').value = currentMap.background_color || '#1e293b';
                 document.getElementById('mapBgColorHex').value = currentMap.background_color || '#1e293b';
                 document.getElementById('mapBgImageUrl').value = currentMap.background_image_url || '';
-                document.getElementById('offlineDelaySeconds').value = currentMap.offline_delay_seconds ?? 5;
+                document.getElementById('offlineDelaySeconds').value = currentMap.offline_delay_seconds ?? 30;
                 els.publicViewToggle.checked = currentMap.public_view_enabled;
                 MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
                 applyTooltipFieldCheckboxes(loadTooltipFieldsForMap(currentMap.id));
@@ -1533,7 +1533,7 @@ function initMap() {
                 e.preventDefault();
                 try {
                     const offlineDelayInput = document.getElementById('offlineDelaySeconds');
-                    const offlineDelay = offlineDelayInput ? parseInt(offlineDelayInput.value, 10) : 5;
+                    const offlineDelay = offlineDelayInput ? parseInt(offlineDelayInput.value, 10) : 30;
                     const bgColorHexInput = document.getElementById('mapBgColorHex');
                     const bgImageUrlInput = document.getElementById('mapBgImageUrl');
                     
@@ -1541,7 +1541,7 @@ function initMap() {
                         background_color: bgColorHexInput ? bgColorHexInput.value : '#1e293b',
                         background_image_url: bgImageUrlInput ? bgImageUrlInput.value : '',
                         public_view_enabled: els.publicViewToggle ? els.publicViewToggle.checked : false,
-                        offline_delay_seconds: (!isNaN(offlineDelay) && offlineDelay >= 1 && offlineDelay <= 300) ? offlineDelay : 5
+                        offline_delay_seconds: (!isNaN(offlineDelay) && offlineDelay >= 1 && offlineDelay <= 300) ? offlineDelay : 30
                     };
                     
                     saveTooltipFieldsForMap(state.currentMapId, readTooltipFieldCheckboxes());
@@ -1561,9 +1561,9 @@ function initMap() {
                         mapEl.style.backgroundImage = updates.background_image_url ? `url(${updates.background_image_url})` : '';
                     }
                     MapApp.mapManager.updatePublicViewLink(state.currentMapId, updates.public_view_enabled);
-                    MapApp.config.offlineDelayMs = (updates.offline_delay_seconds || 5) * 1000;
+                    MapApp.config.offlineDelayMs = (updates.offline_delay_seconds || 30) * 1000;
                     const delayBadge = document.getElementById('offlineDelayValue');
-                    if (delayBadge) delayBadge.textContent = updates.offline_delay_seconds || 5;
+                    if (delayBadge) delayBadge.textContent = updates.offline_delay_seconds || 30;
 
                     if (typeof refreshNodeTooltips === 'function') refreshNodeTooltips();
                     if (typeof refreshEdgeTooltips === 'function') refreshEdgeTooltips();

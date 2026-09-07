@@ -332,7 +332,7 @@ MapApp.mapManager = {
             // Update public view link display
             MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
             // Apply offline delay setting
-            const delaySeconds = currentMap.offline_delay_seconds || 5;
+            const delaySeconds = currentMap.offline_delay_seconds || 30;
             MapApp.config.offlineDelayMs = delaySeconds * 1000;
             // Update offline delay badge in toolbar
             const delayBadge = document.getElementById('offlineDelayValue');

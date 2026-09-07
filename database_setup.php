@@ -258,7 +258,7 @@ try {
             `background_image_url` VARCHAR(255) NULL,
             `is_default` BOOLEAN DEFAULT FALSE,
             `public_view_enabled` BOOLEAN DEFAULT FALSE,
-            `offline_delay_seconds` INT(6) NOT NULL DEFAULT 5,
+            `offline_delay_seconds` INT(6) NOT NULL DEFAULT 30,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
@@ -273,6 +273,7 @@ try {
             `name` VARCHAR(100) NOT NULL,
             `status` ENUM('online', 'offline', 'unknown', 'warning', 'critical') DEFAULT 'unknown',
             `last_seen` TIMESTAMP NULL,
+            `first_failed_at` TIMESTAMP NULL DEFAULT NULL,
             `type` VARCHAR(50) NOT NULL DEFAULT 'server',
             `subchoice` TINYINT UNSIGNED NOT NULL DEFAULT 0,
             `description` TEXT,

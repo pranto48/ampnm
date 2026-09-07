@@ -705,8 +705,8 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     <h3 class="text-lg font-semibold text-white">Offline Detection</h3>
                     <div>
                         <label for="offlineDelaySeconds" class="block text-sm font-medium text-slate-400 mb-1">Offline Delay (seconds)</label>
-                        <input type="number" id="offlineDelaySeconds" name="offline_delay_seconds" min="1" max="300" value="5" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 text-white">
-                        <p class="text-xs text-slate-500 mt-1">How many seconds a device must fail pings before being marked offline. Default: 5</p>
+                        <input type="number" id="offlineDelaySeconds" name="offline_delay_seconds" min="1" max="300" value="30" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 text-white">
+                        <p class="text-xs text-slate-500 mt-1">How many seconds a device must fail pings before being marked offline (Standard: 30s, Critical at 20s). Default: 30</p>
                     </div>
                 </div>
                 <div class="border-t border-slate-700 pt-4 mt-4 space-y-3">
