@@ -29,6 +29,8 @@ RUN set -eux; \
         libwebp-dev \
         libxml2-dev \
         libzip-dev \
+        libssh2-1-dev \
+        openssh-client \
         pkg-config; \
     rm -rf /var/lib/apt/lists/*
 
@@ -47,7 +49,7 @@ RUN set -eux; \
 RUN git config --system --add safe.directory '*'
 
 
-# Compile and enable the required PHP extensions
+# Compile and enable the required PHP extensions including ssh2 and sockets for interactive PTY
 RUN set -eux; \
     docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
     docker-php-ext-install -j"$(nproc)" \
@@ -59,7 +61,10 @@ RUN set -eux; \
         intl \
         opcache \
         pdo_mysql \
-        zip
+        sockets \
+        zip; \
+    pecl install ssh2-1.4.1; \
+    docker-php-ext-enable ssh2;
 
 # Enable Apache's mod_rewrite for pretty URLs
 RUN a2enmod rewrite

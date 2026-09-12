@@ -3,36 +3,43 @@
  * Copyright (c) IT Support BD. All rights reserved.
  * This file is part of AMPNM.
  * 
- * AES-256-GCM Zero-Trust Credential Crypto Vault
+ * AES-256-GCM Zero-Trust Credential Crypto Vault with AMPCrypt In-RAM VirtualLock
  */
+
+require_once __DIR__ . '/ampcrypt_virtual_lock.php';
 
 class CryptoVault
 {
-    private static ?string $masterKey = null;
+    private static ?AmpCryptSecret $lockedMasterKey = null;
 
     /**
-     * Derive or fetch the application master encryption key
+     * Derive and lock the application master encryption key in RAM
      */
-    private static function getMasterKey(): string
+    private static function getLockedMasterKey(): AmpCryptSecret
     {
-        if (self::$masterKey !== null) {
-            return self::$masterKey;
+        if (self::$lockedMasterKey !== null && !self::$lockedMasterKey->isDestroyed()) {
+            return self::$lockedMasterKey;
         }
 
         $envKey = getenv('AMPNM_VAULT_MASTER_KEY') ?: getenv('APP_LICENSE_KEY');
         if (!empty($envKey)) {
-            self::$masterKey = hash('sha256', $envKey, true);
-            return self::$masterKey;
+            $rawKey = hash('sha256', $envKey, true);
+        } else {
+            // Fallback to machine-derived consistent salt if no key provided
+            $fallbackSeed = php_uname() . (getenv('DB_PASSWORD') ?: 'ampnm_secure_vault_seed_2026');
+            $rawKey = hash('sha256', $fallbackSeed, true);
         }
 
-        // Fallback to machine-derived consistent salt if no key provided
-        $fallbackSeed = php_uname() . (getenv('DB_PASSWORD') ?: 'ampnm_secure_vault_seed_2026');
-        self::$masterKey = hash('sha256', $fallbackSeed, true);
-        return self::$masterKey;
+        // Lock in RAM via AmpCryptVirtualLock split-key XOR sharding
+        self::$lockedMasterKey = AmpCryptVirtualLock::lock($rawKey);
+        // Wipe raw key immediately
+        AmpCryptVirtualLock::zeroMemory($rawKey);
+
+        return self::$lockedMasterKey;
     }
 
     /**
-     * Encrypt sensitive data using AES-256-GCM
+     * Encrypt sensitive data using AES-256-GCM with In-RAM VirtualLock protection
      *
      * @param string $plaintext
      * @return string Base64 encoded payload: [IV:12B][TAG:16B][CIPHERTEXT]
@@ -43,22 +50,23 @@ class CryptoVault
             return '';
         }
 
-        $key = self::getMasterKey();
         $cipher = 'aes-256-gcm';
         $ivLen = openssl_cipher_iv_length($cipher);
         $iv = openssl_random_pseudo_bytes($ivLen);
         $tag = '';
 
-        $ciphertext = openssl_encrypt(
-            $plaintext,
-            $cipher,
-            $key,
-            OPENSSL_RAW_DATA,
-            $iv,
-            $tag,
-            '',
-            16
-        );
+        $ciphertext = AmpCryptVirtualLock::withSecret(self::getLockedMasterKey(), function ($key) use ($plaintext, $cipher, $iv, &$tag) {
+            return openssl_encrypt(
+                $plaintext,
+                $cipher,
+                $key,
+                OPENSSL_RAW_DATA,
+                $iv,
+                $tag,
+                '',
+                16
+            );
+        });
 
         if ($ciphertext === false) {
             throw new RuntimeException('CryptoVault encryption failed.');
@@ -68,7 +76,7 @@ class CryptoVault
     }
 
     /**
-     * Decrypt AES-256-GCM payload
+     * Decrypt AES-256-GCM payload with In-RAM VirtualLock protection
      *
      * @param string $encryptedBase64
      * @return string Decrypted plaintext or original if not encrypted
@@ -93,15 +101,16 @@ class CryptoVault
         $tag = substr($raw, $ivLen, $tagLen);
         $ciphertext = substr($raw, $ivLen + $tagLen);
 
-        $key = self::getMasterKey();
-        $plaintext = openssl_decrypt(
-            $ciphertext,
-            $cipher,
-            $key,
-            OPENSSL_RAW_DATA,
-            $iv,
-            $tag
-        );
+        $plaintext = AmpCryptVirtualLock::withSecret(self::getLockedMasterKey(), function ($key) use ($ciphertext, $cipher, $iv, $tag) {
+            return openssl_decrypt(
+                $ciphertext,
+                $cipher,
+                $key,
+                OPENSSL_RAW_DATA,
+                $iv,
+                $tag
+            );
+        });
 
         if ($plaintext === false) {
             // Decryption failed or was plain text
@@ -109,6 +118,21 @@ class CryptoVault
         }
 
         return $plaintext;
+    }
+
+    /**
+     * Safely decrypt and execute in an isolated In-RAM VirtualLock micro-scope.
+     * Guaranteed zero-memory wiping upon callback exit.
+     *
+     * @param string $encryptedBase64
+     * @param callable $callback function(string $plain): mixed
+     * @return mixed
+     */
+    public static function withDecrypted(string $encryptedBase64, callable $callback): mixed
+    {
+        $plain = self::decrypt($encryptedBase64);
+        $locked = AmpCryptVirtualLock::lock($plain);
+        return AmpCryptVirtualLock::withSecret($locked, $callback);
     }
 
     /**

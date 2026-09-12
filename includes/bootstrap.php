@@ -11,6 +11,10 @@
 // It handles basic setup like loading functions and checking database integrity.
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/ampcrypt_virtual_lock.php';
+
+// Initialize AMPCrypt In-RAM VirtualLock process hardening (anti-dump & exception sanitization)
+AmpCryptVirtualLock::initProcessHardening();
 
 // This script should not run on the setup page itself to avoid a redirect loop.
 if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
