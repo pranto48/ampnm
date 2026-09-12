@@ -13,8 +13,8 @@ DOCKER_USERNAME="${DOCKER_USERNAME:-itsupportbd}"
 REPO="${DOCKER_USERNAME}/ampnm"
 TAG_LATEST="${REPO}:latest"
 
-# Get version tag from command line parameter, defaulting to V1.19
-VERSION_TAG="${1:-V1.19}"
+# Get version tag from command line parameter, defaulting to V1.23
+VERSION_TAG="${1:-V1.23}"
 
 # Ensure it starts with uppercase V
 if [[ ! "$VERSION_TAG" =~ ^[vV] ]]; then

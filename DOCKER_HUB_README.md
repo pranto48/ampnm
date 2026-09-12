@@ -20,6 +20,8 @@ All AMPNM components are versioned together under a unified release cycle.
 | Tag | Description | Status |
 |-----|-------------|--------|
 | `latest` | Always points to the most recent stable release | ✅ Stable |
+| `v1.23` | Connection Flow Stop Badges, Packet Count Drop Mode, Web SSH Terminal, LLDP/CDP Auto-Wiring, IPAM, 42U Server Rack Elevation, Golden Config Compliance, AIOps RCA Engine | ✅ Stable |
+| `v1.22` | AIOps RCA Alert Storm Suppressor, Predictive Capacity Forecast, Auto-Remediation Runbooks, Synthetic Timing Waterfall, SLA Reports | ✅ Stable |
 | `v1.1.0` | Tamper-proof licensing, self-healing auth, open-source free tier | ✅ Stable |
 | `v1.0.0` | Initial Docker release with license verification | ✅ Legacy |
 | `nightly` | Latest development build (may be unstable) | ⚠️ Dev |

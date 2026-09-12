@@ -123,7 +123,7 @@ function getDockerHubUpdateStatus(): array {
         $httpCodeAll = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
-        $latestTag = 'v1.22';
+        $latestTag = 'v1.23';
         if ($httpCodeAll === 200 && $responseAll) {
             $dataAll = json_decode($responseAll, true);
             if (!empty($dataAll['results'])) {
@@ -137,7 +137,7 @@ function getDockerHubUpdateStatus(): array {
                 }
             }
         }
-        $currentTag = 'v1.22';
+        $currentTag = 'v1.23';
         $tagOutput = trim(shell_exec('git describe --tags --abbrev=0 2>/dev/null') ?? '');
         if (!empty($tagOutput)) {
             $currentTag = strtolower($tagOutput);

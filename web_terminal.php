@@ -80,7 +80,7 @@ if (isset($_GET['action'])) {
 
             if (stripos($command, 'show version') !== false || stripos($command, 'uname') !== false) {
                 $output .= "Device: " . ($device['name'] ?? 'Core Switch') . "\n";
-                $output .= "OS: AMPNM Embedded Micro-OS v1.22\n";
+                $output .= "OS: AMPNM Embedded Micro-OS v1.23\n";
                 $output .= "Uptime: 48 days, 14 hours, 22 minutes\n";
                 $output .= "System MAC: " . ($device['mac_address'] ?: '00:1A:2B:3C:4D:5E') . "\n";
             } elseif (stripos($command, 'show ip int brief') !== false || stripos($command, 'ip a') !== false) {
@@ -188,7 +188,7 @@ require_once 'header.php';
         <!-- Terminal Console Screen -->
         <div id="termScreen" class="p-6 bg-slate-950 font-mono text-xs text-cyan-300 min-h-[420px] max-h-[550px] overflow-y-auto space-y-2 select-text shadow-inner">
             <div class="text-slate-500">
-                AMPNM Web Terminal Gateway v1.22 [Secure Zero-Trust Session]<br>
+                AMPNM Web Terminal Gateway v1.23 [Secure Zero-Trust Session]<br>
                 Connected to local secure relay daemon.<br>
                 Type commands below or use quick action buttons.<br>
                 ----------------------------------------------------------------------
