@@ -441,8 +441,11 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </h3>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs text-slate-400 mb-1">Line Thickness (px)</label>
-                            <input id="edgeThickness" type="number" min="1" max="10" value="2" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs text-slate-400">Line Thickness (px)</label>
+                                <button type="button" id="resetEdgeThicknessBtn" class="text-[10px] text-cyan-400 hover:text-cyan-300 underline">Reset to Global</button>
+                            </div>
+                            <input id="edgeThickness" type="number" min="1" max="16" step="0.5" placeholder="Default (Global)" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
                         </div>
                         <div>
                             <label class="block text-xs text-slate-400 mb-1">Line Style</label>
@@ -856,7 +859,7 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-700/80">
                         <div>
                             <label for="globalLineThickness" class="block text-xs font-medium text-slate-400 mb-1">Global Line Thickness <span id="globalLineThicknessValue" class="text-cyan-400">2px</span></label>
-                            <input id="globalLineThickness" type="range" min="1" max="8" step="0.5" value="2" class="w-full accent-cyan-500">
+                            <input id="globalLineThickness" type="range" min="1" max="16" step="0.5" value="2" class="w-full accent-cyan-500">
                             <p class="text-xs text-slate-500 mt-1">Applies to all connection lines on this map. Individual overrides take priority.</p>
                         </div>
                         <div>

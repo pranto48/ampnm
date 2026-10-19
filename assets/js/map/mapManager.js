@@ -372,12 +372,64 @@ MapApp.mapManager = {
         }
         
         // Correctly extract the 'devices' array from the API response
-        const [deviceResponse, edgeData] = await Promise.all([
+        const [deviceResponse, edgeData, userSettingsRes] = await Promise.all([
             MapApp.api.get('get_devices', { map_id: mapId }), 
-            MapApp.api.get('get_edges', { map_id: mapId })
+            MapApp.api.get('get_edges', { map_id: mapId }),
+            MapApp.api.get('get_user_map_settings', { map_id: mapId }).catch(() => null)
         ]);
         const deviceData = deviceResponse.devices || []; // Extract the array here
         const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+        
+        if (userSettingsRes && userSettingsRes.success && userSettingsRes.settings) {
+            const uSettings = userSettingsRes.settings;
+            try {
+                if (uSettings.fixed_zoom) {
+                    localStorage.setItem(`ampnm_map_zoom_fixed:${userStorageId}:${mapId}`, JSON.stringify(uSettings.fixed_zoom));
+                } else if (uSettings.fixed_zoom === null) {
+                    localStorage.removeItem(`ampnm_map_zoom_fixed:${userStorageId}:${mapId}`);
+                }
+                if (uSettings.view) {
+                    localStorage.setItem(`ampnm_map_view:${userStorageId}:${mapId}`, JSON.stringify(uSettings.view));
+                }
+                if (uSettings.connection_legend) {
+                    localStorage.setItem(`ampnm_connection_legend_pos:${userStorageId}:${mapId}`, JSON.stringify(uSettings.connection_legend));
+                }
+                if (uSettings.node_positions) {
+                    localStorage.setItem(`ampnm_map_node_positions:${userStorageId}:${mapId}`, JSON.stringify(uSettings.node_positions));
+                }
+                if (uSettings.tooltip_display) {
+                    localStorage.setItem(`ampnm_tooltip_display:${userStorageId}:${mapId}`, JSON.stringify(uSettings.tooltip_display));
+                    localStorage.setItem(`mapTooltipDisplay:${mapId}`, JSON.stringify(uSettings.tooltip_display));
+                    MapApp.state.tooltipDisplaySettingsByMap = MapApp.state.tooltipDisplaySettingsByMap || {};
+                    MapApp.state.tooltipDisplaySettingsByMap[mapId] = uSettings.tooltip_display;
+                }
+                if (uSettings.tooltip_fields) {
+                    localStorage.setItem(`ampnm_tooltip_fields:${userStorageId}:${mapId}`, JSON.stringify(uSettings.tooltip_fields));
+                    localStorage.setItem(`mapTooltipFields:${mapId}`, JSON.stringify(uSettings.tooltip_fields));
+                    MapApp.state.tooltipFieldSettingsByMap = MapApp.state.tooltipFieldSettingsByMap || {};
+                    MapApp.state.tooltipFieldSettingsByMap[mapId] = uSettings.tooltip_fields;
+                }
+                if (uSettings.connection_tooltip_fields) {
+                    localStorage.setItem(`ampnm_conn_tooltip_fields:${userStorageId}:${mapId}`, JSON.stringify(uSettings.connection_tooltip_fields));
+                    localStorage.setItem(`mapConnectionTooltipFields:${mapId}`, JSON.stringify(uSettings.connection_tooltip_fields));
+                    MapApp.state.connectionTooltipFieldSettingsByMap = MapApp.state.connectionTooltipFieldSettingsByMap || {};
+                    MapApp.state.connectionTooltipFieldSettingsByMap[mapId] = uSettings.connection_tooltip_fields;
+                }
+            } catch (e) {
+                console.warn('Error hydrating user map settings:', e);
+            }
+        } else if (currentMap && currentMap.settings) {
+            try {
+                const mapDef = typeof currentMap.settings === 'string' ? JSON.parse(currentMap.settings) : currentMap.settings;
+                if (mapDef && mapDef.tooltip_display) {
+                    MapApp.state.tooltipDisplaySettingsByMap = MapApp.state.tooltipDisplaySettingsByMap || {};
+                    if (!MapApp.state.tooltipDisplaySettingsByMap[mapId]) {
+                        MapApp.state.tooltipDisplaySettingsByMap[mapId] = mapDef.tooltip_display;
+                    }
+                }
+            } catch (e) {}
+        }
+
         const nodePosStorageKey = `ampnm_map_node_positions:${userStorageId}:${mapId}`;
         let nodePositionOverrides = {};
         try {
@@ -481,7 +533,12 @@ MapApp.mapManager = {
             const title = MapApp.utils.buildEdgeTitle(e, srcDevice, tgtDevice);
             
             // Format Vis.js custom properties
-            const width = parseInt(e.thickness) || 2;
+            const displaySettings = (MapApp.utils && typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function')
+                ? MapApp.utils.getCurrentTooltipDisplaySettings()
+                : { connection_line_thickness: 2 };
+            const defaultThickness = Math.max(1, Math.min(16, parseFloat(displaySettings.connection_line_thickness) || 2));
+            const hasCustomThickness = e.thickness !== null && e.thickness !== undefined && e.thickness !== '' && !isNaN(Number(e.thickness)) && Number(e.thickness) > 0;
+            const width = hasCustomThickness ? Math.max(1, Math.min(16, parseFloat(e.thickness))) : defaultThickness;
             const color = e.color ? { color: e.color, hover: e.color, highlight: e.color } : undefined;
             
             let dashes = false;
@@ -513,7 +570,7 @@ MapApp.mapManager = {
                 color,
                 dashes,
                 arrows,
-                custom_thickness: e.thickness,
+                custom_thickness: hasCustomThickness ? parseFloat(e.thickness) : null,
                 custom_color: e.color,
                 custom_line_style: e.line_style,
                 custom_arrows: e.arrows,

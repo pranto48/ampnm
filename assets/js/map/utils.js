@@ -355,8 +355,14 @@ MapApp.utils = {
         let mapSettings = MapApp.state?.tooltipFieldSettingsByMap?.[currentMapId] || {};
         if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
             try {
-                const raw = localStorage.getItem(`mapTooltipFields:${currentMapId}`);
-                mapSettings = raw ? JSON.parse(raw) : {};
+                const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+                const userRaw = localStorage.getItem(`ampnm_tooltip_fields:${userStorageId}:${currentMapId}`);
+                if (userRaw) {
+                    mapSettings = JSON.parse(userRaw);
+                } else {
+                    const raw = localStorage.getItem(`mapTooltipFields:${currentMapId}`);
+                    mapSettings = raw ? JSON.parse(raw) : {};
+                }
             } catch (error) {
                 mapSettings = {};
             }
@@ -371,8 +377,19 @@ MapApp.utils = {
         let mapSettings = MapApp.state?.tooltipDisplaySettingsByMap?.[currentMapId] || {};
         if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
             try {
-                const raw = localStorage.getItem(`mapTooltipDisplay:${currentMapId}`);
-                mapSettings = raw ? JSON.parse(raw) : {};
+                const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+                const userRaw = localStorage.getItem(`ampnm_tooltip_display:${userStorageId}:${currentMapId}`);
+                if (userRaw) {
+                    mapSettings = JSON.parse(userRaw);
+                } else {
+                    const raw = localStorage.getItem(`mapTooltipDisplay:${currentMapId}`);
+                    if (raw) {
+                        mapSettings = JSON.parse(raw);
+                    } else {
+                        const globalRaw = localStorage.getItem('ampnm_tooltip_display_settings');
+                        mapSettings = globalRaw ? JSON.parse(globalRaw) : {};
+                    }
+                }
             } catch (error) {
                 mapSettings = {};
             }
@@ -387,8 +404,14 @@ MapApp.utils = {
         let mapSettings = MapApp.state?.connectionTooltipFieldSettingsByMap?.[currentMapId] || {};
         if ((!mapSettings || Object.keys(mapSettings).length === 0) && typeof localStorage !== 'undefined') {
             try {
-                const raw = localStorage.getItem(`mapConnectionTooltipFields:${currentMapId}`);
-                mapSettings = raw ? JSON.parse(raw) : {};
+                const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+                const userRaw = localStorage.getItem(`ampnm_conn_tooltip_fields:${userStorageId}:${currentMapId}`);
+                if (userRaw) {
+                    mapSettings = JSON.parse(userRaw);
+                } else {
+                    const raw = localStorage.getItem(`mapConnectionTooltipFields:${currentMapId}`);
+                    mapSettings = raw ? JSON.parse(raw) : {};
+                }
             } catch (error) {
                 mapSettings = {};
             }

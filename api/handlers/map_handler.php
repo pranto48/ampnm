@@ -15,7 +15,7 @@ $groupIdsStr = implode(',', array_map('intval', $current_group_user_ids));
 
 switch ($action) {
     case 'get_maps':
-        $sql = "SELECT m.id, m.parent_map_id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id IN ($groupIdsStr)) as deviceCount FROM maps m WHERE m.user_id IN ($groupIdsStr)";
+        $sql = "SELECT m.id, m.parent_map_id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.settings, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id IN ($groupIdsStr)) as deviceCount FROM maps m WHERE m.user_id IN ($groupIdsStr)";
         $params = [];
         $sql .= " ORDER BY m.created_at ASC";
 
@@ -45,7 +45,7 @@ switch ($action) {
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Map ID and updates are required']); exit; }
             
-            $allowed_fields = ['name', 'parent_map_id', 'background_color', 'background_image_url', 'public_view_enabled', 'offline_delay_seconds'];
+            $allowed_fields = ['name', 'parent_map_id', 'background_color', 'background_image_url', 'public_view_enabled', 'offline_delay_seconds', 'settings'];
             $fields = []; $params = [];
             foreach ($updates as $key => $value) {
                 if (in_array($key, $allowed_fields)) {
@@ -59,6 +59,8 @@ switch ($action) {
                             $delay = 5;
                         }
                         $params[] = $delay;
+                    } elseif ($key === 'settings') {
+                        $params[] = is_array($value) ? json_encode($value) : $value;
                     } else {
                         $params[] = ($value === '') ? null : $value;
                     }
@@ -103,6 +105,7 @@ switch ($action) {
     case 'create_edge':
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can create edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $edgeThickness = (isset($input['thickness']) && $input['thickness'] !== '' && $input['thickness'] !== null) ? floatval($input['thickness']) : null;
             $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type, source_port_label, target_port_label, thickness, color, line_style, arrows, label, animated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
@@ -113,7 +116,7 @@ switch ($action) {
                 $input['connection_type'] ?? 'cat5',
                 $input['source_port_label'] ?? null,
                 $input['target_port_label'] ?? null,
-                isset($input['thickness']) ? (int)$input['thickness'] : 2,
+                $edgeThickness,
                 $input['color'] ?? null,
                 $input['line_style'] ?? 'solid',
                 $input['arrows'] ?? 'none',
@@ -135,7 +138,7 @@ switch ($action) {
             $connection_type = $input['connection_type'] ?? 'cat6';
             $source_port_label = $input['source_port_label'] ?? null;
             $target_port_label = $input['target_port_label'] ?? null;
-            $thickness = isset($input['thickness']) ? (int)$input['thickness'] : 2;
+            $thickness = (isset($input['thickness']) && $input['thickness'] !== '' && $input['thickness'] !== null) ? floatval($input['thickness']) : null;
             $color = !empty($input['color']) ? $input['color'] : null;
             $line_style = $input['line_style'] ?? 'solid';
             $arrows = $input['arrows'] ?? 'none';
@@ -518,5 +521,50 @@ switch ($action) {
         $stmt->execute([$hours_ago, $map_id]);
         $device_states = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($device_states);
+        break;
+
+    case 'save_user_map_settings':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $map_id = isset($input['map_id']) ? intval($input['map_id']) : null;
+            $settings = $input['settings'] ?? [];
+            if (!$map_id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Map ID is required']);
+                exit;
+            }
+            $settingsJson = is_string($settings) ? $settings : json_encode($settings);
+
+            $stmt = $pdo->prepare("INSERT INTO user_map_settings (user_id, map_id, settings) 
+                VALUES (?, ?, ?) 
+                ON DUPLICATE KEY UPDATE settings = VALUES(settings), updated_at = CURRENT_TIMESTAMP");
+            $stmt->execute([$current_user_id, $map_id, $settingsJson]);
+
+            echo json_encode(['success' => true, 'message' => 'User map settings saved.']);
+        }
+        break;
+
+    case 'get_user_map_settings':
+        $map_id = isset($_GET['map_id']) ? intval($_GET['map_id']) : null;
+        if (!$map_id) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Map ID is required']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT settings FROM user_map_settings WHERE user_id = ? AND map_id = ?");
+        $stmt->execute([$current_user_id, $map_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $userSettings = ($row && !empty($row['settings'])) ? json_decode($row['settings'], true) : null;
+
+        $stmtMap = $pdo->prepare("SELECT settings FROM maps WHERE id = ?");
+        $stmtMap->execute([$map_id]);
+        $rowMap = $stmtMap->fetch(PDO::FETCH_ASSOC);
+        $mapSettings = ($rowMap && !empty($rowMap['settings'])) ? json_decode($rowMap['settings'], true) : null;
+
+        echo json_encode([
+            'success' => true,
+            'user_settings' => $userSettings,
+            'map_settings' => $mapSettings
+        ]);
         break;
 }

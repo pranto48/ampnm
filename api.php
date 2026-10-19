@@ -223,6 +223,8 @@ try {
         'get_rack_locations', 'get_rack_location', 'get_rack_units',
         // IPAM viewer
         'get_ipam_subnets', 'get_ipam_subnet', 'get_ipam_ips',
+        // User map settings
+        'get_user_map_settings',
     ];
 
     // Define specific POST actions that 'viewer' role can perform
@@ -230,6 +232,7 @@ try {
         'ping_all_devices', // ADDED: Allow viewers to trigger bulk pings
         'check_device',
         'update_device_status_by_ip',
+        'save_user_map_settings', // Allow viewers to save their own user-wise map settings
     ];
 
     // If user is a 'viewer', restrict actions
@@ -296,7 +299,7 @@ try {
         'dispatch_agent_command', 'get_agent_command_status', 'get_agent_services', 'restart_agent_service', 'get_agent_drives',
         'get_agent_software', 'get_agent_security_health'
     ];
-    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state'];
+    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state', 'get_user_map_settings', 'save_user_map_settings'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'save_log_backup_schedule', 'delete_log_backup_schedule', 'run_log_backup_now', 'run_due_log_backups'];

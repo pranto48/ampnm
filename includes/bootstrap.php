@@ -107,6 +107,40 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
                 $pdo->exec("ALTER TABLE `users` ADD COLUMN `user_group` VARCHAR(50) NOT NULL DEFAULT 'default_group'");
             } catch (Exception $e2) {}
         }
+
+        // Auto-migrate user_map_settings table for user-wise map configurations
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `user_map_settings` (
+                `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `user_id` INT(6) UNSIGNED NOT NULL,
+                `map_id` INT(6) UNSIGNED NOT NULL,
+                `settings` LONGTEXT NOT NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY `idx_user_map` (`user_id`, `map_id`),
+                FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+                FOREIGN KEY (`map_id`) REFERENCES `maps`(`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (Exception $e2) {}
+
+        // Auto-migrate maps table for settings column
+        try {
+            $pdo->query("SELECT `settings` FROM `maps` LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $pdo->exec("ALTER TABLE `maps` ADD COLUMN `settings` LONGTEXT NULL DEFAULT NULL");
+            } catch (Exception $e2) {}
+        }
+
+        // Auto-migrate device_edges thickness column to allow NULL
+        try {
+            $pdo->exec("ALTER TABLE `device_edges` MODIFY COLUMN `thickness` DECIMAL(4,1) NULL DEFAULT NULL");
+        } catch (Exception $e2) {}
+
+        // Clean legacy default thickness 2 on device_edges so they inherit map global thickness
+        try {
+            $pdo->exec("UPDATE `device_edges` SET `thickness` = NULL WHERE `thickness` = 2 OR `thickness` = 2.0");
+        } catch (Exception $e2) {}
     } catch (PDOException $e) {
         // Check for the specific "table not found" error.
         if (strpos($e->getMessage(), 'Base table or view not found') !== false) {

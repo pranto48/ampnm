@@ -28,6 +28,34 @@ function stopEdgeAnimation() {
 MapApp.network = {
     isRestoringView: false,
     _saveViewTimeout: null,
+    _syncDbTimeout: null,
+    _pendingDbSettings: {},
+
+    syncUserMapSettingsToDB: (partialSettings) => {
+        if (!MapApp.state?.currentMapId) return;
+        clearTimeout(MapApp.network._syncDbTimeout);
+        MapApp.network._pendingDbSettings = {
+            ...(MapApp.network._pendingDbSettings || {}),
+            ...(partialSettings || {})
+        };
+        const targetMapId = MapApp.state.currentMapId;
+        MapApp.network._syncDbTimeout = setTimeout(async () => {
+            try {
+                const settingsToSave = MapApp.network._pendingDbSettings;
+                MapApp.network._pendingDbSettings = {};
+                if (!settingsToSave || Object.keys(settingsToSave).length === 0) return;
+                if (MapApp.api && typeof MapApp.api.post === 'function') {
+                    await MapApp.api.post('save_user_map_settings', {
+                        map_id: targetMapId,
+                        settings: settingsToSave
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not sync user settings to DB:', e);
+            }
+        }, 800);
+    },
+
     getUserStorageId: () => (window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest'),
     getViewStorageKey: () => `ampnm_map_view:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
     getFixedZoomStorageKey: () => `ampnm_map_zoom_fixed:${MapApp.network.getUserStorageId()}:${MapApp.state.currentMapId}`,
@@ -54,6 +82,7 @@ MapApp.network = {
         } catch (e) {
             // ignore
         }
+        MapApp.network.syncUserMapSettingsToDB({ connection_legend: data });
     },
 
     restoreConnectionLegendPos: () => {
@@ -175,6 +204,7 @@ MapApp.network = {
             if (window.notyf) {
                 window.notyf.info('Zoom & Connection Types position unpinned.');
             }
+            MapApp.network.syncUserMapSettingsToDB({ fixed_zoom: null });
         } else {
             const scale = MapApp.state.network.getScale();
             const position = MapApp.state.network.getViewPosition();
@@ -206,6 +236,7 @@ MapApp.network = {
             if (window.notyf) {
                 window.notyf.success('Current zoom & Connection Types position fixed!');
             }
+            MapApp.network.syncUserMapSettingsToDB({ fixed_zoom: payload, view: { scale, position }, connection_legend: connPos });
         }
     },
 
@@ -225,6 +256,7 @@ MapApp.network = {
                 const position = MapApp.state.network.getViewPosition();
                 if (typeof scale === 'number' && !isNaN(scale) && position && !isNaN(position.x) && !isNaN(position.y)) {
                     localStorage.setItem(MapApp.network.getViewStorageKey(), JSON.stringify({ scale, position }));
+                    MapApp.network.syncUserMapSettingsToDB({ view: { scale, position } });
                 }
             } catch (error) {
                 // Ignore storage error
@@ -242,6 +274,7 @@ MapApp.network = {
         }
         snapshot[String(nodeId)] = { x: position.x, y: position.y };
         localStorage.setItem(MapApp.network.getNodePosStorageKey(), JSON.stringify(snapshot));
+        MapApp.network.syncUserMapSettingsToDB({ node_positions: snapshot });
     },
 
     restoreSavedView: () => {

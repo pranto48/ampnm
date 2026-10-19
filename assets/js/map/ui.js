@@ -210,7 +210,16 @@ MapApp.ui = {
         document.getElementById('connectionType').value = edge.connection_type || '';
         
         // Populate custom edge style fields
-        document.getElementById('edgeThickness').value = edge.custom_thickness !== undefined ? edge.custom_thickness : 2;
+        const hasCustomThickness = edge.custom_thickness !== undefined && edge.custom_thickness !== null && edge.custom_thickness !== '' && !isNaN(Number(edge.custom_thickness)) && Number(edge.custom_thickness) > 0;
+        document.getElementById('edgeThickness').value = hasCustomThickness ? edge.custom_thickness : '';
+        const resetThicknessBtn = document.getElementById('resetEdgeThicknessBtn');
+        if (resetThicknessBtn) {
+            resetThicknessBtn.onclick = (e) => {
+                e.preventDefault();
+                document.getElementById('edgeThickness').value = '';
+                if (window.notyf) window.notyf.info('Line thickness reset to global map setting.');
+            };
+        }
         document.getElementById('edgeLineStyle').value = edge.custom_line_style || 'solid';
         
         const customColor = edge.custom_color || '';
@@ -388,8 +397,9 @@ MapApp.ui = {
                 const color = { color: colorVal, hover: colorVal, highlight: colorVal };
                 
                 // Thickness configuration
-                const defaultThickness = parseInt(displaySettings.connection_line_thickness) || 2;
-                const width = parseInt(edge.custom_thickness) || defaultThickness;
+                const defaultThickness = Math.max(1, Math.min(16, parseFloat(displaySettings.connection_line_thickness) || 2));
+                const hasCustomThickness = edge.custom_thickness !== null && edge.custom_thickness !== undefined && edge.custom_thickness !== '' && !isNaN(Number(edge.custom_thickness)) && Number(edge.custom_thickness) > 0;
+                const width = hasCustomThickness ? Math.max(1, Math.min(16, parseFloat(edge.custom_thickness))) : defaultThickness;
                 
                 // Dashes style configuration
                 let dashes = false;
@@ -413,6 +423,9 @@ MapApp.ui = {
             });
             if (updates.length > 0) {
                 MapApp.state.edges.update(updates);
+            }
+            if (MapApp.state.network) {
+                MapApp.state.network.redraw();
             }
         }
     },
@@ -651,13 +664,13 @@ MapApp.ui = {
         }
     },
 
-    saveConnectionSettings: () => {
+    saveConnectionSettings: async () => {
         const isAnim = document.getElementById('csEnableAnimation') ? document.getElementById('csEnableAnimation').checked : true;
         const glowMode = document.getElementById('csGlowMode')?.value || 'neon-laser';
         const glowRadius = parseInt(document.getElementById('csGlowRadius')?.value, 10) || 14;
         const flowStyle = document.getElementById('csFlowStyle')?.value || 'auto';
         const speed = parseFloat(document.getElementById('csSpeed')?.value) || 1.0;
-        const thickness = parseInt(document.getElementById('csThickness')?.value, 10) || 2;
+        const thickness = Math.max(1, Math.min(16, parseFloat(document.getElementById('csThickness')?.value) || 2));
         const bandwidthGlow = document.getElementById('csEnableBandwidthGlow') ? document.getElementById('csEnableBandwidthGlow').checked : true;
         
         const currentMapId = MapApp.state?.currentMapId;
@@ -676,14 +689,29 @@ MapApp.ui = {
             connection_enable_bandwidth_glow: bandwidthGlow
         };
 
+        const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
         if (currentMapId) {
             if (!MapApp.state.tooltipDisplaySettingsByMap) {
                 MapApp.state.tooltipDisplaySettingsByMap = {};
             }
             MapApp.state.tooltipDisplaySettingsByMap[currentMapId] = updatedSettings;
             try {
+                localStorage.setItem(`ampnm_tooltip_display:${userStorageId}:${currentMapId}`, JSON.stringify(updatedSettings));
                 localStorage.setItem(`mapTooltipDisplay:${currentMapId}`, JSON.stringify(updatedSettings));
             } catch (e) {}
+
+            try {
+                if (MapApp.api && typeof MapApp.api.post === 'function') {
+                    await MapApp.api.post('save_user_map_settings', {
+                        map_id: currentMapId,
+                        settings: {
+                            tooltip_display: updatedSettings
+                        }
+                    });
+                }
+            } catch (dbErr) {
+                console.warn('Could not sync connection settings to DB:', dbErr);
+            }
         }
 
         try {
@@ -691,10 +719,18 @@ MapApp.ui = {
             localStorage.setItem('ampnm_tooltip_display_settings', JSON.stringify({ ...stored, ...updatedSettings }));
         } catch (e) {}
 
+        // Sync inputs in map settings modal
+        const gThicknessInput = document.getElementById('globalLineThickness');
+        const gThicknessPx = document.getElementById('globalLineThicknessPx');
+        const gThicknessVal = document.getElementById('globalLineThicknessValue');
+        if (gThicknessInput) gThicknessInput.value = thickness;
+        if (gThicknessPx) gThicknessPx.value = thickness;
+        if (gThicknessVal) gThicknessVal.textContent = `${thickness}px`;
+
         MapApp.ui.syncConnectionAnimToggleUI(isAnim);
         closeModal('connectionSettingsModal');
         
-        if (window.notyf) window.notyf.success('Connection glow & flow settings saved!');
+        if (window.notyf) window.notyf.success('Connection settings saved!');
         MapApp.ui.updateStaticEdgeColors();
         if (MapApp.state.network) MapApp.state.network.redraw();
     }

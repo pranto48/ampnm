@@ -256,6 +256,7 @@ try {
             `description` TEXT,
             `background_color` VARCHAR(20) NULL,
             `background_image_url` VARCHAR(255) NULL,
+            `settings` LONGTEXT NULL,
             `is_default` BOOLEAN DEFAULT FALSE,
             `public_view_enabled` BOOLEAN DEFAULT FALSE,
             `offline_delay_seconds` INT(6) NOT NULL DEFAULT 30,
@@ -317,7 +318,7 @@ try {
             `target_id` INT(6) UNSIGNED NOT NULL,
             `map_id` INT(6) UNSIGNED NOT NULL,
             `connection_type` VARCHAR(50) DEFAULT 'cat6',
-            `thickness` INT DEFAULT 2,
+            `thickness` DECIMAL(4,1) DEFAULT NULL,
             `color` VARCHAR(50) DEFAULT NULL,
             `line_style` VARCHAR(20) DEFAULT 'solid',
             `arrows` VARCHAR(20) DEFAULT 'none',
@@ -327,6 +328,18 @@ try {
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`source_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`target_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE,
+            FOREIGN KEY (`map_id`) REFERENCES `maps`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+        "CREATE TABLE IF NOT EXISTS `user_map_settings` (
+            `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT(6) UNSIGNED NOT NULL,
+            `map_id` INT(6) UNSIGNED NOT NULL,
+            `settings` LONGTEXT NOT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `idx_user_map` (`user_id`, `map_id`),
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`map_id`) REFERENCES `maps`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
 
