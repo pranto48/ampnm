@@ -38,6 +38,7 @@ ampnm.zip
 
 # Runtime App Storage & Backups
 storage/*.json
+storage/backups/
 storage/logs/*
 data/
 uploads/

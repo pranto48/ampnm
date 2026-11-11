@@ -607,8 +607,8 @@ function checkDevicesInParallel(PDO $pdo, array $devices, string $userRole, int 
         }
 
         // Update database
-        $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ?, consecutive_drops = ? WHERE id = ?";
-        $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $consecutive_drops, $device['id']];
+        $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ?, consecutive_drops = ?, last_ping_output = ? WHERE id = ?";
+        $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $consecutive_drops, $eval['check_output'] ?? null, $device['id']];
 
         if ($userRole !== 'viewer') {
             $updateSql .= " AND user_id = ?";
@@ -867,8 +867,8 @@ switch ($action) {
             
             // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
             // This allows viewers to update the status of devices on shared maps.
-            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ?, consecutive_drops = ? WHERE id = ?";
-            $updateParams = [$status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $consecutive_drops, $deviceId];
+            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ?, first_failed_at = ?, consecutive_drops = ?, last_ping_output = ? WHERE id = ?";
+            $updateParams = [$status, $last_seen, $last_avg_time, $last_ttl, $first_failed_at, $consecutive_drops, $check_output, $deviceId];
 
             // Only add user_id filter if the user is NOT a viewer
             if ($user_role !== 'viewer') {
@@ -960,22 +960,12 @@ switch ($action) {
                 d.last_avg_time, d.last_ttl, d.show_live_ping, d.status, d.last_seen,
                 d.port_config,
                 m.name as map_name,
-                p.output as last_ping_output,
+                d.last_ping_output,
                 hm.cpu_usage, hm.memory_usage, hm.disk_usage, hm.network_in, hm.network_out, hm.last_seen AS agent_last_seen
             FROM 
                 devices d
             LEFT JOIN 
                 maps m ON d.map_id = m.id
-            LEFT JOIN 
-                ping_results p ON (
-                    d.ip IS NOT NULL AND d.ip != '' AND p.id = (
-                        SELECT id 
-                        FROM ping_results 
-                        WHERE host = d.ip 
-                        ORDER BY created_at DESC 
-                        LIMIT 1
-                    )
-                )
             LEFT JOIN 
                 host_metrics hm ON (
                     (d.ip IS NOT NULL AND d.ip != '' AND hm.ip_address = d.ip) OR 
@@ -1335,8 +1325,9 @@ switch ($action) {
             sendTelegramNotification($pdo, $device, $old_status, $status, $details);
             sendWhatsappNotification($pdo, $device, $old_status, $status, $details);
 
-            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, updated_at = CURRENT_TIMESTAMP WHERE ip = ? AND user_id IN ($groupIdsStr)";
-            $updateParams = [$status, $last_seen, $ip_address];
+            $last_ping_output = $input['last_ping_output'] ?? $input['output'] ?? null;
+            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_ping_output = COALESCE(?, last_ping_output), updated_at = CURRENT_TIMESTAMP WHERE ip = ? AND user_id IN ($groupIdsStr)";
+            $updateParams = [$status, $last_seen, $last_ping_output, $ip_address];
             $updateStmt = $pdo->prepare($updateSql);
             $updateStmt->execute($updateParams);
 

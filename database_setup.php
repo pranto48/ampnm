@@ -305,6 +305,7 @@ try {
             `last_avg_time` DECIMAL(10, 2) NULL,
             `last_ttl` INT(11) NULL,
             `show_live_ping` BOOLEAN DEFAULT FALSE,
+            `last_ping_output` TEXT NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
@@ -1274,6 +1275,24 @@ try {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `consecutive_drops` INT(11) NOT NULL DEFAULT 0 AFTER `offline_packet_count`;");
         message("Upgraded 'devices' table: added 'consecutive_drops' column.");
     }
+    if (!columnExists($pdo, $dbname, 'devices', 'last_ping_output')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `last_ping_output` TEXT NULL AFTER `show_live_ping`;");
+        message("Upgraded 'devices' table: added 'last_ping_output' column.");
+
+        // Backfill latest ping output for existing devices so UI immediately has them
+        $stmtDevs = $pdo->query("SELECT id, ip FROM devices WHERE ip IS NOT NULL AND ip != ''");
+        $devsToInit = $stmtDevs->fetchAll(PDO::FETCH_ASSOC);
+        $stmtLatestPing = $pdo->prepare("SELECT output FROM ping_results WHERE host = ? ORDER BY created_at DESC LIMIT 1");
+        $stmtUpdatePing = $pdo->prepare("UPDATE devices SET last_ping_output = ? WHERE id = ?");
+        foreach ($devsToInit as $dRow) {
+            $stmtLatestPing->execute([$dRow['ip']]);
+            $out = $stmtLatestPing->fetchColumn();
+            if ($out) {
+                $stmtUpdatePing->execute([$out, $dRow['id']]);
+            }
+        }
+        message("Backfilled 'last_ping_output' for existing devices.");
+    }
 
     // ==========================================
     // v1.20 MIGRATION: Agent Secure Remote Commanding
@@ -1334,11 +1353,17 @@ try {
 
     message("Applying database indexes for performance...");
     $indexes = [
-        'ping_results' => ['idx_host_created_at' => '(`host`, `created_at` DESC)'],
+        'ping_results' => [
+            'idx_host_created_at' => '(`host`, `created_at` DESC)',
+            'idx_created_at' => '(`created_at`)'
+        ],
         'devices' => [
             'idx_ip' => '(`ip`)',
             'idx_map_id' => '(`map_id`)',
             'idx_user_id' => '(`user_id`)'
+        ],
+        'host_metrics' => [
+            'idx_ip_address' => '(`ip_address`)'
         ],
         'device_status_logs' => ['idx_device_created' => '(`device_id`, `created_at` DESC)']
     ];
