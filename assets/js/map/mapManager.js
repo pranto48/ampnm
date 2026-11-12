@@ -380,45 +380,63 @@ MapApp.mapManager = {
         const deviceData = deviceResponse.devices || []; // Extract the array here
         const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
         
-        if (userSettingsRes && userSettingsRes.success && userSettingsRes.settings) {
-            const uSettings = userSettingsRes.settings;
-            try {
-                if (uSettings.fixed_zoom) {
-                    localStorage.setItem(`ampnm_map_zoom_fixed:${userStorageId}:${mapId}`, JSON.stringify(uSettings.fixed_zoom));
-                } else if (uSettings.fixed_zoom === null) {
-                    localStorage.removeItem(`ampnm_map_zoom_fixed:${userStorageId}:${mapId}`);
-                }
-                if (uSettings.view) {
-                    localStorage.setItem(`ampnm_map_view:${userStorageId}:${mapId}`, JSON.stringify(uSettings.view));
-                }
-                if (uSettings.connection_legend) {
-                    localStorage.setItem(`ampnm_connection_legend_pos:${userStorageId}:${mapId}`, JSON.stringify(uSettings.connection_legend));
-                }
-                if (uSettings.node_positions) {
-                    localStorage.setItem(`ampnm_map_node_positions:${userStorageId}:${mapId}`, JSON.stringify(uSettings.node_positions));
-                }
-                if (uSettings.tooltip_display) {
-                    localStorage.setItem(`ampnm_tooltip_display:${userStorageId}:${mapId}`, JSON.stringify(uSettings.tooltip_display));
-                    localStorage.setItem(`mapTooltipDisplay:${mapId}`, JSON.stringify(uSettings.tooltip_display));
-                    MapApp.state.tooltipDisplaySettingsByMap = MapApp.state.tooltipDisplaySettingsByMap || {};
-                    MapApp.state.tooltipDisplaySettingsByMap[mapId] = uSettings.tooltip_display;
-                }
-                if (uSettings.tooltip_fields) {
-                    localStorage.setItem(`ampnm_tooltip_fields:${userStorageId}:${mapId}`, JSON.stringify(uSettings.tooltip_fields));
-                    localStorage.setItem(`mapTooltipFields:${mapId}`, JSON.stringify(uSettings.tooltip_fields));
-                    MapApp.state.tooltipFieldSettingsByMap = MapApp.state.tooltipFieldSettingsByMap || {};
-                    MapApp.state.tooltipFieldSettingsByMap[mapId] = uSettings.tooltip_fields;
-                }
-                if (uSettings.connection_tooltip_fields) {
-                    localStorage.setItem(`ampnm_conn_tooltip_fields:${userStorageId}:${mapId}`, JSON.stringify(uSettings.connection_tooltip_fields));
-                    localStorage.setItem(`mapConnectionTooltipFields:${mapId}`, JSON.stringify(uSettings.connection_tooltip_fields));
-                    MapApp.state.connectionTooltipFieldSettingsByMap = MapApp.state.connectionTooltipFieldSettingsByMap || {};
-                    MapApp.state.connectionTooltipFieldSettingsByMap[mapId] = uSettings.connection_tooltip_fields;
-                }
-            } catch (e) {
-                console.warn('Error hydrating user map settings:', e);
+        if (userSettingsRes && userSettingsRes.success) {
+            if (userSettingsRes.global_connection_type_colors) {
+                MapApp.state.globalConnectionTypeColors = userSettingsRes.global_connection_type_colors;
+                try {
+                    localStorage.setItem('ampnm_global_connection_type_colors', JSON.stringify(userSettingsRes.global_connection_type_colors));
+                } catch (e) {}
             }
-        } else if (currentMap && currentMap.settings) {
+            if (currentMap && userSettingsRes.map_settings) {
+                currentMap.settings = userSettingsRes.map_settings;
+            }
+            const uSettings = userSettingsRes.user_settings || userSettingsRes.settings || null;
+            if (uSettings) {
+                try {
+                    if (uSettings.fixed_zoom) {
+                        localStorage.setItem(`ampnm_map_zoom_fixed:${userStorageId}:${mapId}`, JSON.stringify(uSettings.fixed_zoom));
+                    } else if (uSettings.fixed_zoom === null) {
+                        localStorage.removeItem(`ampnm_map_zoom_fixed:${userStorageId}:${mapId}`);
+                    }
+                    if (uSettings.view) {
+                        localStorage.setItem(`ampnm_map_view:${userStorageId}:${mapId}`, JSON.stringify(uSettings.view));
+                    }
+                    if (uSettings.connection_legend) {
+                        localStorage.setItem(`ampnm_connection_legend_pos:${userStorageId}:${mapId}`, JSON.stringify(uSettings.connection_legend));
+                    }
+                    if (uSettings.node_positions) {
+                        localStorage.setItem(`ampnm_map_node_positions:${userStorageId}:${mapId}`, JSON.stringify(uSettings.node_positions));
+                    }
+                    if (uSettings.tooltip_display) {
+                        localStorage.setItem(`ampnm_tooltip_display:${userStorageId}:${mapId}`, JSON.stringify(uSettings.tooltip_display));
+                        localStorage.setItem(`mapTooltipDisplay:${mapId}`, JSON.stringify(uSettings.tooltip_display));
+                        MapApp.state.tooltipDisplaySettingsByMap = MapApp.state.tooltipDisplaySettingsByMap || {};
+                        MapApp.state.tooltipDisplaySettingsByMap[mapId] = uSettings.tooltip_display;
+                    }
+                    if (uSettings.tooltip_fields) {
+                        localStorage.setItem(`ampnm_tooltip_fields:${userStorageId}:${mapId}`, JSON.stringify(uSettings.tooltip_fields));
+                        localStorage.setItem(`mapTooltipFields:${mapId}`, JSON.stringify(uSettings.tooltip_fields));
+                        MapApp.state.tooltipFieldSettingsByMap = MapApp.state.tooltipFieldSettingsByMap || {};
+                        MapApp.state.tooltipFieldSettingsByMap[mapId] = uSettings.tooltip_fields;
+                    }
+                    if (uSettings.connection_tooltip_fields) {
+                        localStorage.setItem(`ampnm_conn_tooltip_fields:${userStorageId}:${mapId}`, JSON.stringify(uSettings.connection_tooltip_fields));
+                        localStorage.setItem(`mapConnectionTooltipFields:${mapId}`, JSON.stringify(uSettings.connection_tooltip_fields));
+                        MapApp.state.connectionTooltipFieldSettingsByMap = MapApp.state.connectionTooltipFieldSettingsByMap || {};
+                        MapApp.state.connectionTooltipFieldSettingsByMap[mapId] = uSettings.connection_tooltip_fields;
+                    }
+                    if (uSettings.connection_type_colors) {
+                        localStorage.setItem(`ampnm_conn_type_colors:${userStorageId}:${mapId}`, JSON.stringify(uSettings.connection_type_colors));
+                        localStorage.setItem(`mapConnectionTypeColors:${mapId}`, JSON.stringify(uSettings.connection_type_colors));
+                        MapApp.state.connectionTypeColorsByMap = MapApp.state.connectionTypeColorsByMap || {};
+                        MapApp.state.connectionTypeColorsByMap[mapId] = MapApp.utils.sanitizeConnectionTypeColors(uSettings.connection_type_colors);
+                    }
+                } catch (e) {
+                    console.warn('Error hydrating user map settings:', e);
+                }
+            }
+        }
+        if (currentMap && currentMap.settings) {
             try {
                 const mapDef = typeof currentMap.settings === 'string' ? JSON.parse(currentMap.settings) : currentMap.settings;
                 if (mapDef && mapDef.tooltip_display) {
@@ -427,8 +445,17 @@ MapApp.mapManager = {
                         MapApp.state.tooltipDisplaySettingsByMap[mapId] = mapDef.tooltip_display;
                     }
                 }
+                if (mapDef && mapDef.connection_type_colors) {
+                    MapApp.state.connectionTypeColorsByMap = MapApp.state.connectionTypeColorsByMap || {};
+                    if (!MapApp.state.connectionTypeColorsByMap[mapId]) {
+                        MapApp.state.connectionTypeColorsByMap[mapId] = MapApp.utils.sanitizeConnectionTypeColors(mapDef.connection_type_colors);
+                    }
+                }
             } catch (e) {}
         }
+        // Ensure effective colors are hydrated in state for this map
+        MapApp.state.connectionTypeColorsByMap = MapApp.state.connectionTypeColorsByMap || {};
+        MapApp.state.connectionTypeColorsByMap[mapId] = MapApp.utils.getConnectionTypeColorsForMap(mapId);
 
         const nodePosStorageKey = `ampnm_map_node_positions:${userStorageId}:${mapId}`;
         let nodePositionOverrides = {};
@@ -591,6 +618,8 @@ MapApp.mapManager = {
 
         if (!MapApp.state.network) MapApp.network.initializeMap();
         else MapApp.network.restoreSavedView();
+        if (typeof MapApp.ui.renderConnectionLegend === 'function') MapApp.ui.renderConnectionLegend();
+        if (typeof MapApp.ui.syncConnectionTypeSelectColors === 'function') MapApp.ui.syncConnectionTypeSelectColors();
         MapApp.ui.updateStaticEdgeColors();
         MapApp.ui.startCanvasAnimationLoop();
         if (MapApp.ui && typeof MapApp.ui.syncConnectionAnimToggleUI === 'function') {

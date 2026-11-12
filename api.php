@@ -24,11 +24,26 @@ try {
         $map_id = $_GET['map_id'] ?? null;
         if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required.']); exit; }
 
-        $stmt_map = $pdo->prepare("SELECT id, name, background_color, background_image_url, public_view_enabled FROM maps WHERE id = ? AND public_view_enabled = TRUE");
+        $stmt_map = $pdo->prepare("SELECT id, name, background_color, background_image_url, public_view_enabled, settings FROM maps WHERE id = ? AND public_view_enabled = TRUE");
         $stmt_map->execute([$map_id]);
         $map = $stmt_map->fetch(PDO::FETCH_ASSOC);
 
         if (!$map) { http_response_code(404); echo json_encode(['error' => 'Map not found or not enabled for public view.']); exit; }
+
+        if (!empty($map['settings']) && is_string($map['settings'])) {
+            $decodedSettings = json_decode($map['settings'], true);
+            $map['settings'] = is_array($decodedSettings) ? $decodedSettings : null;
+        }
+        $globalConnColors = null;
+        try {
+            $stmtG = $pdo->prepare("SELECT setting_value FROM app_settings WHERE setting_key = 'connection_type_colors' LIMIT 1");
+            $stmtG->execute();
+            $gVal = $stmtG->fetchColumn();
+            if ($gVal) {
+                $decodedG = json_decode($gVal, true);
+                if (is_array($decodedG)) $globalConnColors = $decodedG;
+            }
+        } catch (Throwable $e) {}
 
         $stmt_devices = $pdo->prepare("
             SELECT 
@@ -53,14 +68,15 @@ try {
         $stmt_devices->execute([$map_id]);
         $devices = $stmt_devices->fetchAll(PDO::FETCH_ASSOC);
 
-        $stmt_edges = $pdo->prepare("SELECT id, source_id, target_id, connection_type FROM device_edges WHERE map_id = ?");
+        $stmt_edges = $pdo->prepare("SELECT id, source_id, target_id, connection_type, color, label, source_port_label, target_port_label FROM device_edges WHERE map_id = ?");
         $stmt_edges->execute([$map_id]);
         $edges = $stmt_edges->fetchAll(PDO::FETCH_ASSOC);
 
         echo json_encode([
             'map' => $map,
             'devices' => $devices,
-            'edges' => $edges
+            'edges' => $edges,
+            'global_connection_type_colors' => $globalConnColors
         ]);
         exit;
     }
@@ -291,7 +307,7 @@ try {
         'dispatch_agent_command', 'get_agent_command_status', 'get_agent_services', 'restart_agent_service', 'get_agent_drives',
         'get_agent_software', 'get_agent_security_health'
     ];
-    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state', 'get_user_map_settings', 'save_user_map_settings'];
+    $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'export_map', 'import_map', 'update_map', 'upload_map_background', 'get_device_used_ports', 'get_historical_map_state', 'get_user_map_settings', 'save_user_map_settings', 'save_global_connection_type_colors'];
     $dashboardActions = ['get_dashboard_data', 'get_server_metrics'];
     $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role', 'update_user_password'];
     $logActions = ['get_status_logs', 'get_downtime_summary', 'get_offline_logs', 'get_log_backup_schedules', 'save_log_backup_schedule', 'delete_log_backup_schedule', 'run_log_backup_now', 'run_due_log_backups'];

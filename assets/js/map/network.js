@@ -620,7 +620,9 @@ MapApp.network = {
                     : (rawEdge?.animated !== undefined ? (rawEdge.animated == 1 || rawEdge.animated === true || rawEdge.animated === '1') : true);
 
                 // Edge Color resolution
-                let edgeColor = (typeof bodyEdge?.options?.color === 'string' ? bodyEdge.options.color : bodyEdge?.options?.color?.color) || rawEdge?.custom_color || rawEdge?.color || '#00F2FE';
+                const rawColorStr = typeof rawEdge?.color === 'string' ? rawEdge.color : rawEdge?.color?.color;
+                const bodyColorStr = typeof bodyEdge?.options?.color === 'string' ? bodyEdge.options.color : bodyEdge?.options?.color?.color;
+                let edgeColor = rawEdge?.custom_color || rawColorStr || bodyColorStr || (MapApp.utils?.getConnectionTypeColor ? MapApp.utils.getConnectionTypeColor(rawEdge?.connection_type) : '#00F2FE');
                 if (isOffline) {
                     edgeColor = '#ef4444'; // Red alert pulse on offline links
                 } else if (isCritical) {

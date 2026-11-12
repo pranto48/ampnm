@@ -23,7 +23,7 @@ const statusColorMap = {
 };
 
 const edgeColorMap = {
-    cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8',
+    cat6: '#a78bfa', cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8',
     radio: '#84cc16', lan: '#60a5fa', 'logical-tunneling': '#c084fc'
 };
 
@@ -356,13 +356,9 @@ function buildEdgeTitle(edge, devices) {
         wifi: '📡 WiFi', radio: '📻 Radio', lan: '🌐 LAN',
         'logical-tunneling': '🔒 Logical Tunnel'
     };
-    const typeColors = {
-        cat6: '#a78bfa', cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8',
-        radio: '#84cc16', lan: '#60a5fa', 'logical-tunneling': '#c084fc'
-    };
     const connType = edge.connection_type || 'unknown';
     const connLabel = typeLabels[connType] || connType;
-    const connColor = typeColors[connType] || '#94a3b8';
+    const connColor = edge.color || edgeColorMap[connType] || (connType === 'cat5' ? edgeColorMap.cat6 : null) || '#94a3b8';
     const statusDotColors = { online: '#22c55e', warning: '#eab308', critical: '#ef4444', offline: '#64748b', unknown: '#94a3b8' };
 
     const srcDevice = devices.find(d => d.id === edge.source_id || d.id == edge.source_id);
@@ -401,9 +397,9 @@ function buildEdgeTitle(edge, devices) {
 }
 
 function buildVisEdge(edge, devices) {
-    const color = edgeColorMap[edge.connection_type] || edgeColorMap.cat5;
+    const color = edge.color || edgeColorMap[edge.connection_type] || (edge.connection_type === 'cat5' ? edgeColorMap.cat6 : null) || edgeColorMap.cat6 || edgeColorMap.cat5;
     const dashes = edgeDashMap[edge.connection_type] ?? false;
-    const label = edgeLabelMap[edge.connection_type] || edge.connection_type || '';
+    const label = edge.label || edgeLabelMap[edge.connection_type] || edge.connection_type || '';
     return {
         id: edge.id,
         from: edge.source_id,
@@ -415,7 +411,16 @@ function buildVisEdge(edge, devices) {
     };
 }
 
-function renderMap({ map, devices, edges }) {
+function renderMap({ map, devices, edges, global_connection_type_colors }) {
+    if (global_connection_type_colors && typeof global_connection_type_colors === 'object') {
+        Object.assign(edgeColorMap, global_connection_type_colors);
+    }
+    if (map?.settings?.connection_type_colors && typeof map.settings.connection_type_colors === 'object') {
+        Object.assign(edgeColorMap, map.settings.connection_type_colors);
+    }
+    if (edgeColorMap.cat6 && !global_connection_type_colors?.cat5 && !map?.settings?.connection_type_colors?.cat5) {
+        edgeColorMap.cat5 = edgeColorMap.cat6;
+    }
     mapTitle.textContent = map?.name || "Shared network map";
     mapSubtitle.textContent = map?.public_view_enabled ? "Public viewing enabled" : "Read-only preview";
     metaSummary.textContent = `${devices.length} devices • ${edges.length} links`;

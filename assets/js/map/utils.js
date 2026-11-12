@@ -419,6 +419,105 @@ MapApp.utils = {
         return { ...defaults, ...(mapSettings || {}) };
     },
 
+    normalizeHexColor: (value, fallback = '#a78bfa') => {
+        if (typeof value !== 'string') return fallback;
+        const trimmed = value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed.toLowerCase();
+        if (/^#[0-9a-fA-F]{3}$/.test(trimmed)) {
+            const r = trimmed[1], g = trimmed[2], b = trimmed[3];
+            return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+        }
+        return fallback;
+    },
+
+    getDefaultConnectionTypeColors: () => {
+        const defs = MapApp.config?.connectionTypeDefinitions || [];
+        if (defs.length > 0) {
+            return defs.reduce((acc, item) => {
+                acc[item.key] = item.defaultColor;
+                return acc;
+            }, {});
+        }
+        return { ...(MapApp.config?.edgeColorMap || {
+            cat6: '#a78bfa',
+            fiber: '#f97316',
+            wifi: '#38bdf8',
+            radio: '#84cc16',
+            lan: '#60a5fa',
+            'logical-tunneling': '#c084fc'
+        }) };
+    },
+
+    sanitizeConnectionTypeColors: (rawColors) => {
+        const defaults = MapApp.utils.getDefaultConnectionTypeColors();
+        const sanitized = { ...defaults };
+        if (!rawColors || typeof rawColors !== 'object') return sanitized;
+        Object.keys(defaults).forEach((key) => {
+            if (rawColors[key]) {
+                sanitized[key] = MapApp.utils.normalizeHexColor(rawColors[key], defaults[key]);
+            }
+        });
+        return sanitized;
+    },
+
+    getConnectionTypeColorsForMap: (mapId) => {
+        const defaults = MapApp.utils.getDefaultConnectionTypeColors();
+        const targetMapId = mapId || MapApp.state?.currentMapId;
+
+        let globalColors = MapApp.state?.globalConnectionTypeColors || null;
+        if (!globalColors && typeof localStorage !== 'undefined') {
+            try {
+                const globalRaw = localStorage.getItem('ampnm_global_connection_type_colors');
+                if (globalRaw) globalColors = JSON.parse(globalRaw);
+            } catch (e) {}
+        }
+
+        let mapDefColors = null;
+        if (targetMapId && Array.isArray(MapApp.state?.maps)) {
+            const m = MapApp.state.maps.find(item => item.id == targetMapId);
+            if (m && m.settings) {
+                try {
+                    const parsed = typeof m.settings === 'string' ? JSON.parse(m.settings) : m.settings;
+                    if (parsed && parsed.connection_type_colors) {
+                        mapDefColors = parsed.connection_type_colors;
+                    }
+                } catch (e) {}
+            }
+        }
+
+        let localMapColors = null;
+        if (targetMapId && typeof localStorage !== 'undefined') {
+            try {
+                const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+                const userRaw = localStorage.getItem(`ampnm_conn_type_colors:${userStorageId}:${targetMapId}`);
+                if (userRaw) {
+                    localMapColors = JSON.parse(userRaw);
+                } else {
+                    const mapRaw = localStorage.getItem(`mapConnectionTypeColors:${targetMapId}`);
+                    if (mapRaw) localMapColors = JSON.parse(mapRaw);
+                }
+            } catch (e) {}
+        }
+
+        const stateColors = (targetMapId && MapApp.state?.connectionTypeColorsByMap?.[targetMapId]) || null;
+
+        return MapApp.utils.sanitizeConnectionTypeColors({
+            ...defaults,
+            ...(globalColors || {}),
+            ...(mapDefColors || {}),
+            ...(localMapColors || {}),
+            ...(stateColors || {})
+        });
+    },
+
+    getConnectionTypeColor: (connectionType, mapId) => {
+        const colors = MapApp.utils.getConnectionTypeColorsForMap(mapId);
+        if (!connectionType) return colors.cat6 || '#a78bfa';
+        if (colors[connectionType]) return colors[connectionType];
+        if (connectionType === 'cat5' && colors.cat6) return colors.cat6;
+        return colors.cat6 || '#a78bfa';
+    },
+
     asTooltipElement: (htmlContent) => {
         if (typeof document === 'undefined') return htmlContent;
         const wrapper = document.createElement('div');
@@ -682,13 +781,9 @@ MapApp.utils = {
             wifi: '📡 WiFi', radio: '📻 Radio', lan: '🌐 LAN',
             'logical-tunneling': '🔒 Logical Tunnel'
         };
-        const typeColors = {
-            cat6: '#a78bfa', cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8',
-            radio: '#84cc16', lan: '#60a5fa', 'logical-tunneling': '#c084fc'
-        };
         const connType = edge.connection_type || 'unknown';
         const connLabel = typeLabels[connType] || connType;
-        const connColor = typeColors[connType] || '#94a3b8';
+        const connColor = edge.custom_color || edge.color?.color || (typeof edge.color === 'string' ? edge.color : null) || MapApp.utils.getConnectionTypeColor(connType) || '#94a3b8';
         const connectionTooltipFields = MapApp.utils.getCurrentConnectionTooltipFields();
         const tooltipDisplay = MapApp.utils.getCurrentTooltipDisplaySettings();
         const fontScale = Math.min(130, Math.max(85, Number(tooltipDisplay.font_scale) || 100));
@@ -704,7 +799,7 @@ MapApp.utils = {
 
         // Header
         title += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">`;
-        title += `<div style="width:12px; height:3px; border-radius:2px; background:${panelAccentColor || connColor};"></div>`;
+        title += `<div style="width:14px; height:3px; border-radius:2px; background:${connColor}; box-shadow:0 0 6px ${connColor};"></div>`;
         title += `<b style="font-size:${Math.round(13 * (fontScale / 100))}px; color:${panelTextColor};">${connectionTooltipFields.type ? connLabel : 'Connection'}</b>`;
         title += `</div>`;
 

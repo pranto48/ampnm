@@ -207,7 +207,10 @@ MapApp.ui = {
             return;
         }
         document.getElementById('edgeId').value = edge.id;
-        document.getElementById('connectionType').value = edge.connection_type || '';
+        MapApp.ui.syncConnectionTypeSelectColors();
+        const connTypeEl = document.getElementById('connectionType');
+        connTypeEl.value = edge.connection_type || '';
+        connTypeEl.dispatchEvent(new Event('change'));
         
         // Populate custom edge style fields
         const hasCustomThickness = edge.custom_thickness !== undefined && edge.custom_thickness !== null && edge.custom_thickness !== '' && !isNaN(Number(edge.custom_thickness)) && Number(edge.custom_thickness) > 0;
@@ -222,9 +225,20 @@ MapApp.ui = {
         }
         document.getElementById('edgeLineStyle').value = edge.custom_line_style || 'solid';
         
+        const typeColor = MapApp.utils.getConnectionTypeColor(edge.connection_type || 'cat6');
         const customColor = edge.custom_color || '';
         document.getElementById('edgeColorHex').value = customColor;
-        document.getElementById('edgeColorPicker').value = customColor ? customColor : '#00f2fe';
+        document.getElementById('edgeColorPicker').value = customColor ? MapApp.utils.normalizeHexColor(customColor, typeColor) : typeColor;
+        const resetColorBtn = document.getElementById('resetEdgeColorBtn');
+        if (resetColorBtn) {
+            resetColorBtn.onclick = (e) => {
+                e.preventDefault();
+                const currentType = document.getElementById('connectionType').value || 'cat6';
+                document.getElementById('edgeColorHex').value = '';
+                document.getElementById('edgeColorPicker').value = MapApp.utils.getConnectionTypeColor(currentType);
+                if (window.notyf) window.notyf.info('Edge color reset to connection type color.');
+            };
+        }
         
         document.getElementById('edgeArrows').value = edge.custom_arrows || 'none';
         document.getElementById('edgeLabel').value = edge.custom_label || '';
@@ -389,10 +403,12 @@ MapApp.ui = {
                 const targetStatus = deviceStatusMap.get(String(edge.to));
                 const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
                 
-                // Color configuration: custom color or status fallback
+                // Color configuration: custom color or dynamic connection type color / status fallback
                 let colorVal = edge.custom_color;
                 if (!colorVal) {
-                    colorVal = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat6);
+                    colorVal = isOffline
+                        ? MapApp.config.statusColorMap.offline
+                        : MapApp.utils.getConnectionTypeColor(edge.connection_type);
                 }
                 const color = { color: colorVal, hover: colorVal, highlight: colorVal };
                 
@@ -733,5 +749,306 @@ MapApp.ui = {
         if (window.notyf) window.notyf.success('Connection settings saved!');
         MapApp.ui.updateStaticEdgeColors();
         if (MapApp.state.network) MapApp.state.network.redraw();
+    },
+
+    renderConnectionLegend: () => {
+        const listEl = document.getElementById('connectionLegendList');
+        if (!listEl) return;
+        const defs = MapApp.config?.connectionTypeDefinitions || [];
+        const activeColors = MapApp.utils.getConnectionTypeColorsForMap(MapApp.state?.currentMapId);
+
+        listEl.innerHTML = defs.map((def) => {
+            const color = activeColors[def.key] || def.defaultColor;
+            const labelText = def.shortLabel || def.label;
+            const dashStyle = def.defaultDashed
+                ? `background: repeating-linear-gradient(to right, ${color} 0, ${color} 5px, transparent 5px, transparent 9px); box-shadow: 0 0 6px ${color};`
+                : `background-color: ${color}; box-shadow: 0 0 6px ${color};`;
+            return `
+                <div class="flex items-center justify-between gap-3 px-1.5 py-1 rounded hover:bg-slate-700/60 cursor-pointer transition group" data-conn-type-row="${def.key}" data-no-drag="true" title="Click to customize ${def.label} color">
+                    <div class="flex items-center gap-2 pointer-events-none">
+                        <div class="w-8 h-0.5 rounded-full transition-all" data-legend-swatch="${def.key}" style="${dashStyle}"></div>
+                        <span class="text-slate-300 group-hover:text-white transition-colors">${def.emoji} ${labelText}</span>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full border border-white/30 opacity-80 group-hover:opacity-100 pointer-events-none" style="background-color: ${color};"></span>
+                </div>
+            `;
+        }).join('');
+
+        listEl.querySelectorAll('[data-conn-type-row]').forEach((row) => {
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const typeKey = row.getAttribute('data-conn-type-row');
+                MapApp.ui.openConnectionTypeColorsModal(typeKey);
+            });
+        });
+    },
+
+    syncConnectionTypeSelectColors: () => {
+        const selectEl = document.getElementById('connectionType');
+        if (!selectEl) return;
+        const activeColors = MapApp.utils.getConnectionTypeColorsForMap(MapApp.state?.currentMapId);
+        Array.from(selectEl.options).forEach((opt) => {
+            if (opt.value && activeColors[opt.value]) {
+                opt.setAttribute('data-color', activeColors[opt.value]);
+            }
+        });
+        if (selectEl.value) {
+            selectEl.dispatchEvent(new Event('change'));
+        }
+    },
+
+    _applyLiveConnectionColorsPreview: (colorMap) => {
+        const currentMapId = MapApp.state?.currentMapId;
+        if (currentMapId) {
+            MapApp.state.connectionTypeColorsByMap = MapApp.state.connectionTypeColorsByMap || {};
+            MapApp.state.connectionTypeColorsByMap[currentMapId] = MapApp.utils.sanitizeConnectionTypeColors(colorMap);
+        }
+        MapApp.ui.renderConnectionLegend();
+        MapApp.ui.syncConnectionTypeSelectColors();
+        MapApp.ui.updateStaticEdgeColors();
+        if (MapApp.state.network) MapApp.state.network.redraw();
+    },
+
+    _readConnectionTypeColorInputs: () => {
+        const defs = MapApp.config?.connectionTypeDefinitions || [];
+        const colors = {};
+        defs.forEach((def) => {
+            const hexInput = document.getElementById(`ctc-hex-${def.key}`);
+            const pickerInput = document.getElementById(`ctc-picker-${def.key}`);
+            const rawVal = (hexInput && hexInput.value) || (pickerInput && pickerInput.value) || def.defaultColor;
+            colors[def.key] = MapApp.utils.normalizeHexColor(rawVal, def.defaultColor);
+        });
+        return colors;
+    },
+
+    _updateCtcPreviewElement: (previewEl, def, hex) => {
+        if (!previewEl) return;
+        if (def.defaultDashed) {
+            previewEl.style.background = `repeating-linear-gradient(to right, ${hex} 0, ${hex} 7px, transparent 7px, transparent 12px)`;
+            previewEl.style.backgroundColor = 'transparent';
+        } else {
+            previewEl.style.background = 'none';
+            previewEl.style.backgroundColor = hex;
+        }
+        previewEl.style.boxShadow = `0 0 10px ${hex}`;
+    },
+
+    _renderConnectionTypeColorRows: (colors, focusTypeKey = null) => {
+        const container = document.getElementById('connectionTypeColorRows');
+        if (!container) return;
+        const defs = MapApp.config?.connectionTypeDefinitions || [];
+
+        container.innerHTML = defs.map((def) => {
+            const hex = MapApp.utils.normalizeHexColor(colors[def.key], def.defaultColor);
+            const isFocused = focusTypeKey && focusTypeKey === def.key;
+            const ringCls = isFocused ? 'border-cyan-500/80 ring-1 ring-cyan-500/50 bg-slate-900/90' : 'border-slate-700/80 bg-slate-900/60';
+            const lineStyle = def.defaultDashed
+                ? `background: repeating-linear-gradient(to right, ${hex} 0, ${hex} 7px, transparent 7px, transparent 12px); box-shadow: 0 0 10px ${hex};`
+                : `background-color: ${hex}; box-shadow: 0 0 10px ${hex};`;
+
+            return `
+                <div id="ctc-row-${def.key}" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border ${ringCls} transition-all">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-base leading-none">${def.emoji}</span>
+                        <div class="min-w-0">
+                            <div class="text-sm font-semibold text-white truncate">${def.label}</div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <div id="ctc-preview-${def.key}" class="w-20 h-1 rounded-full transition-all" style="${lineStyle}"></div>
+                                <span class="text-[10px] text-slate-400 uppercase font-mono">${def.defaultDashed ? 'Dashed' : 'Solid'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <input type="color" id="ctc-picker-${def.key}" value="${hex}" class="h-9 w-11 bg-slate-950 border border-slate-600 rounded-md p-0.5 cursor-pointer" title="Pick ${def.label} color">
+                        <input type="text" id="ctc-hex-${def.key}" value="${hex}" maxlength="7" placeholder="${def.defaultColor}" class="w-24 bg-slate-950 border border-slate-600 rounded-md px-2.5 py-1.5 text-xs font-mono text-white uppercase focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                        <button type="button" class="ctc-single-reset-btn px-2 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 text-xs transition" data-reset-key="${def.key}" title="Reset ${def.label} to default (${def.defaultColor})">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        defs.forEach((def) => {
+            const picker = document.getElementById(`ctc-picker-${def.key}`);
+            const hexInput = document.getElementById(`ctc-hex-${def.key}`);
+            const preview = document.getElementById(`ctc-preview-${def.key}`);
+            const applyRowChange = (nextHex) => {
+                MapApp.ui._updateCtcPreviewElement(preview, def, nextHex);
+                MapApp.ui._applyLiveConnectionColorsPreview(MapApp.ui._readConnectionTypeColorInputs());
+            };
+
+            if (picker && hexInput) {
+                picker.addEventListener('input', (e) => {
+                    const val = MapApp.utils.normalizeHexColor(e.target.value, def.defaultColor);
+                    hexInput.value = val;
+                    applyRowChange(val);
+                });
+                hexInput.addEventListener('input', (e) => {
+                    const raw = e.target.value.trim();
+                    if (/^#[0-9a-fA-F]{6}$/.test(raw)) {
+                        const normalized = raw.toLowerCase();
+                        picker.value = normalized;
+                        applyRowChange(normalized);
+                    }
+                });
+                hexInput.addEventListener('blur', (e) => {
+                    const normalized = MapApp.utils.normalizeHexColor(e.target.value, def.defaultColor);
+                    hexInput.value = normalized;
+                    picker.value = normalized;
+                    applyRowChange(normalized);
+                });
+            }
+        });
+
+        container.querySelectorAll('.ctc-single-reset-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const key = btn.getAttribute('data-reset-key');
+                const def = defs.find(d => d.key === key);
+                if (!def) return;
+                const picker = document.getElementById(`ctc-picker-${key}`);
+                const hexInput = document.getElementById(`ctc-hex-${key}`);
+                const preview = document.getElementById(`ctc-preview-${key}`);
+                if (picker) picker.value = def.defaultColor;
+                if (hexInput) hexInput.value = def.defaultColor;
+                MapApp.ui._updateCtcPreviewElement(preview, def, def.defaultColor);
+                MapApp.ui._applyLiveConnectionColorsPreview(MapApp.ui._readConnectionTypeColorInputs());
+            });
+        });
+    },
+
+    openConnectionTypeColorsModal: (focusTypeKey = null) => {
+        const currentColors = MapApp.utils.getConnectionTypeColorsForMap(MapApp.state?.currentMapId);
+        MapApp.state._connColorSnapshot = { ...currentColors };
+
+        MapApp.ui._renderConnectionTypeColorRows(currentColors, focusTypeKey);
+        const globalChk = document.getElementById('ctcApplyGlobal');
+        if (globalChk) {
+            globalChk.checked = false;
+        }
+        openModal('connectionTypeColorsModal');
+
+        if (focusTypeKey) {
+            const focusedRow = document.getElementById(`ctc-row-${focusTypeKey}`);
+            if (focusedRow && typeof focusedRow.scrollIntoView === 'function') {
+                focusedRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    },
+
+    cancelConnectionTypeColorsModal: () => {
+        if (MapApp.state._connColorSnapshot) {
+            MapApp.ui._applyLiveConnectionColorsPreview(MapApp.state._connColorSnapshot);
+            MapApp.state._connColorSnapshot = null;
+        }
+        closeModal('connectionTypeColorsModal');
+    },
+
+    applyConnectionColorPreset: (presetKey) => {
+        const presets = MapApp.config?.connectionColorPresets || {};
+        const preset = presets[presetKey];
+        if (!preset || !preset.colors) return;
+        const sanitized = MapApp.utils.sanitizeConnectionTypeColors(preset.colors);
+        MapApp.ui._renderConnectionTypeColorRows(sanitized, null);
+        MapApp.ui._applyLiveConnectionColorsPreview(sanitized);
+    },
+
+    resetAllConnectionTypeColors: () => {
+        const defaults = MapApp.utils.getDefaultConnectionTypeColors();
+        MapApp.ui._renderConnectionTypeColorRows(defaults, null);
+        MapApp.ui._applyLiveConnectionColorsPreview(defaults);
+    },
+
+    saveConnectionTypeColors: async () => {
+        const colors = MapApp.ui._readConnectionTypeColorInputs();
+        const currentMapId = MapApp.state?.currentMapId;
+        const userStorageId = window.currentLoggedInUserId || window.currentLoggedInUsername || 'guest';
+        const applyGlobal = document.getElementById('ctcApplyGlobal')?.checked === true;
+
+        MapApp.state._connColorSnapshot = null;
+
+        if (currentMapId) {
+            MapApp.state.connectionTypeColorsByMap = MapApp.state.connectionTypeColorsByMap || {};
+            MapApp.state.connectionTypeColorsByMap[currentMapId] = colors;
+            try {
+                localStorage.setItem(`ampnm_conn_type_colors:${userStorageId}:${currentMapId}`, JSON.stringify(colors));
+                localStorage.setItem(`mapConnectionTypeColors:${currentMapId}`, JSON.stringify(colors));
+            } catch (e) {}
+
+            try {
+                if (MapApp.api && typeof MapApp.api.post === 'function') {
+                    await MapApp.api.post('save_user_map_settings', {
+                        map_id: currentMapId,
+                        settings: {
+                            connection_type_colors: colors
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('Could not sync user connection colors to DB:', err);
+            }
+
+            if (window.userRole === 'admin') {
+                const currentMap = Array.isArray(MapApp.state.maps)
+                    ? MapApp.state.maps.find(m => m.id == currentMapId)
+                    : null;
+                const existingMapSettings = currentMap && currentMap.settings
+                    ? (typeof currentMap.settings === 'string' ? (() => { try { return JSON.parse(currentMap.settings); } catch (e) { return {}; } })() : { ...currentMap.settings })
+                    : {};
+                const nextMapSettings = {
+                    ...existingMapSettings,
+                    connection_type_colors: colors
+                };
+                if (currentMap) {
+                    currentMap.settings = nextMapSettings;
+                }
+                try {
+                    await MapApp.api.post('update_map', {
+                        id: currentMapId,
+                        updates: { settings: nextMapSettings }
+                    });
+                } catch (err) {
+                    console.warn('Could not save map default connection colors to DB:', err);
+                }
+            }
+        }
+
+        if (applyGlobal && window.userRole === 'admin') {
+            MapApp.state.globalConnectionTypeColors = colors;
+            try {
+                localStorage.setItem('ampnm_global_connection_type_colors', JSON.stringify(colors));
+            } catch (e) {}
+            try {
+                await MapApp.api.post('save_global_connection_type_colors', { colors });
+            } catch (err) {
+                console.warn('Could not save global connection colors to DB:', err);
+            }
+        }
+
+        // Refresh edge tooltips with new connection color swatch
+        if (MapApp.state.edges && MapApp.state.nodes) {
+            const edgeUpdates = [];
+            MapApp.state.edges.forEach((edge) => {
+                const fromNode = MapApp.state.nodes.get(edge.from);
+                const toNode = MapApp.state.nodes.get(edge.to);
+                edgeUpdates.push({
+                    id: edge.id,
+                    title: MapApp.utils.buildEdgeTitle(edge, fromNode?.deviceData || null, toNode?.deviceData || null)
+                });
+            });
+            if (edgeUpdates.length > 0) MapApp.state.edges.update(edgeUpdates);
+        }
+
+        MapApp.ui.renderConnectionLegend();
+        MapApp.ui.syncConnectionTypeSelectColors();
+        MapApp.ui.updateStaticEdgeColors();
+        if (MapApp.state.network) MapApp.state.network.redraw();
+
+        closeModal('connectionTypeColorsModal');
+        if (window.notyf) {
+            window.notyf.success(applyGlobal
+                ? 'Connection type colors saved for this map & all maps!'
+                : 'Connection type colors saved!');
+        }
     }
 };

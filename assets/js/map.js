@@ -1453,6 +1453,43 @@ function initMap() {
         });
     }
 
+    // Connection Types Custom Color Chooser Bindings
+    const openConnColorsModalHandler = () => {
+        if (MapApp.ui && typeof MapApp.ui.openConnectionTypeColorsModal === 'function') {
+            MapApp.ui.openConnectionTypeColorsModal();
+        }
+    };
+    const openConnColorsBtn = document.getElementById('openConnColorsBtn');
+    const csOpenConnColorsBtn = document.getElementById('csOpenConnColorsBtn');
+    const msOpenConnColorsBtn = document.getElementById('msOpenConnColorsBtn');
+    const closeConnTypeColorsBtn = document.getElementById('closeConnTypeColorsBtn');
+    const ctcCancelBtn = document.getElementById('ctcCancelBtn');
+    const ctcResetAllBtn = document.getElementById('ctcResetAllBtn');
+    const connectionTypeColorsForm = document.getElementById('connectionTypeColorsForm');
+
+    if (openConnColorsBtn) openConnColorsBtn.addEventListener('click', (e) => { e.stopPropagation(); openConnColorsModalHandler(); });
+    if (csOpenConnColorsBtn) csOpenConnColorsBtn.addEventListener('click', () => { closeModal('connectionSettingsModal'); openConnColorsModalHandler(); });
+    if (msOpenConnColorsBtn) msOpenConnColorsBtn.addEventListener('click', () => { closeModal('mapSettingsModal'); openConnColorsModalHandler(); });
+    if (closeConnTypeColorsBtn) closeConnTypeColorsBtn.addEventListener('click', () => MapApp.ui.cancelConnectionTypeColorsModal());
+    if (ctcCancelBtn) ctcCancelBtn.addEventListener('click', () => MapApp.ui.cancelConnectionTypeColorsModal());
+    if (ctcResetAllBtn) ctcResetAllBtn.addEventListener('click', () => MapApp.ui.resetAllConnectionTypeColors());
+    document.querySelectorAll('.ctc-preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const preset = btn.getAttribute('data-preset');
+            if (preset && MapApp.ui && typeof MapApp.ui.applyConnectionColorPreset === 'function') {
+                MapApp.ui.applyConnectionColorPreset(preset);
+            }
+        });
+    });
+    if (connectionTypeColorsForm) {
+        connectionTypeColorsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (MapApp.ui && typeof MapApp.ui.saveConnectionTypeColors === 'function') {
+                MapApp.ui.saveConnectionTypeColors();
+            }
+        });
+    }
+
     // Place Device Modal Logic (Admin only)
     if (window.userRole === 'admin') {
         els.placeDeviceBtn.addEventListener('click', async () => {
@@ -1601,6 +1638,7 @@ function initMap() {
                     saveTooltipFieldsForMap(state.currentMapId, tooltipFields);
                     saveConnectionTooltipFieldsForMap(state.currentMapId, connTooltipFields);
                     saveTooltipDisplayForMap(state.currentMapId, tooltipDisplay);
+                    const connTypeColors = MapApp.utils.getConnectionTypeColorsForMap(state.currentMapId);
 
                     const updates = {
                         background_color: bgColorHexInput ? bgColorHexInput.value : '#1e293b',
@@ -1610,7 +1648,8 @@ function initMap() {
                         settings: {
                             tooltip_fields: tooltipFields,
                             connection_tooltip_fields: connTooltipFields,
-                            tooltip_display: tooltipDisplay
+                            tooltip_display: tooltipDisplay,
+                            connection_type_colors: connTypeColors
                         }
                     };
                     
@@ -1622,7 +1661,8 @@ function initMap() {
                             settings: {
                                 tooltip_fields: tooltipFields,
                                 connection_tooltip_fields: connTooltipFields,
-                                tooltip_display: tooltipDisplay
+                                tooltip_display: tooltipDisplay,
+                                connection_type_colors: connTypeColors
                             }
                         });
                     } catch (userMapErr) {
@@ -1660,6 +1700,7 @@ function initMap() {
                 const defaultFields = MapApp.utils.getDefaultTooltipFields();
                 const defaultConnFields = MapApp.utils.getDefaultConnectionTooltipFields();
                 const defaultDisplay = MapApp.utils.getDefaultTooltipDisplaySettings();
+                const defaultConnColors = MapApp.utils.getDefaultConnectionTypeColors();
                 const updates = { 
                     background_color: null, 
                     background_image_url: null, 
@@ -1667,12 +1708,19 @@ function initMap() {
                     settings: {
                         tooltip_fields: defaultFields,
                         connection_tooltip_fields: defaultConnFields,
-                        tooltip_display: defaultDisplay
+                        tooltip_display: defaultDisplay,
+                        connection_type_colors: defaultConnColors
                     }
                 };
                 saveTooltipFieldsForMap(state.currentMapId, defaultFields);
                 saveConnectionTooltipFieldsForMap(state.currentMapId, defaultConnFields);
                 saveTooltipDisplayForMap(state.currentMapId, defaultDisplay);
+                state.connectionTypeColorsByMap[state.currentMapId] = defaultConnColors;
+                try {
+                    const userStorageId = getUserStorageId();
+                    localStorage.setItem(`ampnm_conn_type_colors:${userStorageId}:${state.currentMapId}`, JSON.stringify(defaultConnColors));
+                    localStorage.setItem(`mapConnectionTypeColors:${state.currentMapId}`, JSON.stringify(defaultConnColors));
+                } catch (e) {}
                 await api.post('update_map', { id: state.currentMapId, updates });
                 try {
                     await api.post('save_user_map_settings', {
@@ -1680,7 +1728,8 @@ function initMap() {
                         settings: {
                             tooltip_fields: defaultFields,
                             connection_tooltip_fields: defaultConnFields,
-                            tooltip_display: defaultDisplay
+                            tooltip_display: defaultDisplay,
+                            connection_type_colors: defaultConnColors
                         }
                     });
                 } catch (e) {}
@@ -1749,6 +1798,7 @@ function initMap() {
         let offsetY = 0;
 
         const onPointerDown = (event) => {
+            if (event.target.closest('button, input, select, textarea, a, [data-no-drag]')) return;
             isDragging = true;
             const rect = element.getBoundingClientRect();
             offsetX = event.clientX - rect.left;
@@ -1857,6 +1907,9 @@ function initMap() {
         // Restore saved position and fixed status if available
         if (MapApp.network && typeof MapApp.network.restoreConnectionLegendPos === 'function') {
             MapApp.network.restoreConnectionLegendPos();
+        }
+        if (MapApp.ui && typeof MapApp.ui.renderConnectionLegend === 'function') {
+            MapApp.ui.renderConnectionLegend();
         }
     }
 

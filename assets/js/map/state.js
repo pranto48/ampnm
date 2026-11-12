@@ -29,5 +29,9 @@ MapApp.state = {
     // Per-map connection tooltip field visibility settings
     connectionTooltipFieldSettingsByMap: {},
     // Per-map mouse-over tooltip display preferences
-    tooltipDisplaySettingsByMap: {}
+    tooltipDisplaySettingsByMap: {},
+    // Per-map custom connection type colors (cat6, fiber, wifi, radio, lan, logical-tunneling)
+    connectionTypeColorsByMap: {},
+    // Global system-wide default connection type colors (loaded from DB app_settings / localStorage)
+    globalConnectionTypeColors: null
 };

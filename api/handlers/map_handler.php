@@ -60,7 +60,20 @@ switch ($action) {
                         }
                         $params[] = $delay;
                     } elseif ($key === 'settings') {
-                        $params[] = is_array($value) ? json_encode($value) : $value;
+                        $incomingSettings = is_array($value) ? $value : json_decode((string)$value, true);
+                        if (is_array($incomingSettings)) {
+                            $stmtExisting = $pdo->prepare("SELECT settings FROM maps WHERE id = ? AND user_id IN ($groupIdsStr)");
+                            $stmtExisting->execute([$id]);
+                            $existingRaw = $stmtExisting->fetchColumn();
+                            $existingSettings = ($existingRaw && is_string($existingRaw)) ? json_decode($existingRaw, true) : [];
+                            if (!is_array($existingSettings)) {
+                                $existingSettings = [];
+                            }
+                            $mergedSettings = array_merge($existingSettings, $incomingSettings);
+                            $params[] = json_encode($mergedSettings);
+                        } else {
+                            $params[] = is_array($value) ? json_encode($value) : $value;
+                        }
                     } else {
                         $params[] = ($value === '') ? null : $value;
                     }
@@ -532,7 +545,21 @@ switch ($action) {
                 echo json_encode(['error' => 'Map ID is required']);
                 exit;
             }
-            $settingsJson = is_string($settings) ? $settings : json_encode($settings);
+
+            $incomingSettings = is_string($settings) ? json_decode($settings, true) : $settings;
+            if (is_array($incomingSettings)) {
+                $stmtExisting = $pdo->prepare("SELECT settings FROM user_map_settings WHERE user_id = ? AND map_id = ?");
+                $stmtExisting->execute([$current_user_id, $map_id]);
+                $existingRaw = $stmtExisting->fetchColumn();
+                $existingSettings = ($existingRaw && is_string($existingRaw)) ? json_decode($existingRaw, true) : [];
+                if (!is_array($existingSettings)) {
+                    $existingSettings = [];
+                }
+                $mergedSettings = array_merge($existingSettings, $incomingSettings);
+                $settingsJson = json_encode($mergedSettings);
+            } else {
+                $settingsJson = is_string($settings) ? $settings : json_encode($settings);
+            }
 
             $stmt = $pdo->prepare("INSERT INTO user_map_settings (user_id, map_id, settings) 
                 VALUES (?, ?, ?) 
@@ -561,10 +588,62 @@ switch ($action) {
         $rowMap = $stmtMap->fetch(PDO::FETCH_ASSOC);
         $mapSettings = ($rowMap && !empty($rowMap['settings'])) ? json_decode($rowMap['settings'], true) : null;
 
+        $globalConnColors = null;
+        try {
+            $stmtGlobal = $pdo->prepare("SELECT setting_value FROM app_settings WHERE setting_key = 'connection_type_colors' LIMIT 1");
+            $stmtGlobal->execute();
+            $globalVal = $stmtGlobal->fetchColumn();
+            if ($globalVal) {
+                $decodedGlobal = json_decode($globalVal, true);
+                if (is_array($decodedGlobal)) {
+                    $globalConnColors = $decodedGlobal;
+                }
+            }
+        } catch (Throwable $e) {
+            // Ignore if app_settings doesn't exist
+        }
+
         echo json_encode([
             'success' => true,
             'user_settings' => $userSettings,
-            'map_settings' => $mapSettings
+            'map_settings' => $mapSettings,
+            'settings' => $userSettings,
+            'global_connection_type_colors' => $globalConnColors
         ]);
+        break;
+
+    case 'save_global_connection_type_colors':
+        if ($user_role !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin can save global connection type colors.']);
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $rawColors = $input['colors'] ?? [];
+            if (!is_array($rawColors)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Colors map is required.']);
+                exit;
+            }
+            $allowedKeys = ['cat6', 'fiber', 'wifi', 'radio', 'lan', 'logical-tunneling'];
+            $cleanColors = [];
+            foreach ($allowedKeys as $k) {
+                if (isset($rawColors[$k]) && is_string($rawColors[$k]) && preg_match('/^#[0-9a-fA-F]{6}$/', trim($rawColors[$k]))) {
+                    $cleanColors[$k] = strtolower(trim($rawColors[$k]));
+                }
+            }
+            $colorsJson = json_encode($cleanColors);
+
+            $stmtCheck = $pdo->prepare("SELECT id FROM app_settings WHERE setting_key = 'connection_type_colors' LIMIT 1");
+            $stmtCheck->execute();
+            if ($stmtCheck->fetch()) {
+                $stmtUp = $pdo->prepare("UPDATE app_settings SET setting_value = ? WHERE setting_key = 'connection_type_colors'");
+                $stmtUp->execute([$colorsJson]);
+            } else {
+                $stmtIns = $pdo->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES ('connection_type_colors', ?)");
+                $stmtIns->execute([$colorsJson]);
+            }
+            echo json_encode(['success' => true, 'colors' => $cleanColors]);
+        }
         break;
 }
