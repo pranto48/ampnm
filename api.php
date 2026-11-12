@@ -68,7 +68,7 @@ try {
         $stmt_devices->execute([$map_id]);
         $devices = $stmt_devices->fetchAll(PDO::FETCH_ASSOC);
 
-        $stmt_edges = $pdo->prepare("SELECT id, source_id, target_id, connection_type, color, label, source_port_label, target_port_label FROM device_edges WHERE map_id = ?");
+        $stmt_edges = $pdo->prepare("SELECT id, source_id, target_id, connection_type, color, line_style, thickness, arrows, label, animated, source_port_label, target_port_label FROM device_edges WHERE map_id = ?");
         $stmt_edges->execute([$map_id]);
         $edges = $stmt_edges->fetchAll(PDO::FETCH_ASSOC);
 

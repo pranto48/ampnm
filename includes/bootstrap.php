@@ -71,7 +71,7 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
                 $pdo->exec("ALTER TABLE `device_edges` 
                     ADD COLUMN `thickness` INT DEFAULT 2,
                     ADD COLUMN `color` VARCHAR(50) DEFAULT NULL,
-                    ADD COLUMN `line_style` VARCHAR(20) DEFAULT 'solid',
+                    ADD COLUMN `line_style` VARCHAR(20) DEFAULT 'auto',
                     ADD COLUMN `arrows` VARCHAR(20) DEFAULT 'none',
                     ADD COLUMN `label` VARCHAR(100) DEFAULT NULL,
                     ADD COLUMN `animated` TINYINT(1) DEFAULT 1");
@@ -140,6 +140,15 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
         // Clean legacy default thickness 2 on device_edges so they inherit map global thickness
         try {
             $pdo->exec("UPDATE `device_edges` SET `thickness` = NULL WHERE `thickness` = 2 OR `thickness` = 2.0");
+        } catch (Exception $e2) {}
+
+        // One-time migration: switch legacy default line_style 'solid' -> 'auto' so Tunnel/WiFi/Radio render dashed
+        try {
+            $stmtLs = $pdo->query("SELECT COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'device_edges' AND COLUMN_NAME = 'line_style'");
+            if ($stmtLs && $stmtLs->fetchColumn() === 'solid') {
+                $pdo->exec("ALTER TABLE `device_edges` MODIFY COLUMN `line_style` VARCHAR(20) DEFAULT 'auto'");
+                $pdo->exec("UPDATE `device_edges` SET `line_style` = 'auto' WHERE `line_style` = 'solid' OR `line_style` IS NULL OR `line_style` = ''");
+            }
         } catch (Exception $e2) {}
     } catch (PDOException $e) {
         // Check for the specific "table not found" error.

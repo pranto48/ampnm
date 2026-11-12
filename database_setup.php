@@ -321,7 +321,7 @@ try {
             `connection_type` VARCHAR(50) DEFAULT 'cat6',
             `thickness` DECIMAL(4,1) DEFAULT NULL,
             `color` VARCHAR(50) DEFAULT NULL,
-            `line_style` VARCHAR(20) DEFAULT 'solid',
+            `line_style` VARCHAR(20) DEFAULT 'auto',
             `arrows` VARCHAR(20) DEFAULT 'none',
             `label` VARCHAR(100) DEFAULT NULL,
             `animated` TINYINT(1) DEFAULT 1,
@@ -1292,6 +1292,16 @@ try {
             }
         }
         message("Backfilled 'last_ping_output' for existing devices.");
+    }
+
+    // Migrate device_edges.line_style default from 'solid' to 'auto' once so Tunnel/WiFi/Radio show dashed by default
+    $stmtLineStyleDefault = $pdo->prepare("SELECT COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'device_edges' AND COLUMN_NAME = 'line_style'");
+    $stmtLineStyleDefault->execute([$dbname]);
+    $lineStyleDefault = $stmtLineStyleDefault->fetchColumn();
+    if ($lineStyleDefault === 'solid') {
+        $pdo->exec("ALTER TABLE `device_edges` MODIFY COLUMN `line_style` VARCHAR(20) DEFAULT 'auto';");
+        $pdo->exec("UPDATE `device_edges` SET `line_style` = 'auto' WHERE `line_style` = 'solid' OR `line_style` IS NULL OR `line_style` = '';");
+        message("Upgraded 'device_edges' table: set default 'line_style' to 'auto' and migrated legacy edges.");
     }
 
     // ==========================================

@@ -28,8 +28,8 @@ const edgeColorMap = {
 };
 
 const edgeDashMap = {
-    cat5: false, fiber: false, wifi: true,
-    radio: true, lan: false, 'logical-tunneling': [6, 4]
+    cat5: false, cat6: false, fiber: false, wifi: [8, 6],
+    radio: [8, 6], lan: false, 'logical-tunneling': [8, 6]
 };
 
 const edgeLabelMap = {
@@ -398,14 +398,22 @@ function buildEdgeTitle(edge, devices) {
 
 function buildVisEdge(edge, devices) {
     const color = edge.color || edgeColorMap[edge.connection_type] || (edge.connection_type === 'cat5' ? edgeColorMap.cat6 : null) || edgeColorMap.cat6 || edgeColorMap.cat5;
-    const dashes = edgeDashMap[edge.connection_type] ?? false;
+    let dashes = edgeDashMap[edge.connection_type] ?? false;
+    if (edge.line_style === 'dashed') {
+        dashes = [8, 6];
+    } else if (edge.line_style === 'dotted') {
+        dashes = [2, 4];
+    } else if (edge.line_style === 'solid') {
+        dashes = false;
+    }
     const label = edge.label || edgeLabelMap[edge.connection_type] || edge.connection_type || '';
+    const width = edge.thickness ? Number(edge.thickness) : 2;
     return {
         id: edge.id,
         from: edge.source_id,
         to: edge.target_id,
         color: { color, highlight: color, hover: color },
-        dashes, width: 2, label,
+        dashes, width, label,
         font: { color: '#e2e8f0', size: 10, strokeWidth: 0 },
         title: buildEdgeTitle(edge, devices || []),
     };
@@ -606,14 +614,24 @@ function renderMap({ map, devices, edges, global_connection_type_colors }) {
                     }
 
                     // Layer 1: Neon Glow
+                    const bodyEdge = visNetwork?.body?.edges?.[edge.id];
+                    const via = bodyEdge?.edgeType?.via;
+                    ctx.save();
+                    ctx.setLineDash(Array.isArray(edge.dashes) ? edge.dashes : (edge.dashes ? [8, 6] : []));
+                    ctx.lineCap = 'butt';
                     ctx.beginPath();
                     ctx.moveTo(fx, fy);
-                    ctx.lineTo(tx, ty);
+                    if (via && typeof via.x === 'number' && typeof via.y === 'number') {
+                        ctx.quadraticCurveTo(via.x, via.y, tx, ty);
+                    } else {
+                        ctx.lineTo(tx, ty);
+                    }
                     ctx.strokeStyle = edgeColor;
                     ctx.shadowColor = edgeColor;
                     ctx.shadowBlur = isDisrupted ? (isOffline ? 14 : 10) : 10;
                     ctx.lineWidth = Math.max(1, (edge.width || 2) * 0.8);
                     ctx.stroke();
+                    ctx.restore();
 
                     // Layer 2: Moving Cyber Packets OR Hung/Stopped State
                     if (isDisrupted) {

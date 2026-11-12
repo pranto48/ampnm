@@ -223,7 +223,7 @@ MapApp.ui = {
                 if (window.notyf) window.notyf.info('Line thickness reset to global map setting.');
             };
         }
-        document.getElementById('edgeLineStyle').value = edge.custom_line_style || 'solid';
+        document.getElementById('edgeLineStyle').value = edge.custom_line_style || 'auto';
         
         const typeColor = MapApp.utils.getConnectionTypeColor(edge.connection_type || 'cat6');
         const customColor = edge.custom_color || '';
@@ -418,16 +418,7 @@ MapApp.ui = {
                 const width = hasCustomThickness ? Math.max(1, Math.min(16, parseFloat(edge.custom_thickness))) : defaultThickness;
                 
                 // Dashes style configuration
-                let dashes = false;
-                if (edge.custom_line_style === 'dashed') {
-                    dashes = [6, 4];
-                } else if (edge.custom_line_style === 'dotted') {
-                    dashes = [2, 3];
-                } else if (edge.custom_line_style === 'solid') {
-                    dashes = false;
-                } else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') {
-                    dashes = [5, 5];
-                }
+                const dashes = MapApp.utils.resolveEdgeDashPattern(edge.connection_type, edge.custom_line_style);
                 
                 // Arrows configuration
                 let arrows = undefined;
@@ -760,13 +751,11 @@ MapApp.ui = {
         listEl.innerHTML = defs.map((def) => {
             const color = activeColors[def.key] || def.defaultColor;
             const labelText = def.shortLabel || def.label;
-            const dashStyle = def.defaultDashed
-                ? `background: repeating-linear-gradient(to right, ${color} 0, ${color} 5px, transparent 5px, transparent 9px); box-shadow: 0 0 6px ${color};`
-                : `background-color: ${color}; box-shadow: 0 0 6px ${color};`;
+            const lineSvg = MapApp.utils.buildLinePreviewSvg(color, def.defaultDashed, 32, 6, `data-legend-swatch="${def.key}"`);
             return `
                 <div class="flex items-center justify-between gap-3 px-1.5 py-1 rounded hover:bg-slate-700/60 cursor-pointer transition group" data-conn-type-row="${def.key}" data-no-drag="true" title="Click to customize ${def.label} color">
                     <div class="flex items-center gap-2 pointer-events-none">
-                        <div class="w-8 h-0.5 rounded-full transition-all" data-legend-swatch="${def.key}" style="${dashStyle}"></div>
+                        ${lineSvg}
                         <span class="text-slate-300 group-hover:text-white transition-colors">${def.emoji} ${labelText}</span>
                     </div>
                     <span class="w-2.5 h-2.5 rounded-full border border-white/30 opacity-80 group-hover:opacity-100 pointer-events-none" style="background-color: ${color};"></span>
@@ -823,14 +812,7 @@ MapApp.ui = {
 
     _updateCtcPreviewElement: (previewEl, def, hex) => {
         if (!previewEl) return;
-        if (def.defaultDashed) {
-            previewEl.style.background = `repeating-linear-gradient(to right, ${hex} 0, ${hex} 7px, transparent 7px, transparent 12px)`;
-            previewEl.style.backgroundColor = 'transparent';
-        } else {
-            previewEl.style.background = 'none';
-            previewEl.style.backgroundColor = hex;
-        }
-        previewEl.style.boxShadow = `0 0 10px ${hex}`;
+        previewEl.innerHTML = MapApp.utils.buildLinePreviewSvg(hex, def.defaultDashed, 80, 6);
     },
 
     _renderConnectionTypeColorRows: (colors, focusTypeKey = null) => {
@@ -842,9 +824,7 @@ MapApp.ui = {
             const hex = MapApp.utils.normalizeHexColor(colors[def.key], def.defaultColor);
             const isFocused = focusTypeKey && focusTypeKey === def.key;
             const ringCls = isFocused ? 'border-cyan-500/80 ring-1 ring-cyan-500/50 bg-slate-900/90' : 'border-slate-700/80 bg-slate-900/60';
-            const lineStyle = def.defaultDashed
-                ? `background: repeating-linear-gradient(to right, ${hex} 0, ${hex} 7px, transparent 7px, transparent 12px); box-shadow: 0 0 10px ${hex};`
-                : `background-color: ${hex}; box-shadow: 0 0 10px ${hex};`;
+            const previewSvg = MapApp.utils.buildLinePreviewSvg(hex, def.defaultDashed, 80, 6);
 
             return `
                 <div id="ctc-row-${def.key}" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border ${ringCls} transition-all">
@@ -853,7 +833,7 @@ MapApp.ui = {
                         <div class="min-w-0">
                             <div class="text-sm font-semibold text-white truncate">${def.label}</div>
                             <div class="flex items-center gap-2 mt-1">
-                                <div id="ctc-preview-${def.key}" class="w-20 h-1 rounded-full transition-all" style="${lineStyle}"></div>
+                                <div id="ctc-preview-${def.key}" class="flex items-center">${previewSvg}</div>
                                 <span class="text-[10px] text-slate-400 uppercase font-mono">${def.defaultDashed ? 'Dashed' : 'Solid'}</span>
                             </div>
                         </div>

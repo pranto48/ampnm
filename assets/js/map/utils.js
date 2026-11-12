@@ -518,6 +518,34 @@ MapApp.utils = {
         return colors.cat6 || '#a78bfa';
     },
 
+    resolveEdgeDashPattern: (connectionType, customLineStyle) => {
+        const style = (customLineStyle || 'auto').toLowerCase();
+        if (style === 'dashed') return [8, 6];
+        if (style === 'dotted') return [2, 4];
+        if (style === 'solid') return false;
+
+        const defs = MapApp.config?.connectionTypeDefinitions || [];
+        const def = defs.find(d => d.key === connectionType);
+        if (def && def.defaultDashed) return [8, 6];
+        if (connectionType === 'wifi' || connectionType === 'radio' || connectionType === 'logical-tunneling') {
+            return [8, 6];
+        }
+
+        const displaySettings = (typeof MapApp.utils.getCurrentTooltipDisplaySettings === 'function')
+            ? MapApp.utils.getCurrentTooltipDisplaySettings()
+            : {};
+        const runStyle = displaySettings.connection_run_style || 'auto';
+        if (runStyle === 'dashed') return [8, 6];
+        if (runStyle === 'dotted') return [2, 4];
+        return false;
+    },
+
+    buildLinePreviewSvg: (color, isDashed, width = 32, height = 6, extraAttrs = '') => {
+        const dashAttr = isDashed ? 'stroke-dasharray="5 4" stroke-linecap="butt"' : 'stroke-linecap="round"';
+        const cy = height / 2;
+        return `<svg ${extraAttrs} width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="flex-shrink-0" style="filter: drop-shadow(0 0 3px ${color});"><line x1="0" y1="${cy}" x2="${width}" y2="${cy}" stroke="${color}" stroke-width="2.5" ${dashAttr}/></svg>`;
+    },
+
     asTooltipElement: (htmlContent) => {
         if (typeof document === 'undefined') return htmlContent;
         const wrapper = document.createElement('div');

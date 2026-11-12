@@ -349,6 +349,7 @@ MapApp.network = {
                         edgeData.id = newEdge.id;
                         edgeData.connection_type = 'cat6';
                         edgeData.label = 'cat6';
+                        edgeData.custom_line_style = newEdge?.line_style || 'auto';
                         callback(edgeData);
                         MapApp.ui.updateStaticEdgeColors();
                         window.notyf.success('Connection added.');
@@ -653,14 +654,30 @@ MapApp.network = {
                         glowBlur = Math.max(4, baseGlowRadius * 0.6);
                     }
 
+                    const dashPattern = MapApp.utils?.resolveEdgeDashPattern
+                        ? MapApp.utils.resolveEdgeDashPattern(
+                            rawEdge?.connection_type,
+                            rawEdge?.custom_line_style ?? rawEdge?.line_style
+                        )
+                        : (Array.isArray(rawEdge?.dashes) ? rawEdge.dashes : (rawEdge?.dashes ? [8, 6] : false));
+
+                    ctx.save();
+                    ctx.setLineDash(Array.isArray(dashPattern) ? dashPattern : []);
+                    ctx.lineCap = 'butt';
                     ctx.beginPath();
                     ctx.moveTo(fx, fy);
-                    ctx.lineTo(tx, ty);
+                    const via = bodyEdge?.edgeType?.via;
+                    if (via && typeof via.x === 'number' && typeof via.y === 'number') {
+                        ctx.quadraticCurveTo(via.x, via.y, tx, ty);
+                    } else {
+                        ctx.lineTo(tx, ty);
+                    }
                     ctx.strokeStyle = edgeColor;
                     ctx.shadowColor = edgeColor;
                     ctx.shadowBlur = glowBlur;
                     ctx.lineWidth = Math.max(1, (bodyEdge?.options?.width || rawEdge?.width || 2) * 0.8);
                     ctx.stroke();
+                    ctx.restore();
                 }
 
                 // 🌟 LAYER 2: ANIMATED CYBER PACKETS / PULSES (OR HUNG / STOPPED STATE)

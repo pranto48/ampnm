@@ -445,7 +445,7 @@ function initMap() {
             const thickness = (thicknessRaw !== '' && thicknessRaw !== undefined && !isNaN(Number(thicknessRaw)) && Number(thicknessRaw) > 0)
                 ? parseFloat(thicknessRaw)
                 : null;
-            const line_style = document.getElementById('edgeLineStyle').value || 'solid';
+            const line_style = document.getElementById('edgeLineStyle').value || 'auto';
             const color = document.getElementById('edgeColorHex').value || null;
             const arrowsVal = document.getElementById('edgeArrows').value || 'none';
             const labelVal = document.getElementById('edgeLabel').value || null;
@@ -498,16 +498,7 @@ function initMap() {
 
                 // Set formatting parameters for Vis.js dataset
                 const visColor = color ? { color, hover: color, highlight: color } : undefined;
-                let visDashes = false;
-                if (line_style === 'dashed') {
-                    visDashes = [6, 4];
-                } else if (line_style === 'dotted') {
-                    visDashes = [2, 3];
-                } else if (line_style === 'solid') {
-                    visDashes = false;
-                } else if (connection_type === 'wifi' || connection_type === 'radio' || connection_type === 'logical-tunneling') {
-                    visDashes = [5, 5];
-                }
+                const visDashes = MapApp.utils.resolveEdgeDashPattern(connection_type, line_style);
 
                 let visArrows = undefined;
                 if (arrowsVal === 'to') visArrows = { to: { enabled: true } };

@@ -568,16 +568,7 @@ MapApp.mapManager = {
             const width = hasCustomThickness ? Math.max(1, Math.min(16, parseFloat(e.thickness))) : defaultThickness;
             const color = e.color ? { color: e.color, hover: e.color, highlight: e.color } : undefined;
             
-            let dashes = false;
-            if (e.line_style === 'dashed') {
-                dashes = [6, 4];
-            } else if (e.line_style === 'dotted') {
-                dashes = [2, 3];
-            } else if (e.line_style === 'solid') {
-                dashes = false;
-            } else if (e.connection_type === 'wifi' || e.connection_type === 'radio' || e.connection_type === 'logical-tunneling') {
-                dashes = [5, 5];
-            }
+            const dashes = MapApp.utils.resolveEdgeDashPattern(e.connection_type, e.line_style);
             
             let arrows = undefined;
             if (e.arrows === 'to') arrows = { to: { enabled: true } };

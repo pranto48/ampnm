@@ -199,27 +199,27 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                     </div>
                     <div id="connectionLegendList" class="space-y-1.5 text-xs">
                         <div class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700/50 cursor-pointer transition" data-conn-type-row="cat6" title="Click to change CAT6 Cable color">
-                            <div class="w-8 h-0.5 rounded-full" data-legend-swatch="cat6" style="background-color: #a78bfa; box-shadow: 0 0 6px #a78bfa;"></div>
+                            <svg class="w-8 h-2 flex-shrink-0" viewBox="0 0 32 6" style="filter: drop-shadow(0 0 3px #a78bfa);"><line x1="0" y1="3" x2="32" y2="3" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round"/></svg>
                             <span class="text-slate-300">🔌 CAT6 Cable</span>
                         </div>
                         <div class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700/50 cursor-pointer transition" data-conn-type-row="fiber" title="Click to change Fiber Optic color">
-                            <div class="w-8 h-0.5 rounded-full" data-legend-swatch="fiber" style="background-color: #f97316; box-shadow: 0 0 6px #f97316;"></div>
+                            <svg class="w-8 h-2 flex-shrink-0" viewBox="0 0 32 6" style="filter: drop-shadow(0 0 3px #f97316);"><line x1="0" y1="3" x2="32" y2="3" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/></svg>
                             <span class="text-slate-300">💡 Fiber Optic</span>
                         </div>
                         <div class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700/50 cursor-pointer transition" data-conn-type-row="wifi" title="Click to change WiFi color">
-                            <div class="w-8 h-0.5 rounded-full" data-legend-swatch="wifi" style="background-color: #38bdf8; box-shadow: 0 0 6px #38bdf8;"></div>
+                            <svg class="w-8 h-2 flex-shrink-0" viewBox="0 0 32 6" style="filter: drop-shadow(0 0 3px #38bdf8);"><line x1="0" y1="3" x2="32" y2="3" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="butt"/></svg>
                             <span class="text-slate-300">📡 WiFi</span>
                         </div>
                         <div class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700/50 cursor-pointer transition" data-conn-type-row="radio" title="Click to change Radio color">
-                            <div class="w-8 h-0.5 rounded-full" data-legend-swatch="radio" style="background-color: #84cc16; box-shadow: 0 0 6px #84cc16;"></div>
+                            <svg class="w-8 h-2 flex-shrink-0" viewBox="0 0 32 6" style="filter: drop-shadow(0 0 3px #84cc16);"><line x1="0" y1="3" x2="32" y2="3" stroke="#84cc16" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="butt"/></svg>
                             <span class="text-slate-300">📻 Radio</span>
                         </div>
                         <div class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700/50 cursor-pointer transition" data-conn-type-row="lan" title="Click to change LAN color">
-                            <div class="w-8 h-0.5 rounded-full" data-legend-swatch="lan" style="background-color: #60a5fa; box-shadow: 0 0 6px #60a5fa;"></div>
+                            <svg class="w-8 h-2 flex-shrink-0" viewBox="0 0 32 6" style="filter: drop-shadow(0 0 3px #60a5fa);"><line x1="0" y1="3" x2="32" y2="3" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round"/></svg>
                             <span class="text-slate-300">🌐 LAN</span>
                         </div>
                         <div class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700/50 cursor-pointer transition" data-conn-type-row="logical-tunneling" title="Click to change Tunnel color">
-                            <div class="w-8 h-0.5 rounded-full" data-legend-swatch="logical-tunneling" style="background-color: #c084fc; box-shadow: 0 0 6px #c084fc;"></div>
+                            <svg class="w-8 h-2 flex-shrink-0" viewBox="0 0 32 6" style="filter: drop-shadow(0 0 3px #c084fc);"><line x1="0" y1="3" x2="32" y2="3" stroke="#c084fc" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="butt"/></svg>
                             <span class="text-slate-300">🔒 Tunnel</span>
                         </div>
                     </div>
@@ -459,9 +459,10 @@ $deviceIconsLibrary = require_once 'includes/device_icons.php';
                         <div>
                             <label class="block text-xs text-slate-400 mb-1">Line Style</label>
                             <select id="edgeLineStyle" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500">
-                                <option value="solid">Solid Line</option>
-                                <option value="dashed">Dashed Line</option>
-                                <option value="dotted">Dotted Line</option>
+                                <option value="auto">Auto (Default for Type)</option>
+                                <option value="solid">Solid Line (─────)</option>
+                                <option value="dashed">Dashed Line (- - - - -)</option>
+                                <option value="dotted">Dotted Line (· · · · ·)</option>
                             </select>
                         </div>
                     </div>

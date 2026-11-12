@@ -131,7 +131,7 @@ switch ($action) {
                 $input['target_port_label'] ?? null,
                 $edgeThickness,
                 $input['color'] ?? null,
-                $input['line_style'] ?? 'solid',
+                $input['line_style'] ?? 'auto',
                 $input['arrows'] ?? 'none',
                 $input['label'] ?? null,
                 isset($input['animated']) ? (int)$input['animated'] : 1
@@ -153,7 +153,7 @@ switch ($action) {
             $target_port_label = $input['target_port_label'] ?? null;
             $thickness = (isset($input['thickness']) && $input['thickness'] !== '' && $input['thickness'] !== null) ? floatval($input['thickness']) : null;
             $color = !empty($input['color']) ? $input['color'] : null;
-            $line_style = $input['line_style'] ?? 'solid';
+            $line_style = !empty($input['line_style']) ? $input['line_style'] : 'auto';
             $arrows = $input['arrows'] ?? 'none';
             $label = !empty($input['label']) ? $input['label'] : null;
             $animated = isset($input['animated']) ? (int)$input['animated'] : 1;
